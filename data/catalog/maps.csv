@@ -1,0 +1,72 @@
+game,locale,kind,areas_in_game,habitat,page_source,list_source
+MH3U,Deserted Island,locale,12,"Forests, Caves, Oceans",https://monsterhunterwiki.org/wiki/Deserted_Island,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Flooded Forest,locale,10,"Jungles, Swamps, Forests",https://monsterhunterwiki.org/wiki/Flooded_Forest,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Sandy Plains,locale,11,"Deserts, Savannas",https://monsterhunterwiki.org/wiki/Sandy_Plains,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Tundra,locale,9,"Snowfields, Mountains",https://monsterhunterwiki.org/wiki/Tundra,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Volcano (3rd),locale,10,Volcanoes,https://monsterhunterwiki.org/wiki/Volcano_(3rd),https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Misty Peaks,locale,9,"Mountains, Forests",https://monsterhunterwiki.org/wiki/Misty_Peaks,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Underwater Ruin,special,3,"Oceans, Ruins, Special Locales",https://monsterhunterwiki.org/wiki/Underwater_Ruin,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Great Desert,special,2,"Deserts, Special Locales",https://monsterhunterwiki.org/wiki/Great_Desert,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Sacred Land,special,1,"Volcanoes, Special Locales",https://monsterhunterwiki.org/wiki/Sacred_Land,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Tower 3,special,1,"Ruins, Special Locales",https://monsterhunterwiki.org/wiki/Forlorn_Arena,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Tainted Sea,special,1,"Oceans, Special Locales",https://monsterhunterwiki.org/wiki/Tainted_Sea,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Land Arena,special,,,https://monsterhunterwiki.org/wiki/Land_Arena,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Water Arena,special,,,https://monsterhunterwiki.org/wiki/Water_Arena,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Moga Village,settlement,,,https://monsterhunterwiki.org/wiki/Moga,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH3U,Port Tanzia,settlement,,,https://monsterhunterwiki.org/wiki/Port_Tanzia,https://monsterhunterwiki.org/wiki/Template:MH3ULocaleList
+MH4U,Ancestral Steppe,locale,10,"Forests, Highlands, Ruins",https://monsterhunterwiki.org/wiki/Ancestral_Steppe,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Sunken Hollow,locale,10,Caves,https://monsterhunterwiki.org/wiki/Sunken_Hollow,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Primal Forest,locale,10,"Forests, Swamps",https://monsterhunterwiki.org/wiki/Primal_Forest,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Frozen Seaway,locale,9,"Snowfields, Mountains, Caves, Oceans",https://monsterhunterwiki.org/wiki/Frozen_Seaway,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Volcanic Hollow,locale,10,"Volcanoes, Caves",https://monsterhunterwiki.org/wiki/Volcanic_Hollow,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Heaven's Mount,locale,8,"Mountains, Skies, Ruins",https://monsterhunterwiki.org/wiki/Heaven's_Mount,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Everwood,locale,5,"Forests, Ruins, Special Locales",https://monsterhunterwiki.org/wiki/Everwood,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Dunes,locale,11,,https://monsterhunterwiki.org/wiki/Dunes,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Tower Summit,special,1,"Ruins, Special Locales",https://monsterhunterwiki.org/wiki/Tower_Summit,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Great Desert,special,2,"Deserts, Special Locales",https://monsterhunterwiki.org/wiki/Great_Desert,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Sanctuary,special,1,"Mountains, Skies, Special Locales",https://monsterhunterwiki.org/wiki/Sanctuary,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Ingle Isle,special,1,"Volcanoes, Special Locales",https://monsterhunterwiki.org/wiki/Ingle_Isle,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Speartip Crag,special,1,"Mountains, Special Locales",https://monsterhunterwiki.org/wiki/Speartip_Crag,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Great Sea,special,1,"Oceans, Special Locales",https://monsterhunterwiki.org/wiki/Great_Sea,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Arena (MH4),special,,,https://monsterhunterwiki.org/wiki/Arena_(MH4),https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Slayground,special,,,https://monsterhunterwiki.org/wiki/Slayground,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Castle Schrade (4th),special,,,https://monsterhunterwiki.org/wiki/Castle_Schrade_(4th),https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Battlequarters,special,3,Special Locales,https://monsterhunterwiki.org/wiki/Battlequarters,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Polar Field,special,1,"Snowfields, Caves, Special Locales",https://monsterhunterwiki.org/wiki/Polar_Field,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Val Habar,settlement,,,https://monsterhunterwiki.org/wiki/Val_Habar,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Harth,settlement,,,https://monsterhunterwiki.org/wiki/Harth,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Cheeko Sands,settlement,,,https://monsterhunterwiki.org/wiki/Cheeko_Sands,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Cathar,settlement,,,https://monsterhunterwiki.org/wiki/Cathar,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Dundorma,settlement,,,https://monsterhunterwiki.org/wiki/Dundorma,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MH4U,Old Desert,locale,11,,https://monsterhunterwiki.org/wiki/Dunes,https://monsterhunterwiki.org/wiki/Template:MH4ULocaleList
+MHGU,Jurassic Frontier,locale,11,"Forests, Jungles, Highlands",https://monsterhunterwiki.org/wiki/Jurassic_Frontier,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Verdant Hills,locale,12,,https://monsterhunterwiki.org/wiki/Verdant_Hills,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Arctic Ridge,locale,8,"Mountains, Snowfields",https://monsterhunterwiki.org/wiki/Arctic_Ridge,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Misty Peaks,locale,9,"Mountains, Forests",https://monsterhunterwiki.org/wiki/Misty_Peaks,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Dunes,locale,11,,https://monsterhunterwiki.org/wiki/Dunes,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Deserted Island,locale,10,"Forests, Caves, Oceans",https://monsterhunterwiki.org/wiki/Deserted_Island,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Marshlands,locale,9,Swamps,https://monsterhunterwiki.org/wiki/Marshlands,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Volcano (2nd),locale,11,Volcanoes,https://monsterhunterwiki.org/wiki/Volcano_(2nd),https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Ancestral Steppe,locale,10,"Forests, Highlands, Ruins",https://monsterhunterwiki.org/wiki/Ancestral_Steppe,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Primal Forest,locale,10,"Forests, Swamps",https://monsterhunterwiki.org/wiki/Primal_Forest,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Jungle,locale,10,"Jungles, Oceans",https://monsterhunterwiki.org/wiki/Jungle,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Desert,locale,10,,https://monsterhunterwiki.org/wiki/Desert,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Ruined Pinnacle,locale,9,"Mountains, Ruins, Skies",https://monsterhunterwiki.org/wiki/Ruined_Pinnacle,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Frozen Seaway,locale,9,"Snowfields, Mountains, Caves, Oceans",https://monsterhunterwiki.org/wiki/Frozen_Seaway,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Arena (4th),special,,,https://monsterhunterwiki.org/wiki/Arena_(4th),https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Forlorn Arena,special,1,"Ruins, Special Locales",https://monsterhunterwiki.org/wiki/Forlorn_Arena,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Ingle Isle,special,1,"Volcanoes, Special Locales",https://monsterhunterwiki.org/wiki/Ingle_Isle,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Sacred Pinnacle,special,1,"Mountains, Special Locales",https://monsterhunterwiki.org/wiki/Sacred_Pinnacle,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Sanctuary,special,1,"Mountains, Skies, Special Locales",https://monsterhunterwiki.org/wiki/Sanctuary,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Castle Schrade (4th),special,,,https://monsterhunterwiki.org/wiki/Castle_Schrade_(4th),https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Slayground,special,,,https://monsterhunterwiki.org/wiki/Slayground,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Polar Field,special,1,"Snowfields, Caves, Special Locales",https://monsterhunterwiki.org/wiki/Polar_Field,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Moat Arena,special,,,https://monsterhunterwiki.org/wiki/Moat_Arena,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Wyvern's End,special,1,"Caves, Special Locales",https://monsterhunterwiki.org/wiki/Wyvern's_End,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Fortress,special,2,Special Locales,https://monsterhunterwiki.org/wiki/Fortress,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Forlorn Citadel,special,1,"Deserts, Ruins, Special Locales",https://monsterhunterwiki.org/wiki/Forlorn_Citadel,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Bherna,settlement,,,https://monsterhunterwiki.org/wiki/Bherna,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Yukumo,settlement,,,https://monsterhunterwiki.org/wiki/Yukumo,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Pokke,settlement,,,https://monsterhunterwiki.org/wiki/Pokke,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Kokoto,settlement,,,https://monsterhunterwiki.org/wiki/Kokoto,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
+MHGU,Soaratorium,settlement,,,https://monsterhunterwiki.org/wiki/Soaratorium,https://monsterhunterwiki.org/wiki/Template:MHGULocaleList
