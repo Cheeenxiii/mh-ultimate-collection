@@ -45,9 +45,25 @@ config/games/mhxx/          MHXX (3DS), reference only
 - The tables are addresses and names only, like MH4U's (allowed by LEGAL.md). Ghidra exports stay in `build/`.
 - This lives in the engine fork, on a branch from `uc/main`, in new files plus one argument per tool: easy for upstream to take or ignore.
 
+## Step 1 results (2026-11-23)
+
+`mt_dti.py` ran unchanged on all three games: the MT Mobile constructor shape holds for MH3U too. The tables are in the engine fork, branch `uc/reference-classes`, under `config/games/`. Regenerating MH4U's from its v1.3.0 code gives upstream's `config/mt_classes.tsv` exactly.
+
+| Game (code) | Constructor | Classes | Monster classes | Their sizes | Base class |
+|---|---|---|---|---|---|
+| MH4U USA v1.3.0 | 0x005bfa94 | 992 | 55 `uEmNNN` | 0x8d90 (54), 0x8de8 (1) | `uEnemy` 0x8d88 < `uMHchar` |
+| MH3U USA | 0x0054c8b8 | 1,218 | 41 `uEmNNN` | 0x1e70 to 0x2368, many different sizes | `uEnemy` 0x1e70 < `uCharacter` |
+| MHXX JPN v1.0 | 0x0083fd00 | 3,110 | 61 `uEmNNN_NN` | 0xb778 to 0xb790 for most | `uFestaEnemy` 0xb770 < `uEnemy` 0xb730 < `uEnemyBase` |
+
+- **MH4U and MHXX** each give their monsters near-uniform classes that add 8 to 0x20 bytes to the base. That supports the brief's reading: a monster there is mostly data and shared code.
+- **MH3U** is different: its base enemy is a quarter of MH4U's size, and each monster adds its own state, up to 0x4f8 bytes. 3U monsters carry more per-monster code, so lifting them will mean recompiled 3U code (or a reimplementation on MH4U's base, which the fidelity rule rules out) rather than data alone. This is the main input for the converter and plugin plans.
+- Resource classes share names and ids across the games (`rQuestData`, `rEnemyCmd`, `rGUIMessage`, `rModel`, `rTexture`), with different sizes. MHXX has `rSetEmMain`, `rEmSetList` and `rRem`; MH4U and MH3U don't. MH3U has no `rEnemyData` or `rStageAreaInfo`.
+- No class in MH3U's registry is named for swimming, water or oxygen: the swim state lives inside `uPlayer` (0x26a8) and friends, not in classes of its own. Step 4 has to find it in code, not by name.
+- 593 class names are shared between MH4U and MH3U, and 654 between MH4U and MHXX.
+
 ## Steps, in order (first session with game files)
 
-1. **Class registries (no recompile).** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.
+1. **Class registries (no recompile). Done, results above.** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.
 2. **Function tables.** Ghidra export of each game (the fork's `tools/ghidra/` scripts), then `build_function_table.py` and `find_missing_functions.py`.
 3. **Recompile and gametest.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
 4. **Targeted studies.** Run single functions (MH3U's swim state machine, oxygen, underwater camera) in the harness from captured states, with hooks for tracing; feed what's learned into [underwater.md](underwater.md).
