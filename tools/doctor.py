@@ -12,7 +12,8 @@ The workspace is the folder holding this repository, the engine fork and game_fi
 
 usage: doctor.py [--workspace DIR] [--fix] [--install] [--fetch] [--tests] [--session-start]
 
-  --fix            extract missing dumps (the fork's extract_ncch.py) and create the venv
+  --fix            extract missing dumps (the fork's extract_ncch.py), create the venv, and set
+                   both repos' git identity to the project's
   --install        copy tools/workspace/ files into the workspace (CLAUDE.md, .claude/)
   --fetch          git fetch both repositories first (network)
   --tests          run both test suites (the fork's takes about a minute)
@@ -44,6 +45,9 @@ INSTALL = {
     ".claude/skills/handoff/SKILL.md": "skills/handoff/SKILL.md",
 }
 VENV_MODULES = ("pytest", "ruff", "unicorn", "capstone", "elftools")
+# the project's git identity: both repos set it locally so the machine's global identity never leaks
+GIT_NAME = "Cheeenxiii"
+GIT_EMAIL = "342393699+Cheeenxiii@users.noreply.github.com"
 
 
 @dataclass
@@ -127,6 +131,21 @@ def check_venv(ws: str, fix: bool) -> list[Result]:
 
 # ── repositories ───────────────────────────────────────────────────────────
 
+def check_identity(path: str, fix: bool = False) -> Result:
+    """The repo's own user.name/user.email must be the project's, not inherited from ~/.gitconfig."""
+    name = os.path.basename(path)
+    _, local_name = _run(["git", "config", "--local", "user.name"], cwd=path)
+    _, local_email = _run(["git", "config", "--local", "user.email"], cwd=path)
+    if (local_name, local_email) != (GIT_NAME, GIT_EMAIL) and fix:
+        _run(["git", "config", "--local", "user.name", GIT_NAME], cwd=path)
+        _run(["git", "config", "--local", "user.email", GIT_EMAIL], cwd=path)
+        return Result("ok", "identity", f"{name}: set to {GIT_NAME}")
+    if (local_name, local_email) == (GIT_NAME, GIT_EMAIL):
+        return Result("ok", "identity", f"{name}: commits as {GIT_NAME}")
+    return Result("FAIL", "identity", f"{name}: no repo-local {GIT_NAME} identity, commits would use the global one "
+                  "(doctor --fix sets it)")
+
+
 def repo_state(path: str, fetch: bool = False) -> list[Result]:
     name = os.path.basename(path)
     if not os.path.isdir(os.path.join(path, ".git")):
@@ -192,6 +211,8 @@ def doctor(ws: str, fix=False, install=False, fetch=False, tests=False) -> list[
     results = check_install(ws, install)
     for repo in (CONTENT, FORK):
         results += repo_state(os.path.join(ws, repo), fetch)
+        if os.path.isdir(os.path.join(ws, repo, ".git")):
+            results.append(check_identity(os.path.join(ws, repo), fix))
     results += check_venv(ws, fix)
     results += check_dumps(ws, fix)
     if tests:
@@ -215,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
             raise
         results = [Result("FAIL", "doctor", f"crashed: {e}")]
     if a.session_start:
-        shown = [r for r in results if r.level != "ok" or r.area == "git"]
+        shown = [r for r in results if r.level != "ok" or r.area in ("git", "identity")]
         n_ok = sum(r.level == "ok" for r in results)
         print("# Workspace doctor (tools/doctor.py)")
         print("\n".join(r.line() for r in shown))
