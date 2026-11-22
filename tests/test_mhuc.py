@@ -46,7 +46,7 @@ def _sample_arc(version=0x13):
     return arc.Archive(version, entries)
 
 
-@pytest.mark.parametrize("version", [0x13, 0x11])
+@pytest.mark.parametrize("version", [0x13, 0x11, 0x10])
 def test_arc_round_trip(version):
     a = _sample_arc(version)
     data = arc.write(a)
@@ -63,8 +63,32 @@ def test_arc_layout():
     assert (version, count, extra) == (0x13, 3, 0)
     name, tid, csize, size_word, offset = struct.unpack_from("<64sIIII", data, 12)
     assert name.rstrip(b"\0") == b"em\\em001\\mod\\em001"
-    assert size_word & 0x0FFFFFFF == 300 and size_word >> 28 == 4
+    assert size_word & 0x0FFFFFFF == 300 and size_word >> 28 == 2   # MH4U's own flag, 0x20000000
     assert zlib.decompress(data[offset:offset + csize])[:1] is not None
+    assert offset % 32 == 0 and offset - (12 + 3 * 0x50) < 32   # first stream on the next 32-byte boundary
+
+
+@pytest.mark.parametrize("version,align", [(0x13, 32), (0x11, 32), (0x10, 0x8000)])
+def test_arc_data_alignment(version, align):
+    data = arc.write(_sample_arc(version))
+    offsets = [struct.unpack_from("<I", data, 12 + i * 0x50 + 0x4C)[0] for i in range(3)]
+    assert offsets[0] % align == 0
+    sizes = [struct.unpack_from("<I", data, 12 + i * 0x50 + 0x44)[0] for i in range(3)]
+    assert offsets[1] == offsets[0] + sizes[0] and offsets[2] == offsets[1] + sizes[1]   # streams back to back
+    assert len(data) == offsets[2] + sizes[2]
+
+
+def test_arc_data_start_kept():
+    data = bytearray(arc.write(_sample_arc()))
+    # move every stream 0x40 further, as an archive written by another tool might be
+    first = struct.unpack_from("<I", data, 12 + 0x4C)[0]
+    data[first:first] = bytes(0x40)
+    for i in range(3):
+        o = struct.unpack_from("<I", data, 12 + i * 0x50 + 0x4C)[0]
+        struct.pack_into("<I", data, 12 + i * 0x50 + 0x4C, o + 0x40)
+    a = arc.read(bytes(data))
+    assert a.data_start == first + 0x40
+    assert arc.write(a) == bytes(data)
 
 
 def test_arc_flags_kept():
@@ -219,14 +243,35 @@ def test_ppm(tmp_path):
 # ── GMD ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("version", [gmd.V1, gmd.V2])
-def test_gmd_round_trip(version):
+@pytest.mark.parametrize("version,layout", [(gmd.V1, "v1"), (gmd.V1, "v1-short"), (gmd.V2, "v2"),
+                                            (gmd.V2, "v2-32")])
+def test_gmd_round_trip(version, layout):
     g = gmd.Gmd("test_table", ["First line", "Zweite Zeile ü", "", "last"],
-                {0: "LBL_FIRST", 1: "LBL_SECOND", 3: "LBL_LAST"}, version=version)
+                {0: "LBL_FIRST", 1: "LBL_SECOND", 3: "LBL_LAST"}, version=version, layout=layout)
     data = gmd.write(g)
+    assert gmd.layout_of(data) == layout
     back = gmd.read(data)
-    assert (back.name, back.strings, back.labels, back.version) == (g.name, g.strings, g.labels, version)
+    assert (back.name, back.strings, back.labels, back.version, back.layout) == \
+        (g.name, g.strings, g.labels, version, layout)
     assert gmd.write(back) == data
+
+
+def test_gmd_short_header():
+    # MH3U: magic, version, language, label count, string count, label bytes, string bytes, name length
+    data = gmd.write(gmd.Gmd("Item00", ["a", "bc"], {1: "L"}, layout="v1-short", language=2))
+    assert struct.unpack_from("<4s7I", data) == (b"GMD\0", gmd.V1, 2, 1, 2, 2, 5, 6)
+    assert data[0x20:0x27] == b"Item00\0"
+
+
+def test_gmd_v2_index_kept():
+    data = bytearray(gmd.write(gmd.Gmd("t", ["x", "y"], {0: "A", 1: "B"}, version=gmd.V2, layout="v2-32")))
+    at = 0x28 + 2
+    struct.pack_into("<II", data, at + 4, 0x12345678, 0x9ABCDEF0)   # the game's own hashes
+    data[at + 2 * 0x14 + 7] = 0x55                                   # and a non-zero bucket
+    g = gmd.read(bytes(data))
+    assert gmd.write(g) == bytes(data)
+    g.labels[1] = "C"                       # changed labels: a new index is built
+    assert gmd.read(gmd.write(g)).labels == {0: "A", 1: "C"}
 
 
 def test_gmd_header_fields():
