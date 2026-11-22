@@ -15,19 +15,14 @@ Findings that steer the next steps (report: `docs/reports/2026-11-23-first-game-
 
 ## Branches
 
-| Repository | Branch | State |
-|---|---|---|
-| mh-ultimate-collection | `claude/game-files-checks` | pushed; PR to open into `claude/nice-knuth-5gd62h` (the default branch) |
-| MH4UltimateDC-fork | `uc/reference-classes` | pushed; PR to open into `uc/main` |
-| MH4UltimateDC-fork | `uc/main` | the plugin API is merged (PR #1) |
+Nothing in flight: both repos' work from 2026-11-23 is merged (content PR 1 into `claude/nice-knuth-5gd62h`, the default branch; fork PR 2 into `uc/main`). Start new work from those.
 
 ## Next tasks, in order
 
-1. **Open PRs** for both branches (pushed 2026-11-23). Done when both are merged or under review.
-2. **Build the port with the plugin layer** (`uc/main`, inside Azahar's tree) and run the sample plugin procedure in `docs/design/plugin-api.md`. Done when the procedure's result is written there.
-3. **Find MH4U's monster ID table and factory** (`docs/design/id-tables.md`, steps 1-2) in the v1.3.0 code. Done when the addresses and the procedure are in id-tables.md and the fork's `config/`.
-4. **MH3U function table** (`docs/design/reference-recompiles.md`, step 2): Ghidra export, `build_function_table.py`, `find_missing_functions.py`. Done when `config/games/mh3u/functions.tsv` exists.
-5. **MOD M2:** compare Rathalos (`em001`) across the three games with a model tool. Done when `specs/mod.md` names what each header slot holds.
+1. **Build the port with the plugin layer** (`uc/main`, inside Azahar's tree) and run the sample plugin procedure in `docs/design/plugin-api.md`. Done when the procedure's result is written there.
+2. **Find MH4U's monster ID table and factory** (`docs/design/id-tables.md`, steps 1-2) in the v1.3.0 code. Done when the addresses and the procedure are in id-tables.md and the fork's `config/`.
+3. **MH3U function table** (`docs/design/reference-recompiles.md`, step 2): Ghidra export, `build_function_table.py`, `find_missing_functions.py`. Done when `config/games/mh3u/functions.tsv` exists.
+4. **MOD M2:** compare Rathalos (`em001`) across the three games with a model tool. Done when `specs/mod.md` names what each header slot holds.
 
 ## Waiting on the maintainer
 
