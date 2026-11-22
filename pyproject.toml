@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mhuc"
+version = "0.0.1"
+description = "Tools for the MH Ultimate Collection mod: MT Framework archives, 3DS textures, GMD text"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+mhuc = "mhuc.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["tools"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tools"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

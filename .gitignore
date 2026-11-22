@@ -1,0 +1,18 @@
+# Dumps and anything built from them stay outside git (LEGAL.md)
+baserom/
+build/
+dumps/
+work/
+*.3ds
+*.cci
+*.cia
+*.cxi
+*.arc
+*.nsp
+*.xci
+code.bin
+exheader.bin
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
