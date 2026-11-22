@@ -1,0 +1,13 @@
+{
+  "_comment": "The maintainer's dumps, by work-folder name. 'file' is under game_files/; 'role' says what it is used for. File names only: never the files.",
+  "dumps": {
+    "mh4u_usa": {"file": "Monster Hunter 4 Ultimate (USA) Decrypted.3ds", "role": "MH4U reference (cartridge)"},
+    "mh4u_usa_upd": {"file": "Monster Hunter 4 Ultimate Update v1.1 (USA) Decrypted.cia", "role": "MH4U v1.3.0 code, the port's target"},
+    "mh4u_eur": {"file": "Monster Hunter 4 Ultimate (EUR) Decrypted.3ds", "role": "checks only"},
+    "mh4u_eur_upd": {"file": "Monster Hunter 4 Ultimate Update v1.1 (EUR) Decrypted.cia", "role": "EUR v1.1.0 code"},
+    "mh3u_usa": {"file": "Monster Hunter 3 Ultimate (USA) Decrypted.3ds", "role": "MH3U reference"},
+    "mhxx_jpn": {"file": "Monster Hunter XX/Monster Hunter XX-JPN-RF.3ds", "role": "MHXX reference (v1.0)"},
+    "mhxx_en": {"file": "Monster Hunter XX - Double Cross (English Patched v4) Decrypted.3ds", "role": "fan-patched, not a reference"},
+    "mhxx_gupatch": {"file": "Monster Hunter XX - GU Patch v2 DecrTD.cia", "role": "v4.8.0 update as repackaged by a fan translation, not a reference"}
+  }
+}

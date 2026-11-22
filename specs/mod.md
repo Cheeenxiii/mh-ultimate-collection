@@ -7,20 +7,20 @@ status: unverified
 
 # MOD: model (partial)
 
-Meshes, bones, groups and materials. Only the header is described here; the mesh and vertex layouts differ by version and are left to the first session with game files. The header changes with the version byte, so MH3U's models (an older version) and MH4U's need separate readings: that difference is what the model converter will be built on.
+Meshes, bones, groups and materials. Only the header is described here; the mesh and vertex layouts are still to describe. **Check M1 found the same version, 0xE6, and the same header shape in all three 3DS games, MH3U included.** The 3DS MH3U is a port onto MH4U's MT Mobile engine generation, and its models are not the older format Silvris's template reads (that template's versions under 190 are the Wii/Wii U files'). Moving a 3U model into MH4U is therefore not a format conversion at the container level; what differs is skeletons, materials and the data the models point to (M2).
 
 ## Header (MH4U, version 0xE6, per mhff; 64 bytes)
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | char[4] | magic `MOD\0` | unverified | mhff io_import_scene_mod.py |
-| 0x04 | u16 | version: 0xE6 for MH4U | unverified | mhff io_import_scene_mod.py |
+| 0x00 | char[4] | magic `MOD\0` | verified | mhff io_import_scene_mod.py; check M1 |
+| 0x04 | u16 | version: 0xE6 in MH4U, MH3U and MHXX | verified | mhff io_import_scene_mod.py; check M1 |
 | 0x06 | u16 | bone count | unverified | Silvris MH3U MOD.bt (field order) |
 | 0x08 | u16 | mesh count | unverified | mhff io_import_scene_mod.py |
 | 0x0A | u16 | material count | unverified | Silvris MH3U MOD.bt |
-| 0x0C | u32 × 13 | counts and offsets; mhff uses the 12th as the mesh table offset, the 13th as the vertex buffer, the 14th as the index buffer | unverified | mhff io_import_scene_mod.py |
+| 0x0C | u32 × 13 | counts and offsets; mhff uses the 12th as the mesh table offset, the 13th as the vertex buffer, the 14th as the index buffer. The words at 0x18 and 0x2C to 0x3C are file offsets in every model sampled, 0x28 in most; the first data usually starts at 0x80. The same in all three games | unverified | mhff io_import_scene_mod.py; check M1 (shape only) |
 
-## Header (MH3U and versions under 190, per Silvris)
+## Header (Wii/Wii U MH3U and versions under 190, per Silvris; not used by the 3DS games)
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
@@ -47,5 +47,5 @@ Meshes, bones, groups and materials. Only the header is described here; the mesh
 
 ## Checks
 
-- **M1 (with game files):** for every `.mod` in MH4U, MH3U and MHXX, record the version values seen and whether the header sizes above add up to the first offset.
+- **M1 (done, 2026-11-23):** `mhuc survey` counted every `rModel` entry: MH4U 10,472, MH3U 6,237, MHXX JPN 17,661, all with magic `MOD\0` and version 0xE6. On 1,500 models per game, the u32 words that are valid offsets fall in the same slots in all three games (0x18, 0x2C to 0x3C always, 0x28 in about three quarters), and the smallest offset is 0x80 in most. What each slot holds is left to M2.
 - **M2 (with game files):** import one monster's model from each game with the community Blender/Noesis tools and with a future `mhuc` reader; compare vertex and face counts.

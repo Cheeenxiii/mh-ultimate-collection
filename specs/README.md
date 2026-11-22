@@ -22,14 +22,15 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2) (`plugin_mt_framework`) | GPL-3.0 | ARC header variants, GMD v1/v2 |
 | [3dbrew: GPU/Textures](https://www.3dbrew.org/wiki/GPU/Textures) | wiki | PICA200 texture formats and tiling |
 | MH4UltimateDC `config/mt_classes.tsv`, `docs/research/mt-classes.md` | GPL-3.0 | class names, ids, sizes |
+| MH4UltimateDC-fork `config/games/` (MH3U, MHXX registries) | GPL-3.0 | class names, ids, sizes of the source games |
 
 ## Index
 
 | Spec | Class | Status |
 |---|---|---|
-| [arc](arc.md) | rArchive | unverified (class-id hash verified) |
-| [tex](tex.md) | rTexture | unverified |
-| [gmd](gmd.md) | rGUIMessage | unverified |
-| [mod](mod.md) | rModel | unverified, partial |
-| [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem | unverified, partial |
+| [arc](arc.md) | rArchive | verified (MH4U, MH3U, MHXX) |
+| [tex](tex.md) | rTexture | header and 11 formats verified; formats 6, 15, 16 open |
+| [gmd](gmd.md) | rGUIMessage | layouts verified (MH3U v1-short, MHXX v2 and v2-32); v2 hashes open |
+| [mod](mod.md) | rModel | version and header shape verified, the same in all three games; fields partial |
+| [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem | where each game keeps quests verified; layouts unknown |
 | [placeholders/](placeholders/) | enemy, stage and quest classes | unknown |

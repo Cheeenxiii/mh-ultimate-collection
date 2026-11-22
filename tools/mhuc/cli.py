@@ -6,7 +6,7 @@ import json
 import os
 import sys
 
-from . import __version__, arc, classid, gmd, tex
+from . import __version__, arc, classid, gmd, romfs, survey, tex
 
 
 def _read(path: str) -> bytes:
@@ -67,6 +67,17 @@ def cmd_tex(args) -> int:
     return 0
 
 
+def cmd_romfs(args) -> int:
+    for f in romfs.open_image(args.image).files():
+        print(f"{f.size:>10}  {f.path}")
+    return 0
+
+
+def cmd_survey(args) -> int:
+    print(survey.report(survey.survey(args.image, args.workers)))
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -100,6 +111,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("out", nargs="?")
     p.add_argument("--flip-y", action="store_true", help="rows stored bottom-up")
     p.set_defaults(func=cmd_tex)
+
+    p = sub.add_parser("romfs", help="list the files of a RomFS image (romfs.bin)")
+    p.add_argument("action", choices=["list"])
+    p.add_argument("image")
+    p.set_defaults(func=cmd_romfs)
+
+    p = sub.add_parser("survey", help="run the specs' with-game-files checks over a RomFS image; counts only")
+    p.add_argument("image")
+    p.add_argument("--workers", type=int, default=4, help="processes (each holds one archive in memory)")
+    p.set_defaults(func=cmd_survey)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
                        ("convert", "convert a source game's assets for MH4U (needs game files)"),

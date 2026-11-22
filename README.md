@@ -22,7 +22,9 @@ Everything new is extracted from the game it comes from, both its assets and its
 | `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression |
 | `docs/sources/` | what each source game supplies; the authored register |
 | `specs/` | one spec per file type (`.ksy` + notes), each field marked verified or unverified |
-| `tools/mhuc/` | Python toolkit: ARC, textures, GMD text, class ids, CLI |
+| `STATUS.md` | where the project stands and what's next; rewritten every session |
+| `tools/doctor.py`, `tools/workspace/` | the workspace check, and the Claude files (CLAUDE.md, hook, skills) it installs |
+| `tools/mhuc/` | Python toolkit: RomFS, ARC, textures, GMD text, class ids, the specs' checks, CLI |
 | `tests/` | tests on generated fixtures only |
 | `data/catalog/` | facts from public wikis, a source URL on every row |
 | `plugins/` | native plugin sources (C), built against the engine fork's `include/mh4u_plugin.h` |
@@ -44,6 +46,8 @@ mhuc --help
 | `mhuc classid NAME...` | the engine's class-id hash of a type name |
 | `mhuc gmd dump FILE` | a GMD text file as JSON |
 | `mhuc tex info FILE` / `mhuc tex decode FILE OUT.ppm` | 3DS textures |
+| `mhuc romfs list ROMFS.BIN` | the files of a RomFS image, read in place |
+| `mhuc survey ROMFS.BIN [--workers N]` | the specs' with-game-files checks over a whole RomFS; prints counts only |
 | `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
 ## Tests
