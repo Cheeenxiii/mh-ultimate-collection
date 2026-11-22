@@ -1,12 +1,12 @@
 # First web session: report (2026-11-22)
 
-All nine tasks of the brief's "First web session" have work committed. Two items are partial: the fork's `main`/`uc/main` branches wait on permission, and the catalog lacks the columns the wiki doesn't hold. Branch in both repositories: `claude/nice-knuth-5gd62h`.
+All nine tasks of the brief's "First web session" have work committed. One item is partial: the catalog lacks the columns the wiki doesn't hold. Branch in both repositories: `claude/nice-knuth-5gd62h`.
 
 ## Done
 
 | # | Task | Result | Where |
 |---|---|---|---|
-| 1 | Sync the fork | the session branch is fast-forwarded to upstream 6825147 (0.1.7); 84 commits, a clean fast-forward. **`main` and `uc/main` not pushed**: the session may push only its own branch | fork |
+| 1 | Sync the fork | `main` fast-forwarded to upstream 6825147 (0.1.7), 84 commits; `uc/main` created at the same commit; the session branch carries the plugin work on top | fork |
 | 2 | Scaffold the content repo | LICENSE (GPL-3.0), LEGAL.md, CLAUDE.md with the ground rules, CONTRIBUTING.md, CI (pytest, ruff, spec checks, game-data guard) | this repo |
 | 3 | Plugin API design | docs/design/plugin-api.md, naming each fork file changed | this repo |
 | 4 | Plugin API implementation | `include/mh4u_plugin.h`, `port/src/plugin_host.h`, `port/src/plugins.{h,cpp}`, LoadCode wiring, `tools/mod_hooks.py`, `mods.py` and `build_game.py` changes, sample plugin, docs/MODS.md section; 27 new tests; fork suite 990 passed, 81 skipped | fork |
@@ -20,7 +20,6 @@ Verified on the way: the class-id hash `~crc32(name) & 0x7FFFFFFF` matches 989 o
 
 ## Couldn't be checked or done
 
-- **Fork branches:** `main` (fast-forward to 6825147) and `uc/main` need an explicit go-ahead to push.
 - **Plugin API in the game:** the port wasn't built here (it builds inside Azahar's tree). The host is tested on recompiled test code; `plugins.cpp` and the `arm_recomp.cpp` change are compiled only by the port's CI. The in-game procedure is in plugin-api.md.
 - **Every spec field** except the class-id hash is unverified: no game files here.
 - **Catalog gaps:** habitats per game, skeleton family, tier, underwater areas and underwater movesets aren't structured facts on the wiki. The catalog README says where each will come from.
@@ -29,7 +28,7 @@ Verified on the way: the class-id hash `~crc32(name) & 0x7FFFFFFF` matches 989 o
 
 ## Checklist for the first session with game files
 
-1. Push the fork's `main` and create `uc/main` if not done; rebase the plugin work onto `uc/plugin-api`.
+1. Move the plugin work (session branch, two commits on 6825147) to `uc/plugin-api`.
 2. ARC: run checks C2, C3 on MH4U, MH3U and MHXX; record MH3U's ARC version.
 3. TEX: checks T1-T3; settle the header reading and the `--flip-y` question.
 4. GMD: checks G1, G2; record versions per game.
