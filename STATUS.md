@@ -17,13 +17,13 @@ Findings that steer the next steps (report: `docs/reports/2026-11-23-first-game-
 
 | Repository | Branch | State |
 |---|---|---|
-| mh-ultimate-collection | `claude/game-files-checks` | 5 commits, not pushed; to merge into `claude/nice-knuth-5gd62h` (the default branch) |
-| MH4UltimateDC-fork | `uc/reference-classes` | 1 commit on `uc/main`, not pushed; PR into `uc/main` |
+| mh-ultimate-collection | `claude/game-files-checks` | pushed; PR to open into `claude/nice-knuth-5gd62h` (the default branch) |
+| MH4UltimateDC-fork | `uc/reference-classes` | pushed; PR to open into `uc/main` |
 | MH4UltimateDC-fork | `uc/main` | the plugin API is merged (PR #1) |
 
 ## Next tasks, in order
 
-1. **Push both branches** and open PRs. Done when both are on GitHub.
+1. **Open PRs** for both branches (pushed 2026-11-23). Done when both are merged or under review.
 2. **Build the port with the plugin layer** (`uc/main`, inside Azahar's tree) and run the sample plugin procedure in `docs/design/plugin-api.md`. Done when the procedure's result is written there.
 3. **Find MH4U's monster ID table and factory** (`docs/design/id-tables.md`, steps 1-2) in the v1.3.0 code. Done when the addresses and the procedure are in id-tables.md and the fork's `config/`.
 4. **MH3U function table** (`docs/design/reference-recompiles.md`, step 2): Ghidra export, `build_function_table.py`, `find_missing_functions.py`. Done when `config/games/mh3u/functions.tsv` exists.
