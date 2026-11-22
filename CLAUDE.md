@@ -2,6 +2,12 @@
 
 Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Monster Hunter 4 Ultimate) that brings MH3U's and MHGU/MHXX's maps, monsters and systems, underwater combat included, into MH4U. The engine side lives in `Cheeenxiii/MH4UltimateDC-fork` (branch `uc/main`); this repository holds everything about content.
 
+## Start and end of a session
+
+- **Start:** read [STATUS.md](STATUS.md): where the project stands, the branches in flight and the next tasks. In the maintainer's workspace a SessionStart hook prints it with `tools/doctor.py`'s report, and `/next` orients a session explicitly.
+- **End:** rewrite STATUS.md (don't append), write a report in `docs/reports/`, run the checks, commit. In the workspace, `/handoff` does all of it.
+- The workspace's own `CLAUDE.md`, hook and skills are versioned in `tools/workspace/`; `tools/doctor.py --install` installs them one folder up.
+
 ## Ground rules (every session starts from these)
 
 1. **No game data in any repository, ever.** That includes anything derived from it: traces, captures, disassembly listings, screenshots, extracted tables and converted assets. Addresses and names in config files and specs are fine. Work only from the maintainer's own dumps, outside the repository.

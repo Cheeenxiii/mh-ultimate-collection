@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/mh-ultimate-collection/tools/doctor.py\" --workspace \"$CLAUDE_PROJECT_DIR\" --session-start 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Checking the workspace"
+          }
+        ]
+      }
+    ]
+  }
+}

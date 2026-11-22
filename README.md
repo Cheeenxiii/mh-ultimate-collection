@@ -22,6 +22,8 @@ Everything new is extracted from the game it comes from, both its assets and its
 | `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression |
 | `docs/sources/` | what each source game supplies; the authored register |
 | `specs/` | one spec per file type (`.ksy` + notes), each field marked verified or unverified |
+| `STATUS.md` | where the project stands and what's next; rewritten every session |
+| `tools/doctor.py`, `tools/workspace/` | the workspace check, and the Claude files (CLAUDE.md, hook, skills) it installs |
 | `tools/mhuc/` | Python toolkit: RomFS, ARC, textures, GMD text, class ids, the specs' checks, CLI |
 | `tests/` | tests on generated fixtures only |
 | `data/catalog/` | facts from public wikis, a source URL on every row |
