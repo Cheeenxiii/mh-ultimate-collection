@@ -28,7 +28,7 @@ Verified on the way: the class-id hash `~crc32(name) & 0x7FFFFFFF` matches 989 o
 
 ## Checklist for the first session with game files
 
-1. Move the plugin work (session branch, two commits on 6825147) to `uc/plugin-api`.
+1. Review `uc/plugin-api` (the plugin work, two commits on `uc/main`) and merge it into `uc/main` once the port CI builds it.
 2. ARC: run checks C2, C3 on MH4U, MH3U and MHXX; record MH3U's ARC version.
 3. TEX: checks T1-T3; settle the header reading and the `--flip-y` question.
 4. GMD: checks G1, G2; record versions per game.

@@ -1,6 +1,6 @@
 # Plugin API
 
-**Decision:** mods hook game functions by name through `mod.json`; `build_game.py` merges those hooks into the build's hook points and lists each mod's native library next to the code library; the port loads the libraries and runs every hook on a function as a chain: the last mod first, then the port's own hook, then the game's function. Implemented on the engine fork (`Cheeenxiii/MH4UltimateDC-fork`, branch `claude/nice-knuth-5gd62h`, to become `uc/plugin-api`), tested on recompiled test code. The in-game check is written down at the end for the first session with game files.
+**Decision:** mods hook game functions by name through `mod.json`; `build_game.py` merges those hooks into the build's hook points and lists each mod's native library next to the code library; the port loads the libraries and runs every hook on a function as a chain: the last mod first, then the port's own hook, then the game's function. Implemented on the engine fork (`Cheeenxiii/MH4UltimateDC-fork`, branch `uc/plugin-api`, on `uc/main`), tested on recompiled test code. The in-game check is written down at the end for the first session with game files.
 
 ## What the fork had
 
