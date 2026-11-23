@@ -16,7 +16,7 @@ This session, one survey per game ([report](docs/reports/2026-11-23-romfs-survey
 
 ## Branches
 
-- This repo: `romfs-surveys` from `main` (the check fixes, the specs, the report), committed and not pushed; it goes up only on the maintainer's yes, then a PR.
+- This repo: `romfs-surveys` from `main` (the check fixes, the specs, the report), pushed, PR [Cheeenxiii/mh-ultimate-collection#6](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/6) open.
 - Fork: nothing in flight (`uc/main`; PR #5 squash-merged).
 
 ## Next tasks, in order
@@ -29,6 +29,7 @@ This session, one survey per game ([report](docs/reports/2026-11-23-romfs-survey
 
 ## Waiting on the maintainer
 
+- Reviewing and merging PR #6.
 - Running the test kit in game, and saying which region and language the Extra Data's game is.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.
 - A check of the port's pad features with the plugin, on a machine with a display; whether to offer the inline-cache fix to upstream.
