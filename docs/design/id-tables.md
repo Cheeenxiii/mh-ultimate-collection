@@ -1,6 +1,6 @@
 # ID tables
 
-**Point:** adding monsters, maps and quests to MH4U means growing the game's fixed-size tables, which are indexed by numeric ids. This doc lists the tables that will have to grow and how to find each one once the game files are at hand. The monster id table and the monster factory are found (USA v1.3.0, below, verified 2026-11-23 against the maintainer's dump); the other rows are still unverified.
+**Point:** adding monsters, maps and quests to MH4U means growing the game's fixed-size tables, which are indexed by numeric ids. This doc lists the tables that will have to grow and how to find each one once the game files are at hand. The monster id table and the monster factory are found (USA v1.3.0, below, verified 2026-11-23 against the maintainer's dump), and so are the per-monster tables for names, sizes and crowns, icons, resource paths and item drops ("Other per-monster tables", below); the other rows are still unverified.
 
 ## Tables that have to grow
 
@@ -8,9 +8,9 @@
 |---|---|---|---|
 | Monster (enemy) id table | monster id | every new 3U or GU monster needs an id | an array of per-monster records in `.data` (model/ARC paths, class, sizes), or a resource (`rEnemyData`, `.emd`) per monster plus a master list |
 | Monster class factory | monster id → class | MH4U has 55 classes `uEm001`…`uEm118` (config/mt_classes.tsv); new monsters need a class to run as | a switch or table mapping ids to `MtDTI*`; the uniform size 0x8d90 suggests one class can host different monsters' data |
-| Monster names and texts | monster id → text id | names in the hunter's notes, quest texts | GMD tables (rGUIMessage) indexed by id |
-| Monster size and crown tables | monster id | size scaling, crowns | `rEmSizeCalcTblElement`-like resource, or arrays |
-| Monster parts, breaks, rewards | monster id, part id | carves, breaks, quest rewards | resources per monster; reward tables inside quest data |
+| Monster names and texts | monster id → text id | names in the hunter's notes, quest texts | found: `emName`/`emExp` `rLayoutMessage` resources, message N = id N (below) |
+| Monster size and crown tables | monster id | size scaling, crowns | found: `crownSizeTable`, an array in `.data` (below) |
+| Monster parts, breaks, rewards | monster id, part id | carves, breaks, quest rewards | drops found: id-indexed index tables into an item-list array in `.data` (below); parts probably in the per-monster `.emd`/`.etd` (unverified); quest rewards in quest data |
 | Item and material ids | item id | new monsters bring new materials | item data resource (`rItemData`-like) plus GMD names and icons |
 | Equipment tables | weapon/armor id per class | new monsters' weapons and armour | per-class weapon data (`w00d`… in mhff's table), armour series data |
 | Stage (map) table | stage id | new 3U maps | `rStageInfoSet`, `rStageAreaInfo`, `rStageCameraData` per stage plus a master list of stage ids → folders |
@@ -70,6 +70,105 @@ Id 0 creates `uEmXXX` (size `0x8d88`). Every other class is `0x8d90` bytes, so o
 6. Check that the two tables agree: for each id, the path the index gives and the class the factory makes should be the same `emNNN`, or the same neighbour for an id with no files of its own.
 
 The scripts used live in the maintainer's workspace (`game_files/work/idt/`), since they read the dump; this procedure is enough to rewrite them.
+
+## Other per-monster tables (USA v1.3.0)
+
+Found 2026-11-23 by static reading of the v1.3.0 code and RomFS (procedure below). Addresses, sizes and counts only. In the Status column, **verified** means read from the code: the address, the row size, the bound and what indexes the table. A row's *meaning* (what its fields are for) is **unverified** unless the column says otherwise, because nothing here has been checked in a running game yet.
+
+**Where the monster id lives.** The uEnemy constructor (`0x00955fbc`) stores the id as a byte at offset `0x1c0` of the data block that `this+0xe28` points to. Code reads the current monster's id with `ldr rX, [this, #0xe28]; ldrb rY, [rX, #0x1c0]`.
+
+### Names (text)
+
+| What | Where | Shape | Bound | Status |
+|---|---|---|---|---|
+| `msg\emName_<lang>` | `eng/msg/emName_eng.lmd` (`rLayoutMessage`) in `data/core_common.arc`, in both the base RomFS and the update's | one message per monster id: message N names id N | **123 messages**, so ids 0..122; id 123 has no name entry | address and indexing verified; the count is read from the LMD header word at `+0x08`, which matches `itemName_eng.lmd`'s item count, but the LMD format has no spec yet, so the count is unverified |
+| `msg\emExp_<lang>` | `eng/msg/emExp_eng.lmd`, same archive | hunter's-notes text by id | 123 messages | as above |
+| Message file list | `0x00f006c4` | 71 pointers to `msg\…_jpn` paths (the language suffix is replaced at load); emName is entry 6, emExp entry 7 | `cmp #0x47` in the loader `0x005aa2f0` | verified |
+| Loaded messages | `0x0109a080` (`.bss`) | 71 `rLayoutMessage*`; emName at `0x0109a098`, emExp at `0x0109a09c` | 71 | verified |
+| Name getters | `0x005a9000` `(id, outLen)` returns the string; `0x005a9184` `(buf, id)` formats it | read `0x0109a098` and index by id | none: the id isn't range-checked | verified; that the argument is the monster id is shown by `0x006b8290`, which passes ids it compares with `0x23`, `0x52` and `0x67` |
+
+New names go into `emName`/`emExp` (and every language's copy); these two resources hold one message fewer than there are ids.
+
+### Size and crowns
+
+| What | Address | Shape | Bound | Status |
+|---|---|---|---|---|
+| `crownSizeTable` | `0x00f32008` .. `0x00f327c8` | 124 rows × 16 bytes (4 floats), by id | `cmp id, #0x7c` in `getCrown` | verified; 86 rows have a non-zero first float |
+| `getCrown` | `0x0068877c` | `(id, sizePercent, out)`: scales the row's float 0 by the percentage, compares the result with floats 1, 2 and 3, and writes a crown code to `out` (`0xff` none, `0`, `1`, `2`, `3`) | `0x7c` | verified. Field meaning: float 0 is the base size; floats 1, 3 and 2 are the mini, gold and silver thresholds: **unverified** (read from which comparison writes which code) |
+
+Callers of `getCrown`: `0x00622d24`, `0x00a318c8`, `0x00a54430`, `0x00ab01bc`, `0x00acc36c`, `0x00acc5b4`, `0x00c20a70`.
+
+### Hunter's-notes list and icons
+
+| What | Address | Shape | Bound | Status |
+|---|---|---|---|---|
+| `monsterListOrder` | `0x00df35b0` | 124 rows × 8 bytes, **by list position, not by id**: byte 0 is the monster id (the 124 rows hold each id 0..123 once); byte 1 a category; u16 at `+4` a save-flag number (non-zero in 91 rows) that `0x00c1bea8` tests | loops `while < 0x7c` in `0x006191f8`, `0x0061dc58`, `0x0061df4c` | verified for the shape, the id and the bound; the category and flag meanings are unverified |
+| `monsterIconIndex` | `0x00e06698` (`.rodata`) | 124 bytes by id; `0x7f` = no icon (7 ids) | `cmp id, #0x7c` in `0x00c0e164` and `0x00c0e800`, which copy the 124 bytes to the stack | verified |
+| Icon cell to UV | `0x00c0e8ac` | icon index → cell in a 7-column sheet; indexes `0x00..0x61` use one sheet and `0x63..0x7b` another | `cmp #0x62`, then `sub #0x63; cmp #0x19` | verified |
+
+The icon sheets themselves have room for `0x7b` indexes at most; a new monster needs a new cell or a reused one.
+
+### Resource paths
+
+| What | Address | Shape | Bound | Status |
+|---|---|---|---|---|
+| `enemyResourceIndex` | `0x00efbd08` | 124 pointers by id (id 0 null), each to a record in `enemyResourceRecords` | followed by `enemyDataPaths` at `0x00efbef8` | verified |
+| `enemyResourceRecords` | `0x00efa7e0` .. `0x00efbd04` | 123 records × `0x2c` bytes: 11 pointers to null-terminated lists of path strings (model, motions, camera list, extra models, motion effects, command file, sound sequence, effect lists) | 123 | verified (pointer targets are `enemy\emNNN\…`, `effect\…` and `sound\…` paths) |
+
+Readers: `0x00682ca0`, `0x0068d8c8` (returns the record's word at `+0x14`), `0x00c0b830`.
+
+### Item drops (rewards)
+
+Reward items are lists in `.data`, reached through one master pointer array and three id-indexed index tables. The rank offset comes from `0x006bc528`, which returns 0..3 from the current quest. Each index table gives a base index into the master array, and the code adds `4 × slot + rank` to it.
+
+| What | Address | Shape | Bound | Status |
+|---|---|---|---|---|
+| `itemListTable` | `0x01002a5c` .. `0x01003bec` | 1124 pointers (281 groups of 4, one per rank), 853 non-null, each to an item list: 4-byte entries (u8, u8, u16 item id) ended by `0xffff` | none in code; set by the largest index the tables below produce (`0x460 + 3`) | address and bound verified; the entry fields are unverified (the u16 ranges over item ids, below `itemName`'s 1937) |
+| `dropRecordIndex` | `0x01003bec` | 124 pointers by id (114 non-null) to records at `0x01003fcc`.. of 16-byte entries; an entry's u16 at `+0` is a base index into `itemListTable` and its byte at `+0xb` another index (`0xff` none) | 124 | verified for the shape and the indexing; what the entries describe (the floats suggest parts or drop points) is unverified |
+| `dropBaseA` | `0x01003ddc` | 124 u16 by id, `0xffff` = none (81 used) | 124 | verified |
+| `dropBaseB` | `0x01003ed4` | 124 u16 by id, `0xffff` = none (12 used) | 124, followed by the records at `0x01003fcc` | verified |
+
+Readers: `0x00684b40` `(_, id)` and `0x0092600c` use `dropRecordIndex`; `0x00911f20` uses `dropBaseA` (after a percentage roll and a per-monster counter at data-block offset `0x7a64`, so probably shiny drops: unverified); `0x009357b4` uses `dropBaseB`. All four create an item-pop object through the manager at `*0x00fb8a1c` (`0x005b90d4`) and store the item list in it at `+0x28`. **Which of these are carves, captures, breaks and shiny drops is unverified**; carving was not traced.
+
+### Parts
+
+No part table indexed by id was found in `.data`. The per-monster resources are the likely place: `data/em_data.arc` holds 110 `rEnemyData` (`.emd`) and 110 `rEnemyTuneData` (`.etd`) files, one pair per monster with files (the same 110 as `enemyDataPaths`). Both are section-offset files (`.emd` magic `emd\0`, `.etd` magic `etd\0`) with no spec yet. **Unverified:** that hitzones, part HP and breaks live there. A new monster brings its own pair, loaded through `enemyDataPathIndex`, so these files don't grow a table.
+
+### Other tables indexed by id, purpose unknown
+
+Each is read with the monster id from the data block (`ldrb [x, #0x1c0]`) as its index. Bounds are the gap to the next referenced address and are verified; meanings are not.
+
+| Address | Shape | Reader |
+|---|---|---|
+| `0x00deef04` | 124 bytes | `0x00b9b340` |
+| `0x00e067f4` | 124 u16 | `0x00696878` |
+| `0x00e070a4`, `0x00e07120` | 124 bytes each | `0x006b8290`, `0x006b40dc` |
+| `0x00fc96dc` | 124 bytes | `0x006a69e4` |
+| `0x00fcd71c` | 123 rows × 8 bytes (two floats) | `0x0030f4cc` (`cmp #0x7c`) |
+| `0x00ffeaa4` | 124 pointers to small records at `0x00ffea88`.. | `0x0093f350` |
+| `0x00ffecb8` .. `0x00fff55e` | **nine tables of 123 i16** (stride `0xf6`), one picked by quest type; the result goes to data-block offset `0x7af4` | `0x0094813c`, `0x0094829c`, `0x0094c840`, `0x0094c948` |
+| `0x00f384d0` | 124 words, `-1` = none | `0x0068efc8` |
+
+The 123-entry tables (the nine i16 tables, `0x00fcd71c`, `emName`, `emExp`) stop one short of id 123: reading them for id 123 reads the next table's first entry.
+
+### Not monster tables
+
+`0x00f029e4` (20-byte rows; byte 6 counts up) is the item table: it is indexed by item id, and its `cmp #0x7c`/`#0x7d` are item ids. The 124-entry tables at `0x01017980`..`0x0101b214` are read by `0x00c4c4fc` with an index from `this+0xfd` that isn't a monster id. `0x00ecf1d8` and its neighbours are gathering lists chosen by stage.
+
+### Bounds to move, all together
+
+When ids grow past 123: the factory compare and jump table, `enemyDataPathIndex`, `enemyDataById` (above); `crownSizeTable`, `monsterListOrder` (and the three loops over it), `monsterIconIndex` (and the two 124-byte stack copies), `enemyResourceIndex` and its records, `dropRecordIndex`, `dropBaseA`, `dropBaseB` and `itemListTable` (for new lists); the unknown-purpose tables above; and every language's `emName`/`emExp`.
+
+### Procedure (repeatable from the dump; record results, never bytes)
+
+1. Lay out the code as in step 1 above. List the code's literals that point into `.rodata`/`.data`. For each, take the distance to the next referenced address; keep the ones that are 123, 124 or 125 times a small row size.
+2. Find the functions that read the id (`ldrb [x, #0x1c0]` after `ldr [this, #0xe28]`) or compare a register with `#0x7c`. Keep the literal tables they index with that register; the shift or multiply gives the row size.
+3. Names: find `msg\emName_jpn` in `.rodata`, the pointer list that holds it (`0x00f006c4`), and its loader (one function with a `cmp #0x47` loop storing `rLayoutMessage` pointers). The functions that read the stored pointer at `+0x18` are the getters. Count the messages from the `.lmd` file's header in `core_common.arc`.
+4. Crowns: the function that indexes a 16-byte-row table by an id it compares with `#0x7c` and compares floats.
+5. Drops: scan `.data` for runs of pointers whose targets are lists of 4-byte entries ending in `0xffff`. The long run is `itemListTable`; the functions that read it show the index tables and the `0x006bc528` rank offset.
+6. For each table, check its count against the id tables (each id in range, the list order a permutation of 0..123).
+
+The scripts live in the maintainer's workspace (`game_files/work/mt/`).
 
 ## How to find the rest
 
