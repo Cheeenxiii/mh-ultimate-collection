@@ -136,6 +136,105 @@ def test_mh4u_slots_and_cli(tmp_path, capsys):
     assert "2 quests read, 0 files failed" in capsys.readouterr().out
 
 
+def test_mh4u_pack_slot_round_trips(tmp_path, capsys):
+    mib = build_mib4(60005)
+    slot = quest.mh4u_pack_slot(mib, "m60005.mib", pad=b"\xAA" * 8)
+    assert len(slot) == quest.SLOT and slot[quest.SLOT_DATA:].rstrip(b"\0") == b"m60005.mib"
+    size = len(mib) + 20
+    assert slot[size - 20:size - 18] == b"\0\0"
+    assert struct.unpack(">I", slot[(size + 7) // 8 * 8:(size + 7) // 8 * 8 + 4])[0] == size
+    assert quest.mh4u_slot_mib(slot[:quest.SLOT_DATA]) == mib
+    bad = bytearray(slot)
+    bad[0x40] ^= 1
+    with pytest.raises(quest.QuestError):
+        quest.mh4u_slot_mib(bytes(bad[:quest.SLOT_DATA]))
+    data = quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 2, slot)
+    assert [(k, n) for k, n, _ in quest.mh4u_slots(data)] == [(2, "m60005.mib")]
+    qf, mf, out = tmp_path / "q", tmp_path / "m60007.mib", tmp_path / "q2"
+    qf.write_bytes(data)
+    mf.write_bytes(build_mib4(60007))
+    assert cli.main(["questslot", "put", str(qf), "--slot", "5", "--mib", str(mf), "--out", str(out)]) == 0
+    capsys.readouterr()
+    assert cli.main(["questslot", "check", str(out)]) == 0
+    assert "2 used slots, 2 with a matching hash and size" in capsys.readouterr().out
+    broken = tmp_path / "broken"
+    broken.write_bytes(quest.mh4u_put_slot(data, 0, bytes(bad)))
+    assert cli.main(["questslot", "check", str(broken)]) == 1
+
+
+def test_mib4_patch_and_copy_slot(tmp_path, capsys):
+    mib = build_mib4(60001)
+    old = quest.parse_mib4(mib)
+    new = quest.mib4_patch(mib, quest_id=60999, title="UC")
+    got = quest.parse_mib4(new)
+    assert got["quest_id"] == 60999 and len(new) == len(mib)
+    assert all(t["title"] == "UC" for t in got["text"].values())
+    assert got["text"]["eng"]["success"] == old["text"]["eng"]["success"]
+    with pytest.raises(quest.QuestError):
+        quest.mib4_patch(mib, title="x" * 200)
+    qf, out = tmp_path / "q", tmp_path / "q2"
+    qf.write_bytes(quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 0, quest.mh4u_pack_slot(mib, "m60001.mib")))
+    assert cli.main(["questslot", "put", str(qf), "--slot", "1", "--from-slot", "0", "--id", "60999",
+                     "--title", "UC", "--out", str(out)]) == 0
+    slots = quest.mh4u_slots(out.read_bytes())
+    assert [(k, n) for k, n, _ in slots] == [(0, "m60001.mib"), (1, "m60999.mib")]
+    assert cli.main(["questslot", "put", str(out), "--slot", "1", "--from-slot", "0", "--id", "60998",
+                     "--out", str(out)]) == 1  # used slot, no --replace
+    assert quest.parse_mib4(quest.mh4u_slot_mib(slots[1][2]))["quest_id"] == 60999
+
+
+def test_mib4_model_build_round_trip():
+    from mhuc import mibwrite
+    mib = build_mib4(60002)
+    model = mibwrite.mib4_model(mib)
+    out = mibwrite.mib4_build(model)
+    assert quest.parse_mib4(out) == quest.parse_mib4(mib)
+    assert mibwrite.mib4_model(out) == model and mibwrite.mib4_build(mibwrite.mib4_model(out)) == out
+    assert len(out) % 0x20 == 0
+    longer = mibwrite.mib4_build(mibwrite.mib4_set_texts(model, 0, "A much longer title than before " * 3))
+    got = quest.parse_mib4(longer)
+    assert all(t["title"].startswith("A much longer") for t in got["text"].values())
+    assert got["large_waves"] == quest.parse_mib4(mib)["large_waves"]
+    with pytest.raises(quest.QuestError):
+        mibwrite.mib4_build(dict(model, texts=model["texts"][:4]))
+
+
+def test_mib_json_round_trip_and_edit(tmp_path, capsys):
+    from mhuc import mibwrite
+    mib = build_mib4(60003)
+    obj = json.loads(json.dumps(mibwrite.model_to_json(mibwrite.mib4_model(mib))))
+    assert mibwrite.model_from_json(obj) == mibwrite.mib4_model(mib)
+    obj["fields"]["quest_id"] = 60123
+    obj["texts"]["eng"]["title"] = "Edited"
+    wave = obj["waves"][0]
+    wave[0]["monster"], wave[0]["area"] = 7, 3
+    got = quest.parse_mib4(mibwrite.mib4_build(mibwrite.model_from_json(obj)))
+    assert got["quest_id"] == 60123 and got["text"]["eng"]["title"] == "Edited"
+    assert (got["large_waves"][0][0]["monster"], got["large_waves"][0][0]["area"]) == (7, 3)
+    src, js, out = tmp_path / "m.mib", tmp_path / "m.json", tmp_path / "n.mib"
+    src.write_bytes(mib)
+    assert cli.main(["mib", "export", str(src), str(js)]) == 0
+    assert cli.main(["mib", "import", str(js), str(out)]) == 0
+    assert quest.parse_mib4(out.read_bytes()) == quest.parse_mib4(mib)
+    slotfile, got_mib = tmp_path / "q", tmp_path / "g.mib"
+    slotfile.write_bytes(quest.mh4u_put_slot(bytes(40 * quest.SLOT), 4, quest.mh4u_pack_slot(mib, "m60003.mib")))
+    assert cli.main(["questslot", "get", str(slotfile), "--slot", "4", "--out", str(got_mib)]) == 0
+    assert got_mib.read_bytes() == mib
+    assert cli.main(["questslot", "get", str(slotfile), "--slot", "5", "--out", str(got_mib)]) == 1
+
+
+def test_questslot_put_long_title_rebuilds(tmp_path, capsys):
+    mib = build_mib4(60001)
+    qf, out = tmp_path / "q", tmp_path / "q2"
+    qf.write_bytes(quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 0, quest.mh4u_pack_slot(mib, "m60001.mib")))
+    title = "A title far longer than the synthetic one"
+    assert cli.main(["questslot", "put", str(qf), "--slot", "1", "--from-slot", "0", "--id", "60998",
+                     "--title", title, "--out", str(out)]) == 0
+    body = quest.mh4u_slots(out.read_bytes())[1][2]
+    got = quest.parse_mib4(quest.mh4u_slot_mib(body))
+    assert got["quest_id"] == 60998 and got["text"]["ita"]["title"] == title
+
+
 # ── MHXX ──────────────────────────────────────────────────────────────────────
 
 
@@ -254,3 +353,13 @@ def test_decrypt_cli(tmp_path, capsys):
     assert out.read_bytes() == plain
     key.write_bytes(b"wrong")
     assert cli.main(["decrypt", "mh3u-dlc", str(enc), str(out), "--key", str(key)]) == 1
+
+
+def test_survey_runs_q6_q18_and_q13():
+    from mhuc import survey
+    st: dict = {}
+    survey.survey_entry("rQuestData", build_mib4(60001), st)
+    survey.survey_entry(None, build_qtds(), st)
+    c = st["quest"]
+    assert c["Q6 .mib read"] == 1 and c["Q18 builder round trip ok"] == 1
+    assert c["Q13 QTDS read"] == 1

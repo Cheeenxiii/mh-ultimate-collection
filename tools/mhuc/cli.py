@@ -114,6 +114,15 @@ def cmd_decrypt(args) -> int:
     return 0
 
 
+def cmd_encrypt(args) -> int:
+    key = _read(args.key).rstrip(b"\r\n")
+    out = dlccrypt.mh4u_save_encrypt(_read(args.file), key, args.mode, args.seed)
+    with open(args.out, "wb") as f:
+        f.write(out)
+    print(f"{len(out)} bytes to {args.out}")
+    return 0
+
+
 def _quest_files(kind: str, path: str):
     """(name, parsed) for every quest in a file: an Extra Data quest file, a .mib, an MHXX .arc or a .quest."""
     data = _read(path)
@@ -157,6 +166,222 @@ def cmd_quest(args) -> int:
             print(f"{os.path.basename(p)}: {e}", file=sys.stderr)
     print(f"{ok} quests read, {bad} files failed")
     return 1 if bad else 0
+
+
+def cmd_mib(args) -> int:
+    from . import mibwrite
+    if args.action == "export":
+        obj = mibwrite.model_to_json(mibwrite.mib4_model(_read(args.src)))
+        with open(args.dst, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+    else:
+        with open(args.src, encoding="utf-8") as f:
+            mib = mibwrite.mib4_build(mibwrite.model_from_json(json.load(f)))
+        quest.parse_mib4(mib)  # refuse to write what the reader can't read back
+        with open(args.dst, "wb") as f:
+            f.write(mib)
+    print(f"{args.src} -> {args.dst}")
+    return 0
+
+
+def cmd_questslot(args) -> int:
+    if args.action == "get":
+        if len(args.paths) != 1 or args.slot is None or not args.out:
+            print("mhuc questslot get: one quest file, with --slot and --out", file=sys.stderr)
+            return 2
+        found = {k: body for k, _, body in quest.mh4u_slots(_read(args.paths[0]))}
+        if args.slot not in found:
+            print(f"mhuc questslot get: slot {args.slot} is empty", file=sys.stderr)
+            return 1
+        with open(args.out, "wb") as f:
+            f.write(quest.mh4u_slot_mib(found[args.slot]))
+        print(f"slot {args.slot} -> {args.out}")
+        return 0
+    if args.action == "check":
+        used = good = 0
+        for p in args.paths:
+            for k, name, body in quest.mh4u_slots(_read(p)):
+                used += 1
+                try:
+                    quest.mh4u_slot_mib(body)
+                    good += 1
+                except quest.QuestError as e:
+                    print(f"{os.path.basename(p)} slot {k} ({name}): {e}", file=sys.stderr)
+        print(f"{used} used slots, {good} with a matching hash and size")
+        return 0 if used == good else 1
+    if len(args.paths) != 1 or args.slot is None or not args.out or (args.mib is None) == (args.from_slot is None):
+        print("mhuc questslot put: one quest file, with --slot, --out and one of --mib, --from-slot", file=sys.stderr)
+        return 2
+    data = _read(args.paths[0])
+    if any(k == args.slot for k, _, _ in quest.mh4u_slots(data)) and not args.replace:
+        print(f"mhuc questslot put: slot {args.slot} holds a quest; pass --replace to overwrite it", file=sys.stderr)
+        return 1
+    if args.mib:
+        mib, name = _read(args.mib), os.path.basename(args.mib)
+    else:
+        found = {k: body for k, _, body in quest.mh4u_slots(data)}
+        if args.from_slot not in found:
+            print(f"mhuc questslot put: slot {args.from_slot} is empty", file=sys.stderr)
+            return 1
+        mib = quest.mh4u_slot_mib(found[args.from_slot])
+        name = None
+    if args.id is not None or args.title is not None:
+        try:
+            mib = quest.mib4_patch(mib, args.id, args.title)
+        except quest.QuestError:  # a longer title: lay the quest out again (check Q18)
+            from . import mibwrite
+            mib = mibwrite.mib4_build(mibwrite.mib4_set_texts(mibwrite.mib4_model(mib), 0, args.title))
+            mib = quest.mib4_patch(mib, args.id)
+            print("the title didn't fit in place: the quest was laid out again", file=sys.stderr)
+    name = args.name or (f"m{args.id:05d}.mib" if args.id is not None else name)
+    if not name:
+        print("mhuc questslot put: give --name or --id for a copied slot", file=sys.stderr)
+        return 2
+    new = quest.mh4u_put_slot(data, args.slot, quest.mh4u_pack_slot(mib, name))
+    with open(args.out, "wb") as f:
+        f.write(new)
+    print(f"{name} ({len(mib)} bytes) in slot {args.slot}, {len(new)} bytes to {args.out}")
+    return 0
+
+
+def cmd_extdata(args) -> int:
+    from . import extdata
+    if args.action == "testkit":
+        if not args.key or not args.out:
+            print("mhuc extdata testkit EXTDATA_DIR --key K --out DIR", file=sys.stderr)
+            return 2
+        files = {n: _read(os.path.join(args.file, n)) for n in sorted(os.listdir(args.file))
+                 if n.startswith(("quest", "otomo"))}
+        out, notes = extdata.testkit(files, _read(args.key).rstrip(b"\r\n"))
+        os.makedirs(args.out, exist_ok=True)
+        for n, d in out.items():
+            with open(os.path.join(args.out, n), "wb") as f:
+                f.write(d)
+        text = ("MH Ultimate Collection in-game test kit (specs/quest.md Q17, Q19; specs/extdata.md E4).\n"
+                "Back up your Extra Data first, then copy these files over it and open the downloaded "
+                "quests and the DLC Palicos.\n\n" + "\n".join("- " + n for n in notes) + "\n")
+        with open(os.path.join(args.out, "TESTKIT.txt"), "w", encoding="utf-8") as f:
+            f.write(text)
+        print(text, end="")
+        return 0
+    with open(args.file, "rb") as f:
+        data = f.read()
+    if args.action == "rename":
+        if args.kind != "otomo" or args.slot is None or args.name is None or not args.out:
+            print("mhuc extdata rename: otomo only, with --slot, --name and --out", file=sys.stderr)
+            return 2
+        new = extdata.rename_palico(data, args.slot, args.name, args.last_byte)
+        with open(args.out, "wb") as f:
+            f.write(new)
+        print(f"slot {args.slot} renamed, {len(new)} bytes to {args.out}")
+        return 0
+    if args.kind == "card":
+        out = extdata.card_summary(data)
+        if args.action == "dump":
+            out = {"used": out, "guild_quests": [extdata.parse_guild_quest(r)
+                                                 for r in extdata.card_records(data, "guild_quests") if any(r)]}
+    else:
+        slots = extdata.otomo_slots(data)
+        out = slots if args.action == "dump" else {"palicos": len(slots)}
+    json.dump(out, sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
+def cmd_catalog(args) -> int:
+    from . import catalog
+    text = catalog.render(args.dir)
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(text)
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def cmd_convert(args) -> int:
+    need = (args.what, args.src, args.template, args.texts, args.id, args.out)
+    if args.what != "quest" or None in need:
+        print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
+              "[--tables DIR] --out OUT.json  (docs/design/quest-conversion.md)", file=sys.stderr)
+        return 2
+    from . import convert
+
+    def load(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    src = load(args.src)
+    if isinstance(src, dict) and "mib" not in src and len(src) == 1:  # mhuc quest dump's {name: parts}
+        src = next(iter(src.values()))
+    try:
+        out = convert.convert_mhxx(src, load(args.template), convert.load_tables(args.tables), args.id,
+                                   load(args.texts))
+    except convert.ConvertError as e:
+        print(f"mhuc convert: {e}", file=sys.stderr)
+        return 1
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+    print(f"{args.out}: {len(out['placeholders'])} placeholders to record (docs/sources/authored-register.md); "
+          "build it with mhuc mib import")
+    return 0
+
+
+def cmd_idnames(args) -> int:
+    import csv as _csv
+
+    from . import catalog, idnames
+    out_real = os.path.realpath(args.out)
+    repo = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if out_real == repo or out_real.startswith(repo + os.sep):
+        print("mhuc idnames: the table is derived from the game's files; write it outside the repository",
+              file=sys.stderr)
+        return 2
+    game = {"mh4u": "MH4U", "mh3u": "MH3U"}[args.kind]
+    known = {r["monster"] for r in catalog.read_table(os.path.join(repo, "data", "catalog", "monsters.csv"))
+             if r["game"] == game}
+    obs = []
+    for p in args.paths:
+        for _, q in _quest_files(args.kind, p):
+            if args.kind == "mh4u":
+                ids, title = {d["monster"] for w in q["large_waves"] for d in w}, q["text"]["eng"]["title"]
+            else:
+                ids, title = {m["type"] for m in q["monsters"] if m["type"]}, q["name"]["eng"]
+            text = idnames.fetch_page(f"{title} ({game} Quest)", args.cache)
+            if text and ids:
+                obs.append((ids, idnames.categories(text, game, known)))
+    res = idnames.infer(obs)
+    with open(args.out, "w", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        w.writerow(["id", "name", "candidates"])
+        for i, c in res.items():
+            w.writerow([i, c[0] if len(c) == 1 else "", "; ".join(c)])
+    one = sum(1 for c in res.values() if len(c) == 1)
+    print(f"{len(obs)} quests with a wiki page; {len(res)} ids, {one} with one name; table in {args.out}")
+    return 0
+
+
+def cmd_mod(args) -> int:
+    from . import mod as modfile
+    out = {os.path.basename(p): modfile.info(_read(p)) for p in args.paths}
+    json.dump(out, sys.stdout, indent=1)
+    print()
+    return 0
+
+
+def cmd_emd(args) -> int:
+    from collections import Counter
+
+    from . import survey
+    total: Counter = Counter()
+    for p in args.paths:
+        st: dict = {}
+        survey.survey_arc(_read(p), st)
+        total.update(st.get("emd", Counter()))
+    for k, v in sorted(total.items()):
+        print(f"{k}: {v}")
+    return 0 if total else 1
 
 
 def cmd_pipeline(args) -> int:
@@ -220,14 +445,90 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=dlccrypt.MH4U_SAVE_MODES, default="normal", help="mh4u-save only")
     p.set_defaults(func=cmd_decrypt)
 
+    p = sub.add_parser("encrypt", help="encrypt an MH4U save or Extra Data file again (the key comes from a file)")
+    p.add_argument("kind", choices=["mh4u-save"])
+    p.add_argument("file")
+    p.add_argument("out")
+    p.add_argument("--key", required=True, help="a file holding the key's bytes (never kept in this repository)")
+    p.add_argument("--mode", choices=dlccrypt.MH4U_SAVE_MODES, default="normal")
+    p.add_argument("--seed", type=lambda v: int(v, 0), default=0x1234, help="the 16-bit XOR seed")
+    p.set_defaults(func=cmd_encrypt)
+
     p = sub.add_parser("quest", help="read quests: MH4U .mib, MHXX quest .arc, MH3U QTDS, or Extra Data quest files")
     p.add_argument("action", choices=["dump", "check"])
     p.add_argument("kind", choices=["mh4u", "mhxx", "mh3u"])
     p.add_argument("paths", nargs="+")
     p.set_defaults(func=cmd_quest)
 
+    p = sub.add_parser("mib", help="MH4U .mib as editable JSON: export a quest, import (build) it back")
+    p.add_argument("action", choices=["export", "import"])
+    p.add_argument("src", help="the .mib (export) or the JSON (import)")
+    p.add_argument("dst")
+    p.set_defaults(func=cmd_mib)
+
+    p = sub.add_parser("questslot", help="MH4U Extra Data quest slots (decrypted): check hashes, put a .mib")
+    p.add_argument("action", choices=["check", "get", "put"])
+    p.add_argument("paths", nargs="+")
+    p.add_argument("--slot", type=int)
+    p.add_argument("--mib")
+    p.add_argument("--replace", action="store_true", help="allow overwriting a used slot")
+    p.add_argument("--from-slot", type=int, help="copy the quest stored in this slot instead of --mib")
+    p.add_argument("--id", type=int, help="give the quest this id (and the name mNNNNN.mib)")
+    p.add_argument("--title", help="a new title in all five languages (a longer one lays the quest out again)")
+    p.add_argument("--name", help="the slot's file name (default: the .mib's, or mNNNNN.mib with --id)")
+    p.add_argument("--out")
+    p.set_defaults(func=cmd_questslot)
+
+    p = sub.add_parser("extdata", help="MH4U Extra Data besides quests (decrypted): card* and otomo1")
+    p.add_argument("action", choices=["dump", "check", "rename", "testkit"],
+                   help="check prints counts only; rename edits a Palico's name (check E4); testkit takes the "
+                        "encrypted Extra Data folder and builds the files for checks Q17, Q19 and E4")
+    p.add_argument("kind", nargs="?", choices=["card", "otomo"], default="otomo")
+    p.add_argument("file", help="a decrypted file, or for testkit the Extra Data folder")
+    p.add_argument("--key", help="testkit: a file holding the save key (never kept in this repository)")
+    p.add_argument("--slot", type=int)
+    p.add_argument("--name")
+    p.add_argument("--last-byte", type=lambda v: int(v, 0))
+    p.add_argument("--out")
+    p.set_defaults(func=cmd_extdata)
+
+    p = sub.add_parser("catalog", help="what MH4U already has of 3U's and GU's monsters and maps (data/catalog)")
+    p.add_argument("action", choices=["overlap"])
+    p.add_argument("--dir", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "catalog"))
+    p.add_argument("--out", help="write the Markdown here instead of printing it")
+    p.set_defaults(func=cmd_catalog)
+
+    p = sub.add_parser("mod", help="MT Mobile models: header and mesh summary (specs/mod.md)")
+    p.add_argument("action", choices=["info"])
+    p.add_argument("paths", nargs="+")
+    p.set_defaults(func=cmd_mod)
+
+    p = sub.add_parser("emd", help="check E1 (specs/emd.md) on ARCs holding .emd/.etd pairs (data/em_data.arc)")
+    p.add_argument("action", choices=["check"])
+    p.add_argument("paths", nargs="+")
+    p.set_defaults(func=cmd_emd)
+
+    p = sub.add_parser("idnames", help="monster ids to names from quests and the wiki's quest pages (table "
+                                       "written outside the repository)")
+    p.add_argument("kind", choices=["mh4u", "mh3u"])
+    p.add_argument("paths", nargs="+", help="decrypted Extra Data quest files (or .mib / QTDS files)")
+    p.add_argument("--cache", required=True, help="a folder for the fetched wiki pages")
+    p.add_argument("--out", required=True, help="the CSV to write, outside the repository")
+    p.set_defaults(func=cmd_idnames)
+
+    p = sub.add_parser("convert", help="convert a source game's quest into an MH4U .mib model (JSON)")
+    p.add_argument("what", nargs="?", choices=["quest"])
+    p.add_argument("src", nargs="?", help="the quest as `mhuc quest dump mhxx` prints it")
+    p.add_argument("--from", dest="game", choices=["mhxx"], default="mhxx")
+    p.add_argument("--template", help="an MH4U quest as `mhuc mib export` writes it, for what isn't converted")
+    p.add_argument("--texts", help="JSON: for each of eng, fre, spa, ger, ita, the 7 MH4U strings")
+    p.add_argument("--id", type=int, help="the MH4U quest id to give it")
+    p.add_argument("--tables", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "idmap",
+                                                     "mhxx-mh4u"))
+    p.add_argument("--out")
+    p.set_defaults(func=cmd_convert)
+
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
-                       ("convert", "convert a source game's assets for MH4U (needs game files)"),
                        ("build", "build the mod's romfs and plugins (needs game files)")):
         p = sub.add_parser(name, help=text)
         p.add_argument("rest", nargs=argparse.REMAINDER)

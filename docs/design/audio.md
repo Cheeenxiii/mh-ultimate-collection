@@ -24,7 +24,7 @@
 
 ## Unknowns to settle first
 
-1. The file versions of each sound kind in MH3U and MHXX against MH4U (S1).
+1. The file versions of each sound kind in MH3U and MHXX against MH4U (SN1).
 2. MHXX's layouts against GU's (S3).
 3. How MH4U picks a monster's theme: a per-monster table, the quest, or the stage. Its readers set the bound to move (id-tables.md).
 4. The `.stq` layout (S4).
@@ -33,8 +33,8 @@
 
 ## Order of work
 
-1. S1 survey, alongside the next RomFS session (it's counts only, so pair it with quest checks Q6 and Q13).
-2. Verify the MH4U layouts on MH4U's own files (S2), then `mhuc sound` to list and decode waves to WAV for checking by ear, on the maintainer's machine only. No output is committed.
+1. SN1 survey, alongside the next RomFS session (it's counts only, so pair it with quest checks Q6 and Q13).
+2. Verify the MH4U layouts on MH4U's own files (SN2), then `mhuc sound` to list and decode waves to WAV for checking by ear, on the maintainer's machine only. No output is committed.
 3. The first monster port's sounds, as part of that monster: bank, request, waves, and its theme if it has one.
 4. The first locale's music and ambience, with its map.
 5. Underwater audio, with the swim state (underwater.md, step 3).

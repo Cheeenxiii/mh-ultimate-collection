@@ -93,7 +93,7 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 
 ## Checks (with game files)
 
-- **S1:** survey the sound entries of the three RomFS (`mhuc survey`): the count per type id and per version for each kind above, MH4U against MH3U against MHXX. That tells whether MH3U's versions are MH4U's.
-- **S2:** parse every MH4U `MADP`, `SNDB`, `SREQ` and `SES` with this layout. Count files whose sizes and offsets close exactly, and record the counts, never bytes. A field becomes verified when every file agrees.
+- **SN1:** survey the sound entries of the three RomFS (`mhuc survey`): the count per type id and per version for each kind above, MH4U against MH3U against MHXX. That tells whether MH3U's versions are MH4U's.
+- **SN2:** parse every MH4U `MADP`, `SNDB`, `SREQ` and `SES` with this layout. Count files whose sizes and offsets close exactly, and record the counts, never bytes. A field becomes verified when every file agrees.
 - **S3:** MHXX's wave, bank and request against Definitive Edition's GU layouts (`SBKR` v4, `SRQR` v5, wave v2). If they agree, the XX → 4U conversion is the 4U → GU rule run backwards.
 - **S4:** the `.stq` layout, from `rLtSoundStreamRequest`'s loader in the MH4U recompile.

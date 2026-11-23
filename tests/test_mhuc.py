@@ -333,3 +333,13 @@ def test_cli_gmd_and_tex(tmp_path, capsys):
 def test_cli_pipeline_stubs():
     for cmd in ("ingest", "convert", "build"):
         assert cli.main([cmd]) == 2
+
+
+@pytest.mark.parametrize("layout", ["v2", "v2-32"])
+def test_gmd_label_hashes_written_and_checked(layout):
+    import zlib
+    label = "TXT_TEST_01"
+    b = label.encode()
+    assert gmd.label_hashes(label) == (zlib.crc32(b * 2) ^ 0xFFFFFFFF, zlib.crc32(b * 3) ^ 0xFFFFFFFF)
+    g = gmd.read(gmd.write(gmd.Gmd("t", ["x", "y"], {0: label, 1: "OTHER"}, version=gmd.V2, layout=layout)))
+    assert gmd.hash_check(g) == (2, 2)

@@ -162,6 +162,10 @@ That is 1,938 of 2,000 (96.9%) agreeing, with no function returning a different 
 
 Memory on this 14 GB machine: the full MH4U recompile (and MH3U's, close to it) hits `MemoryError` under `ulimit -v 3000000` in `code_cover`, the data-pointer pass's set of every covered halfword. MH3U's run peaked at about 2.5 GB. The harness reserves a 4 GB guest address window at start (`harness.c`, PROT_NONE and MAP_NORESERVE: address space, not memory), so gametest can't start under any `ulimit -v` below about 4.3 GB. It ran in a cgroup instead: `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapMax=0`, with `ulimit -v 6000000`, which caps real memory at 3 GB. Under that 3 GB cap the full MH4U recompile is killed; the workspace cap is 6 GB since 2026-11-23, and the full run fits in it.
 
+## MHXX's code modules (2026-11-23)
+
+The MHXX numbers above are for `code.bin` only. MHXX keeps much of its code in 109 CRO modules in RomFS (`/modules_MasterRelease/`, 6.5 MB of code: every large and small monster, the 16 weapon types, village, quest, title), loaded at run time; the static side calls into them through 699 veneers the loader fills. So the MHXX reference recompile has no monster or weapon behaviour code. The engine fork's `tools/cro.py` (branch `uc/monster-port-step1`) loads all 109 modules with their relocations and static imports, and the analyser reads `roEm001` (Rathian) cleanly. Recompiling the modules and linking them at run time is still to do ([monster-port.md](monster-port.md), step 1 results). MH4U and MH3U have no modules.
+
 ## Steps, in order (first session with game files)
 
 1. **Class registries (no recompile). Done, results above.** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.

@@ -17,6 +17,12 @@ Nothing here is verified yet. Every "where it lives" below is a hypothesis for t
 | Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters (audio.md) | converted assets; filters through MH4U's own screen filters where they match |
 | HUD | oxygen gauge, depth cues | layout files (rLayout) | converted layout, or drawn by the plugin if layouts don't convert |
 
+## Other leads
+
+MH3U's underwater motions are LMT files: [specs/lmt.md](../../specs/lmt.md) has MH4U's version-67 layout (from MHGU Definitive Edition), which MHXX shares. Check L1 found MH3U's 387 motion lists are all **version 66**, which that layout doesn't read: the underwater motions need a version-66 layout (Cha-Cha's Wii U files are the lead) or a converter to 67.
+
+Monster Hunter Tri, 3U's Wii base and the first game with underwater combat, has a static recompilation to native ARM and reverse-engineering tools (sepalani's MHTrIDA); see [related-projects](../sources/related-projects.md). They are a reference for behaviour beside Cha-Cha and our MH3U 3DS recompile, never a source (rule 2: MH3U 3DS supplies the swimming code and motions). Neither has been read for this yet.
+
 ## Leads from Cha-Cha (MH3U Wii U)
 
 Cha-Cha, a recompilation of the Wii U build of MH3U, marks some of this already ([docs/sources/cha-cha.md](../sources/cha-cha.md)). Wii U offsets, to re-find on 3DS before use:

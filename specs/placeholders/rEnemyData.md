@@ -7,7 +7,7 @@ status: unknown
 
 # rEnemyData (enemy)
 
-Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `config/mt_classes.tsv`) lists it under `cResource`, class id `0x0a0e48d4`, resource object size 0x70 bytes (the loaded object, not the file).
+**Now laid out in [emd.md](../emd.md)** (from MHGU Definitive Edition, unverified on our files); this placeholder keeps the registry facts. Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `config/mt_classes.tsv`) lists it under `cResource`, class id `0x0a0e48d4`, resource object size 0x70 bytes (the loaded object, not the file).
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|

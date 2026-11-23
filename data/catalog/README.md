@@ -7,6 +7,7 @@ Facts from the public [Monster Hunter Wiki](https://monsterhunterwiki.org) (mons
 | [monsters.csv](monsters.md) | 300 | every monster each game's list page shows, large and small, with class and first game |
 | [maps.csv](maps.md) | 71 | every locale, special locale and settlement each game's locale list shows, with area counts |
 | [weapons.csv](weapons.md) | 40 | the weapon classes of each game |
+| [overlap.md](overlap.md) | — | generated: which 3U and GU monsters and locales MH4U already has (same wiki page), by `mhuc catalog overlap` |
 
 `game` is the wiki's game: MH3U, MH4U, MHGU. `source_game` (monsters) is the dump the mod takes that version from, per the fidelity rule: MH3U (3DS) for 3U, MH4U USA v1.3.0 for 4U, MHXX (3DS) for GU-era assets.
 
