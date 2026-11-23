@@ -34,7 +34,7 @@ Class names and extensions come from mhff's table. MH4U's registry (MH4UltimateD
 | file | extdata | downloaded quests are kept in Extra Data, in five files `quest1`..`quest5` of 328,704 bytes each, beside `card1`..`card3`, `cardbox` and `otomo1` | verified | ours; check Q3 |
 | whole | bytes | every Extra Data file, and the save's `system`, is encrypted: mhef's `SavedataCipher` (MH4G) decrypts all of them with a matching checksum, in mode "quest" for `quest*`, "card" for `card*` and "normal" for the rest | verified | svanheulen/mhef; ours, check Q4 |
 | quest file | slots | a decrypted `quest*` file is 40 slots of 0x2010 bytes, then 120 zero bytes; a slot is all zero (empty) or holds one bare `.mib` from its offset 0 (no ARC around it) | verified | ours; check Q5 |
-| slot 0x2000 | 16 bytes | the last 16 bytes of a used slot: never all zero, not an MD5, SHA-1, SHA-256, CRC-32 or byte sum of the slot's first 0x2000 bytes | unknown | ours; check Q5 |
+| slot 0x2000 | char[16] | the quest's file name, `m` + the quest id in five decimal digits + `.mib`, NUL-padded (`m6NNNN.mib` for every DLC quest); the `.mib` body before it ends well short of 0x2000 and is zero-padded | verified | ours; check Q8 |
 
 ### Header
 
@@ -108,7 +108,8 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 
 ## Open questions
 
-- MH4U's `.mib`: the header's remaining unverified fields (Q6 against the game's own quests; in-game checks for meanings), and the 16-byte trailer of each Extra Data slot.
+- MH4U's `.mib`: the header's remaining unverified fields (Q6 against the game's own quests; in-game checks for meanings).
+- Whether a server DLC file, once through mhef's `DLCCipher`, holds the same `.mib` bytes as its Extra Data slot (needs one file from Capcom's server; this environment can't reach it).
 - MH3U's quest format: loose `QTDS`/`QTDB` files and `XFS` support files, not ARCs (check Q1). Their layouts are unknown; `XFS` is MT's generic serialisation, which may make `.supp` readable from the class registry.
 - How MHXX's `.sem`/`.esl`/`.rem` map onto `.mib` sections.
 
@@ -125,4 +126,5 @@ Q3 to Q5 were run on 2026-11-23 in a web session on the maintainer's own MH4U (U
 - **Q4 (done):** decrypt each file with mhef's `SavedataCipher(MH4G_NA)` in all three modes. Pass: exactly the modes in the table above give a matching checksum, for all eleven files (`cardbox`, `otomo1` and `system` also pass in quest mode, whose only difference is dropping the last 0x100 bytes).
 - **Q5 (done):** in each decrypted `quest*` file, split at 0x2010 and look at every slot. Pass: 200 slots, 120 holding a quest and 80 all zero; every quest starts at its slot's offset 0 with 0xA0 and `v005`. On all 120 quests: every header offset listed as verified lands inside the slot; the supply-box list ends with 0xFF; the main reward items end with 0xFFFF at a 6-byte stride; the large monster list ends with 0xFFFFFFFF at a 0x28 stride with every id below 124 (the id table's size, [id-tables](../docs/design/id-tables.md)); the intruder list ends at a 0x2C stride; the English title decodes as printable UTF-16. The value ranges quoted in the header table are from the same 120.
 - **Q7 (done):** a second pass over the same 120 quests, for the sub-structures and the spread of enum-like values. Pass: the large-monster offset leads to a 0-terminated list of wave offsets, each a terminated definition list, and every objective target of types 0x1, 0x81 and 0x204 is a monster of those waves; the small-monster offset leads to a 0-terminated list of areas, each a terminated definition list with ids below 0x200; every supply item with a non-zero id has a count of 1 to 99; the five language offsets are distinct and all seven strings of each decode as UTF-16. The value spreads in the header table come from this pass.
+- **Q8 (done):** compare each used slot's last 16 bytes with the quest id at 0xC0. Pass: in all 120 they are exactly `m%05d.mib` of that id, NUL-padded. (Q5 had ruled out the common hashes; the low entropy, 10 printable ASCII characters and digits matching the quest id gave it away.)
 - **Q6 (open):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.
