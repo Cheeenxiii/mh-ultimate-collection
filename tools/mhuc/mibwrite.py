@@ -140,3 +140,78 @@ def mib4_set_texts(model: dict, index: int, text: str, langs: range = range(5)) 
     for lang in langs:
         new["texts"][lang][index] = text
     return new
+
+
+# ── JSON form: the model with the known fields decoded and the rest as hex ─────
+
+def _def_json(raw: bytes, first: int = 0) -> dict:
+    b = raw[first:]
+    mid, count = struct.unpack_from("<2I", b, 0)
+    out = {"monster": mid, "count": count, "condition": b[8], "area": b[9], "frenzy": b[0xF],
+           "pos": list(struct.unpack_from("<3f", b, 0x10)), "raw": raw.hex()}
+    if first:
+        out["chance"] = struct.unpack_from("<I", raw, 0)[0]
+    return out
+
+
+def _def_bytes(obj: dict, size: int, first: int = 0) -> bytes:
+    b = bytearray(bytes.fromhex(obj["raw"]) if obj.get("raw") else bytes(size))
+    if len(b) != size:
+        raise QuestError(f"a definition is {size:#x} bytes")
+    if first:
+        struct.pack_into("<I", b, 0, obj.get("chance", struct.unpack_from("<I", b, 0)[0]))
+    struct.pack_into("<2I", b, first, obj["monster"], obj["count"])
+    b[first + 8], b[first + 9], b[first + 0xF] = obj["condition"], obj["area"], obj["frenzy"]
+    struct.pack_into("<3f", b, first + 0x10, *obj["pos"])
+    return bytes(b)
+
+
+def model_to_json(model: dict) -> dict:
+    from .quest import MIB4_FIELDS, MIB4_LANGS, MIB4_TEXTS
+    h = model["header"]
+    fields = {}
+    for name, o, f in MIB4_FIELDS:
+        v = struct.unpack_from("<" + f, h, o)
+        fields[name] = list(v) if len(v) > 1 else v[0]
+    return {
+        "format": "mhuc mib4 model 1",
+        "fields": fields,
+        "header": h.hex(),
+        "texts": {lang: dict(zip(MIB4_TEXTS, t, strict=True)) for lang, t in zip(MIB4_LANGS, model["texts"],
+                                                                                 strict=True)},
+        "presets": model["presets"].hex() if model.get("presets") else None,
+        "supply": [{"head": head.hex(), "items": [list(struct.unpack_from("<HH", items, 4 * i))
+                                                  for i in range(len(items) // 4)]}
+                   for head, items in model["supply"]],
+        "rewards": {name: {"head": head.hex(), "items": [list(struct.unpack("<3H", it)) for it in items]}
+                    for name, (head, items) in model["rewards"].items()},
+        "waves": [[_def_json(d) for d in wave] for wave in model["waves"]],
+        "small_areas": [[_def_json(d) for d in area] for area in model["small_areas"]],
+        "intruders": [_def_json(d, 4) for d in model["intruders"]],
+    }
+
+
+def model_from_json(obj: dict) -> dict:
+    from .quest import MIB4_FIELDS, MIB4_LANGS, MIB4_TEXTS
+    if obj.get("format") != "mhuc mib4 model 1":
+        raise QuestError("not an mhuc mib4 model")
+    h = bytearray(bytes.fromhex(obj["header"]))
+    for name, o, f in MIB4_FIELDS:  # the decoded fields win over the raw header
+        v = obj["fields"][name]
+        struct.pack_into("<" + f, h, o, *(v if isinstance(v, list) else [v]))
+    supply = []
+    for box in obj["supply"]:
+        head = bytearray(bytes.fromhex(box["head"]))
+        head[1] = len(box["items"])  # the slot count follows the list
+        supply.append((bytes(head), b"".join(struct.pack("<HH", *it) for it in box["items"])))
+    return {
+        "header": bytes(h),
+        "texts": [[obj["texts"][lang][t] for t in MIB4_TEXTS] for lang in MIB4_LANGS],
+        "presets": bytes.fromhex(obj["presets"]) if obj.get("presets") else None,
+        "supply": supply,
+        "rewards": {name: (bytes.fromhex(r["head"]), [struct.pack("<3H", *it) for it in r["items"]])
+                    for name, r in obj["rewards"].items()},
+        "waves": [[_def_bytes(d, DEF) for d in wave] for wave in obj["waves"]],
+        "small_areas": [[_def_bytes(d, DEF) for d in area] for area in obj["small_areas"]],
+        "intruders": [_def_bytes(d, INTRUDER, 4) for d in obj["intruders"]],
+    }

@@ -168,7 +168,36 @@ def cmd_quest(args) -> int:
     return 1 if bad else 0
 
 
+def cmd_mib(args) -> int:
+    from . import mibwrite
+    if args.action == "export":
+        obj = mibwrite.model_to_json(mibwrite.mib4_model(_read(args.src)))
+        with open(args.dst, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+    else:
+        with open(args.src, encoding="utf-8") as f:
+            mib = mibwrite.mib4_build(mibwrite.model_from_json(json.load(f)))
+        quest.parse_mib4(mib)  # refuse to write what the reader can't read back
+        with open(args.dst, "wb") as f:
+            f.write(mib)
+    print(f"{args.src} -> {args.dst}")
+    return 0
+
+
 def cmd_questslot(args) -> int:
+    if args.action == "get":
+        if len(args.paths) != 1 or args.slot is None or not args.out:
+            print("mhuc questslot get: one quest file, with --slot and --out", file=sys.stderr)
+            return 2
+        found = {k: body for k, _, body in quest.mh4u_slots(_read(args.paths[0]))}
+        if args.slot not in found:
+            print(f"mhuc questslot get: slot {args.slot} is empty", file=sys.stderr)
+            return 1
+        with open(args.out, "wb") as f:
+            f.write(quest.mh4u_slot_mib(found[args.slot]))
+        print(f"slot {args.slot} -> {args.out}")
+        return 0
     if args.action == "check":
         used = good = 0
         for p in args.paths:
@@ -347,8 +376,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("paths", nargs="+")
     p.set_defaults(func=cmd_quest)
 
+    p = sub.add_parser("mib", help="MH4U .mib as editable JSON: export a quest, import (build) it back")
+    p.add_argument("action", choices=["export", "import"])
+    p.add_argument("src", help="the .mib (export) or the JSON (import)")
+    p.add_argument("dst")
+    p.set_defaults(func=cmd_mib)
+
     p = sub.add_parser("questslot", help="MH4U Extra Data quest slots (decrypted): check hashes, put a .mib")
-    p.add_argument("action", choices=["check", "put"])
+    p.add_argument("action", choices=["check", "get", "put"])
     p.add_argument("paths", nargs="+")
     p.add_argument("--slot", type=int)
     p.add_argument("--mib")

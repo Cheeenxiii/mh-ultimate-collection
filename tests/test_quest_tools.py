@@ -199,6 +199,30 @@ def test_mib4_model_build_round_trip():
         mibwrite.mib4_build(dict(model, texts=model["texts"][:4]))
 
 
+def test_mib_json_round_trip_and_edit(tmp_path, capsys):
+    from mhuc import mibwrite
+    mib = build_mib4(60003)
+    obj = json.loads(json.dumps(mibwrite.model_to_json(mibwrite.mib4_model(mib))))
+    assert mibwrite.model_from_json(obj) == mibwrite.mib4_model(mib)
+    obj["fields"]["quest_id"] = 60123
+    obj["texts"]["eng"]["title"] = "Edited"
+    wave = obj["waves"][0]
+    wave[0]["monster"], wave[0]["area"] = 7, 3
+    got = quest.parse_mib4(mibwrite.mib4_build(mibwrite.model_from_json(obj)))
+    assert got["quest_id"] == 60123 and got["text"]["eng"]["title"] == "Edited"
+    assert (got["large_waves"][0][0]["monster"], got["large_waves"][0][0]["area"]) == (7, 3)
+    src, js, out = tmp_path / "m.mib", tmp_path / "m.json", tmp_path / "n.mib"
+    src.write_bytes(mib)
+    assert cli.main(["mib", "export", str(src), str(js)]) == 0
+    assert cli.main(["mib", "import", str(js), str(out)]) == 0
+    assert quest.parse_mib4(out.read_bytes()) == quest.parse_mib4(mib)
+    slotfile, got_mib = tmp_path / "q", tmp_path / "g.mib"
+    slotfile.write_bytes(quest.mh4u_put_slot(bytes(40 * quest.SLOT), 4, quest.mh4u_pack_slot(mib, "m60003.mib")))
+    assert cli.main(["questslot", "get", str(slotfile), "--slot", "4", "--out", str(got_mib)]) == 0
+    assert got_mib.read_bytes() == mib
+    assert cli.main(["questslot", "get", str(slotfile), "--slot", "5", "--out", str(got_mib)]) == 1
+
+
 def test_questslot_put_long_title_rebuilds(tmp_path, capsys):
     mib = build_mib4(60001)
     qf, out = tmp_path / "q", tmp_path / "q2"

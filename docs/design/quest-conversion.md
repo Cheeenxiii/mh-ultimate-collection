@@ -85,6 +85,6 @@ In order of dependence:
 
 **The cheapest first quest** is therefore a GU (MHXX) quest set on one of those shared locales whose large monsters are among the 46 MH4U also has (overlap.md lists them): no new monster and no new map, only the id tables for monsters, the map, items and objectives. Which quest, and whether the GU or MH4U version of a shared monster is used, belongs to the open decisions.
 
-The writer side exists: `mibwrite.mib4_build` lays out a `.mib` from a model (header, texts, raw list entries) and recomputes every offset; it round-trips all 120 DLC quests (quest.md Q18). A converter fills that model. Whether the game takes the builder's layout is check Q19.
+The writer side exists: `mibwrite.mib4_build` lays out a `.mib` from a model (header, texts, raw list entries) and recomputes every offset; it round-trips all 120 DLC quests (quest.md Q18). A converter fills that model, or its JSON form (`mhuc mib export`/`import`), which is also how a quest can be edited by hand. Whether the game takes the builder's layout is check Q19.
 
 A converter (`mhuc convert quest`) can be written as soon as the id tables exist as data files; it should refuse a quest whose ids it can't map rather than guess.
