@@ -14,7 +14,7 @@ The MH4U quest format (`.mib`) is now specified from mhff's wiki and partly veri
 
 Findings that steer the next steps:
 - Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, each ending with its file name (`mNNNNN.mib`), under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables. Monsters come in waves; objective types are mapped by value, though their meanings aren't confirmed.
-- This environment can't reach Capcom's DLC server (proxy 403, and the server speaks plain HTTP only).
+- Capcom's MH4U DLC server is gone: `goshawk.capcom.co.jp` gives NXDOMAIN from public DNS (checked by the maintainer, 2026-11-23). The maintainer's Extra Data is the only source of DLC quests; the server-form rows in specs/quest.md stay unverified.
 - No public layout exists for `.emd`/`.etd`; that spec has to come from the files and the code.
 - Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
 - Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
@@ -34,7 +34,6 @@ This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of 
 
 ## Waiting on the maintainer
 
-- Optional: server DLC files downloaded on their own machine (mhef `tools/download_n3ds.py`), uploaded as they come, to compare with the Extra Data copies.
 - Merging `claude/zealous-wozniak-eip1pk` into `main`.
 - A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
 - Whether to offer the inline-cache fix (fork `recomp.h`) to upstream MH4UltimateDC.

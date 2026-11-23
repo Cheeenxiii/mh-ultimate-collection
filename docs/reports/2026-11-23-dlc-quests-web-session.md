@@ -21,7 +21,7 @@ A web session with no RomFS or code dumps. The only game files were the maintain
 
 ## Not done
 
-- The quest downloader. The maintainer overrode ground rule 5 for this session, but the environment's proxy refuses `goshawk.capcom.co.jp` (403, host not allowed), and mhef's downloader uses plain HTTP, which the proxy doesn't carry at all. The maintainer can run it on their own machine and upload the files.
+- The quest downloader. The maintainer overrode ground rule 5 for this session, but the environment's proxy refuses `goshawk.capcom.co.jp` (403, host not allowed), and mhef's downloader uses plain HTTP, which the proxy doesn't carry at all. The maintainer then ran it on their own machine: the host doesn't resolve, and public DNS gives NXDOMAIN. Capcom's MH4U DLC server is gone.
 - STATUS.md's next tasks 1 to 4: each needs the RomFS or code dumps, which this session didn't have.
 - Q6: the same checks on the game's own 508 `.mib`.
 - `card*`, `cardbox`, `otomo1` and `system` decrypt, but their contents weren't examined. mhff's wiki has "MH4U card1 Format" and "MH4U DLC Palico Format" pages for them.
@@ -29,7 +29,6 @@ A web session with no RomFS or code dumps. The only game files were the maintain
 
 ## Checklist for the next session
 
-1. If the maintainer uploads server DLC files: decrypt them with mhef's `DLCCipher` and compare each `.mib` with its Extra Data slot (same quest id); that settles the server-side rows of specs/quest.md.
-2. With the RomFS: Q6 (the Q5 checks on `quest00.arc`/`quest01.arc`) promotes the header rows from DLC-only to the game's own quests.
-3. `.emd`/`.etd` specs from the files, with no public layout to start from.
-4. Re-running Q3 to Q5 needs mhef's `SavedataCipher` (the key is in mhef's `mhef/n3ds.py`, not in this repository): decrypt into a folder outside the repositories, then split each `quest*` file at 0x2010.
+1. With the RomFS: Q6 (the Q5 checks on `quest00.arc`/`quest01.arc`) promotes the header rows from DLC-only to the game's own quests.
+2. `.emd`/`.etd` specs from the files, with no public layout to start from.
+3. Re-running Q3 to Q5 needs mhef's `SavedataCipher` (the key is in mhef's `mhef/n3ds.py`, not in this repository): decrypt into a folder outside the repositories, then split each `quest*` file at 0x2010.

@@ -109,7 +109,7 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 ## Open questions
 
 - MH4U's `.mib`: the header's remaining unverified fields (Q6 against the game's own quests; in-game checks for meanings).
-- Whether a server DLC file, once through mhef's `DLCCipher`, holds the same `.mib` bytes as its Extra Data slot (needs one file from Capcom's server; this environment can't reach it).
+- Whether a server DLC file, once through mhef's `DLCCipher`, holds the same `.mib` bytes as its Extra Data slot (needs one server file; Capcom's DLC server is gone, `goshawk.capcom.co.jp` gives NXDOMAIN as of 2026-11-23, so only an archived copy could settle it).
 - MH3U's quest format: loose `QTDS`/`QTDB` files and `XFS` support files, not ARCs (check Q1). Their layouts are unknown; `XFS` is MT's generic serialisation, which may make `.supp` readable from the class registry.
 - How MHXX's `.sem`/`.esl`/`.rem` map onto `.mib` sections.
 
