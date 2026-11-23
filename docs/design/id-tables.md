@@ -159,6 +159,8 @@ The 123-entry tables (the nine i16 tables, `0x00fcd71c`, `emName`, `emExp`) stop
 
 When ids grow past 123: the factory compare and jump table, `enemyDataPathIndex`, `enemyDataById` (above); `crownSizeTable`, `monsterListOrder` (and the three loops over it), `monsterIconIndex` (and the two 124-byte stack copies), `enemyResourceIndex` and its records, `dropRecordIndex`, `dropBaseA`, `dropBaseB` and `itemListTable` (for new lists); the unknown-purpose tables above; and every language's `emName`/`emExp`.
 
+**Save-side limits (not tables to move):** a guild quest (specs/extdata.md) stores each monster id in one byte, so ids above 255 can't appear in one; ids up to 255 fit as they are.
+
 ### Procedure (repeatable from the dump; record results, never bytes)
 
 1. Lay out the code as in step 1 above. List the code's literals that point into `.rodata`/`.data`. For each, take the distance to the next referenced address; keep the ones that are 123, 124 or 125 times a small row size.

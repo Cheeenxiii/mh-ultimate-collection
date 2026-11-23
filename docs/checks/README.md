@@ -13,6 +13,8 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | MOD field meanings (M2) | specs/mod.md | all three, a model tool | open |
 | Quest files (Q1, Q2) | specs/quest.md | MH4U, MH3U, MHXX RomFS | done 2026-11-23 |
 | Extra Data crypto and quest slots, `.mib` header on 120 DLC quests (Q3-Q5) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
+| Extra Data cards, DLC Palicos, MH3U saves (E1-E3) | specs/extdata.md | MH4U, MH3U Extra Data | done 2026-11-23 |
+| A changed DLC Palico through `otomo1` (E4) | specs/extdata.md | MH4U save, a save manager, the game | open |
 | `.mib` header on the game's own 508 quests (Q6) | specs/quest.md | MH4U RomFS | open |
 | Native plugin in the game | docs/design/plugin-api.md | MH4U dump, the port | open |
 | Class registries of MH3U and MHXX | docs/design/reference-recompiles.md | MH3U, MHXX code.bin | done 2026-11-23 |
