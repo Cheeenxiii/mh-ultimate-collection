@@ -2,28 +2,28 @@
 
 The one place that says where the project stands. Overwritten at the end of every session (`/handoff`); history is in `docs/reports/`. Keep it under a screen.
 
-**Updated:** 2026-11-23, after the session that built the port and found the monster id table.
+**Updated:** 2026-11-23, after the session that recompiled MH3U, built MHXX's table, added plugin `alloc`/`free` and mapped the monster tables.
 
 ## Where we are
 
-Phase: **engine work with the game files.** The port builds and runs the game with a native plugin; MH4U's monster ids, factory and their bounds are found; MH3U has a function table; MOD headers are named. Report: [docs/reports/2026-11-23-port-ids-and-tables.md](docs/reports/2026-11-23-port-ids-and-tables.md).
+Phase: **engine work with the game files.** MH3U recompiles with 0 unresolved jump tables and passes a 2,000-function gametest with none differing; MHXX v1.4 has its function table (38,931) and classes; plugins can allocate from the game's own heap (ABI 2, step 6 passes in game); every per-monster table found has an address and bound. Report: [docs/reports/2026-11-23-parallel-engine-tasks.md](docs/reports/2026-11-23-parallel-engine-tasks.md).
 
 Findings that steer the next steps:
-- Monster ids run 0..123; three 124-entry bounds move when ids grow (id-tables.md). Every MH4U monster class is the same size.
-- MH4U's and MHXX's Rathalos share one skeleton by bone id; MH3U's differs (specs/mod.md).
-- The clean MHXX v1.4 dump has the same code as the fan-repackaged one; it's the MHXX reference now (`mhxx_upd`).
-- Growing tables from plugins needs guest allocation: the game's heap functions are the next thing to find.
+- MH4U's jump-table patterns cover MH3U unchanged, so 3U code is a realistic native-runtime candidate (the decision stays open).
+- Adding an id means moving every bound in id-tables.md's "Bounds to move" list; some tables hold 123 entries, not 124.
+- Part data isn't in a code table: probably in the per-monster `.emd`/`.etd` files.
+- Memory: the harness reserves 4 GB of address space, so cap jobs with a cgroup (`MemoryMax=3G`), not `ulimit -v`.
 
 ## Branches
 
-Nothing in flight: content PR 2 is merged into `main`, now the content repo's default branch (the old `claude/nice-knuth-5gd62h` is kept, unused); fork PR 3 into `uc/main`. Start new work from those.
+Nothing in flight: this session's branches are merged into `main` here and `uc/main` in the fork. Both are ahead of their remotes until pushed. The merged branches (`mh3u-recompile`, `heap-alloc`, `monster-tables`; fork `uc/mh3u-recompile`, `uc/heap-alloc`, `uc/mhxx-functions`) and their worktrees under `worktrees/` can be deleted.
 
 ## Next tasks, in order
 
-1. **MH3U recompile and gametest** (reference-recompiles.md step 3): `recompile.py --game mh3u` (MH4U's output byte-identical without it), then gametest. Done when the pass rate and unresolved jump tables are in reference-recompiles.md.
-2. **MHXX v1.4 function table and classes** with the same Ghidra pipeline. Done when `config/games/mhxx/functions.tsv` exists and game.json names the v1.4 code.
-3. **Heap functions and plugin `alloc`/`free`**: find the game's allocator, add the ABI members with tests, rerun plugin step 6. Done when plugin-api.md records step 6 passing.
-4. **The rest of the monster tables** (names, sizes, parts, rewards). Done when each has an address and bound in id-tables.md.
+1. **MHXX recompile and gametest**: `recompile.py --game mhxx`, gametest `--sample 2000`. Done when its pass rate and unresolved jump tables are in reference-recompiles.md.
+2. **MH3U's missing targets and full gametest**: check `0x0010853c` and `0x00260914`, add them to `extra_entries.txt`, rerun, gametest every function. Done when reference-recompiles.md has the full-run results.
+3. **`.emd`/`.etd` specs** (`rEnemyData`, `rEnemyTuneData`): parts, hitzones, breaks; trace carves. Done when specs/ has both with verified/unverified fields and id-tables.md's parts row points at them.
+4. **A first table-growing plugin**: grow one id-indexed table with `alloc` and repoint its readers, checked in game. Done when a procedure in docs/checks/ passes.
 
 ## Waiting on the maintainer
 
