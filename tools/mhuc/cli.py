@@ -114,6 +114,15 @@ def cmd_decrypt(args) -> int:
     return 0
 
 
+def cmd_encrypt(args) -> int:
+    key = _read(args.key).rstrip(b"\r\n")
+    out = dlccrypt.mh4u_save_encrypt(_read(args.file), key, args.mode, args.seed)
+    with open(args.out, "wb") as f:
+        f.write(out)
+    print(f"{len(out)} bytes to {args.out}")
+    return 0
+
+
 def _quest_files(kind: str, path: str):
     """(name, parsed) for every quest in a file: an Extra Data quest file, a .mib, an MHXX .arc or a .quest."""
     data = _read(path)
@@ -163,6 +172,15 @@ def cmd_extdata(args) -> int:
     from . import extdata
     with open(args.file, "rb") as f:
         data = f.read()
+    if args.action == "rename":
+        if args.kind != "otomo" or args.slot is None or args.name is None or not args.out:
+            print("mhuc extdata rename: otomo only, with --slot, --name and --out", file=sys.stderr)
+            return 2
+        new = extdata.rename_palico(data, args.slot, args.name, args.last_byte)
+        with open(args.out, "wb") as f:
+            f.write(new)
+        print(f"slot {args.slot} renamed, {len(new)} bytes to {args.out}")
+        return 0
     if args.kind == "card":
         out = extdata.card_summary(data)
         if args.action == "dump":
@@ -237,6 +255,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=dlccrypt.MH4U_SAVE_MODES, default="normal", help="mh4u-save only")
     p.set_defaults(func=cmd_decrypt)
 
+    p = sub.add_parser("encrypt", help="encrypt an MH4U save or Extra Data file again (the key comes from a file)")
+    p.add_argument("kind", choices=["mh4u-save"])
+    p.add_argument("file")
+    p.add_argument("out")
+    p.add_argument("--key", required=True, help="a file holding the key's bytes (never kept in this repository)")
+    p.add_argument("--mode", choices=dlccrypt.MH4U_SAVE_MODES, default="normal")
+    p.add_argument("--seed", type=lambda v: int(v, 0), default=0x1234, help="the 16-bit XOR seed")
+    p.set_defaults(func=cmd_encrypt)
+
     p = sub.add_parser("quest", help="read quests: MH4U .mib, MHXX quest .arc, MH3U QTDS, or Extra Data quest files")
     p.add_argument("action", choices=["dump", "check"])
     p.add_argument("kind", choices=["mh4u", "mhxx", "mh3u"])
@@ -244,9 +271,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_quest)
 
     p = sub.add_parser("extdata", help="MH4U Extra Data besides quests (decrypted): card* and otomo1")
-    p.add_argument("action", choices=["dump", "check"], help="check prints counts only")
+    p.add_argument("action", choices=["dump", "check", "rename"],
+                   help="check prints counts only; rename edits a Palico's name (check E4)")
     p.add_argument("kind", choices=["card", "otomo"])
     p.add_argument("file")
+    p.add_argument("--slot", type=int)
+    p.add_argument("--name")
+    p.add_argument("--last-byte", type=lambda v: int(v, 0))
+    p.add_argument("--out")
     p.set_defaults(func=cmd_extdata)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),

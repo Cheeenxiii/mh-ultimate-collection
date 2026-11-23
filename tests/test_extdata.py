@@ -90,3 +90,44 @@ def test_cli_extdata(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out) == {"palicos": 2}
     assert cli.main(["extdata", "dump", "otomo", str(path)]) == 0
     assert json.loads(capsys.readouterr().out)[1]["file"] == "ot001_xxx.otb"
+
+
+def test_set_otb_texts_moves_the_table():
+    rec = make_otb(name="Cat")
+    new = extdata.set_otb_texts(rec, name="A much longer name")
+    got = extdata.parse_otb(new)
+    assert (got["owner"], got["name"], got["greeting"]) == ("Maker", "A much longer name", "Hi!")
+    assert new[:extdata.OTB_HEADER] == rec[:extdata.OTB_HEADER]
+    table = struct.unpack_from("<I", new, extdata.OTB_HEADER)[0]
+    offsets = struct.unpack_from("<3I", new, table)
+    assert offsets[0] == 0x28 and all(o % 8 == 0 for o in offsets) and table % 4 == 0
+    assert extdata.set_otb_texts(new) == new  # stable once in the game's layout
+    with pytest.raises(ValueError):
+        extdata.set_otb_texts(rec, greeting="x" * 60)
+
+
+def test_rename_palico_keeps_other_slots(tmp_path, capsys):
+    data = make_slot(make_otb(), "ot001_xxx.otb", 7) + make_slot(make_otb(name="Two"), "ot002_xxx.otb", 9)
+    new = extdata.rename_palico(data, 1, "Renamed")
+    assert new[:extdata.OTOMO_SLOT] == data[:extdata.OTOMO_SLOT]
+    s = extdata.otomo_slots(new)[1]
+    assert (s["name"], s["file"], s["last_byte"]) == ("Renamed", "ot002_xxx.otb", 9)
+    assert extdata.otomo_slots(extdata.rename_palico(data, 0, "X", last_byte=0))[0]["last_byte"] == 0
+    with pytest.raises(ValueError):
+        extdata.rename_palico(data + bytes(extdata.OTOMO_SLOT), 2, "X")
+    src, out = tmp_path / "o", tmp_path / "o2"
+    src.write_bytes(data)
+    assert cli.main(["extdata", "rename", "otomo", str(src), "--slot", "0", "--name", "Y", "--out", str(out)]) == 0
+    assert extdata.otomo_slots(out.read_bytes())[0]["name"] == "Y"
+
+
+def test_cli_encrypt_round_trips(tmp_path, capsys):
+    from mhuc import dlccrypt
+    key, plain = tmp_path / "k", tmp_path / "p"
+    key.write_bytes(b"synthetic test key")
+    plain.write_bytes(bytes(range(256)) * 4)
+    out = tmp_path / "e"
+    assert cli.main(["encrypt", "mh4u-save", str(plain), str(out), "--key", str(key), "--seed", "0x4321"]) == 0
+    enc = out.read_bytes()
+    assert dlccrypt.mh4u_save_decrypt(enc, b"synthetic test key") == plain.read_bytes()
+    assert enc == dlccrypt.mh4u_save_encrypt(plain.read_bytes(), b"synthetic test key", seed=0x4321)

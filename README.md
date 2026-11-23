@@ -52,7 +52,9 @@ mhuc --help
 | `mhuc xfs dump FILE` | an MT XFS file (`.supp`, `.pop`, `.list`, …) as JSON, its schema included; either byte order |
 | `mhuc decrypt KIND IN OUT --key FILE [--mode M]` | DLC and Extra Data crypto: `mh4u-save` (modes normal, card, quest), `mh4u-dlc`, `mhxx-dlc`, `mh3u-dlc` (MtCipher). The key comes from a file you supply; none is in this repository |
 | `mhuc quest dump\|check KIND PATH...` | quests as JSON or as counts: `mh4u` (a `.mib` or a decrypted Extra Data `quest*` file), `mhxx` (a quest `.arc`, every part), `mh3u` (a `QTDS` file or a 3DS Extra Data `quest*` file) |
+| `mhuc encrypt mh4u-save IN OUT --key FILE [--mode M] [--seed N]` | encrypt a decrypted MH4U save or Extra Data file again; with the file's own seed the result is byte-identical to the original (specs/extdata.md check E5) |
 | `mhuc extdata dump\|check card\|otomo FILE` | MH4U Extra Data besides quests, decrypted first: a `card*` file (used records per section, guild quests) or `otomo1` (the DLC Palicos) |
+| `mhuc extdata rename otomo FILE --slot N --name NAME --out OUT [--last-byte V]` | rename one DLC Palico in a decrypted `otomo1`, for the in-game check E4 |
 | `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
 ## Tests

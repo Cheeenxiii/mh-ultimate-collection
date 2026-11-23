@@ -130,3 +130,49 @@ def otomo_slots(data: bytes) -> list[dict]:
         rec["slot"], rec["last_byte"] = i, s[OTOMO_SLOT - 1]
         out.append(rec)
     return out
+
+
+def set_otb_texts(rec: bytes, owner: str | None = None, name: str | None = None,
+                  greeting: str | None = None) -> bytes:
+    """Rebuild an `.otb` record with new strings: the header is kept, the strings and the text table are
+    rewritten in the game's order and padding (owner, name, greeting, table); with the same strings the result
+    is byte-identical to the game's records (check E2)."""
+    old = parse_otb(rec)
+    texts = [old["owner"] if owner is None else owner, old["name"] if name is None else name,
+             old["greeting"] if greeting is None else greeting]
+    out, offsets = bytearray(rec[:OTB_HEADER] + bytes(4)), []
+    for t in texts:  # the game's padding (check E2): each string starts at align8(previous end + 1)
+        offsets.append(len(out))
+        out += t.encode("utf-16-le") + b"\0\0"
+        out += bytes(-(len(out) + 1) % 8 + 1) if t is not texts[-1] else b""
+    out += bytes(-(len(out) + 1) % 4 + 1)  # and the table at align4(end + 1)
+    table = len(out)
+    struct.pack_into("<I", out, OTB_HEADER, table)
+    out = bytes(out) + struct.pack("<3I", *offsets)
+    if len(out) > OTOMO_NAME:
+        raise ValueError(f"the record would be {len(out)} bytes; a slot holds {OTOMO_NAME}")
+    return out
+
+
+def put_otomo_slot(data: bytes, slot: int, rec: bytes, file: str, last_byte: int) -> bytes:
+    """`otomo1` with one slot replaced: the record, zeros, the file name, the last byte."""
+    if not 0 <= slot < OTOMO_SLOTS:
+        raise ValueError(f"slot is 0..{OTOMO_SLOTS - 1}")
+    if len(rec) > OTOMO_NAME or len(file) > 15:
+        raise ValueError("record or file name too long for a slot")
+    s = bytearray(OTOMO_SLOT)
+    s[:len(rec)] = rec
+    s[OTOMO_NAME:OTOMO_NAME + len(file)] = file.encode("ascii")
+    s[-1] = last_byte
+    return data[:slot * OTOMO_SLOT] + bytes(s) + data[(slot + 1) * OTOMO_SLOT:]
+
+
+def rename_palico(data: bytes, slot: int, name: str, last_byte: int | None = None) -> bytes:
+    """Check E4's edit: give the Palico in `slot` a new name, keeping everything else (or set the last byte)."""
+    found = {s["slot"]: s for s in otomo_slots(data)}
+    if slot not in found:
+        raise ValueError(f"slot {slot} is empty")
+    s = found[slot]
+    raw = data[slot * OTOMO_SLOT: slot * OTOMO_SLOT + s["size"]]
+    return put_otomo_slot(data, slot, set_otb_texts(raw, name=name), s["file"],
+                          s["last_byte"] if last_byte is None else last_byte)
