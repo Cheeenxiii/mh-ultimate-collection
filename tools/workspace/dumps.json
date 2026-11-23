@@ -8,6 +8,7 @@
     "mh3u_usa": {"file": "Monster Hunter 3 Ultimate (USA) Decrypted.3ds", "role": "MH3U reference"},
     "mhxx_jpn": {"file": "Monster Hunter XX/Monster Hunter XX-JPN-RF.3ds", "role": "MHXX reference (v1.0)"},
     "mhxx_en": {"file": "Monster Hunter XX - Double Cross (English Patched v4) Decrypted.3ds", "role": "fan-patched, not a reference"},
-    "mhxx_gupatch": {"file": "Monster Hunter XX - GU Patch v2 DecrTD.cia", "role": "v4.8.0 update as repackaged by a fan translation, not a reference"}
+    "mhxx_gupatch": {"file": "Monster Hunter XX - GU Patch v2 DecrTD.cia", "role": "v4.8.0 update as repackaged by a fan translation, not a reference"},
+    "mhxx_upd": {"file": "MHXX Update v4.8.0 (JPN) Decrypted.cxi", "role": "MHXX official v4.8.0 update code (the game's v1.4), decrypted from the maintainer's own CIA; reference"}
   }
 }
