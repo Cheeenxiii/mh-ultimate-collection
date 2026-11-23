@@ -17,8 +17,8 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 
 ## Branches
 
-- This repo: `monster-port-step1` from `main` (report, STATUS, monster-port.md and reference-recompiles.md), not pushed yet.
-- Fork: `uc/monster-port-step1` from `uc/main` (`tools/cro.py`, `tools/fnmap.py`, tests, `config/games/README.md`), not pushed yet.
+- This repo: `monster-port-step1` from `main` (report, STATUS, monster-port.md and reference-recompiles.md), pushed, PR [Cheeenxiii/mh-ultimate-collection#7](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/7) open.
+- Fork: `uc/monster-port-step1` from `uc/main` (`tools/cro.py`, `tools/fnmap.py`, tests, `config/games/README.md`), pushed, PR [Cheeenxiii/MH4UltimateDC-fork#6](https://github.com/Cheeenxiii/MH4UltimateDC-fork/pull/6) open.
 
 ## Next tasks, in order
 
@@ -30,7 +30,7 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 
 ## Waiting on the maintainer
 
-- Reviewing the two `monster-port-step1` branches once pushed.
+- Reviewing and merging PRs #7 (this repo) and #6 (fork).
 - Running the test kit in game, and saying which region and language the Extra Data's game is.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.
 - A check of the port's pad features with the plugin, on a machine with a display; whether to offer the inline-cache fix to upstream.
