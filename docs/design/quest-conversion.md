@@ -78,9 +78,11 @@ Routes 2 and 3 suit event-style quests; route 1 suits quests woven into progress
 In order of dependence:
 
 1. Monster ids for the quest's monsters in MH4U (an existing MH4U monster first: a 3U quest whose monsters MH4U already has, so no new monster is needed).
-2. The map: a 3U or GU quest needs its own map in MH4U, so a faithful first quest waits for the first converted stage. A test may run it on an MH4U map meanwhile, recorded as a placeholder, never shipped.
+2. The map: a 3U quest needs its own map in MH4U, so a faithful 3U quest waits for the first converted stage. A test may run it on an MH4U map meanwhile, recorded as a placeholder, never shipped. GU is different: four of its locales are MH4U's own (Ancestral Steppe, Frozen Seaway, Primal Forest, and the wiki's "Dunes", MH4U's Old Desert), with the special locales Castle Schrade, Ingle Isle, Polar Field, Sanctuary and Slayground ([overlap.md](../../data/catalog/overlap.md)).
 3. Item ids for rewards and supplies (MH4U's own items where the item exists in both games, by name from the GMD texts).
 4. The value tables for monster HP and attack (read from both games' code in the reference recompiles), or MH4U's defaults for a first test, recorded as a placeholder.
 5. One route above, checked in game with a procedure in docs/checks/.
+
+**The cheapest first quest** is therefore a GU (MHXX) quest set on one of those shared locales whose large monsters are among the 46 MH4U also has (overlap.md lists them): no new monster and no new map, only the id tables for monsters, the map, items and objectives. Which quest, and whether the GU or MH4U version of a shared monster is used, belongs to the open decisions.
 
 A converter (`mhuc convert quest`) can be written as soon as the id tables exist as data files; it should refuse a quest whose ids it can't map rather than guess.

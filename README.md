@@ -56,6 +56,7 @@ mhuc --help
 | `mhuc encrypt mh4u-save IN OUT --key FILE [--mode M] [--seed N]` | encrypt a decrypted MH4U save or Extra Data file again; with the file's own seed the result is byte-identical to the original (specs/extdata.md check E5) |
 | `mhuc extdata dump\|check card\|otomo FILE` | MH4U Extra Data besides quests, decrypted first: a `card*` file (used records per section, guild quests) or `otomo1` (the DLC Palicos) |
 | `mhuc extdata rename otomo FILE --slot N --name NAME --out OUT [--last-byte V]` | rename one DLC Palico in a decrypted `otomo1`, for the in-game check E4 |
+| `mhuc catalog overlap [--out F]` | which 3U and GU monsters and locales MH4U already has, from data/catalog (writes data/catalog/overlap.md) |
 | `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
 ## Tests

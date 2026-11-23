@@ -236,6 +236,17 @@ def cmd_extdata(args) -> int:
     return 0
 
 
+def cmd_catalog(args) -> int:
+    from . import catalog
+    text = catalog.render(args.dir)
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(text)
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -335,6 +346,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--last-byte", type=lambda v: int(v, 0))
     p.add_argument("--out")
     p.set_defaults(func=cmd_extdata)
+
+    p = sub.add_parser("catalog", help="what MH4U already has of 3U's and GU's monsters and maps (data/catalog)")
+    p.add_argument("action", choices=["overlap"])
+    p.add_argument("--dir", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "catalog"))
+    p.add_argument("--out", help="write the Markdown here instead of printing it")
+    p.set_defaults(func=cmd_catalog)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
                        ("convert", "convert a source game's assets for MH4U (needs game files)"),
