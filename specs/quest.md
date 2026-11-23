@@ -55,7 +55,7 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 | 0x28 | u32 | offset to the large monsters | verified | mhff wiki; check Q5 |
 | 0x2C | u32 | offset to the small monsters | verified | mhff wiki; check Q7 |
 | 0x30 | u32 | offset to the intruder monsters | verified | mhff wiki; check Q5 |
-| 0x34..0x5B | stats ×5 | large monster stats, 8 bytes each: u16 size percentage (0 or 50..200 in 596 of 600), then size variation, health, attack, defense, stamina, unknown. Over the 120 quests the bytes reach at most 40, 90, 119, 140, 4 and 2: table indices, not percentages | unverified | mhff wiki; check Q5, Q7 |
+| 0x34..0x5B | stats ×5 | large monster stats, 8 bytes each: u16 size percentage (0 or 50..200 in 596 of 600), then size variation, health, attack, defense, stamina, unknown. Over the 120 quests the bytes reach at most 40, 90, 119, 140, 4 and 2: table indices, not percentages. MHGU Definitive Edition reads bytes +3, +4 and +5 as row numbers into the game's monster stat table `em_nando_tbl` (32-byte rows of floats: HP, attack, then defense and five statuses; at 0xF3A330 in the European v1.1 code, to be found in USA v1.3.0) | unverified | mhff wiki; MHGU-DE `quest4u.py`; check Q5, Q7 |
 | 0x5C | stats | small monster stats | unverified | mhff wiki |
 | 0x64..0x70 | u32 ×4 | unknown: 0x64 and 0x6C always 0, 0x68 and 0x70 never 0 | unknown | mhff wiki; check Q7 |
 | 0x74 | u32 | main hunter rank points | unverified | mhff wiki |
@@ -84,7 +84,7 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 | 0xD4 | u32, u16, u16 | main objective 2 (type 0 = none, in 91 of 120) | unverified | mhff wiki; check Q7 |
 | 0xDC | u32, u16, u16 | sub objective (type 0 = none, in 68; 0x204 in 37) | unverified | mhff wiki; check Q7 |
 | 0xE4 | u32 | offset to equipment and item presets (0 in 96) | unverified | mhff wiki |
-| 0xE8..0xF0 | u16 ×5 | objective icon ids | unverified | mhff wiki |
+| 0xE8..0xF0 | u16 ×5 | objective icon ids (98 = none, per MHGU-DE) | unverified | mhff wiki; MHGU-DE `quest4u.py` |
 
 ### Sub-structures
 
@@ -92,7 +92,7 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 |---|---|---|---|---|
 | supply box | 8 bytes | u8 box id, u8 slot count, u16 ?, u32 offset to items; the list ends at box id 0xFF | verified | mhff wiki; check Q5 (the end marker) |
 | supply item | 4 bytes | u16 item id, u16 count; the box's slot count gives the number of items | verified | mhff wiki; check Q7 (every count of a non-zero item is 1..99) |
-| reward box | 8 bytes | u8, u8, u16 unknown, u32 offset to items | verified | mhff wiki; check Q5 (the item offset) |
+| reward box | 8 bytes | read as u32 0x8000 by MHGU-DE (the bytes 00 80 00 00 in 188 of 267 boxes here; 03 80 00 00 in 79), then u32 offset to items | verified | mhff wiki; MHGU-DE `quest4u.py`; check Q5 (the item offset) |
 | reward item | 6 bytes | u16 probability (0xFFFF ends the list), u16 item id, u16 count | verified | mhff wiki; check Q5 (stride and end marker) |
 | large monsters | u32 ×n | offsets to waves, ending at 0; each wave is a list of definitions. 109 quests have one wave, 3 two, 7 three, 1 four; a wave can be empty (9 quests have only an empty one, and the last wave of a multi-wave quest often is) | verified | mhff wiki (one list); ours, check Q7 (the waves) |
 | monster definition | 0x28 bytes | u32 monster id (0xFFFFFFFF ends the list), u32 spawn count, u8 condition, u8 area, sizes, u8 frenzy, f32 x/y/z | verified | mhff wiki; check Q5 (stride, end marker, ids all < 124) |
@@ -263,6 +263,7 @@ Layouts from the mhff wiki's MHX pages ("MHX rSetEmMain/rEmSetList/rRem/rSupplyL
 - Whether the game checks a stored quest's hash or its padding bytes when it lists or loads the quest (check Q17, in game). The 28 bytes themselves are understood (Q16), so a mod quest can be stored in the same form either way.
 - MH3U's quest format: the `QTDS` record is now laid out (above); Q13 checks it on the RomFS's own quests. `.quest_btl` (`QTDB`) and `.supp` (`XFS`) are still unknown. Why the game zeroes the first two bytes of a stored quest's SHA-1 is open (a "checked" mark, perhaps).
 - How MHXX's `.sem`/`.esl`/`.rem` map onto `.mib` sections.
+- MHGU Definitive Edition's `quest4u.py` names 0xAC the sub-quest reward; Q20 found the sub-quest reward at 0xB0 in all 116 quests the wiki lists, so this spec keeps 0xB0 and leaves 0xAC as the faint penalty (unverified).
 
 ## Checks
 
