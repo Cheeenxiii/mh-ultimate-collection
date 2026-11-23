@@ -26,7 +26,7 @@ A content mod that brings MH3U's and MHGU/MHXX's maps, monsters and systems into
 
 - Keep everything inside this folder. Scratch output, extractions and venvs go in `game_files/work/`; `/tmp` and the session scratchpad don't survive a reboot.
 - Run Python with `game_files/work/venv/bin/python` (by that path: resolving the symlink loses the venv).
-- Big jobs over a whole RomFS: at most 4 worker processes and a memory cap (`ulimit -v 3000000`). The machine has 14 GB and crashed once at 16 workers.
+- Big jobs (a whole RomFS, a recompile, Ghidra, gametest): at most 4 worker processes and a 3 GB memory cap: `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapMax=0 <cmd>`, or `ulimit -v 3000000` for jobs that reserve no large address space (the harness reserves 4 GB, and a full recompile needs more than 3 GB virtual). Ghidra: `GHIDRA_HEADLESS_MAXMEM=3G`. The machine has 14 GB and crashed once at 16 workers.
 - Both repos commit as Cheeenxiii (GitHub noreply address), set in each repo's own git config; never the machine's global identity. The doctor FAILs if a repo lacks it; `doctor.py --fix` sets it.
 - Nothing from `game_files/` goes into either repository: counts, versions, hashes, addresses and names only. Both repos have a game-data check; run it before committing.
 - Never look for or fetch keys or dumps elsewhere on the PC or online. `game_files/aes_keys.txt` is the maintainer's own; use it only when asked.
