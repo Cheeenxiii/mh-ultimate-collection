@@ -362,6 +362,20 @@ def cmd_idnames(args) -> int:
     return 0
 
 
+def cmd_emd(args) -> int:
+    from collections import Counter
+
+    from . import survey
+    total: Counter = Counter()
+    for p in args.paths:
+        st: dict = {}
+        survey.survey_arc(_read(p), st)
+        total.update(st.get("emd", Counter()))
+    for k, v in sorted(total.items()):
+        print(f"{k}: {v}")
+    return 0 if total else 1
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -475,6 +489,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dir", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "catalog"))
     p.add_argument("--out", help="write the Markdown here instead of printing it")
     p.set_defaults(func=cmd_catalog)
+
+    p = sub.add_parser("emd", help="check E1 (specs/emd.md) on ARCs holding .emd/.etd pairs (data/em_data.arc)")
+    p.add_argument("action", choices=["check"])
+    p.add_argument("paths", nargs="+")
+    p.set_defaults(func=cmd_emd)
 
     p = sub.add_parser("idnames", help="monster ids to names from quests and the wiki's quest pages (table "
                                        "written outside the repository)")

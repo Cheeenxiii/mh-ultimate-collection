@@ -14,7 +14,7 @@ import struct
 from collections import Counter
 from multiprocessing import Pool
 
-from . import arc, classid, gmd, pica, romfs, tex
+from . import arc, classid, emd, gmd, pica, romfs, tex
 
 QUEST_TYPES = ("rQuestData", "rSetEmMain", "rEmSetList", "rRem")
 _IMG: romfs.Romfs | None = None
@@ -81,6 +81,10 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
         c[f"language {g.language}"] += 1
         c[f"layout {g.layout}"] += 1
         c["G2 round trip ok" if gmd.write(g) == data else "G2 round trip differs"] += 1
+    elif type_name == "rEnemyData":
+        st.setdefault("emd", Counter()).update(emd.check_emd(data))
+    elif type_name == "rEnemyTuneData":
+        st.setdefault("emd", Counter()).update(emd.check_etd(data))
     elif type_name == "rModel" or data[:4] == b"MOD\0":
         c = st.setdefault("mod", Counter())
         if data[:4] != b"MOD\0":
@@ -116,6 +120,14 @@ def survey_arc(data: bytes, st: dict) -> None:
         name = classid.name_of(e.type_id)
         types.append(name)
         survey_entry(name, e.data, st)
+    pairs: dict = {}
+    for e, name in zip(a.entries, types, strict=True):
+        if name in ("rEnemyData", "rEnemyTuneData"):
+            pairs.setdefault(e.path, {})[name] = e.data
+    for pair in pairs.values():
+        if len(pair) == 2:
+            st.setdefault("emd", Counter()).update(emd.check_pair(pair["rEnemyData"], pair["rEnemyTuneData"]))
+            st["emd"]["E1 pairs"] += 1
     q = [t for t in types if t in QUEST_TYPES]
     if q:
         qc = st.setdefault("quest", Counter())
@@ -152,7 +164,7 @@ def report(total: dict) -> str:
     lines = [f"files in image: {total['files']}"]
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
-    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest"):
+    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]
