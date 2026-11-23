@@ -25,7 +25,6 @@ The fifth session with the maintainer's dumps. It took STATUS.md's first next ta
 ## Not done
 
 - MHXX's full gametest (every function): only the 2,000 sample was rerun.
-- The fork's `uc/reference-classes` branch is merged but still exists, locally and on the remote.
 - The fork's pre-existing ruff findings in `tools/recompile.py` and `tests/test_recomp.py` are left alone. This session added none.
 
 ## Checklist for the next session with game files

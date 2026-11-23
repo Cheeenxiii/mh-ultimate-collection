@@ -21,7 +21,7 @@ Findings that steer the next steps:
 
 ## Branches
 
-This session's work is on `mh3u-full-gametest` here and `uc/mh3u-full-gametest` in the fork, to be fast-forwarded into `main` / `uc/main` and pushed if the maintainer approves at handoff. The fork's `uc/reference-classes` is merged (PR #2) and can be deleted locally and on the remote.
+Nothing in flight: all work is on `main` here and `uc/main` in the fork, both pushed. The fork's merged `uc/` branches are deleted; its other remote branches came from upstream with the fork and are left alone.
 
 ## Next tasks, in order
 
