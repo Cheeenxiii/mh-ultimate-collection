@@ -25,12 +25,12 @@ def make_etd() -> bytes:
     d = bytearray(0x200)
     d[:4] = b"etd\0"
     struct.pack_into("<I", d, 0x10, 4200)
-    struct.pack_into("<I", d, 4 * 7, 0xA0)          # hitzone table 0xA0..0xC0: 32 bytes
-    struct.pack_into("<I", d, 4 * 27, 0xC0)         # one attack-volume group
-    struct.pack_into("<I", d, 4 * 28, 0xC4)         # attack records 0xC4..0x114: 2 records
-    struct.pack_into("<I", d, 4 * 29, 0x114)
-    struct.pack_into("<I", d, 0xC0, 0x140)
-    struct.pack_into("<H", d, 0x140 + emd.HIT, 0xFFFF)  # one volume, then the end
+    struct.pack_into("<I", d, 4 * 7, 0xA0)          # hitzone table 0xA0..0xF0: 8 rows of 10 bytes
+    struct.pack_into("<I", d, 4 * 27, 0xF0)         # one attack-volume group
+    struct.pack_into("<I", d, 4 * 28, 0xF4)         # attack records 0xF4..0x144: 2 records
+    struct.pack_into("<I", d, 4 * 29, 0x144)
+    struct.pack_into("<I", d, 0xF0, 0x160)
+    struct.pack_into("<H", d, 0x160 + emd.HIT, 0xFFFF)  # one volume, then the end
     return bytes(d)
 
 
@@ -45,10 +45,17 @@ def test_check_emd_and_etd():
     assert t["E1 etd words 5-34: OUTSIDE"] == 0
 
 
-def test_check_pair_row_size():
+def test_check_pair_hitzone_table():
     c = emd.check_pair(make_emd(rows=(0, 1)), make_etd())
     assert c["E1 pair parts within 8"] == 1
-    assert c["E1 pair hitzone table bytes / rows used = 16"] == 1
+    assert c["E1 pair hitzone table 8 x 10 bytes"] == 1 and c["E1 pair hitzone rows within 8"] == 1
+    assert emd.check_pair(make_emd(rows=(0, 9)), make_etd())["E1 pair hitzone row >= 8"] == 1
+
+
+def test_attack_records_running_to_an_unpointed_tail():
+    d = bytearray(make_etd())
+    struct.pack_into("<I", d, 4 * 29, 0)            # no end word and no block after: the file's end, 0x200
+    assert emd.check_etd(bytes(d))["E1 etd attack records run to an unpointed tail"] == 1
 
 
 def test_unterminated_list_is_counted():
