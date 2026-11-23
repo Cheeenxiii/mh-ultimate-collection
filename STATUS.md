@@ -35,7 +35,6 @@ This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of 
 ## Waiting on the maintainer
 
 - Optional: server DLC files downloaded on their own machine (mhef `tools/download_n3ds.py`), uploaded as they come, to compare with the Extra Data copies.
-
 - Merging `claude/zealous-wozniak-eip1pk` into `main`.
 - A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
 - Whether to offer the inline-cache fix (fork `recomp.h`) to upstream MH4UltimateDC.
