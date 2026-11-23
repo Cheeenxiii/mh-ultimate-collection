@@ -6,7 +6,7 @@ import json
 import os
 import sys
 
-from . import __version__, arc, classid, gmd, romfs, survey, tex
+from . import __version__, arc, classid, entropy, gmd, romfs, survey, tex
 
 
 def _read(path: str) -> bytes:
@@ -78,6 +78,11 @@ def cmd_survey(args) -> int:
     return 0
 
 
+def cmd_entropy(args) -> int:
+    print(entropy.report(entropy.walk(args.paths)))
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -121,6 +126,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("image")
     p.add_argument("--workers", type=int, default=4, help="processes (each holds one archive in memory)")
     p.set_defaults(func=cmd_survey)
+
+    p = sub.add_parser("entropy", help="size, block alignment and byte entropy of files (encrypted?); counts only")
+    p.add_argument("paths", nargs="+", help="files or folders")
+    p.set_defaults(func=cmd_entropy)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
                        ("convert", "convert a source game's assets for MH4U (needs game files)"),
