@@ -93,13 +93,50 @@ No new analysis pattern was needed: every MH3U jump table matches the patterns t
 
 That is 1,994 of 2,000 (99.7%) agreeing, and no function returns a different state, the same picture as MH4U's runs (the fork's docs/RECOMPILER.md). Next for MH3U: add the two missing targets to `config/games/mh3u/extra_entries.txt` (0x00260914 sits inside the function that jumps to it, so check it's a real entry first), then a full run of every function.
 
+## Step 3 results, MHXX v1.4 (2026-11-23)
+
+`tools/recompile.py --game mhxx` (engine fork, branch `uc/mhxx-recompile`) recompiles MHXX JPN v1.4 (update v4.8.0) from `config/games/mhxx/`. The first run gave 0 unresolved jump tables, but its gametest found two indirect targets missing. They led to three analysis patterns MH4U's tuning hadn't needed. Each is added with a synthetic test in the fork's `tests/test_recomp.py`:
+
+1. **RVCT's Thumb switch helper** (`__ARM_common_switch8`, at 0x002e4328 in MHXX). A Thumb `bl` to it is followed by a byte table: the case count, then one entry per case and a default. The helper jumps to `lr + 2 * entry` and never returns to `lr`. The analyser decoded the table as code and never reached the cases. It now treats the call as a multi-return call, like the floating-point descriptor helpers. MHXX has 37 call sites; MH4U and MH3U don't have the helper. This one was invisible in the "unresolved jump tables" count: the 9 trap instructions of the first run drop to 3.
+2. **Callbacks built position-independently.** MHXX's stream readers (0x002e3fc8 reads a byte, 0x002e6710 a halfword) are installed with `ldr r1, =off; add r1, pc`. No word in the data or literal pools holds their address, so the data-pointer scan missed them. Literal-plus-PC sums now go through the same checks as other candidates.
+3. **ARM thunks into Thumb.** `add ip, pc, #1; bx ip` (0x00127204 → 0x00127214 in MHXX, a this-adjusting thunk). The constant-target rule took only ARM targets; an odd target after `bx` is now Thumb.
+
+| | MHXX JPN v1.4 | first run, before the fixes |
+|---|---|---|
+| Functions recompiled | 63,083 (38,931 from the table, 684 static constructors, 23,046 through data pointers, 422 discovered) | 63,050 |
+| Instructions | 2,763,585 | 2,759,769 |
+| Jump tables resolved | 1,681 (+ 37 switch-helper tables) | 1,681 |
+| Unresolved jump tables | **0** | 0 |
+| Trap instructions | 3: two VFPv3 `d16-d31` save/restore stubs of the runtime library (the 3DS's VFPv2 never calls them) and one ASCII word reached inside a data block | 9 |
+| Recompile time | 34 s analysis + 18 s emit, under the 3 GB cgroup cap | 32 s + 19 s |
+
+The init-table scan finds 684 static constructors in MHXX (none in MH3U). Three times as many functions come through data pointers as in MH3U (23,046 against 8,086): MHXX has 2.5 times as many classes (3,110), so more vtables. The gametest samples all 63,083 functions, these included, and finds none that differ.
+
+**Gametest** (harness library at `-O0 -D RC_CHECK_RETURNS`, `--sample 2000 --cases 3 --seed 1`, 5 s):
+
+| Verdict | Functions | First run |
+|---|---|---|
+| pass | 818 | 879 |
+| agree-fault-only | 1,120 | 1,083 |
+| inconclusive | 62 (all the instruction budget) | 36 |
+| native-nofunc | **0** | 2 (0x0030553b, 0x00305571: switch-helper cases) |
+| differ | **0** | 0 |
+
+The two samples are different functions: the sample is drawn from the whole set, which grew by 33. An intermediate run, with only the switch helper fixed, found the three other missing targets (0x002e3fc9, 0x002e6711 and 0x00127215), and the trace that led to patterns 2 and 3.
+
+That is 1,938 of 2,000 (96.9%) agreeing, with no function returning a different state.
+
+**Effect on MH4U.** MH4U doesn't have the switch helper, but it has the other two patterns: 22 ARM→Thumb thunks, and 10 distinct Thumb addresses built with `add rN, pc`.
+- Without data pointers, MH4U's generated code changes only by additions: 4 Thumb functions the thunks reach (0x00100482, 0x0010050c, 0x001005a6, 0x00101de0), 601 new lines, nothing else changed. In the gametest, 1 passes and 3 agree-fault-only (20 cases each). A 2,000-function sample of that build finds 0 differing.
+- With data pointers, one more function should join: 0x00101990, a Thumb callback no word holds. **Not verified:** the full MH4U recompile doesn't fit the 3 GB cap, before or after the change, so the full before/after comparison waits for a run with more memory.
+
 Memory on this 14 GB machine: the full MH4U recompile (and MH3U's, close to it) hits `MemoryError` under `ulimit -v 3000000` in `code_cover`, the data-pointer pass's set of every covered halfword. MH3U's run peaked at about 2.5 GB. The harness reserves a 4 GB guest address window at start (`harness.c`, PROT_NONE and MAP_NORESERVE: address space, not memory), so gametest can't start under any `ulimit -v` below about 4.3 GB. It ran in a cgroup instead: `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapMax=0`, with `ulimit -v 6000000`, which caps real memory at 3 GB.
 
 ## Steps, in order (first session with game files)
 
 1. **Class registries (no recompile). Done, results above.** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.
 2. **Function tables.** Ghidra export of each game (the fork's `tools/ghidra/` scripts), then `build_function_table.py` and `find_missing_functions.py`.
-3. **Recompile and gametest. Done for MH3U, results above; MHXX waits for its function table.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
+3. **Recompile and gametest. Done for MH3U and MHXX, results above.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
 4. **Targeted studies.** Run single functions (MH3U's swim state machine, oxygen, underwater camera) in the harness from captured states, with hooks for tracing; feed what's learned into [underwater.md](underwater.md).
 
 ## Optional refactor done now?
