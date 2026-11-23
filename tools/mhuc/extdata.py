@@ -6,6 +6,7 @@ Structure" and "MH4U DLC Palico Format" pages (svanheulen/mhff, GPL-3.0), checke
 """
 from __future__ import annotations
 
+import hashlib
 import struct
 
 # ── card* (offsets in the decrypted file) ──────────────────────────────────────
@@ -84,7 +85,9 @@ def parse_guild_quest(rec: bytes) -> dict:
 
 OTOMO_SLOT = 0x90
 OTOMO_SLOTS = 9
-OTOMO_NAME = 0x80  # the slot's file name field, 15 bytes NUL-padded; byte 0x8F is unknown
+OTOMO_NAME = 0x80  # the slot's file name field, 15 bytes NUL-padded; byte 0x8F is SHA-1 byte 15
+OTOMO_RECORD = 0x80  # the server's plaintext: the record zero-padded to 0x80 (then its SHA-1, check E6)
+OTOMO_TAIL = 12  # after the last used slot: SHA-1 bytes 16..19, 4 padding bytes, the size 0x94 as a u32 BE
 OTB_HEADER = 0x24
 
 
@@ -116,20 +119,48 @@ def parse_otb(data: bytes) -> dict:
     }
 
 
+def otomo_digest(rec: bytes) -> bytes:
+    """SHA-1 of a Palico record as the server sent it: zero-padded to 0x80 bytes."""
+    return hashlib.sha1(rec.ljust(OTOMO_RECORD, b"\0")).digest()
+
+
 def otomo_slots(data: bytes) -> list[dict]:
-    """The used Palico slots of a decrypted `otomo1`: the record, its file name and the unknown last byte."""
+    """The used Palico slots of a decrypted `otomo1` (a slot is used when its name field is): the record,
+    its file name, the last byte and whether that byte is the record's SHA-1 byte 15 (check E6)."""
     out = []
     for i in range(OTOMO_SLOTS):
         s = data[i * OTOMO_SLOT: (i + 1) * OTOMO_SLOT]
-        if len(s) < OTOMO_SLOT or not any(s):
+        if len(s) < OTOMO_SLOT or not s[OTOMO_NAME]:
             continue
         rec = parse_otb(s[:OTOMO_NAME])
         if any(s[rec["size"]:OTOMO_NAME]):
             raise ValueError(f"slot {i}: bytes between the record and the name field")
         rec["file"] = s[OTOMO_NAME:OTOMO_NAME + 15].split(b"\0")[0].decode("ascii")
         rec["slot"], rec["last_byte"] = i, s[OTOMO_SLOT - 1]
+        rec["hash_ok"] = otomo_digest(s[:OTOMO_NAME])[15] == rec["last_byte"]
         out.append(rec)
     return out
+
+
+def otomo_tail(rec: bytes, pad: bytes = b"\0" * 4) -> bytes:
+    """The 12 bytes the game leaves after the last used slot (check E6); the padding bytes are the server
+    file's ciphertext in the game's own data, and `pad` stands in for them."""
+    return otomo_digest(rec)[16:] + pad[:4] + struct.pack(">I", OTOMO_RECORD + 20)
+
+
+def otomo_problems(data: bytes) -> list[str]:
+    """Check E6 on a decrypted `otomo1`: every slot's last byte, and the tail after the last used slot."""
+    slots = otomo_slots(data)
+    problems = [f"slot {s['slot']}: last byte isn't the record's SHA-1 byte 15" for s in slots if not s["hash_ok"]]
+    if slots:
+        last = slots[-1]["slot"]
+        at = (last + 1) * OTOMO_SLOT
+        rec = data[last * OTOMO_SLOT: last * OTOMO_SLOT + OTOMO_NAME]
+        want = otomo_tail(rec)
+        got = data[at:at + OTOMO_TAIL]
+        if got[:4] != want[:4] or got[8:] != want[8:]:
+            problems.append(f"the {OTOMO_TAIL} bytes after slot {last} aren't its hash tail and size")
+    return problems
 
 
 def set_otb_texts(rec: bytes, owner: str | None = None, name: str | None = None,
@@ -154,25 +185,32 @@ def set_otb_texts(rec: bytes, owner: str | None = None, name: str | None = None,
     return out
 
 
-def put_otomo_slot(data: bytes, slot: int, rec: bytes, file: str, last_byte: int) -> bytes:
-    """`otomo1` with one slot replaced: the record, zeros, the file name, the last byte."""
+def put_otomo_slot(data: bytes, slot: int, rec: bytes, file: str, last_byte: int | None = None) -> bytes:
+    """`otomo1` with one slot replaced, in the form the game leaves (check E6): the record, zeros, the file name,
+    the record's SHA-1 byte 15 (or `last_byte`); and, when no used slot follows, the 12-byte tail after it."""
     if not 0 <= slot < OTOMO_SLOTS:
         raise ValueError(f"slot is 0..{OTOMO_SLOTS - 1}")
-    if len(rec) > OTOMO_NAME or len(file) > 15:
+    if len(rec) > OTOMO_NAME or not 0 < len(file) <= 15:
         raise ValueError("record or file name too long for a slot")
     s = bytearray(OTOMO_SLOT)
     s[:len(rec)] = rec
     s[OTOMO_NAME:OTOMO_NAME + len(file)] = file.encode("ascii")
-    s[-1] = last_byte
-    return data[:slot * OTOMO_SLOT] + bytes(s) + data[(slot + 1) * OTOMO_SLOT:]
+    s[-1] = otomo_digest(rec)[15] if last_byte is None else last_byte
+    out = bytearray(data[:slot * OTOMO_SLOT] + bytes(s) + data[(slot + 1) * OTOMO_SLOT:])
+    if not any(x["slot"] > slot for x in otomo_slots(bytes(out))):
+        at = (slot + 1) * OTOMO_SLOT
+        old = data[at:at + OTOMO_TAIL] if len(data) >= at + OTOMO_TAIL else b""
+        pad = old[4:8] if len(old) == OTOMO_TAIL and old[8:] == struct.pack(">I", OTOMO_RECORD + 20) else b"\0" * 4
+        out[at:at + OTOMO_TAIL] = otomo_tail(rec, pad)
+    return bytes(out)
 
 
 def rename_palico(data: bytes, slot: int, name: str, last_byte: int | None = None) -> bytes:
-    """Check E4's edit: give the Palico in `slot` a new name, keeping everything else (or set the last byte)."""
+    """Check E4's edit: give the Palico in `slot` a new name, keeping everything else; the check byte (and the
+    tail, for the last slot) follow the new record unless `last_byte` is given."""
     found = {s["slot"]: s for s in otomo_slots(data)}
     if slot not in found:
         raise ValueError(f"slot {slot} is empty")
     s = found[slot]
     raw = data[slot * OTOMO_SLOT: slot * OTOMO_SLOT + s["size"]]
-    return put_otomo_slot(data, slot, set_otb_texts(raw, name=name), s["file"],
-                          s["last_byte"] if last_byte is None else last_byte)
+    return put_otomo_slot(data, slot, set_otb_texts(raw, name=name), s["file"], last_byte)

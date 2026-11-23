@@ -111,7 +111,8 @@ def test_rename_palico_keeps_other_slots(tmp_path, capsys):
     new = extdata.rename_palico(data, 1, "Renamed")
     assert new[:extdata.OTOMO_SLOT] == data[:extdata.OTOMO_SLOT]
     s = extdata.otomo_slots(new)[1]
-    assert (s["name"], s["file"], s["last_byte"]) == ("Renamed", "ot002_xxx.otb", 9)
+    assert (s["name"], s["file"], s["hash_ok"]) == ("Renamed", "ot002_xxx.otb", True)
+    assert not any("slot 1" in p for p in extdata.otomo_problems(new + bytes(64)))
     assert extdata.otomo_slots(extdata.rename_palico(data, 0, "X", last_byte=0))[0]["last_byte"] == 0
     with pytest.raises(ValueError):
         extdata.rename_palico(data + bytes(extdata.OTOMO_SLOT), 2, "X")
@@ -119,6 +120,20 @@ def test_rename_palico_keeps_other_slots(tmp_path, capsys):
     src.write_bytes(data)
     assert cli.main(["extdata", "rename", "otomo", str(src), "--slot", "0", "--name", "Y", "--out", str(out)]) == 0
     assert extdata.otomo_slots(out.read_bytes())[0]["name"] == "Y"
+
+
+def test_put_otomo_slot_writes_hash_byte_and_tail():
+    rec = make_otb()
+    data = extdata.put_otomo_slot(bytes(0x21F8), 0, rec, "ot001_xxx.otb")
+    digest = extdata.otomo_digest(rec)
+    assert data[extdata.OTOMO_SLOT - 1] == digest[15]
+    tail = data[extdata.OTOMO_SLOT:extdata.OTOMO_SLOT + extdata.OTOMO_TAIL]
+    assert tail[:4] == digest[16:] and tail[8:] == struct.pack(">I", 0x94)
+    assert extdata.otomo_problems(data) == []
+    data = extdata.put_otomo_slot(data, 1, make_otb(name="Next"), "ot002_xxx.otb")  # the tail moves on
+    assert [s["slot"] for s in extdata.otomo_slots(data)] == [0, 1] and extdata.otomo_problems(data) == []
+    bad = extdata.put_otomo_slot(data, 1, make_otb(name="Next"), "ot002_xxx.otb", last_byte=digest[15] ^ 1)
+    assert extdata.otomo_problems(bad) and not extdata.otomo_slots(bad)[1]["hash_ok"]
 
 
 def test_cli_encrypt_round_trips(tmp_path, capsys):

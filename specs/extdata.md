@@ -64,8 +64,8 @@ The monster id is one byte here, so a guild quest can name ids up to 255 (docs/d
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x000 | 0x90 bytes ×9 | Palico slots, in download order | verified | ours; check E2 |
-| 0x510 | 12 bytes | unknown, after the ninth slot (non-zero) | unknown | ours; check E2 |
+| 0x000 | 0x90 bytes ×9 | Palico slots, in download order; a slot is used when its name field is | verified | ours; check E2 |
+| after the last used slot | 12 bytes | the tail of that slot's server file: its SHA-1 bytes 16..19, the 4 padding bytes as the server file's ciphertext, the plaintext size 0x94 (0x80 + 20) as a u32 BE (at 0x510 here, after the ninth slot) | verified | ours; check E6 |
 | 0x51C | to 0x21F8 | zeros | verified | ours; check E2 |
 
 ## Palico slot (0x90 bytes)
@@ -75,7 +75,9 @@ The monster id is one byte here, so a guild quest can name ids up to 255 (docs/d
 | 0x00 | variable | the `.otb` record (table below), 112 to 124 bytes here | verified | ours; check E2 |
 | record end | to 0x80 | zeros | verified | ours; check E2 |
 | 0x80 | 15 bytes | the record's file name, `otNNN_<lang>.otb`, NUL-padded (as a quest slot ends with `mNNNNN.mib`) | verified | ours; check E2 |
-| 0x8F | u8 | unknown: differs in every slot; not a sum, XOR, CRC-32 or first MD5/SHA-1 byte of the record, slot or name | unknown | ours; check E2 |
+
+How the slots come about (check E6): the game decrypts each server file up to its stated size, as it does for quests (specs/quest.md Q16): the record padded to 0x80, its SHA-1, 4 padding bytes, the size, 0x98 bytes in all. It writes that at a stride of 0x90, so the next slot overwrites the last 8 bytes, and puts the 15-byte name at 0x80, over SHA-1 bytes 0..14. Byte 15 of the hash is what's left at 0x8F, and only the last slot keeps its full tail. `mhuc extdata rename` and `extdata.put_otomo_slot` write a slot that way.
+| 0x8F | u8 | byte 15 of the SHA-1 of the record zero-padded to 0x80 bytes | verified | ours; check E6 |
 
 ## `.otb` record
 
@@ -99,7 +101,7 @@ The monster id is one byte here, so a guild quest can name ids up to 255 (docs/d
 
 ## Open
 
-- The unknown byte at a Palico slot's 0x8F, and the 12 bytes after the ninth slot. Whether the game checks either decides whether a mod Palico can go in through `otomo1` (check E4). Comparing the slots with the server's `.otb` files (goshawk mirror, `ot001`..`ot009` in five languages) would show whether the record is stored as sent, as quests are.
+- Whether the game checks the hash byte at 0x8F, or the tail, when it lists the Palicos (check E4). Both are understood (E6), so a mod Palico can be written in the game's form either way. Decrypting the server's `.otb` files (goshawk mirror) would confirm that each record is stored as sent; their size trailers (148 = 0x80 + 20) and the matching padding bytes already point that way.
 - The stored Palicos are the `_ger` files. Check that this Extra Data comes from the same game as the base (MH4U USA v1.3.0): a European game, or a system in German, would explain it.
 - Guild cards (4,608 bytes) have no MH4U layout; mhff's "MHGen Guild Card Structure" is a later game's.
 
@@ -110,5 +112,6 @@ Run on 2026-11-23 in a web session, on the maintainer's own MH4U Extra Data and 
 - **E1 (done):** decrypt `card1`..`card3` in mode `card`, `cardbox` and `system` in mode `normal`. Pass: the sizes above; `extdata.card_layout_problems()` is empty, so the sections tile the 494,584 bytes with a 16-byte header; `mhuc extdata check card` reports 0 used records in every section of all three files (the maintainer's cards are empty); `cardbox` is all zero.
 - **E2 (done):** decrypt `otomo1` in mode `normal`, then `mhuc extdata dump otomo`. Pass: 9 slots of 0x90 bytes read without error; each record's colour terminators are 0xFF, its text table points at three NUL-terminated UTF-16 strings in the record, the bytes after the record are zero up to 0x80, and the name field reads `ot001_ger.otb` to `ot009_ger.otb` in slot order. The value spreads in the `.otb` table come from those 9 records. `extdata.set_otb_texts` with each record's own strings rebuilds all 9 byte for byte, which confirms the padding rule.
 - **E3 (done):** `mhuc entropy` on the MH3U 3DS Extra Data and save `system`. Pass: all plain; `card*` and `cardbox` all zero.
-- **E4 (open, in game):** back up the Extra Data, then `mhuc decrypt mh4u-save otomo1 o.bin --key K`, `mhuc extdata rename otomo o.bin --slot 0 --name Testname --out o2.bin`, `mhuc encrypt mh4u-save o2.bin otomo1 --key K` and put `otomo1` back with a save manager (Checkpoint, JKSM). Open the DLC Palico list in game. Pass: the first Palico shows as Testname. Then repeat with `--last-byte 0`: if that Palico disappears or the game reports corrupt data, the byte at 0x8F is a check value; if it loads, it isn't checked.
+- **E4 (open, in game):** back up the Extra Data, then `mhuc decrypt mh4u-save otomo1 o.bin --key K`, `mhuc extdata rename otomo o.bin --slot 0 --name Testname --out o2.bin`, `mhuc encrypt mh4u-save o2.bin otomo1 --key K` and put `otomo1` back with a save manager (Checkpoint, JKSM). Open the DLC Palico list in game. Pass: the first Palico shows as Testname. `rename` recomputes the hash byte at 0x8F (and the tail, for the last slot). Then repeat with `--last-byte` set to any other value: if that Palico disappears or the game reports corrupt data, the game checks the byte; if it loads, it doesn't.
+- **E6 (done):** for each of the 9 slots, hash the first 0x80 bytes with SHA-1; compare the 12 bytes after the ninth slot with the goshawk mirror's still-encrypted `ot009_ger.otb` (compared as stored, nothing decrypted). Pass: every slot's byte 0x8F is byte 15 of its hash (other bytes of the hash, sums, XORs, CRC-32 and Adler-32 of the record, slot or name had failed); the tail is that hash's bytes 16..19, then the server file's bytes 148..151 (its padding), then 0x94 as a u32 BE; the mirror's 45 `.otb` files are all 156 bytes with the size trailer 148. `extdata.otomo_problems` is empty on the maintainer's `otomo1`, and stays empty after `rename` on the first or the last slot.
 - **E5 (done):** decrypt `otomo1` (normal), `quest1` (quest) and `card1` (card), then encrypt each again with `mhuc encrypt` and the seed read from the file's first word. Pass: all three come out byte-identical to the originals, so a file `mhuc` writes is in the exact form the game wrote (the quest file's last 0x100 bytes are zero in the original too).
