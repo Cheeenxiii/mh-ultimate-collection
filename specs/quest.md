@@ -195,11 +195,53 @@ All integers little-endian. A "text" is five strings, English, French, German, I
 | class | rSuppItem | `.supp`: id 0x4EC7B399, 0x1A0 bytes in memory, a `cResource` (3DS DTI at 0x00CB9FF0) | verified | MH4UltimateDC-fork `mt_classes.tsv`; Cha-Cha `config/dti.csv` |
 | file | xfs | `.supp` is an XFS file, so its field names come with it (check X1 in [xfs](xfs.md)); the game's quest supply box keeps 40 cells of 4 bytes (Wii U, Cha-Cha `src/game/menu_mouse.cpp`), which suggests what a supply set holds | unverified | Cha-Cha `docs/formats/xfs.md`, `menu_mouse.cpp` |
 
-## rSetEmMain, rEmSetList, rRem
+## rSetEmMain, rEmSetList, rRem, supply list (MHXX)
+
+Layouts from the mhff wiki's MHX pages ("MHX rSetEmMain/rEmSetList/rRem/rSupplyList Format", GPL-3.0), checked on the parts of MHXX JPN's 173 DLC quest archives (check Q15). MHXX's `.esl` doesn't follow the MHX page; the layout below is ours. All little-endian.
+
+### rSetEmMain (.sem): a boss monster's placement
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | ? | layout unknown here | unknown | mhff (names and extensions only) |
+| file | 32 bytes | every `.sem` is 0x20 bytes (430 files); named `b_mMMemEEE_NN.sem` (map, monster, variant) | verified | ours; check Q15 |
+| 0x00 | f32 | magic 1.0 | verified | mhff wiki; check Q15 |
+| 0x04 | u32 | count (1 in all) | verified | mhff wiki; check Q15 |
+| 0x08 | u32 | round number? (0 in 426, 1 in 4) | unverified | mhff wiki; check Q15 |
+| 0x0C | u32 | area | unverified | mhff wiki; check Q15 (all small) |
+| 0x10 | f32 | angle | unverified | mhff wiki |
+| 0x14 | f32 ×3 | x, y, z position | unverified | mhff wiki; check Q15 (all finite, within ±1e5) |
+
+### rEmSetList (.esl): small monsters per area
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `esl\0` | verified | mhff wiki (a magic); check Q15 (the value) |
+| 0x04 | u32 | 2 in all (a version, presumably; the MHX page says unknown) | verified | ours; check Q15 |
+| 0x08 | u32 ×14 | area offsets from the file start, 0 = unused, used ones first; the first area at 0x40 (the MHX page has 20 slots, from 0x08 to 0x54: not so in MHXX) | verified | ours; check Q15 |
+| file | 0x40 bytes | every quest carries one empty `.esl` (no area; 173 of 249) | verified | ours; check Q15 |
+| area +0x00 | char[4] | magic `ESD\0` | verified | ours; check Q15 |
+| area +0x04 | u32 | 20151214 in all 631 areas (a date: a version, presumably) | verified | ours; check Q15 |
+| area +0x08 | u16 | entry count; areas follow one another with nothing between, the last ending at the file end (the MHX page has a u32 count at +0x08 and 40-byte entries: not so in MHXX) | verified | ours; check Q15 |
+| area +0x0A | 36 bytes ×count | entries: u8 small-monster id (38 values, at most 101), u8 0x10, then 8 bytes of settings; 0xCDCD at +0x0A (uninitialised fill); f32 x, y, z at +0x0C; zeros at +0x18; a u16 at +0x1C; zeros to the end | unverified | ours; check Q15 (stride, zeros, floats finite) |
+
+### rRem (.rem): a reward table
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| file | 184 bytes | every `.rem` is 0xB8 bytes (786 files), named `rem_NNNNNN.rem` | verified | ours; check Q15 |
+| 0x00 | f32 | magic 1.0 | verified | mhff wiki; check Q15 |
+| 0x04 | u32 | count (1 in all) | verified | mhff wiki; check Q15 |
+| 0x08 | (u8, u8) ×8 | flags: id, item count; the counts add up to the number of non-empty slots in all 786 | verified | mhff wiki; check Q15 |
+| 0x18 | (u16, u8, u8) ×40 | slots: item id, count, chance; in 738 of 786 the non-empty slots come first and each flag's group of chances sums to 100; the other 48 have gaps (unexplained) | unverified | mhff wiki; check Q15 |
+
+### Supply list (`supp_N`, class 0x54539AEE)
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| file | 168 bytes | every supply list is 0xA8 bytes (173 files) | verified | mhff wiki (rSupplyList); check Q15 |
+| 0x00 | f32 | magic 1.0 | verified | mhff wiki; check Q15 |
+| 0x04 | u32 | count (1 in all) | verified | mhff wiki; check Q15 |
+| 0x08 | (u16, u8, u8) ×40 | slots: item id, count (1..99 whenever the item is non-zero), label (0..4 seen) | verified | mhff wiki; check Q15 (stride, counts) |
 
 ## Open questions
 
@@ -228,4 +270,5 @@ Q3 to Q5 were run on 2026-11-23 in a web session on the maintainer's own MH4U (U
 - **Q12 (done):** the maintainer's MH3U 3DS Extra Data (USA), uploaded by them, outside the repositories. Pass: no file is encrypted (`mhuc entropy`: all plain); each `quest*` file starts with a u32, then `QTDS` at 4 + 0x2010·k; 38 quests in 80 slots, all 38 on the goshawk mirror. Parsing each with quest-studio's layout reads to the end of the arena gear sets without error; the fixed tail is 442 bytes in all; the record ends 20 bytes before the mirror file's plaintext size, and the slot then holds the padding and the size exactly as the mirror file's last bytes, the same length as the file. Pairing slot and mirror blocks gives a consistent codebook (10,095 of 10,098), which shows ECB with one key; Blowfish, DES, CAST and RC2 under the known keys don't reproduce it.
 - **Q13 (open):** parse the 365 RomFS `.quest` files of MH3U USA with the same layout (no arena block outside 201xx..203xx and 6xxxx). Needs the MH3U RomFS.
 - **Q14 (done):** decrypt the goshawk mirror's MH3U files with MtCipher as Cha-Cha describes it (standard pi tables computed, not copied; little-endian words; the S-box quirk) under goshawk's MH3G key. Pass: all 38 USA (`mh3gu_us`) and all 47 Japanese MH3G (`mh3g`) files decrypt to `QTDS` with a matching SHA-1. Against the maintainer's 38 stored quests: every record is byte-identical to its server file; the 20 bytes after it are the SHA-1 with bytes 0 and 1 zeroed; the padding bytes equal the server file's ciphertext; the size trailer is the same.
+- **Q15 (done):** over the 173 decrypted MHXX JPN quest archives (Q11), read every `rSetEmMain`, `rEmSetList`, `rRem` and supply-list entry with the tables above. Pass: sizes, magics and counts as stated for 430 `.sem`, 249 `.esl` (631 areas, 1,815 entries), 786 `.rem` and 173 supply lists; every `.esl` area is `ESD\0` + version + u16 count + 36-byte entries, back to back, to the file end.
 - **Q6 (open):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.
