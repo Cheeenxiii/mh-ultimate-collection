@@ -19,6 +19,8 @@ Nothing here is verified yet. Every "where it lives" below is a hypothesis for t
 
 ## Other leads
 
+MH3U's underwater motions are LMT files: [specs/lmt.md](../../specs/lmt.md) has MH4U's version-67 layout (from MHGU Definitive Edition), and check L1 tells which version MH3U uses.
+
 Monster Hunter Tri, 3U's Wii base and the first game with underwater combat, has a static recompilation to native ARM and reverse-engineering tools (sepalani's MHTrIDA); see [related-projects](../sources/related-projects.md). They are a reference for behaviour beside Cha-Cha and our MH3U 3DS recompile, never a source (rule 2: MH3U 3DS supplies the swimming code and motions). Neither has been read for this yet.
 
 ## Leads from Cha-Cha (MH3U Wii U)
