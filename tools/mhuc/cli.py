@@ -198,7 +198,13 @@ def cmd_questslot(args) -> int:
         mib = quest.mh4u_slot_mib(found[args.from_slot])
         name = None
     if args.id is not None or args.title is not None:
-        mib = quest.mib4_patch(mib, args.id, args.title)
+        try:
+            mib = quest.mib4_patch(mib, args.id, args.title)
+        except quest.QuestError:  # a longer title: lay the quest out again (check Q18)
+            from . import mibwrite
+            mib = mibwrite.mib4_build(mibwrite.mib4_set_texts(mibwrite.mib4_model(mib), 0, args.title))
+            mib = quest.mib4_patch(mib, args.id)
+            print("the title didn't fit in place: the quest was laid out again", file=sys.stderr)
     name = args.name or (f"m{args.id:05d}.mib" if args.id is not None else name)
     if not name:
         print("mhuc questslot put: give --name or --id for a copied slot", file=sys.stderr)
@@ -331,7 +337,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--replace", action="store_true", help="allow overwriting a used slot")
     p.add_argument("--from-slot", type=int, help="copy the quest stored in this slot instead of --mib")
     p.add_argument("--id", type=int, help="give the quest this id (and the name mNNNNN.mib)")
-    p.add_argument("--title", help="a new title in all five languages, no longer than the old ones")
+    p.add_argument("--title", help="a new title in all five languages (a longer one lays the quest out again)")
     p.add_argument("--name", help="the slot's file name (default: the .mib's, or mNNNNN.mib with --id)")
     p.add_argument("--out")
     p.set_defaults(func=cmd_questslot)

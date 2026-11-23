@@ -183,6 +183,34 @@ def test_mib4_patch_and_copy_slot(tmp_path, capsys):
     assert quest.parse_mib4(quest.mh4u_slot_mib(slots[1][2]))["quest_id"] == 60999
 
 
+def test_mib4_model_build_round_trip():
+    from mhuc import mibwrite
+    mib = build_mib4(60002)
+    model = mibwrite.mib4_model(mib)
+    out = mibwrite.mib4_build(model)
+    assert quest.parse_mib4(out) == quest.parse_mib4(mib)
+    assert mibwrite.mib4_model(out) == model and mibwrite.mib4_build(mibwrite.mib4_model(out)) == out
+    assert len(out) % 0x20 == 0
+    longer = mibwrite.mib4_build(mibwrite.mib4_set_texts(model, 0, "A much longer title than before " * 3))
+    got = quest.parse_mib4(longer)
+    assert all(t["title"].startswith("A much longer") for t in got["text"].values())
+    assert got["large_waves"] == quest.parse_mib4(mib)["large_waves"]
+    with pytest.raises(quest.QuestError):
+        mibwrite.mib4_build(dict(model, texts=model["texts"][:4]))
+
+
+def test_questslot_put_long_title_rebuilds(tmp_path, capsys):
+    mib = build_mib4(60001)
+    qf, out = tmp_path / "q", tmp_path / "q2"
+    qf.write_bytes(quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 0, quest.mh4u_pack_slot(mib, "m60001.mib")))
+    title = "A title far longer than the synthetic one"
+    assert cli.main(["questslot", "put", str(qf), "--slot", "1", "--from-slot", "0", "--id", "60998",
+                     "--title", title, "--out", str(out)]) == 0
+    body = quest.mh4u_slots(out.read_bytes())[1][2]
+    got = quest.parse_mib4(quest.mh4u_slot_mib(body))
+    assert got["quest_id"] == 60998 and got["text"]["ita"]["title"] == title
+
+
 # ── MHXX ──────────────────────────────────────────────────────────────────────
 
 

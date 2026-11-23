@@ -16,6 +16,8 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | Extra Data cards, DLC Palicos, MH3U saves, re-encryption (E1-E3, E5, E6) | specs/extdata.md | MH4U, MH3U Extra Data | done 2026-11-23 |
 | A changed DLC Palico through `otomo1` (E4) | specs/extdata.md | MH4U save, a save manager, the game | open |
 | Stored-quest trailer: hash, padding, size (Q16) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
+| `.mib` model and builder on 120 quests (Q18) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
+| A rebuilt quest in game (Q19) | specs/quest.md | MH4U save, a save manager, the game | open |
 | A mod quest through an Extra Data slot (Q17) | specs/quest.md | MH4U save, a save manager, the game | open |
 | `.mib` header on the game's own 508 quests (Q6) | specs/quest.md | MH4U RomFS | open |
 | Native plugin in the game | docs/design/plugin-api.md | MH4U dump, the port | open |
