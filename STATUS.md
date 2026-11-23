@@ -25,8 +25,8 @@ This session ([report](docs/reports/2026-11-23-extra-data-records.md)):
 ## Next tasks, in order
 
 1. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`, on a console or in the port after the fork's extdata check (`docs/research/extdata.md`). Done when the specs record the results and extra-data.md says which routes work.
-2. **`.emd`/`.etd` check E1**: the spec now exists, from MHGU Definitive Edition's readers ([emd.md](specs/emd.md), all unverified). Run E1 on the 110 pairs with the RomFS. Done when its fields are verified or corrected.
-3. **Quest checks Q6 and Q13** (the game's own 508 `.mib` and MH3U's 365 `.quest`). Needs both RomFS; do them alongside task 2.
+2. **One `mhuc survey` per game** (MH4U, MH3U, MHXX RomFS): it now runs every open check at once (Q6, Q13, Q18, E1, L1, M3, A1, S1, G3). Done when each spec records its counts and promotes or corrects its fields ([emd.md](specs/emd.md) and [lmt.md](specs/lmt.md) come from MHGU Definitive Edition, all unverified).
+3. **The monster-port pipeline** ([monster-port.md](docs/design/monster-port.md)): step 1 (map MH3U/MHXX engine calls to MH4U's through a shared monster) can start with the reference recompiles.
 4. **A first converted GU quest**: decrypt the MHXX DLC (maintainer's machine), pick a quest on a shared locale, fill data/idmap/ row by row, run `mhuc convert`, then Q17's procedure. Done when it is listed in game.
 5. **A first table-growing plugin**, then the **MHXX full gametest** and **MH3U targeted studies** (reference-recompiles.md, underwater.md).
 

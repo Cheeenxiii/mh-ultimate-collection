@@ -30,6 +30,15 @@ Tests: 139 in this repository (all synthetic), ruff, `check_specs` and `check_no
 | `.emd`/`.etd` spec | STATUS's first RomFS task, written from MHGU-DE's readers: header words, body records (bone, shape, hitzone row, part, radius, offsets), visibility rows, the `.etd` part table, hitzone table, sensors, ailments, attack volumes and records, base HP. Its class ids match our registry. All unverified until check E1 on the RomFS | specs/emd.md, id-tables.md |
 | Cross-checks | MHGU-DE agrees with our quest stat rows (and names the stat table), the reward box word, icon 98 = none, and the save key's place in the game's code. Its 0xAC "sub reward" disagrees with Q20 (0xB0), so the spec keeps 0xB0. `mod.md`'s unknown 0x1C-byte entries are skin palettes per MHGU-DE/RevilLib. SBC (collision) and EMC (AI) layouts went into their placeholders | specs/quest.md, extdata.md, mod.md, placeholders/ |
 
+### Last stretch: checks ready for the RomFS
+
+| Task | Result | Where |
+|---|---|---|
+| One survey for every open check | `mhuc survey` now also runs Q6, Q13 and Q18 (the builder on the game's own quests), E1 (`.emd`/`.etd`, also `mhuc emd check`), L1 (LMT), M3 (MOD meshes, also `mhuc mod info`), A1 (AI, EMC), S1 (collision, SBC) and G3 (GMD v2 label hashes) | `tools/mhuc/survey.py`, `emd.py`, `lmt.py`, `mod.py`; specs |
+| LMT spec | animations, from MHGU-DE (version 67 in MH4U), with a reader | specs/lmt.md |
+| GMD v2 label hashes | the inverted CRC-32 of the label twice and three times over, from beeequeue/gmd (MIT); `mhuc` now writes them, and G3 checks them on MHXX | specs/gmd.md, `tools/mhuc/gmd.py` |
+| Designs | the monster-port pipeline (after MHGU-DE's guide, turned the other way); prior art for the plugin layer; id allocation rules; the save's 82-entry monster log as a save-side limit; MH4U's monster stat table | docs/design/monster-port.md, plugin-api.md, id-tables.md, quest-conversion.md |
+
 ## What it changes for the plan
 
 - **A mod quest can be written end to end without the RomFS.** The pipeline: export or convert to the JSON model, build the `.mib`, put it in a slot, encrypt. Every step reproduces the game's own form where the game's form is known. What's missing is the game's verdict: Q17, Q19 and E4, which the test kit prepares.
