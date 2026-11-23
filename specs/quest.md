@@ -68,19 +68,19 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 | 0x8C | u8 | spawn area: 0 camp, 1 random, 2 elder dragon fight | unverified | mhff wiki |
 | 0x8D | u8 | arena fence: 0 off, 1 on | unverified | mhff wiki |
 | 0x8F | u8 | unknown (0 in 112; else 40 to 210, multiples of 10) | unknown | mhff wiki; check Q7 |
-| 0xA0..0xA3 | u8 ×4 | flags: quest type, repel, sub-quest, ship integrity (0x08). Each is a bit set: 0xA0 is one of 0x01, 0x02, 0x03, 0x04, 0x08, 0x10; 0xA1 0, 0x01, 0x02 or 0x04; 0xA2 0, 0x04, 0x40 or 0x84; 0xA3 0, 0x04, 0x08 or 0x0C | unverified | mhff wiki; check Q7 |
-| 0xA4 | u32 | posting fee | unverified | mhff wiki |
-| 0xA8 | u32 | main reward (zenny) | unverified | mhff wiki |
+| 0xA0..0xA3 | u8 ×4 | flags: quest type, repel, sub-quest, ship integrity (0x08). Each is a bit set; for 0xA0, the quest types the wiki gives agree with bits 0x01 slay (and arena), 0x02 capture, 0x04 delivery, 0x10 special, 0x03 hunt, with 0x08 on 8 hunts and 3 arena quests (check Q20): 0xA0 is one of 0x01, 0x02, 0x03, 0x04, 0x08, 0x10; 0xA1 0, 0x01, 0x02 or 0x04; 0xA2 0, 0x04, 0x40 or 0x84; 0xA3 0, 0x04, 0x08 or 0x0C | unverified | mhff wiki; checks Q7, Q20 |
+| 0xA4 | u32 | posting fee (zenny): equals the wiki's contract fee in 104 of the 116 quests it lists; the other 12 differ by 100 to 1,300 | verified | mhff wiki; check Q20 |
+| 0xA8 | u32 | main reward (zenny): equals the wiki's reward in 115 of 116 | verified | mhff wiki; check Q20 |
 | 0xAC | u32 | reward lost per faint | unverified | mhff wiki |
-| 0xB0 | u32 | sub-quest reward | unverified | mhff wiki |
-| 0xB4 | u32 | time limit in minutes (1..50 in all 120) | unverified | mhff wiki; check Q5 |
+| 0xB0 | u32 | sub-quest reward (zenny): equals the wiki's second reward (the "+ N" part, 0 when absent) in all 116 | verified | mhff wiki; check Q20 |
+| 0xB4 | u32 | time limit in minutes (1..50 in all 120): equals the wiki's in 115 of 116 | verified | mhff wiki; checks Q5, Q20 |
 | 0xB8 | u32 | intruder probability | unverified | mhff wiki |
 | 0xBC | u32 | offset to the text languages | verified | mhff wiki; check Q5 |
 | 0xC0 | u16 | quest id (60000..69999 for all 120 DLC quests) | unverified | mhff wiki; check Q5 |
-| 0xC2 | u16 | star rank (1..10 in all 120) | unverified | mhff wiki; check Q5 |
-| 0xC4 | u8 | map (19 different values, 1..17 among them) | unverified | mhff wiki; check Q7 |
+| 0xC2 | u16 | star rank, one scale across ranks: 1..3 Low Rank, 4..7 High Rank (the same number), 8..10 G Rank ★1..★3; agrees with the wiki's rank and level in all 116 that state them | verified | mhff wiki; checks Q5, Q20 |
+| 0xC4 | u8 | map. The wiki's locale for each quest gives: 1 Ancestral Steppe, 2 Sunken Hollow, 3 Primal Forest, 4 Frozen Seaway, 5 Heaven's Mount, 6 Great Desert, 7 Tower Summit, 8 Speartip Crag, 9 Ingle Isle, 10 Castle Schrade, 11 Arena, 12 Slayground, 15 Volcanic Hollow, 16 Sanctuary, 17 and 18 Dunes (two ids, perhaps day and night or the Old Desert variant), 19 Battlequarters, 20 Polar Field, 21 Great Sea; each id has one locale in all 116 | verified | mhff wiki; checks Q7, Q20 |
 | 0xC5, 0xC6 | u8 ×2 | requirements to post or join | unverified | mhff wiki |
-| 0xCC | u32, u16, u16 | main objective 1: type, target id, count. Types seen: 0x1, 0x81, 0x101, 0x204 (target always a monster of the quest's waves), 0x2 (never one: an item, presumably), 0x2004 (sub only); 0x101 also targets ids outside the waves with counts of 10 to 50, small monsters presumably | unverified | mhff wiki; check Q7 |
+| 0xCC | u32, u16, u16 | main objective 1: type, target id, count. Types seen, with the wiki's quest type of each quest (check Q20): 0x1 hunt (53 of 53), 0x81 capture, 0x101 slay (29 slay, 24 arena), 0x2 delivery (5, and 1 hunt whose second objective is a hunt), 0x204 special (3). 0x1, 0x81, 0x101, 0x204 (target always a monster of the quest's waves), 0x2 (never one: an item, presumably), 0x2004 (sub only); 0x101 also targets ids outside the waves with counts of 10 to 50, small monsters presumably | verified | mhff wiki; checks Q7, Q20 |
 | 0xD4 | u32, u16, u16 | main objective 2 (type 0 = none, in 91 of 120) | unverified | mhff wiki; check Q7 |
 | 0xDC | u32, u16, u16 | sub objective (type 0 = none, in 68; 0x204 in 37) | unverified | mhff wiki; check Q7 |
 | 0xE4 | u32 | offset to equipment and item presets (0 in 96) | unverified | mhff wiki |
@@ -180,9 +180,9 @@ All integers little-endian. A "text" is five strings, English, French, German, I
 | 0x08 | text | name | verified | mh3u-quest-studio; check Q12 |
 | next | u16 | quest number: the file's `q_NNNNN` in all 38 (20xxx and 6xxxx here) | verified | mh3u-quest-studio; check Q12 |
 | next | text | main objective | verified | mh3u-quest-studio; check Q12 |
-| next | u8, u8 | stars (1..8 here), map | verified | mh3u-quest-studio; check Q12 (layout) |
+| next | u8, u8 | stars (1..8 here: the wiki's rank level, in all 36 quests it lists), map. The wiki's locales give: 1 Deserted Island, 2 Sandy Plains, 3 Flooded Forest, 4 Tundra (day and night alike), 5 Volcano, 6 Great Desert, 7 Underwater Ruin, 8 Land Arena, 11 Sacred Land, 12 Water Arena, 14 Tower, 15 Tainted Sea; each id one locale | verified | mh3u-quest-studio; checks Q12, Q21 |
 | next | text | sub objective | verified | mh3u-quest-studio; check Q12 |
-| next | u16 | time limit in minutes (30 or 50 here) | verified | mh3u-quest-studio; check Q12 |
+| next | u16 | time limit in minutes (30 or 50 here; equals the wiki's in all 36) | verified | mh3u-quest-studio; checks Q12, Q21 |
 | next | text | failure conditions | verified | mh3u-quest-studio; check Q12 |
 | next | u16 ×3 | special flag and two conditions | unverified | mh3u-quest-studio |
 | next | text ×2 | client, description | verified | mh3u-quest-studio; check Q12 |
@@ -191,7 +191,7 @@ All integers little-endian. A "text" is five strings, English, French, German, I
 | tail +0x0A | 11 bytes ×5 | large monsters: type, set type, start type, number, HP, attack and other table rows (0..127, rows of a table in the code), a fourth row, size, size parameter, stamina; type 0 = empty slot | verified | mh3u-quest-studio; check Q12 (stride; table rows all ≤ 127) |
 | tail +0x41 | u8 ×6 | intruder settings | unverified | mh3u-quest-studio |
 | tail +0x47 | 4 bytes ×64 | rewards: u16 item, u8 count, u8 chance; even slots are table A, odd slots table B, each ending at item 0 | verified | mh3u-quest-studio; check Q12 (both tables end; chances ≤ 100) |
-| tail +0x147 | i32 ×5 | fee, reward, reward lost per faint, main HRP, failure HRP | verified | mh3u-quest-studio; randomizer; check Q12 (first three in range) |
+| tail +0x147 | i32 ×5 | fee, reward, reward lost per faint, main HRP, failure HRP; fee and reward equal the wiki's in all 36 | verified | mh3u-quest-studio; randomizer; checks Q12 (first three in range), Q21 (fee, reward) |
 | tail +0x15B | mixed | u8 ×4, u16 ×8, u32 ×4, u16 ×6, u32 ×2: gathering, progress, enemy level, supply and small-monster settings | unverified | mh3u-quest-studio |
 | tail +0x193 | u16 | clear pattern: 0 one objective, 1 both, 2 either | verified | mh3u-quest-studio; randomizer; check Q12 (0..2) |
 | tail +0x195 | (u32, u16, i16) ×2 | objectives: type in the low u16 (0x1 hunt, 0x2 deliver, item id as target, 0x81 capture, 0x101 slay, 0x8101 slay small, 0x404 repel, 0x2515 and 0x4014 siege repel, 0x2000 siege damage), target, count | verified | mh3u-quest-studio; check Q12 (every type seen is in that list) |
@@ -293,4 +293,6 @@ Q3 to Q5 were run on 2026-11-23 in a web session on the maintainer's own MH4U (U
 - **Q18 (done):** split each of the 120 `.mib` into the model and build it again. Pass: for all 120, `parse_mib4` of the rebuilt file equals `parse_mib4` of the original, the rebuilt file's model equals the original's, a second rebuild is byte-identical to the first, and every rebuilt quest fits a slot (sizes change by −512 to +160 bytes). The block order, the alignments and terminators in "Writing a .mib", and the small-monster header's three equal offsets were read from the same files. The JSON form (`model_to_json`, then `model_from_json`) gives back an equal model for all 120.
 - **The test kit:** `mhuc extdata testkit <Extra Data folder> --key K --out kit/` builds Q17's, Q19's and E4's files in one go, encrypted and ready to copy over a backed-up Extra Data, with a TESTKIT.txt listing the quest ids (60999, 61000), titles and slots it used. On the maintainer's data it fills `quest2`'s last two slots and renames the first Palico.
 - **Q19 (open, in game):** as Q17, but with a title longer than the original (`questslot put ... --title "<a long title>"` lays the quest out again with the builder). Pass: the quest is listed with the new title and plays like the original. A pass means the builder's layout is one the game takes, so a converter can write quests from scratch.
+- **Q20 (done):** for each of the 120 DLC quests, take its English title and read the public Monster Hunter Wiki page "<title> (MH4U Quest)" (monsterhunterwiki.org, through its API, on 2026-11-23): rank, rank level, contract fee, time limit, reward money, locale and quest type. 116 pages exist. Pass: the counts in the rows for 0xA0, 0xA4, 0xA8, 0xB0, 0xB4, 0xC2, 0xC4 and 0xCC. The wiki is a secondary source (its fee differs in 12 quests), so a field counts as verified where the two agree in all or nearly all quests and the exceptions are listed.
+- **Q21 (done):** the same as Q20 for the 38 MH3U quests in the maintainer's 3DS Extra Data, with the pages "<title> (MH3U Quest)": 36 exist. Pass: fee, reward and time limit equal the wiki's in all 36; the stars byte equals the wiki's rank level in all 36 (MH3U numbers them 1..8 across Low, High and G, the wiki labelling some levels with two ranks); each map id has one locale.
 - **Q6 (open):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.

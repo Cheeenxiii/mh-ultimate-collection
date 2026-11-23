@@ -17,6 +17,7 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | A changed DLC Palico through `otomo1` (E4) | specs/extdata.md | MH4U save, a save manager, the game | open |
 | Stored-quest trailer: hash, padding, size (Q16) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
 | `.mib` model and builder on 120 quests (Q18) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
+| `.mib` and `QTDS` fields against the wiki: fee, rewards, time, stars, maps, objective types (Q20, Q21) | specs/quest.md | MH4U, MH3U Extra Data | done 2026-11-23 |
 | A rebuilt quest in game (Q19) | specs/quest.md | MH4U save, a save manager, the game | open |
 | A mod quest through an Extra Data slot (Q17) | specs/quest.md | MH4U save, a save manager, the game | open |
 | A local DLC responder with its own key (D1), the DLC list files (D2) | docs/design/dlc-responder.md | the port; the goshawk mirror | open |
