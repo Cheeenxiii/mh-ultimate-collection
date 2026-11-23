@@ -10,7 +10,7 @@ Phase: **engine work with the game files.** Both reference games recompile, and 
 
 This session ([report](docs/reports/2026-11-24-monster-port-classes.md), results in [monster-port.md](docs/design/monster-port.md), "Step 1 continued"):
 - **Every class's vtable**, in all three games (99%), with MHXX's monster classes found through their CRO modules (fork `tools/mt_vtables.py`). Used as anchors, they double the function maps: 7,542 pairs with MHXX, 6,866 with MH3U, all held-out checks correct.
-- **A GU monster needs MHXX's enemy layer.** `roEm001` imports 330 engine functions. 262 have no MH4U counterpart, mostly in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, GU's projectile classes). Whether GU monsters run with that layer or get rewritten on MH4U's `uEnemy` is now an open decision ("Monster versions").
+- **A GU monster needs MHXX's enemy layer.** `roEm001` imports 330 engine functions. 262 have no MH4U counterpart, mostly in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, GU's projectile classes). The maintainer settled it: monsters are ported onto MH4U's `uEnemy`, so the source code is a reference to translate, not code the mod runs.
 - **MH3U runs Rathian on `uEm002`** (ids 1, 2, 62-65), found through MH3U's enemy factory (id-tables.md has its id-to-class table). The three Rathians are three codebases.
 
 ## Branches
@@ -34,7 +34,6 @@ This session ([report](docs/reports/2026-11-24-monster-port-classes.md), results
 ## Waiting on the maintainer
 
 - Reviewing and merging this session's two PRs.
-- The new open question in "Monster versions": GU monsters with MHXX's enemy layer, or rewritten on MH4U's `uEnemy`.
 - Whether to contact MHGU Definitive Edition's maintainers about shared format specs.
 - Running the test kit in game, and saying which region and language the Extra Data's game is.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.
