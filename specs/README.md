@@ -20,6 +20,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [svanheulen/mhff](https://github.com/svanheulen/mhff) | GPL-3.0 | ARC, TEX, MOD header, quest ARCs; its wiki's "MH4U rQuestData Format" and "MH4U DLC Encryption" pages for the `.mib` layout |
 | [GrenderG/goshawk](https://github.com/GrenderG/goshawk) | AGPL-3.0 (the DLC files in it are Capcom's) | a preservation mirror of Capcom's DLC server; its MH4U quest files were read outside the repositories for check Q9 of quest.md, nothing copied |
 | [svanheulen/mhef](https://gitlab.com/svanheulen/mhef) | GPL-3.0 | MH4U save, Extra Data and DLC encryption (`SavedataCipher`, `DLCCipher`); used outside the repositories, no code or key copied |
+| [BoyClinton/Cha-Cha](https://github.com/BoyClinton/Cha-Cha) | GPL-3.0 | MH3U's DLC wire format and MtCipher's Blowfish variant (`runtime/os/dlc_server.cpp`); no code copied |
 | [Matt-Wood-23/mh3u-quest-studio](https://github.com/Matt-Wood-23/mh3u-quest-studio) | MIT | the MH3U `QTDS` record and event-pack slots (`questlib/quest_format.py`, `dlc_pack.py`) |
 | [ArmoredRaven17/mh3u-quest-randomizer](https://github.com/ArmoredRaven17/mh3u-quest-randomizer) | MIT | MH3U `QTDS` tail offsets (`scripts/build_data.py`) |
 | [Silvris/MH-Tools-and-Scripts](https://github.com/Silvris/MH-Tools-and-Scripts) | see repository | MOD (MH3U, MHGU), TEX (mobile), GMD |
