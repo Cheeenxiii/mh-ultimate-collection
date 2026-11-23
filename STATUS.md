@@ -14,7 +14,7 @@ The MH4U quest format (`.mib`) is now specified from mhff's wiki and partly veri
 
 Findings that steer the next steps:
 - Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, each ending with its file name (`mNNNNN.mib`), under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables. Monsters come in waves; objective types are mapped by value, though their meanings aren't confirmed.
-- Capcom's MH4U DLC server is gone (NXDOMAIN). Its files live on in the GrenderG/goshawk preservation mirror (AGPL-3.0, files Capcom's): server quests are bare `.mib`, identical to what the game stores, plus 28 bytes the game adds (unknown; they decide whether mod quests can go in through Extra Data). The mirror also has MH3U and MHXX DLC quests.
+- Capcom's MH4U DLC server is gone (NXDOMAIN). Its files live on in the GrenderG/goshawk preservation mirror (AGPL-3.0, files Capcom's): server quests are bare `.mib`, identical to what the game stores, plus 28 bytes the game adds (unknown; they decide whether mod quests can go in through Extra Data). The mirror's MH3U DLC quests (38 USA) are encrypted with a cipher whose key we don't have (goshawk's MH3G login key doesn't work); MHXX's are there too.
 - No public layout exists for `.emd`/`.etd`; that spec has to come from the files and the code.
 - Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
 - Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
@@ -29,8 +29,9 @@ This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of 
 1. **`.emd`/`.etd` specs** (`rEnemyData`, `rEnemyTuneData`): parts, hitzones, breaks; trace carves. Needs the RomFS. Done when specs/ has both with verified/unverified fields and id-tables.md's parts row points at them.
 2. **A first table-growing plugin**: grow one id-indexed table with `alloc` and repoint its readers. Done when a procedure in docs/checks/ passes in game.
 3. **Quest check Q6**: run the Q5 checks on the game's 508 `.mib` (specs/quest.md). Needs the RomFS; it's short, so do it alongside task 1.
-4. **MHXX full gametest** (every function, 4 shards, about 5 minutes). Done when reference-recompiles.md has its verdict counts and every non-agreeing function is explained.
-5. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness). Done when underwater.md cites what the harness showed.
+4. **MH3U quest format** (`QTDS`): the layout from the RomFS's 365 plain `.quest` files, and the DLC cipher from MH3U's code, then a check on the mirror's 38 DLC quests. Needs the MH3U dump. Done when specs/quest.md's MH3U section has a field table with verified rows.
+5. **MHXX full gametest** (every function, 4 shards, about 5 minutes). Done when reference-recompiles.md has its verdict counts and every non-agreeing function is explained.
+6. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness). Done when underwater.md cites what the harness showed.
 
 ## Waiting on the maintainer
 

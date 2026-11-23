@@ -12,6 +12,7 @@ A web session with no RomFS or code dumps. The only game files were the maintain
 | `.mib` header | the whole layout from the mhff wiki's "MH4U rQuestData Format" page, field by field, credited. Verified on the 120 quests: the magic, the flags offset, the supply, reward, large-monster, intruder and text offsets; the supply, reward-item, monster and intruder list strides and end markers; the 5×7 text pointers to UTF-16. Value ranges recorded for the time, stars, carve table, quest id and size percentage, with those fields left unverified | specs/quest.md |
 | Second pass (Q7, Q8) | large monsters come in waves (a 0-terminated list of definition lists); small monsters are a 0-terminated list of areas; all 7 strings of all 5 languages decode; supply items verified; value spreads recorded for the objectives, flags and unknown bytes. Objective types seen: 0x1, 0x81, 0x101, 0x204 (target always a monster of the quest), 0x2 (never one: an item, presumably), 0x2004. The slot trailer is the quest's file name, `m` + the five-digit quest id + `.mib` | specs/quest.md |
 | Server quest files (Q9) | Capcom's server is gone (NXDOMAIN), so the maintainer approved the GrenderG/goshawk preservation mirror. Its 120 USA and 120 EUR quest files (identical) decrypt with mhef's `DLCCipher`, SHA-1 checked. Each is a bare `.mib` (no ARC, against mhff's convert_quest.py) and is byte-identical to the start of the matching Extra Data slot. The game adds 28 bytes after it (unknown: not a hash of the file or name) | specs/quest.md |
+| MH3U DLC quests (Q10) | 38 USA quests in the goshawk mirror, identical in EUR and on Wii U; 47 for Japan's MH3G. Container understood: ECB with an 8-byte block cipher, then the plaintext size as a big-endian u32. The key isn't known: goshawk's MH3G login key and mhef's keys give no plaintext. The `QTDS` layout is still unspecified | specs/quest.md |
 | Credits | mhff wiki pages and mhef (GPL-3.0) | specs/README.md |
 
 ## What it changes for the plan
@@ -30,7 +31,7 @@ A web session with no RomFS or code dumps. The only game files were the maintain
 
 ## Checklist for the next session
 
-0. The goshawk mirror also holds MH3U's DLC quests (`files/3ds/mh3gu_us/q_*.quest`) and MHXX's: a source for the 3U quest format (QTDS) when that spec is started.
+0. MH3U quests: specify `QTDS` from the RomFS's 365 plain `.quest` files, and find the DLC cipher in MH3U's code (the routine that takes the login key and decrypts a downloaded `.quest`); then decrypt the mirror's 38 USA quests and check the spec on them too.
 1. With the RomFS: Q6 (the Q5 checks on `quest00.arc`/`quest01.arc`) promotes the header rows from DLC-only to the game's own quests.
 2. `.emd`/`.etd` specs from the files, with no public layout to start from.
 3. Re-running Q3 to Q5 needs mhef's `SavedataCipher` (the key is in mhef's `mhef/n3ds.py`, not in this repository): decrypt into a folder outside the repositories, then split each `quest*` file at 0x2010.
