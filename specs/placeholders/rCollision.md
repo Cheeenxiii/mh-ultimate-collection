@@ -7,6 +7,8 @@ status: unknown
 
 # rCollision (stage)
 
+**A layout exists** in MHGU Definitive Edition's `tools/sbc.py` (GPL-3.0-or-later), which reads MH4U's stage collision and converts it to MHGU's; its class id for the MH4U file, 0x51FC779F, is this class's. Summary, unverified on our files: magic `SBC\xff`, an inner class hash (0x77CF8DF8 in MH4U), counts of parts, attribute groups, polygons, triangles and vertices, a bounding box (header 0x48 bytes in MH4U); then one 0x48-byte record per part (a uniform grid each; indices local to the part), 28-byte polygon boxes, a `BVHC` block of 112-byte four-wide nodes over the parts, the grids, triangles and vertices, with no alignment between blocks. Stage conversion (3U and GU maps into MH4U) will need this; MH3U's and MHXX's own collision formats are still to find.
+
 Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `config/mt_classes.tsv`) lists it under `cResource`, class id `0x51fc779f`, resource object size 0xd8 bytes (the loaded object, not the file).
 
 | Offset | Type | Name | Status | Source |

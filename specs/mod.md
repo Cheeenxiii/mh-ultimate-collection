@@ -22,17 +22,19 @@ The same layout in all three games. "M2" fields were checked on every `rModel` i
 | 0x0A | u16 | material count | verified | Silvris MH3U MOD.bt; check M2 |
 | 0x0C | u32 | vertex count: the sum of the meshes' vertex counts | verified | check M2 |
 | 0x10 | u32 | index count: the index buffer holds this many u16 minus one and ends at the end of the file (the minus one is observed, not explained) | verified | mhff io_import_scene_mod.py; check M2 |
-| 0x14 | u32 | unknown; less than the vertex count | unverified | check M2 |
+| 0x14 | u32 | edge count per RevilLib (via MHGU Definitive Edition's `mod.py`); less than the vertex count here | unverified | check M2; MHGU-DE `mod.py` |
 | 0x18 | u32 | vertex buffer size in bytes (0x34 + this = 0x3C) | verified | check M2 |
 | 0x1C | u32 | always 0 | verified | check M2 |
 | 0x20 | u32 | group count (0x20-byte entries at 0x2C) | verified | check M2 |
-| 0x24 | u32 | count of 0x1C-byte entries inside the bone block (0 without bones); what they are is unknown (the size is checked, the meaning is not) | unverified | check M2 |
+| 0x24 | u32 | count of 0x1C-byte entries inside the bone block (0 without bones). MHGU Definitive Edition's `mod.py` reads them as skin palettes, MH4U only: {u32 count, u8 bones[24]}, which a mesh's skin-bone index picks (the size is checked here, the meaning is theirs) | unverified | check M2; MHGU-DE `mod.py` |
 | 0x28 | u32 | bone block offset, 0x80; 0 without bones | verified | check M2 |
 | 0x2C | u32 | group table offset (0x80 when there are no bones) | verified | check M2 |
 | 0x30 | u32 | material table offset: material count × 0x80 bytes | verified | check M2 |
 | 0x34 | u32 | mesh table offset: mesh count × 0x30, then a u32 n and n × 0x90 bytes (n is 0 in skinned models; in unskinned effect models it equals the mesh count) | verified | mhff io_import_scene_mod.py; check M2 |
 | 0x38 | u32 | vertex buffer offset | verified | mhff io_import_scene_mod.py; check M2 |
 | 0x3C | u32 | index buffer offset | verified | mhff io_import_scene_mod.py; check M2 |
+
+MHGU Definitive Edition's `mod.py` (GPL-3.0-or-later, after PredatorCZ's RevilLib) also lays out what follows the header for MH4U: a bounding sphere and box, then metadata (middle and low LOD distances, light group, boundary joint); bones as 24-byte records {u8 index, parent, mirror, pad, f32 furthest vertex, f32 parent distance, f32 pos[3]}, then the local and inverse-bind matrices and a 256-byte remap (bone id to index); materials as 128-byte names whose CRC-32 (inverted) is the MRL material hash; meshes as 48-byte records (draw mode, vertex count, group/material/LOD bit fields, visibility/weights/stride/primitive bit fields, vertex start and stream offset, vertex format hash, index start, count and value offset, skin-bone start, envelopes). Unverified here; check M2 can take each field in turn.
 
 ## Bone block (at 0x28, size 0x2C − 0x28)
 
