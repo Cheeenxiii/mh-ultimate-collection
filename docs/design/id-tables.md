@@ -174,6 +174,36 @@ When ids grow past 123: the factory compare and jump table, `enemyDataPathIndex`
 
 The scripts live in the maintainer's workspace (`game_files/work/mt/`).
 
+## MH3U's factory (reference, 2026-11-24)
+
+Found with the engine fork's `tools/mt_vtables.py`: the function that calls the most `uEm` constructors (functions that load a `uEm` vtable) is the factory. The same search finds MH4U's `createEnemy` at `0x006901f4`, as above.
+
+| What | Address | Shape | Bound |
+|---|---|---|---|
+| MH3U factory | `0x005bbc5c` | `(owner, id)`: `cmp r1, #0x56`, `ldrlo pc` into an 86-word jump table at `0x005bbc78`; cases allocate and call their class's constructor, several sharing a tail | `0x56` (86 ids); id 0 and out of range create nothing |
+
+**Id to class** follows MH4U's rule: id N runs `uEmN`, or another monster's class when there's no `uEmN`. The shared classes:
+
+| Class | Ids | Class | Ids |
+|---|---|---|---|
+| uEm002 | 1, 2, 62-65 | uEm025 | 25, 85 |
+| uEm003 | 3, 51 | uEm027 | 27, 28, 49, 78 |
+| uEm004 | 4, 52 | uEm030 | 30, 31 |
+| uEm005 | 5, 53 | uEnemy (the base class itself) | 32, 50 |
+| uEm006 | 6, 58 | uEm034 | 34, 77 |
+| uEm007 | 7, 71 | uEm036 | 36-39 |
+| uEm008 | 8, 54 | uEm040 | 40, 79-84 |
+| uEm009 | 9, 55 | uEm041 | 41, 72 |
+| uEm010 | 10, 13 | uEm042 | 42-44 |
+| uEm011 | 11, 48 | uEm046 | 46, 73 |
+| uEm012 | 12, 14, 45 | uEm059 | 59-61 |
+| uEm015 | 15, 68, 69 | uEm066 | 66, 67 |
+| uEm017 | 16, 17, 21 | | |
+| uEm019 | 19, 57 | | |
+| uEm020 | 20, 70 | | |
+
+The others (18, 22-24, 26, 29, 33, 35, 47, 56, 74-76) have a class of their own. **Rathian (id 1) runs on `uEm002`**, Rathalos's class, with ids 62-65 (the colour variants). `uEm002`'s vtable slot 14 (`0x006918a4`) names their files by id: 1 → em001, 2 → em002, 62-65 → em062-em065. MH4U does it the other way round: ids 1-6 all run `uEm001`.
+
 ## How to find the rest
 
 1. **Start from a known monster.** Pick one MH4U monster whose files are known by name in the RomFS (its ARC folder, `em/emXXX/`-style). Its id is in the folder name. Search `.data` and `.rodata` for that id next to its path string: the record that holds the path is a row of the monster table; its neighbours are the other rows, and the table's start and end bound the count.
