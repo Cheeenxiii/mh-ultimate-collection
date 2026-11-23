@@ -4,9 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import struct
 import sys
 
-from . import __version__, arc, classid, gmd, romfs, survey, tex
+from . import __version__, arc, classid, dlccrypt, entropy, gmd, quest, romfs, survey, tex, xfs
 
 
 def _read(path: str) -> bytes:
@@ -78,6 +79,86 @@ def cmd_survey(args) -> int:
     return 0
 
 
+def cmd_entropy(args) -> int:
+    print(entropy.report(entropy.walk(args.paths)))
+    return 0
+
+
+def cmd_xfs(args) -> int:
+    x = xfs.read(_read(args.file))
+    json.dump({"endian": x.endian, "version": [x.version, x.subversion],
+               "classes": [{"dti_id": f"0x{c.dti_id:08X}",
+                            "props": [{"name": p.name, "type": p.type_name, "attr": p.attr} for p in c.props]}
+                           for c in x.classes],
+               "root": x.root}, sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
+DECRYPT = {"mh4u-save": "mh4u_save_decrypt", "mh4u-dlc": "mh4u_dlc_decrypt",
+           "mhxx-dlc": "mhxx_dlc_decrypt", "mh3u-dlc": "mh3u_dlc_decrypt"}
+
+
+def cmd_decrypt(args) -> int:
+    key = _read(args.key).rstrip(b"\r\n")
+    data = _read(args.file)
+    fn = getattr(dlccrypt, DECRYPT[args.kind])
+    try:
+        plain = fn(data, key, args.mode) if args.kind == "mh4u-save" else fn(data, key)
+    except dlccrypt.CryptoError as e:
+        print(f"mhuc decrypt: {e}", file=sys.stderr)
+        return 1
+    with open(args.out, "wb") as f:
+        f.write(plain)
+    print(f"{len(plain)} bytes to {args.out}")
+    return 0
+
+
+def _quest_files(kind: str, path: str):
+    """(name, parsed) for every quest in a file: an Extra Data quest file, a .mib, an MHXX .arc or a .quest."""
+    data = _read(path)
+    if kind == "mh4u":
+        if data[4:8] == b"v005" and len(data) < quest.SLOT:
+            return [(os.path.basename(path), quest.parse_mib4(data))]
+        return [(name, quest.parse_mib4(body)) for _, name, body in quest.mh4u_slots(data)]
+    if kind == "mh3u":
+        if data[:4] == b"QTDS":
+            return [(os.path.basename(path), quest.parse_qtds(data))]
+        return [(name, quest.parse_qtds(rec)) for _, name, rec in quest.mh3u_slots(data)]
+    a = arc.read(data)  # mhxx: a quest archive, every part read
+    parts: dict = {}
+    for e in a.entries:
+        n = e.file_name.split("/")[-1]
+        if e.type_name == "rQuestData":
+            parts["mib"] = quest.parse_mibxx(e.data)
+        elif e.type_name == "rSetEmMain":
+            parts.setdefault("sem", {})[n] = quest.parse_sem(e.data)
+        elif e.type_name == "rEmSetList":
+            parts.setdefault("esl", {})[n] = quest.parse_esl(e.data)
+        elif e.type_name == "rRem":
+            parts.setdefault("rem", {})[n] = quest.parse_rem(e.data)
+        elif n.startswith("supp_"):
+            parts["supply"] = quest.parse_supply(e.data)
+    return [(os.path.basename(path), parts)]
+
+
+def cmd_quest(args) -> int:
+    if args.action == "dump":
+        out = {name: q for p in args.paths for name, q in _quest_files(args.kind, p)}
+        json.dump(out, sys.stdout, ensure_ascii=False, indent=1)
+        print()
+        return 0
+    ok = bad = 0  # check: parse everything, print counts only
+    for p in args.paths:
+        try:
+            ok += len(_quest_files(args.kind, p))
+        except (struct.error, UnicodeDecodeError, ValueError, IndexError) as e:
+            bad += 1
+            print(f"{os.path.basename(p)}: {e}", file=sys.stderr)
+    print(f"{ok} quests read, {bad} files failed")
+    return 1 if bad else 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -121,6 +202,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("image")
     p.add_argument("--workers", type=int, default=4, help="processes (each holds one archive in memory)")
     p.set_defaults(func=cmd_survey)
+
+    p = sub.add_parser("entropy", help="size, block alignment and byte entropy of files (encrypted?); counts only")
+    p.add_argument("paths", nargs="+", help="files or folders")
+    p.set_defaults(func=cmd_entropy)
+
+    p = sub.add_parser("xfs", help="MT XFS serialised objects (.supp, .pop, ...) as JSON, schema included")
+    p.add_argument("action", choices=["dump"])
+    p.add_argument("file")
+    p.set_defaults(func=cmd_xfs)
+
+    p = sub.add_parser("decrypt", help="decrypt a DLC or Extra Data file (the key comes from a file you supply)")
+    p.add_argument("kind", choices=sorted(DECRYPT))
+    p.add_argument("file")
+    p.add_argument("out")
+    p.add_argument("--key", required=True, help="a file holding the key's bytes (never kept in this repository)")
+    p.add_argument("--mode", choices=dlccrypt.MH4U_SAVE_MODES, default="normal", help="mh4u-save only")
+    p.set_defaults(func=cmd_decrypt)
+
+    p = sub.add_parser("quest", help="read quests: MH4U .mib, MHXX quest .arc, MH3U QTDS, or Extra Data quest files")
+    p.add_argument("action", choices=["dump", "check"])
+    p.add_argument("kind", choices=["mh4u", "mhxx", "mh3u"])
+    p.add_argument("paths", nargs="+")
+    p.set_defaults(func=cmd_quest)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
                        ("convert", "convert a source game's assets for MH4U (needs game files)"),

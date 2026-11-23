@@ -48,6 +48,10 @@ mhuc --help
 | `mhuc tex info FILE` / `mhuc tex decode FILE OUT.ppm` | 3DS textures |
 | `mhuc romfs list ROMFS.BIN` | the files of a RomFS image, read in place |
 | `mhuc survey ROMFS.BIN [--workers N]` | the specs' with-game-files checks over a whole RomFS; prints counts only |
+| `mhuc entropy PATH...` | size, 8-byte alignment and byte entropy of files or folders, to tell encrypted ones (saves, Extra Data) from plain; prints counts only |
+| `mhuc xfs dump FILE` | an MT XFS file (`.supp`, `.pop`, `.list`, …) as JSON, its schema included; either byte order |
+| `mhuc decrypt KIND IN OUT --key FILE [--mode M]` | DLC and Extra Data crypto: `mh4u-save` (modes normal, card, quest), `mh4u-dlc`, `mhxx-dlc`, `mh3u-dlc` (MtCipher). The key comes from a file you supply; none is in this repository |
+| `mhuc quest dump\|check KIND PATH...` | quests as JSON or as counts: `mh4u` (a `.mib` or a decrypted Extra Data `quest*` file), `mhxx` (a quest `.arc`, every part), `mh3u` (a `QTDS` file or a 3DS Extra Data `quest*` file) |
 | `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
 ## Tests
