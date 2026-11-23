@@ -19,6 +19,7 @@ Findings that steer the next steps:
 - Quests are now fully readable and checkable in three games: `mhuc decrypt` and `mhuc quest` reproduce every check, and [docs/design/quest-conversion.md](docs/design/quest-conversion.md) maps 3U and GU fields onto MH4U's `.mib`, with three routes into the game (quest archives, Extra Data slots, a local DLC responder) left as options.
 - `.emd`/`.etd` now have a public lead: MHGU Definitive Edition's `tools/emdata4u.py` reads 4U's `emd`/`etd` (from EUR v1.1), checked by rebuilding GU monsters. Its `allocations.toml` and monster registry are the pattern for growing tables. Assessment: [docs/sources/mhgu-definitive-edition.md](docs/sources/mhgu-definitive-edition.md). Its addresses are EUR v1.1: map `.text` ones through the fork's `config/shifts/eur_v110.txt` and check on USA v1.3.0.
 - Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
+- Audio was never planned; now it is ([docs/design/audio.md](docs/design/audio.md), [specs/sound.md](specs/sound.md)). MH3U uses MH4U's sound classes (same ids). MHXX uses GU's, whose 4U → GU conversion Definitive Edition derived from Capcom's own pairs, so the reverse may give XX → 4U.
 - Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
 - Memory: cap big jobs with a cgroup at **6 GB** (one job at a time, 4 workers). Fork recompiler tests need `PATH=/usr/lib/llvm-22/bin:$PATH`.
 
@@ -30,7 +31,7 @@ This repo: `claude/practical-johnson-jobxzw` has this session's docs commits on 
 
 1. **`.emd`/`.etd` specs** (`rEnemyData`, `rEnemyTuneData`): parts, hitzones, breaks; trace carves. Start from Definitive Edition's `emdata4u.py` and `hagi4u.py` (fields `unverified`, credited), then verify on USA v1.3.0. Needs the RomFS. Done when specs/ has both with verified/unverified fields and id-tables.md's parts row points at them.
 2. **A first table-growing plugin**: grow one id-indexed table with `alloc` and repoint its readers. Read Definitive Edition's `allocations.toml` and `notes/registry.md` first. Done when a procedure in docs/checks/ passes in game.
-3. **Quest check Q6**: run the Q5 checks on the game's 508 `.mib` (specs/quest.md). Needs the RomFS; it's short, so do it alongside task 1.
+3. **Quest check Q6 and sound check S1**: run the Q5 checks on the game's 508 `.mib` (specs/quest.md), and survey the sound entries of the three RomFS by type and version (specs/sound.md). Needs the RomFS; both are short, so do them alongside task 1.
 4. **MH3U quest check Q13**: run the `QTDS` parse on the RomFS's 365 `.quest` files (specs/quest.md). Needs the MH3U RomFS; short, so pair it with Q6.
 5. **MHXX full gametest** (every function, 4 shards, about 5 minutes). Done when reference-recompiles.md has its verdict counts and every non-agreeing function is explained.
 6. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness), starting from Cha-Cha's swim and camera marks (underwater.md, "Leads from Cha-Cha"). Done when underwater.md cites what the harness showed.
@@ -42,4 +43,4 @@ This repo: `claude/practical-johnson-jobxzw` has this session's docs commits on 
 - Whether to contact MHGU Definitive Edition's maintainers about shared format specs.
 - A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
 - Whether to offer the inline-cache fix (fork `recomp.h`) to upstream MH4UltimateDC.
-- The open decisions in [docs/design/open-decisions.md](docs/design/open-decisions.md): three were added this session (versions of shared systems, map versions and lighting, GU Switch assets), and progression gained option E. None settled.
+- The open decisions in [docs/design/open-decisions.md](docs/design/open-decisions.md): four were added this session (versions of shared systems, map versions and lighting, music and sound versions, GU Switch assets), and progression gained option E. None settled.
