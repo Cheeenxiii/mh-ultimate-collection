@@ -19,8 +19,8 @@ Everything new is extracted from the game it comes from, both its assets and its
 
 | Path | What |
 |---|---|
-| `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression |
-| `docs/sources/` | what each source game supplies; the authored register |
+| `docs/design/` | design documents: the [decisions](docs/design/open-decisions.md), plugin API, underwater, ID tables, reference recompiles, progression |
+| `docs/sources/` | what each source game supplies; the authored register; related projects |
 | `specs/` | one spec per file type (`.ksy` + notes), each field marked verified or unverified |
 | `STATUS.md` | where the project stands and what's next; rewritten every session |
 | `tools/doctor.py`, `tools/workspace/` | the workspace check, and the Claude files (CLAUDE.md, hook, skills) it installs |
@@ -60,6 +60,14 @@ mhuc --help
 python3 -m pytest
 ruff check .
 ```
+
+## Related projects
+
+- [Cha-Cha](https://github.com/BoyClinton/Cha-Cha): MH3U (Wii U) recompiled for PC.
+- [MHGURecomp](https://github.com/morerokk/MHGURecomp): MHGU (Switch) recompiled for PC.
+- [MHGU Definitive Edition](https://github.com/Scrimas/MH4U-port-to-MHGU): MH4U monsters added to MHGU, the other way round from this project.
+
+What each offers us: [docs/sources/](docs/sources/README.md#reference-projects).
 
 ## Licence
 

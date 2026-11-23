@@ -12,3 +12,13 @@ The fidelity rule: everything new is extracted from the game it comes from, its 
 Each player supplies their own dumps (LEGAL.md). The tools read them outside the repository and write the converted mod to the player's machine.
 
 Anything not supplied by one of these games is authored and listed in the [authored register](authored-register.md).
+
+## Reference projects
+
+Other projects on the same games. Their facts and formats inform our specs, credited where used. None of them is a source of game content.
+
+| Project | Game and platform | Licence | Assessment |
+|---|---|---|---|
+| [Cha-Cha](https://github.com/BoyClinton/Cha-Cha) | MH3U, Wii U (recompile) | GPL-3.0 | [cha-cha.md](cha-cha.md) |
+| [MHGU Definitive Edition](https://github.com/Scrimas/MH4U-port-to-MHGU) | MH4U monsters into MHGU, Switch (mod) | GPL-3.0-or-later | [mhgu-definitive-edition.md](mhgu-definitive-edition.md) |
+| [MHGURecomp](https://github.com/morerokk/MHGURecomp) | MHGU, Switch (recompile) | MIT | [mhgurecomp.md](mhgurecomp.md) |
