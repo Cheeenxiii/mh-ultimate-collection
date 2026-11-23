@@ -15,6 +15,7 @@ The MH4U quest format (`.mib`) is now specified from mhff's wiki and partly veri
 Findings that steer the next steps:
 - Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, each ending with its file name (`mNNNNN.mib`), under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables. Monsters come in waves; objective types are mapped by value, though their meanings aren't confirmed.
 - Capcom's MH4U DLC server is gone (NXDOMAIN). Its files live on in the GrenderG/goshawk preservation mirror (AGPL-3.0, files Capcom's): server quests are bare `.mib`, identical to what the game stores, plus 28 bytes the game adds (unknown; they decide whether mod quests can go in through Extra Data). MHXX's DLC (173 quests) decrypts and fits mhff's MHXX `.mib` layout. MH3U's `QTDS` layout (from mh3u-quest-studio) is verified on the 38 USA DLC quests stored in clear in the maintainer's 3DS Extra Data; its DLC cipher is MT Framework's Blowfish variant (MtCipher, as Cha-Cha documents it): all 38 USA and 47 Japanese MH3G server quests decrypt. Its S-box quirk isn't in MH4U's or MHXX's DLC crypto, which standard Blowfish decrypts.
+- Cha-Cha (MH3U Wii U recompile, GPL-3.0) is a strong lead for MH3U: DLC, formats, ~36,000 class-and-slot function names, and underwater state marks. Its addresses are Wii U PowerPC and must be re-found on 3DS. Assessment: [docs/sources/cha-cha.md](docs/sources/cha-cha.md).
 - No public layout exists for `.emd`/`.etd`; that spec has to come from the files and the code.
 - Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
 - Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
@@ -31,7 +32,8 @@ This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of 
 3. **Quest check Q6**: run the Q5 checks on the game's 508 `.mib` (specs/quest.md). Needs the RomFS; it's short, so do it alongside task 1.
 4. **MH3U quest check Q13**: run the `QTDS` parse on the RomFS's 365 `.quest` files (specs/quest.md). Needs the MH3U RomFS; short, so pair it with Q6.
 5. **MHXX full gametest** (every function, 4 shards, about 5 minutes). Done when reference-recompiles.md has its verdict counts and every non-agreeing function is explained.
-6. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness). Done when underwater.md cites what the harness showed.
+6. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness), starting from Cha-Cha's swim and camera marks (underwater.md, "Leads from Cha-Cha"). Done when underwater.md cites what the harness showed.
+7. **Cha-Cha names on the MH3U recompile** (fork): carry its class-and-slot names onto our 3DS vtables. Done when the fork's MH3U config has the names and a count of slots that matched.
 
 ## Waiting on the maintainer
 
