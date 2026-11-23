@@ -37,6 +37,14 @@ This repo: `claude/practical-johnson-jobxzw` has this session's docs commits on 
 6. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness), starting from Cha-Cha's swim and camera marks (underwater.md, "Leads from Cha-Cha"). Done when underwater.md cites what the harness showed.
 7. **Cha-Cha names on the MH3U recompile** (fork): carry its class-and-slot names onto our 3DS vtables. Done when the fork's MH3U config has the names and a count of slots that matched.
 
+## Housekeeping (first session on the maintainer's machine)
+
+Cloud sessions can push only their own branch, so these wait for a local session:
+- **Fork branches:** delete every remote branch except `main`, `native`, `uc/main` and the heads of open PRs. On 2026-11-23 that was 32 branches. 26 were upstream's (`batch/*`, `wp/*`, `fix/*`, `docs/*`, and five `claude/*`). The other 6 were ours and already merged: three in upstream's `native` (CompaLarios18/MH4UltimateDC#64, #65 and #66), two in `main`, one in `uc/main`. Re-check with `git branch -r --merged` before deleting.
+- **Fork mirrors:** fast-forward `native` to upstream's (it was behind on 2026-11-23); check `main` too.
+- **Fork default branch:** set to `uc/main` if the maintainer agrees, so the fork's page shows `.github/README.md` (Cheeenxiii/MH4UltimateDC-fork#4).
+- **Merged session branches:** delete them in both repositories once their PRs are merged.
+
 ## Waiting on the maintainer
 
 - Reviewing this session's branch (`claude/practical-johnson-jobxzw`): docs only.
