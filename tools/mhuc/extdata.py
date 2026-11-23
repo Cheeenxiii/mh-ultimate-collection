@@ -214,3 +214,57 @@ def rename_palico(data: bytes, slot: int, name: str, last_byte: int | None = Non
     s = found[slot]
     raw = data[slot * OTOMO_SLOT: slot * OTOMO_SLOT + s["size"]]
     return put_otomo_slot(data, slot, set_otb_texts(raw, name=name), s["file"], last_byte)
+
+
+# ── In-game test kit (checks Q17, Q19, E4) ─────────────────────────────────────
+
+TESTKIT_ID = 60999
+TESTKIT_TITLE = "UC test"
+TESTKIT_LONG_TITLE = "UC test: a rebuilt quest with a longer title"
+TESTKIT_PALICO = "UC Test"
+
+
+def testkit(files: dict[str, bytes], key: bytes) -> tuple[dict[str, bytes], list[str]]:
+    """From an MH4U Extra Data folder's encrypted files (name -> bytes), the files for checks Q17, Q19 and E4,
+    encrypted again, and the notes saying what each changed. Every other file is left out: copy only these."""
+    from . import dlccrypt, mibwrite, quest
+
+    out, notes = {}, []
+    source = target = None
+    plain = {}
+    for name in sorted(n for n in files if n.startswith("quest")):
+        plain[name] = dlccrypt.mh4u_save_decrypt(files[name], key, "quest")
+        used = {k for k, _, _ in quest.mh4u_slots(plain[name])}
+        if used and source is None:
+            source = (name, min(used))
+        free = [k for k in range(len(plain[name]) // quest.SLOT) if k not in used]
+        if len(free) >= 2 and target is None:
+            target = (name, free[0], free[1])
+    if source and target:
+        body = {k: b for k, _, b in quest.mh4u_slots(plain[source[0]])}[source[1]]
+        mib = quest.mh4u_slot_mib(body)
+        try:
+            q17 = quest.mib4_patch(mib, TESTKIT_ID, TESTKIT_TITLE)  # in place: the layout stays the game's
+        except quest.QuestError:
+            q17 = quest.mib4_patch(mib, TESTKIT_ID)
+        model = mibwrite.mib4_set_texts(mibwrite.mib4_model(q17), 0, TESTKIT_LONG_TITLE)
+        q19 = quest.mib4_patch(mibwrite.mib4_build(model), TESTKIT_ID + 1)
+        name, a, b = target
+        data = quest.mh4u_put_slot(plain[name], a, quest.mh4u_pack_slot(q17, f"m{TESTKIT_ID:05d}.mib"))
+        data = quest.mh4u_put_slot(data, b, quest.mh4u_pack_slot(q19, f"m{TESTKIT_ID + 1:05d}.mib"))
+        out[name] = dlccrypt.mh4u_save_encrypt(data, key, "quest")
+        notes.append(f"{name}: slot {a} holds a copy of {source[0]} slot {source[1]} as quest {TESTKIT_ID} (Q17: "
+                     f"same layout, titled \"{TESTKIT_TITLE}\" in place); "
+                     f"slot {b} holds it as quest {TESTKIT_ID + 1}, laid out again by "
+                     f"the builder, titled \"{TESTKIT_LONG_TITLE}\" (Q19).")
+    else:
+        notes.append("no quest file with a stored quest and two free slots: Q17 and Q19 skipped.")
+    if "otomo1" in files:
+        o = dlccrypt.mh4u_save_decrypt(files["otomo1"], key, "normal")
+        if otomo_slots(o):
+            out["otomo1"] = dlccrypt.mh4u_save_encrypt(rename_palico(o, otomo_slots(o)[0]["slot"],
+                                                                     TESTKIT_PALICO), key, "normal")
+            notes.append(f"otomo1: the first DLC Palico is renamed \"{TESTKIT_PALICO}\" (E4).")
+    if "otomo1" not in out:
+        notes.append("no otomo1 with a Palico: E4 skipped.")
+    return out, notes

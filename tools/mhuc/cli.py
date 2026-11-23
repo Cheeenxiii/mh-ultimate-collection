@@ -218,6 +218,24 @@ def cmd_questslot(args) -> int:
 
 def cmd_extdata(args) -> int:
     from . import extdata
+    if args.action == "testkit":
+        if not args.key or not args.out:
+            print("mhuc extdata testkit EXTDATA_DIR --key K --out DIR", file=sys.stderr)
+            return 2
+        files = {n: _read(os.path.join(args.file, n)) for n in sorted(os.listdir(args.file))
+                 if n.startswith(("quest", "otomo"))}
+        out, notes = extdata.testkit(files, _read(args.key).rstrip(b"\r\n"))
+        os.makedirs(args.out, exist_ok=True)
+        for n, d in out.items():
+            with open(os.path.join(args.out, n), "wb") as f:
+                f.write(d)
+        text = ("MH Ultimate Collection in-game test kit (specs/quest.md Q17, Q19; specs/extdata.md E4).\n"
+                "Back up your Extra Data first, then copy these files over it and open the downloaded "
+                "quests and the DLC Palicos.\n\n" + "\n".join("- " + n for n in notes) + "\n")
+        with open(os.path.join(args.out, "TESTKIT.txt"), "w", encoding="utf-8") as f:
+            f.write(text)
+        print(text, end="")
+        return 0
     with open(args.file, "rb") as f:
         data = f.read()
     if args.action == "rename":
@@ -343,10 +361,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_questslot)
 
     p = sub.add_parser("extdata", help="MH4U Extra Data besides quests (decrypted): card* and otomo1")
-    p.add_argument("action", choices=["dump", "check", "rename"],
-                   help="check prints counts only; rename edits a Palico's name (check E4)")
-    p.add_argument("kind", choices=["card", "otomo"])
-    p.add_argument("file")
+    p.add_argument("action", choices=["dump", "check", "rename", "testkit"],
+                   help="check prints counts only; rename edits a Palico's name (check E4); testkit takes the "
+                        "encrypted Extra Data folder and builds the files for checks Q17, Q19 and E4")
+    p.add_argument("kind", nargs="?", choices=["card", "otomo"], default="otomo")
+    p.add_argument("file", help="a decrypted file, or for testkit the Extra Data folder")
+    p.add_argument("--key", help="testkit: a file holding the save key (never kept in this repository)")
     p.add_argument("--slot", type=int)
     p.add_argument("--name")
     p.add_argument("--last-byte", type=lambda v: int(v, 0))

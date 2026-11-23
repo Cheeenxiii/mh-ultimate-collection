@@ -56,6 +56,7 @@ mhuc --help
 | `mibwrite.mib4_model` / `mib4_build` (Python) | split an MH4U `.mib` into an editable model and lay it out again with every offset recomputed (specs/quest.md, "Writing a .mib") |
 | `mhuc encrypt mh4u-save IN OUT --key FILE [--mode M] [--seed N]` | encrypt a decrypted MH4U save or Extra Data file again; with the file's own seed the result is byte-identical to the original (specs/extdata.md check E5) |
 | `mhuc extdata dump\|check card\|otomo FILE` | MH4U Extra Data besides quests, decrypted first: a `card*` file (used records per section, guild quests) or `otomo1` (the DLC Palicos) |
+| `mhuc extdata testkit EXTDATA_DIR --key FILE --out DIR` | from an encrypted MH4U Extra Data folder, the encrypted files for the in-game checks Q17, Q19 and E4 (a copied quest, a rebuilt quest, a renamed Palico) and a TESTKIT.txt saying what to look for |
 | `mhuc extdata rename otomo FILE --slot N --name NAME --out OUT [--last-byte V]` | rename one DLC Palico in a decrypted `otomo1`, for the in-game check E4 |
 | `mhuc catalog overlap [--out F]` | which 3U and GU monsters and locales MH4U already has, from data/catalog (writes data/catalog/overlap.md) |
 | `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |

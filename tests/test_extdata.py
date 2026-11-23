@@ -146,3 +146,26 @@ def test_cli_encrypt_round_trips(tmp_path, capsys):
     enc = out.read_bytes()
     assert dlccrypt.mh4u_save_decrypt(enc, b"synthetic test key") == plain.read_bytes()
     assert enc == dlccrypt.mh4u_save_encrypt(plain.read_bytes(), b"synthetic test key", seed=0x4321)
+
+
+def test_testkit_builds_q17_q19_e4(tmp_path, capsys):
+    from mhuc import dlccrypt, quest
+    from test_quest_tools import build_mib4
+    key = b"synthetic test key"
+    q = quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 0, quest.mh4u_pack_slot(build_mib4(60001), "m60001.mib"))
+    otomo = extdata.put_otomo_slot(bytes(0x21F8), 0, make_otb(), "ot001_xxx.otb")
+    src = tmp_path / "extdata"
+    src.mkdir()
+    (src / "quest1").write_bytes(dlccrypt.mh4u_save_encrypt(q, key, "quest"))
+    (src / "otomo1").write_bytes(dlccrypt.mh4u_save_encrypt(otomo, key, "normal"))
+    (tmp_path / "k").write_bytes(key)
+    out = tmp_path / "kit"
+    assert cli.main(["extdata", "testkit", str(src), "--key", str(tmp_path / "k"), "--out", str(out)]) == 0
+    assert sorted(p.name for p in out.iterdir()) == ["TESTKIT.txt", "otomo1", "quest1"]
+    slots = quest.mh4u_slots(dlccrypt.mh4u_save_decrypt((out / "quest1").read_bytes(), key, "quest"))
+    assert [(k, n) for k, n, _ in slots] == [(0, "m60001.mib"), (1, "m60999.mib"), (2, "m61000.mib")]
+    q19 = quest.parse_mib4(quest.mh4u_slot_mib(slots[2][2]))
+    assert q19["quest_id"] == 61000 and q19["text"]["eng"]["title"] == extdata.TESTKIT_LONG_TITLE
+    pal = extdata.otomo_slots(dlccrypt.mh4u_save_decrypt((out / "otomo1").read_bytes(), key, "normal"))
+    assert pal[0]["name"] == extdata.TESTKIT_PALICO and pal[0]["hash_ok"]
+    assert "Q19" in capsys.readouterr().out

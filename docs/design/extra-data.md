@@ -22,6 +22,6 @@ Every file round-trips through `mhuc decrypt mh4u-save` and `mhuc encrypt mh4u-s
 
 ## Limits and unknowns
 
-- None of this has run in the game yet: Q17 and E4 are the first two in-game checks to run, and they need a save manager (Checkpoint, JKSM) on a console or an emulator's save folder.
+- None of this has run in the game yet: Q17, Q19 and E4 are the first in-game checks to run, and they need a save manager (Checkpoint, JKSM) on a console or an emulator's save folder. `mhuc extdata testkit` builds all three files at once.
 - The maintainer's Palicos are the `_ger` files. This Extra Data may come from a European game or a German-language system, while the base is MH4U USA v1.3.0 (rule 2). Quests are identical in both regions (quest.md Q9), but it's worth checking before relying on region-specific data.
 - In the port, Extra Data is the runtime's SD extdata folder. The fork's `tools/extdata_path.py` reads the game's extdata id from its exheader and prints where Azahar keeps the folder (fork `docs/research/extdata.md`, Cheeenxiii/MH4UltimateDC-fork#5); the check there, that the game reads files put in it, lets Q17, Q19 and E4 run in the port instead of on a console.
