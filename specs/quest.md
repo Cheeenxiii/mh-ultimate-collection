@@ -17,8 +17,8 @@ How a quest is put together differs between the games, and the mod needs to tran
 | `.rem` | rRem | MHX/MHXX (rGuestRemData) | reward tables |
 | `.gmd` | rGUIMessage | MH3U, MHXX | quest name, client, description (see [gmd](gmd.md)); MH4U has no GMDs |
 | `.quest` | ? | MH3U | loose files under `/quest/us/` (365), magic `QTDS` |
-| `.quest_btl` | ? | MH3U | loose files under `/quest/btl/` (353), magic `QTDB` |
-| `.supp` | ? | MH3U | loose files under `/quest/support/` (196), magic `XFS\0` (MT's serialised-object format) |
+| `.quest_btl` | rQuestBattleData | MH3U | loose files under `/quest/btl/` (353), magic `QTDB` |
+| `.supp` | rSuppItem | MH3U | loose files under `/quest/support/` (196), magic `XFS\0`: [XFS](xfs.md), MT's self-describing serialised objects |
 
 Class names and extensions come from mhff's table. MH4U's registry (MH4UltimateDC `config/mt_classes.tsv`) has `rQuestData` and `rQuestInfoTbl` but no `rSetEmMain`, `rEmSetList` or `rRem`: in MH4U the monster sets and rewards live inside `.mib`.
 
@@ -185,6 +185,15 @@ All integers little-endian. A "text" is five strings, English, French, German, I
 | tail +0x1BA | — | end of the fixed tail (442 bytes in all 38) | verified | randomizer; check Q12 |
 | next | u32, 45 bytes ×n | arena monster sets (quests 201xx..203xx and 6xxxx; all 38 here) | verified | mh3u-quest-studio; check Q12 |
 | next | u32, 172 bytes ×n | arena gear sets (5 in all 38): 86 u16, equipment, talismans, pouch, ammo | verified | mh3u-quest-studio; check Q12 (count and stride) |
+
+### .quest_btl and .supp
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| class | rQuestBattleData | `.quest_btl`: id 0x7FD4466F, 0x88 bytes in memory, a `cResource`, in both MH3U 3DS (DTI at 0x00CB9E90) and Wii U; loader `rQuestBattleData::load` (Wii U 0x02074174) | verified | MH4UltimateDC-fork `config/games/mh3u/mt_classes.tsv`; Cha-Cha `config/dti.csv`, `symbols.txt` |
+| file | ? | `.quest_btl` layout, magic `QTDB` (Wii U `BDTQ`): not documented anywhere public; the next step is the loader in MH3U's code, or the 353 files | unknown | — |
+| class | rSuppItem | `.supp`: id 0x4EC7B399, 0x1A0 bytes in memory, a `cResource` (3DS DTI at 0x00CB9FF0) | verified | MH4UltimateDC-fork `mt_classes.tsv`; Cha-Cha `config/dti.csv` |
+| file | xfs | `.supp` is an XFS file, so its field names come with it (check X1 in [xfs](xfs.md)); the game's quest supply box keeps 40 cells of 4 bytes (Wii U, Cha-Cha `src/game/menu_mouse.cpp`), which suggests what a supply set holds | unverified | Cha-Cha `docs/formats/xfs.md`, `menu_mouse.cpp` |
 
 ## rSetEmMain, rEmSetList, rRem
 
