@@ -138,17 +138,53 @@ Field names and offsets come from the mhff wiki's "MHXX rQuestData Format" page 
 | 0xE3 | char[] | then the quest id and `_jpn` (11 characters, NUL-terminated): the stem of the archive's own GMD | verified | mhff wiki; check Q11 |
 | 0xF1, 0xF5 | u32 ×2 | `mVillagePointG?`, `mFlag?` | unverified | mhff wiki |
 
-## MH3U quests (.quest)
+## MH3U quests (.quest, QTDS)
 
-The RomFS's own quests are loose `QTDS` files (check Q1); their layout is unknown. MH3U's DLC quests come from the GrenderG/goshawk preservation mirror (check Q10) and are still encrypted: the container is understood, the cipher key isn't.
+The `QTDS` layout comes from Matt-Wood-23's mh3u-quest-studio (`questlib/quest_format.py`, MIT), written for the Wii U version; ArmoredRaven17's mh3u-quest-randomizer (`scripts/build_data.py`, MIT) gives the same tail offsets. "Verified" means checked on the 38 USA DLC quests in the maintainer's own MH3U 3DS Extra Data, which the game stores in the clear (checks Q10, Q12). The RomFS's 365 `.quest` files are not checked yet (Q13).
+
+### Where quests live
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| file | quest | the server's DLC quests are `q_NNNNN.quest`: 38 in the USA folder (`mh3gu_us`), the same 38 byte for byte in EUR (`mh3gu_eu`) and on Wii U (`mh3ghd_us`); 47 for Japan's MH3G (`mh3g`) | verified | ours; check Q10 |
-| whole | bytes | an 8-byte block cipher in ECB mode: about a third of a file's aligned 8-byte blocks are one repeated block (encrypted padding, presumably), and the first block is the same in every file (a common header) | verified | ours; check Q10 |
-| end | u32 BE | the plaintext size; the encrypted part before it is that size rounded up to 8 (padding 0..7 bytes, all eight values seen) | verified | ours; check Q10 |
-| key | — | goshawk's login reply for MH3G (`BLOWFISH_KEY_TYPE_1`) doesn't decrypt these with Blowfish, in either word order, nor do mhef's MH4U keys: the cipher, the key or an extra layer is unknown | unknown | ours; check Q10 |
-| plaintext | ? | presumably the same `QTDS` layout as the RomFS's quests; unconfirmed | unknown | — |
+| file | quest | the server's DLC quests are `q_NNNNN.quest`: 38 in the USA folder (`mh3gu_us`), the same 38 byte for byte in EUR (`mh3gu_eu`) and on Wii U (`mh3ghd_us`); 47 for Japan's MH3G (`mh3g`) | verified | GrenderG/goshawk; check Q10 |
+| whole | bytes | server files: a fixed-key 64-bit block cipher in ECB mode over the plaintext rounded up to 8, then the plaintext size as a u32 BE. Across the 38 files, 10,095 of 10,098 distinct plaintext blocks map to one ciphertext block each | verified | ours; checks Q10, Q12 |
+| key | — | not Blowfish, DES, CAST or RC2 under goshawk's MH3G login key (`BLOWFISH_KEY_TYPE_1`) or mhef's keys, in the usual byte orders: unknown, and not needed while the stored copies are plain | unknown | ours; checks Q10, Q12 |
+| file | extdata | the 3DS Extra Data holds `quest1`..`quest4` of 0x29000 bytes: a u32 (44 in all four), then 20 slots of 0x2010 bytes, then zeros; `card1`..`card3` and `cardbox` were empty here | verified | ours; check Q12 |
+| whole | bytes | the 3DS Extra Data is not encrypted (MH4U's is) | verified | ours; check Q12 |
+| slot | bytes | a slot is empty, or holds a downloaded quest as the server sent it once decrypted: the `QTDS` record, 20 bytes, the padding to 8 (left as decrypted, not zeroed), the plaintext size as a u32 BE; zeros up to 0x2000; the file name (`q_NNNNN.quest`) at 0x2000. The slot's used length equals the server file's length | verified | mh3u-quest-studio `dlc_pack.py` (slot, name); ours, check Q12 |
+| slot | 20 bytes | after the record: not a SHA-1 or SHA-256 of the record (either byte order): unknown, a keyed hash perhaps | unknown | ours; check Q12 |
+| file | extdata | on Wii U the pack header is 0x28 bytes, then the same 20 slots | unverified | mh3u-quest-studio `dlc_pack.py` |
+
+### Record
+
+All integers little-endian. A "text" is five strings, English, French, German, Italian, Spanish, each a u32 byte length and UTF-8 without a terminator.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `QTDS` | verified | mh3u-quest-studio; check Q12 |
+| 0x04 | u32 | language count, 5 | verified | mh3u-quest-studio; check Q12 |
+| 0x08 | text | name | verified | mh3u-quest-studio; check Q12 |
+| next | u16 | quest number: the file's `q_NNNNN` in all 38 (20xxx and 6xxxx here) | verified | mh3u-quest-studio; check Q12 |
+| next | text | main objective | verified | mh3u-quest-studio; check Q12 |
+| next | u8, u8 | stars (1..8 here), map | verified | mh3u-quest-studio; check Q12 (layout) |
+| next | text | sub objective | verified | mh3u-quest-studio; check Q12 |
+| next | u16 | time limit in minutes (30 or 50 here) | verified | mh3u-quest-studio; check Q12 |
+| next | text | failure conditions | verified | mh3u-quest-studio; check Q12 |
+| next | u16 ×3 | special flag and two conditions | unverified | mh3u-quest-studio |
+| next | text ×2 | client, description | verified | mh3u-quest-studio; check Q12 |
+| tail +0x00 | u8 ×2 | main small monsters 1 and 2 | unverified | mh3u-quest-studio |
+| tail +0x02 | u64 | category bits (0x10 and 0x100000: monster HP ×0.55, per quest-studio) | unverified | mh3u-quest-studio |
+| tail +0x0A | 11 bytes ×5 | large monsters: type, set type, start type, number, HP, attack and other table rows (0..127, rows of a table in the code), a fourth row, size, size parameter, stamina; type 0 = empty slot | verified | mh3u-quest-studio; check Q12 (stride; table rows all ≤ 127) |
+| tail +0x41 | u8 ×6 | intruder settings | unverified | mh3u-quest-studio |
+| tail +0x47 | 4 bytes ×64 | rewards: u16 item, u8 count, u8 chance; even slots are table A, odd slots table B, each ending at item 0 | verified | mh3u-quest-studio; check Q12 (both tables end; chances ≤ 100) |
+| tail +0x147 | i32 ×5 | fee, reward, reward lost per faint, main HRP, failure HRP | verified | mh3u-quest-studio; randomizer; check Q12 (first three in range) |
+| tail +0x15B | mixed | u8 ×4, u16 ×8, u32 ×4, u16 ×6, u32 ×2: gathering, progress, enemy level, supply and small-monster settings | unverified | mh3u-quest-studio |
+| tail +0x193 | u16 | clear pattern: 0 one objective, 1 both, 2 either | verified | mh3u-quest-studio; randomizer; check Q12 (0..2) |
+| tail +0x195 | (u32, u16, i16) ×2 | objectives: type in the low u16 (0x1 hunt, 0x2 deliver, item id as target, 0x81 capture, 0x101 slay, 0x8101 slay small, 0x404 repel, 0x2515 and 0x4014 siege repel, 0x2000 siege damage), target, count | verified | mh3u-quest-studio; check Q12 (every type seen is in that list) |
+| tail +0x1A5 | u16 ×2, u64 ×2, u8 | arena times, unlock flags required and counted, clears required | unverified | mh3u-quest-studio; randomizer |
+| tail +0x1BA | — | end of the fixed tail (442 bytes in all 38) | verified | randomizer; check Q12 |
+| next | u32, 45 bytes ×n | arena monster sets (quests 201xx..203xx and 6xxxx; all 38 here) | verified | mh3u-quest-studio; check Q12 |
+| next | u32, 172 bytes ×n | arena gear sets (5 in all 38): 86 u16, equipment, talismans, pouch, ammo | verified | mh3u-quest-studio; check Q12 (count and stride) |
 
 ## rSetEmMain, rEmSetList, rRem
 
@@ -160,7 +196,7 @@ The RomFS's own quests are loose `QTDS` files (check Q1); their layout is unknow
 
 - MH4U's `.mib`: the header's remaining unverified fields (Q6 against the game's own quests; in-game checks for meanings).
 - The 28 bytes the game adds after a stored quest. Writing a mod quest into Extra Data needs them (or needs the game not to check them); the code that stores a downloaded quest is where to look.
-- MH3U's quest format: loose `QTDS`/`QTDB` files and `XFS` support files, not ARCs (check Q1). Their layouts are unknown; `XFS` is MT's generic serialisation, which may make `.supp` readable from the class registry. The plain RomFS files are the place to start the `QTDS` layout. The DLC cipher is best found in MH3U's own code: the download path that takes the login key and decrypts a `.quest` (the full MH3U recompile and its Ghidra export are in the maintainer's workspace).
+- MH3U's quest format: the `QTDS` record is now laid out (above); Q13 checks it on the RomFS's own quests. `.quest_btl` (`QTDB`) and `.supp` (`XFS`) are still unknown. The DLC cipher and the 20 bytes after a stored record matter only for writing new DLC-style quests; the code that downloads a `.quest` is where to find both.
 - How MHXX's `.sem`/`.esl`/`.rem` map onto `.mib` sections.
 
 ## Checks
@@ -180,4 +216,6 @@ Q3 to Q5 were run on 2026-11-23 in a web session on the maintainer's own MH4U (U
 - **Q9 (done):** take the server's quest files from the GrenderG/goshawk preservation mirror (Capcom's server is gone: `goshawk.capcom.co.jp` gives NXDOMAIN as of 2026-11-23): 120 `m*.mib` in `files/3ds/mh4g_us_/` and 120 in `mh4g_eu_/`, outside the repositories. Decrypt with mhef's `DLCCipher` (MH4G NA). Pass: all 240 check against their SHA-1, every encrypted size is the plaintext plus 20, padded to 8, plus 4; every plaintext starts with 0xA0 and `v005`, none is an ARC, all are under 0x2000 bytes; EUR and USA are identical; the 120 names are exactly the 120 quests of the maintainer's Extra Data, and each slot starts with its server file byte for byte, followed by 28 bytes, then zeros.
 - **Q10 (done):** take MH3U's DLC quests from the goshawk mirror (`files/3ds/mh3gu_us`, `mh3gu_eu`, `mh3g`, `files/wiiu/mh3ghd_us`), outside the repositories. Pass: the USA, EUR and Wii U folders hold the same 38 files byte for byte; every file is 8n+4 bytes; in every file the last 4 bytes, big-endian, are 0 to 7 less than the length before them; the aligned 8-byte blocks repeat (a third of them one block) and the first is common to all 85. Fail, so far: Blowfish with goshawk's MH3G key (and mhef's MH4U keys, with simple variants and byte orders) gives no plaintext; the repeated block doesn't decrypt to a constant under any of them.
 - **Q11 (done):** take MHXX JPN's DLC from the goshawk mirror (`files/3ds/mhxx_jp`), outside the repositories, and decrypt with mhef's `DLCXCipher` logic and goshawk's MHXX JPN key. The layout that works ends with one 0x100 signature, not two. Pass: all 188 files check against their SHA-1 (173 quest ARCs, the two quest lists, the GMDs, the Palico and update files); every quest is an ARC 0x11 whose last entry is a 249-byte `.mib`, as in the RomFS (Q2); over the 173 `.mib`, the header rows marked verified hold, and the spreads quoted come from the same files.
+- **Q12 (done):** the maintainer's MH3U 3DS Extra Data (USA), uploaded by them, outside the repositories. Pass: no file is encrypted (`mhuc entropy`: all plain); each `quest*` file starts with a u32, then `QTDS` at 4 + 0x2010·k; 38 quests in 80 slots, all 38 on the goshawk mirror. Parsing each with quest-studio's layout reads to the end of the arena gear sets without error; the fixed tail is 442 bytes in all; the record ends 20 bytes before the mirror file's plaintext size, and the slot then holds the padding and the size exactly as the mirror file's last bytes, the same length as the file. Pairing slot and mirror blocks gives a consistent codebook (10,095 of 10,098), which shows ECB with one key; Blowfish, DES, CAST and RC2 under the known keys don't reproduce it.
+- **Q13 (open):** parse the 365 RomFS `.quest` files of MH3U USA with the same layout (no arena block outside 201xx..203xx and 6xxxx). Needs the MH3U RomFS.
 - **Q6 (open):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.
