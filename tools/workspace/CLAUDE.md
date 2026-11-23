@@ -19,8 +19,8 @@ A content mod that brings MH3U's and MHGU/MHXX's maps, monsters and systems into
 ## Every session
 
 - **Start:** the SessionStart hook prints the doctor's report and `STATUS.md`. Begin from STATUS.md's next tasks; `/next` does the orientation explicitly. The repos' own `CLAUDE.md` files hold the ground rules: read `mh-ultimate-collection/CLAUDE.md` before changing anything.
-- **Work unattended:** the maintainer leaves sessions running. Take the top task and carry it through all its steps (finding, tool, tests, docs), then go on to the next task. Don't stop to ask which task, or which way to go after a finding. Stop only for what is the maintainer's: open decisions (rule 6), dumps or keys, in-game checks, pushes and merges.
-- **End:** `/handoff` updates STATUS.md, writes the report, runs the checks, commits and asks before pushing.
+- **Work unattended, one area per session:** the maintainer leaves sessions running. Take one coherent area of work (the monster port's next stage, say) and carry it as far as it goes, with a PR per finished piece. Don't stop to ask after each finding, and don't hop to unrelated tasks: a new area is a new session. Stop only for what is the maintainer's: open decisions (rule 6), dumps or keys, in-game checks, merges.
+- **End:** `/handoff` updates STATUS.md, writes the report, runs the checks, commits, pushes and opens the PRs. The maintainer merges.
 - **Doctor:** `python3 mh-ultimate-collection/tools/doctor.py` (`--fix` re-extracts dumps and rebuilds the venv, `--install` refreshes these workspace files, `--tests` runs both suites, `--fetch` updates remote state).
 
 ## Rules for this machine

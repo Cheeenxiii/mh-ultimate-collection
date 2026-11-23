@@ -2,7 +2,7 @@
 
 The one place that says where the project stands. Overwritten at the end of every session (`/handoff`); history is in `docs/reports/`. Keep it under a screen.
 
-**Updated:** 2026-11-24, after a workspace session on the monster port's step 1 (Rathian's engine calls across the three games), and the merge of the related-projects web session (PR #4). From now on sessions run unattended: `/next` starts the top task and chains tasks.
+**Updated:** 2026-11-24, after a workspace session on the monster port's step 1 (Rathian's engine calls across the three games), and the merge of the related-projects web session (PR #4). From now on a session takes one coherent area of work and carries it far unattended, with a PR per piece (`/next`).
 
 ## Where we are
 
@@ -17,7 +17,7 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 
 ## Branches
 
-- This repo: `long-sessions` (the workspace's `/next` and CLAUDE.md now carry tasks on unattended; this STATUS fix).
+- This repo: `long-sessions` (the workspace's `/next`, `/handoff` and CLAUDE.md: one area per session, unattended, a PR per piece; this STATUS fix), PR [#8](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/8) open.
 - Fork: nothing in flight (`uc/main`; PR #6, `cro.py` and `fnmap.py`, squash-merged).
 
 ## Next tasks, in order
