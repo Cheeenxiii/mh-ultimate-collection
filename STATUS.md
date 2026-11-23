@@ -13,7 +13,8 @@ Phase: **engine work with the game files.** Both reference games recompile clean
 The MH4U quest format (`.mib`) is now specified from mhff's wiki and partly verified on the 120 DLC quests in the maintainer's Extra Data. Report: [docs/reports/2026-11-23-dlc-quests-web-session.md](docs/reports/2026-11-23-dlc-quests-web-session.md).
 
 Findings that steer the next steps:
-- Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables; the 16-byte slot trailer is unexplained.
+- Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, each ending with its file name (`mNNNNN.mib`), under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables. Monsters come in waves; objective types are mapped by value, though their meanings aren't confirmed.
+- This environment can't reach Capcom's DLC server (proxy 403, and the server speaks plain HTTP only).
 - No public layout exists for `.emd`/`.etd`; that spec has to come from the files and the code.
 - Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
 - Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
@@ -21,7 +22,7 @@ Findings that steer the next steps:
 
 ## Branches
 
-This repo: `claude/zealous-wozniak-eip1pk` has this session's three commits on top of `main`. It's pushed, with no PR open. The fork is unchanged. Nothing else is in flight.
+This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of `main`. It's pushed, with no PR open. The fork is unchanged. Nothing else is in flight.
 
 ## Next tasks, in order
 
@@ -32,6 +33,8 @@ This repo: `claude/zealous-wozniak-eip1pk` has this session's three commits on t
 5. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness). Done when underwater.md cites what the harness showed.
 
 ## Waiting on the maintainer
+
+- Optional: server DLC files downloaded on their own machine (mhef `tools/download_n3ds.py`), uploaded as they come, to compare with the Extra Data copies.
 
 - Merging `claude/zealous-wozniak-eip1pk` into `main`.
 - A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
