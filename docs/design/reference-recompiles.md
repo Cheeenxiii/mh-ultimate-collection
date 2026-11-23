@@ -65,11 +65,41 @@ config/games/mhxx/          MHXX (3DS), reference only
 
 MH3U's function table is in the engine fork, `config/games/mh3u/functions.tsv`: 24,869 functions (800 DTI initialisers, 493 SDK), made with Ghidra 12.1.4 headless in two passes (20,281 from the first, then `find_missing_functions.py`'s 4,510 candidates added; 347 candidates are left for a third pass). The commands are in the fork's `config/games/README.md`. Ghidra 12.2 needs JDK 25; 12.1.4, the version `ExportForAgents.java` was verified on, runs on JDK 21. MHXX's table is not made yet; the official v1.4 (v4.8.0) update now has a clean dump, whose code is the same as the fan-repackaged copy's.
 
+## Step 3 results, MH3U (2026-11-23)
+
+`tools/recompile.py --game mh3u` (engine fork, branch `uc/mh3u-recompile`) recompiles MH3U from `config/games/mh3u/`: its function table and extra entries (none yet), no hooks or tunables, and only code whose hash matches its `game.json`. Without `--game`, MH4U's generated code is byte-identical to `uc/main`'s: all 209 generated source files are identical, and only report.txt's timings differ. That comparison ran with `--no-data-pointers` on both sides, because the full MH4U run needs more than the 3 GB memory cap (below). The change only touches how arguments are resolved, which that flag doesn't bypass.
+
+| | MH3U USA | MH4U USA v1.3.0 (for scale, `--no-data-pointers`) |
+|---|---|---|
+| Functions recompiled | 33,275 (24,869 from the table, 8,086 through data pointers, 320 discovered) | 32,439 |
+| Instructions | 2,498,365 | 3,179,179 |
+| Jump tables resolved | 2,543 | 3,397 |
+| Unresolved jump tables | **0** | 0 (2 other problems) |
+| Trap instructions | 3 | 1 |
+| Static constructors from the init table | 0 found | 256 |
+| Recompile time | 38 s analysis + 23 s emit | 34 s + 23 s |
+
+No new analysis pattern was needed: every MH3U jump table matches the patterns tuned on MH4U. The init-table scan finds nothing in MH3U: either its RVCT init table has another shape, or its 800 DTI initialisers are already in the table. Worth a look before relying on static constructors.
+
+**Gametest** (harness library at `-O0 -D RC_CHECK_RETURNS`, `--sample 2000 --cases 3 --seed 1`, 13 s):
+
+| Verdict | Functions | |
+|---|---|---|
+| pass | 858 | same registers, flags, VFP and writable memory |
+| agree-fault-only | 1,136 | both sides fault at the same address (random states) |
+| native-nofunc | 4 | an indirect call to a target missing from the table: 0x0010853c (3 callers), 0x00260914 (1) |
+| inconclusive | 2 | instruction budget |
+| differ | **0** | |
+
+That is 1,994 of 2,000 (99.7%) agreeing, and no function returns a different state, the same picture as MH4U's runs (the fork's docs/RECOMPILER.md). Next for MH3U: add the two missing targets to `config/games/mh3u/extra_entries.txt` (0x00260914 sits inside the function that jumps to it, so check it's a real entry first), then a full run of every function.
+
+Memory on this 14 GB machine: the full MH4U recompile (and MH3U's, close to it) hits `MemoryError` under `ulimit -v 3000000` in `code_cover`, the data-pointer pass's set of every covered halfword. MH3U's run peaked at about 2.5 GB. The harness reserves a 4 GB guest address window at start (`harness.c`, PROT_NONE and MAP_NORESERVE: address space, not memory), so gametest can't start under any `ulimit -v` below about 4.3 GB. It ran in a cgroup instead: `systemd-run --user --scope -p MemoryMax=3G -p MemorySwapMax=0`, with `ulimit -v 6000000`, which caps real memory at 3 GB.
+
 ## Steps, in order (first session with game files)
 
 1. **Class registries (no recompile). Done, results above.** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.
 2. **Function tables.** Ghidra export of each game (the fork's `tools/ghidra/` scripts), then `build_function_table.py` and `find_missing_functions.py`.
-3. **Recompile and gametest.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
+3. **Recompile and gametest. Done for MH3U, results above; MHXX waits for its function table.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
 4. **Targeted studies.** Run single functions (MH3U's swim state machine, oxygen, underwater camera) in the harness from captured states, with hooks for tracing; feed what's learned into [underwater.md](underwater.md).
 
 ## Optional refactor done now?
