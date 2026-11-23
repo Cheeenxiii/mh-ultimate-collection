@@ -353,3 +353,13 @@ def test_decrypt_cli(tmp_path, capsys):
     assert out.read_bytes() == plain
     key.write_bytes(b"wrong")
     assert cli.main(["decrypt", "mh3u-dlc", str(enc), str(out), "--key", str(key)]) == 1
+
+
+def test_survey_runs_q6_q18_and_q13():
+    from mhuc import survey
+    st: dict = {}
+    survey.survey_entry("rQuestData", build_mib4(60001), st)
+    survey.survey_entry(None, build_qtds(), st)
+    c = st["quest"]
+    assert c["Q6 .mib read"] == 1 and c["Q18 builder round trip ok"] == 1
+    assert c["Q13 QTDS read"] == 1

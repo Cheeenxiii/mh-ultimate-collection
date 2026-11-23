@@ -3,7 +3,8 @@
 It reads the image in place (mhuc.romfs) and every ARC inside it, and reports only counts,
 versions and pass/fail tallies: nothing from the files themselves, so its output can go into
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
-G1, G2 (gmd), M1 (mod), Q1, Q2 (quest).
+G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), L1 (lmt), A1 (rEnemyCmd),
+S1 (rCollision).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -16,6 +17,7 @@ from multiprocessing import Pool
 
 from . import arc, classid, emd, gmd, lmt, pica, romfs, tex
 from . import mod as modfile
+from . import quest as questfile
 
 QUEST_TYPES = ("rQuestData", "rSetEmMain", "rEmSetList", "rRem")
 _IMG: romfs.Romfs | None = None
@@ -84,6 +86,34 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
         c["G2 round trip ok" if gmd.write(g) == data else "G2 round trip differs"] += 1
     elif type_name == "rMotionList" or data[:4] == b"LMT\0":
         st.setdefault("lmt", Counter()).update(lmt.check(data))
+    elif data[:4] == b"QTDS":
+        c = st.setdefault("quest", Counter())
+        try:
+            q = questfile.parse_qtds(data)
+            c["Q13 QTDS read"] += 1
+            c["Q13 record is the whole file" if q["size"] == len(data) else "Q13 bytes after the record"] += 1
+        except (questfile.QuestError, struct.error, UnicodeDecodeError, IndexError) as e:
+            c[f"Q13 QTDS not read: {str(e)[:40]}"] += 1
+    elif type_name == "rQuestData" and data[4:8] == b"v005":
+        c = st.setdefault("quest", Counter())
+        try:
+            q = questfile.parse_mib4(data)
+        except (questfile.QuestError, struct.error, UnicodeDecodeError, IndexError):
+            c["Q6 .mib not read"] += 1
+            return
+        c["Q6 .mib read"] += 1
+        c[f"Q6 carve table {q['carve_table']}"] += 1
+        c["Q6 stars 1..10" if 1 <= q["stars"] <= 10 else "Q6 stars outside 1..10"] += 1
+        c["Q6 time 1..50" if 1 <= q["time_min"] <= 50 else "Q6 time outside 1..50"] += 1
+        from . import mibwrite
+        try:
+            model = mibwrite.mib4_model(data)
+            rebuilt = mibwrite.mib4_build(model)
+            same = questfile.parse_mib4(rebuilt) == q and mibwrite.mib4_model(rebuilt) == model
+            c["Q18 builder round trip ok" if same else "Q18 builder round trip differs"] += 1
+            c["Q18 byte-identical" if rebuilt == data else "Q18 laid out differently"] += 1
+        except (questfile.QuestError, struct.error, ValueError):
+            c["Q18 model not built"] += 1
     elif type_name == "rEnemyCmd" or data[:4] == b"EMC\0":
         c = st.setdefault("emc", Counter())
         if data[:4] != b"EMC\0" or len(data) < 16:

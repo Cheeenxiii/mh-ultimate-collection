@@ -2,7 +2,7 @@
 
 Procedures for things that can only be checked with the game files or in the game. Each records its result in words (pass, fail, counts, versions seen), never as bytes from the files.
 
-Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place and prints only counts. Run it from your own extraction (`tools/extract_ncch.py --romfs` in the engine fork), outside this repository.
+Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place and prints only counts. Since 2026-11-23 it also runs the open checks Q6, Q13, Q18 (on the game's quests), E1, L1, M3, A1 and S1, so one run per game covers them all. Run it from your own extraction (`tools/extract_ncch.py --romfs` in the engine fork), outside this repository.
 
 | Check | Where written | Needs | Status |
 |---|---|---|---|
