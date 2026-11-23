@@ -16,10 +16,7 @@ Findings that steer the next steps:
 
 ## Branches
 
-| Repo | Branch | State |
-|---|---|---|
-| content | `claude/port-ids-and-tables` | committed; pushed and PR'd only if the maintainer says so |
-| fork | `uc/monster-ids-mh3u-functions` | committed; the same |
+Nothing in flight: content PR 2 is merged into `main`, now the content repo's default branch (the old `claude/nice-knuth-5gd62h` is kept, unused); fork PR 3 into `uc/main`. Start new work from those.
 
 ## Next tasks, in order
 
@@ -30,6 +27,5 @@ Findings that steer the next steps:
 
 ## Waiting on the maintainer
 
-- Push and PR the two branches above (asked at the end of the session).
 - A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
 - The open decisions (combat base, monster versions, runtime, progression): unchanged, not ours to settle.
