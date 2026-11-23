@@ -28,7 +28,9 @@ def template() -> dict:
 def test_convert_maps_ids_and_builds():
     out = convert.convert_mhxx(PARTS, template(), TABLES, 61001, TEXTS)
     got = quest.parse_mib4(mibwrite.mib4_build(mibwrite.model_from_json(out)))
-    assert (got["quest_id"], got["stars"], got["time_min"], got["map"]) == (61001, 4, 50, 7)
+    stars = quest.parse_mib4(build_mib4(60001))["stars"]
+    assert (got["quest_id"], got["stars"], got["time_min"], got["map"]) == (61001, stars, 50, 7)
+    assert any(p.startswith("stars") for p in out["placeholders"])
     assert [[(d["monster"], d["area"]) for d in w] for w in got["large_waves"]] == [[(1, 5)], [(0x1B, 2)]]
     assert got["large_waves"][0][0]["pos"] == [1.0, 2.0, 3.0]
     assert got["small_areas"][0][0]["monster"] == 40

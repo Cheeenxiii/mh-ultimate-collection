@@ -65,7 +65,6 @@ def convert_mhxx(parts: dict, template: dict, tables: dict, quest_id: int, texts
     xx_map = mib["map"]
     fields.update({
         "quest_id": quest_id,
-        "stars": mib["stars"],
         "time_min": mib["time_min"],
         "fee": mib["fee"],
         "reward": mib["reward"],
@@ -73,7 +72,9 @@ def convert_mhxx(parts: dict, template: dict, tables: dict, quest_id: int, texts
         "map": m.get("map", str(xx_map)),
     })
     out["fields"] = fields
-    placeholders = ["header bytes other than quest id, stars, time, fee, rewards and map (template)",
+    placeholders = ["header bytes other than quest id, time, fee, rewards and map (template)",
+                    f"stars (template): MH4U counts 1-3 Low, 4-7 High, 8-10 G (specs/quest.md 0xC2); MHXX's "
+                    f"{mib['stars']} stars at rank {mib.get('rank')} need a decision on the scale",
                     "faint penalty, HR points, carve table, gathering rank, AI level, flags (template)",
                     "objectives (template): MHXX's objective types have no table yet",
                     "equipment presets (template)", "intruders (template)"]
@@ -126,7 +127,8 @@ def convert_mhxx(parts: dict, template: dict, tables: dict, quest_id: int, texts
             head = template["rewards"].get(name, template["rewards"].get("main", {"head": "00800000"}))["head"]
             rewards[name] = {"head": head, "items": items}
     out["rewards"] = rewards or template["rewards"]
-    placeholders.append("which .rem table is MH4U's main, extra and sub reward is assumed by order")
+    placeholders.append("which .rem table is MH4U's main, extra and sub reward is assumed by order, and each "
+                        "slot is read as (item, count, chance)")
 
     supply = parts.get("supply")
     if supply:
