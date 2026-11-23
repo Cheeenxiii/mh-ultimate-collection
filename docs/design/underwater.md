@@ -17,6 +17,14 @@ Nothing here is verified yet. Every "where it lives" below is a hypothesis for t
 | Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters | converted assets; filters through MH4U's own screen filters where they match |
 | HUD | oxygen gauge, depth cues | layout files (rLayout) | converted layout, or drawn by the plugin if layouts don't convert |
 
+## Leads from Cha-Cha (MH3U Wii U)
+
+Cha-Cha, a recompilation of the Wii U build of MH3U, marks some of this already ([docs/sources/cha-cha.md](../sources/cha-cha.md)). Wii U offsets, to re-find on 3DS before use:
+
+- Swim state: the player's pad block (player + 0xE30 there) holds 3 at +0x3D under water (`src/game/modern_camera.cpp`, `camera_speed.cpp`).
+- Camera: a mark at +0x12D of the camera block is 1 under water; under water the game handles camera pitch itself (`cameraPitchInput?`), and its turn ramp is longer (10 frames instead of 5).
+- Carving: a carve spot is kind 6 under water, 4 on land (`src/game/carving.cpp`).
+
 ## Unknowns to settle first
 
 1. Whether MH4U's engine kept any of MH3U's water code (dead code, unused states, class names). Check: MH4U's class registry (`config/mt_classes.tsv`) for water-related names; none found by name so far would mean nothing kept.
