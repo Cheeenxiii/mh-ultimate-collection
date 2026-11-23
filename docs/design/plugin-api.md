@@ -120,6 +120,13 @@ Not changed: `config/hooks.txt`, `hooks.cpp`, the recompiler, the code-library A
 - Plugins can allocate guest memory (ABI 2, default heap only) but can't add new guest code. A plugin that wants another category's heap (the unit or resource heaps) would need an `alloc` with a category: not added until something needs it.
 - `mods.py status` doesn't yet flag a plugin list older than the enabled mods; the build record should carry the hook list's fingerprint.
 
+## Prior art in other MH projects
+
+Two projects solve the same problem on MHGU (docs/sources/related-projects.md). They are recorded here as inputs to the next steps above, not as decisions:
+
+- **MHGURecomp** (MHGU Switch recompiled, MIT) layers mods at startup in four ways. Romfs mods are merged into the game's archives per ARC entry, matched by internal name and type, with a load order file. Exefs patches (`.pchtxt`, IPS) touch data and code; a function a patch changes runs in an interpreter instead of its recompiled code, only that function. Forge plugins (`.nro`) hook at runtime. Engine modules are native programs with the game's rights. Per-entry ARC merging is what lets two mods touch the same archive, which Azahar's single mods folder can't do (fork docs/MODS.md, "Order and conflicts").
+- **MHGU Definitive Edition** (GPL-3.0-or-later) adds monsters without replacing any: a C module (`subsdk1`) with an IPS patch branching into it, per-monster data files, and converted assets through layeredFS. New ids, quests and items are *added* by that module, which is the table growth our plugin layer is for (id-tables.md, "Bounds to move"). Its `allocations.toml` and `notes/registry.md` describe how it allocates ids and registers classes on the GU side, a pattern to compare with ours when the first table-growing plugin is written.
+
 ## In-game check (first session with game files)
 
 Written for a Windows or Linux PC with the USA v1.3.0 dump and the port installed.
