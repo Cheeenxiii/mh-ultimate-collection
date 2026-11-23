@@ -181,12 +181,29 @@ def cmd_questslot(args) -> int:
                     print(f"{os.path.basename(p)} slot {k} ({name}): {e}", file=sys.stderr)
         print(f"{used} used slots, {good} with a matching hash and size")
         return 0 if used == good else 1
-    if len(args.paths) != 1 or args.slot is None or not args.mib or not args.out:
-        print("mhuc questslot put: one quest file, with --slot, --mib and --out", file=sys.stderr)
+    if len(args.paths) != 1 or args.slot is None or not args.out or (args.mib is None) == (args.from_slot is None):
+        print("mhuc questslot put: one quest file, with --slot, --out and one of --mib, --from-slot", file=sys.stderr)
         return 2
-    mib = _read(args.mib)
-    name = args.name or os.path.basename(args.mib)
-    new = quest.mh4u_put_slot(_read(args.paths[0]), args.slot, quest.mh4u_pack_slot(mib, name))
+    data = _read(args.paths[0])
+    if any(k == args.slot for k, _, _ in quest.mh4u_slots(data)) and not args.replace:
+        print(f"mhuc questslot put: slot {args.slot} holds a quest; pass --replace to overwrite it", file=sys.stderr)
+        return 1
+    if args.mib:
+        mib, name = _read(args.mib), os.path.basename(args.mib)
+    else:
+        found = {k: body for k, _, body in quest.mh4u_slots(data)}
+        if args.from_slot not in found:
+            print(f"mhuc questslot put: slot {args.from_slot} is empty", file=sys.stderr)
+            return 1
+        mib = quest.mh4u_slot_mib(found[args.from_slot])
+        name = None
+    if args.id is not None or args.title is not None:
+        mib = quest.mib4_patch(mib, args.id, args.title)
+    name = args.name or (f"m{args.id:05d}.mib" if args.id is not None else name)
+    if not name:
+        print("mhuc questslot put: give --name or --id for a copied slot", file=sys.stderr)
+        return 2
+    new = quest.mh4u_put_slot(data, args.slot, quest.mh4u_pack_slot(mib, name))
     with open(args.out, "wb") as f:
         f.write(new)
     print(f"{name} ({len(mib)} bytes) in slot {args.slot}, {len(new)} bytes to {args.out}")
@@ -300,7 +317,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("paths", nargs="+")
     p.add_argument("--slot", type=int)
     p.add_argument("--mib")
-    p.add_argument("--name", help="the slot's file name (default: the .mib's)")
+    p.add_argument("--replace", action="store_true", help="allow overwriting a used slot")
+    p.add_argument("--from-slot", type=int, help="copy the quest stored in this slot instead of --mib")
+    p.add_argument("--id", type=int, help="give the quest this id (and the name mNNNNN.mib)")
+    p.add_argument("--title", help="a new title in all five languages, no longer than the old ones")
+    p.add_argument("--name", help="the slot's file name (default: the .mib's, or mNNNNN.mib with --id)")
     p.add_argument("--out")
     p.set_defaults(func=cmd_questslot)
 

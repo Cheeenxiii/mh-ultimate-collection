@@ -87,6 +87,26 @@ def mh4u_put_slot(data: bytes, k: int, slot: bytes) -> bytes:
     return data[:k * SLOT] + slot + data[(k + 1) * SLOT:]
 
 
+def mib4_patch(mib: bytes, quest_id: int | None = None, title: str | None = None) -> bytes:
+    """An MH4U `.mib` with a new quest id (0xC0) and/or a new title in all five languages, in place: the
+    layout and every offset stay as they are, so the title must fit where each language's old one was
+    (its old length, NUL included); the rest of that space is zeroed."""
+    out = bytearray(mib)
+    if quest_id is not None:
+        if not 0 <= quest_id <= 0xFFFF:
+            raise QuestError("a quest id is a u16")
+        struct.pack_into("<H", out, 0xC0, quest_id)
+    if title is not None:
+        new = title.encode("utf-16-le") + b"\0\0"
+        for lang in struct.unpack_from("<5I", mib, _u32(mib, 0xBC)):
+            at = _u32(mib, lang)  # title is the first of the seven strings
+            room = len(_utf16(mib, at).encode("utf-16-le")) + 2
+            if len(new) > room:
+                raise QuestError(f"the title needs {len(new)} bytes; this quest has room for {room}")
+            out[at:at + room] = new.ljust(room, b"\0")
+    return bytes(out)
+
+
 def mh3u_slots(data: bytes) -> list[tuple[int, str, bytes]]:
     """An MH3U 3DS `quest*` file (not encrypted): a u32, then 20 slots of 0x2010 bytes; a used one holds the
     server file decrypted (record, SHA-1 with two bytes zeroed, padding, u32 BE size) and its name at 0x2000.

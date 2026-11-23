@@ -162,6 +162,27 @@ def test_mh4u_pack_slot_round_trips(tmp_path, capsys):
     assert cli.main(["questslot", "check", str(broken)]) == 1
 
 
+def test_mib4_patch_and_copy_slot(tmp_path, capsys):
+    mib = build_mib4(60001)
+    old = quest.parse_mib4(mib)
+    new = quest.mib4_patch(mib, quest_id=60999, title="UC")
+    got = quest.parse_mib4(new)
+    assert got["quest_id"] == 60999 and len(new) == len(mib)
+    assert all(t["title"] == "UC" for t in got["text"].values())
+    assert got["text"]["eng"]["success"] == old["text"]["eng"]["success"]
+    with pytest.raises(quest.QuestError):
+        quest.mib4_patch(mib, title="x" * 200)
+    qf, out = tmp_path / "q", tmp_path / "q2"
+    qf.write_bytes(quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 0, quest.mh4u_pack_slot(mib, "m60001.mib")))
+    assert cli.main(["questslot", "put", str(qf), "--slot", "1", "--from-slot", "0", "--id", "60999",
+                     "--title", "UC", "--out", str(out)]) == 0
+    slots = quest.mh4u_slots(out.read_bytes())
+    assert [(k, n) for k, n, _ in slots] == [(0, "m60001.mib"), (1, "m60999.mib")]
+    assert cli.main(["questslot", "put", str(out), "--slot", "1", "--from-slot", "0", "--id", "60998",
+                     "--out", str(out)]) == 1  # used slot, no --replace
+    assert quest.parse_mib4(quest.mh4u_slot_mib(slots[1][2]))["quest_id"] == 60999
+
+
 # ── MHXX ──────────────────────────────────────────────────────────────────────
 
 
