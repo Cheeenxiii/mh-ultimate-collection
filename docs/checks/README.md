@@ -19,6 +19,7 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | `.mib` model and builder on 120 quests (Q18) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
 | A rebuilt quest in game (Q19) | specs/quest.md | MH4U save, a save manager, the game | open |
 | A mod quest through an Extra Data slot (Q17) | specs/quest.md | MH4U save, a save manager, the game | open |
+| A local DLC responder with its own key (D1), the DLC list files (D2) | docs/design/dlc-responder.md | the port; the goshawk mirror | open |
 | `.mib` header on the game's own 508 quests (Q6) | specs/quest.md | MH4U RomFS | open |
 | Native plugin in the game | docs/design/plugin-api.md | MH4U dump, the port | open |
 | Class registries of MH3U and MHXX | docs/design/reference-recompiles.md | MH3U, MHXX code.bin | done 2026-11-23 |

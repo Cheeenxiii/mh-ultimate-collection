@@ -19,7 +19,7 @@ Everything new is extracted from the game it comes from, both its assets and its
 
 | Path | What |
 |---|---|
-| `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression, quest conversion, Extra Data |
+| `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression, quest conversion, Extra Data, DLC responder |
 | `docs/sources/` | what each source game supplies; the authored register |
 | `specs/` | one spec per file type (`.ksy` + notes), each field marked verified or unverified |
 | `STATUS.md` | where the project stands and what's next; rewritten every session |
