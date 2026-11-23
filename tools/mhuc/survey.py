@@ -15,6 +15,7 @@ from collections import Counter
 from multiprocessing import Pool
 
 from . import arc, classid, emd, gmd, lmt, pica, romfs, tex
+from . import mod as modfile
 
 QUEST_TYPES = ("rQuestData", "rSetEmMain", "rEmSetList", "rRem")
 _IMG: romfs.Romfs | None = None
@@ -114,6 +115,7 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
             c[f"other magic {data[:4]!r}"] += 1
             return
         c[f"version 0x{struct.unpack_from('<H', data, 4)[0]:04x}"] += 1
+        c.update(modfile.check(data))
 
 
 def survey_arc(data: bytes, st: dict) -> None:

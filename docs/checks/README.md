@@ -11,6 +11,7 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | GMD versions, round trip (G1, G2) | specs/gmd.md | MH3U, MHXX RomFS | done 2026-11-23 |
 | MOD versions (M1) | specs/mod.md | MH4U, MH3U, MHXX RomFS | done 2026-11-23 |
 | MOD field meanings (M2) | specs/mod.md | all three, a model tool | open |
+| MOD mesh records against the header and buffers (M3) | specs/mod.md | MH4U, MH3U, MHXX RomFS | open |
 | Quest files (Q1, Q2) | specs/quest.md | MH4U, MH3U, MHXX RomFS | done 2026-11-23 |
 | Extra Data crypto and quest slots, `.mib` header on 120 DLC quests (Q3-Q5) | specs/quest.md | MH4U Extra Data | done 2026-11-23 |
 | Extra Data cards, DLC Palicos, MH3U saves, re-encryption (E1-E3, E5, E6) | specs/extdata.md | MH4U, MH3U Extra Data | done 2026-11-23 |

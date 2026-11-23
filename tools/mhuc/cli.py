@@ -362,6 +362,14 @@ def cmd_idnames(args) -> int:
     return 0
 
 
+def cmd_mod(args) -> int:
+    from . import mod as modfile
+    out = {os.path.basename(p): modfile.info(_read(p)) for p in args.paths}
+    json.dump(out, sys.stdout, indent=1)
+    print()
+    return 0
+
+
 def cmd_emd(args) -> int:
     from collections import Counter
 
@@ -489,6 +497,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dir", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "catalog"))
     p.add_argument("--out", help="write the Markdown here instead of printing it")
     p.set_defaults(func=cmd_catalog)
+
+    p = sub.add_parser("mod", help="MT Mobile models: header and mesh summary (specs/mod.md)")
+    p.add_argument("action", choices=["info"])
+    p.add_argument("paths", nargs="+")
+    p.set_defaults(func=cmd_mod)
 
     p = sub.add_parser("emd", help="check E1 (specs/emd.md) on ARCs holding .emd/.etd pairs (data/em_data.arc)")
     p.add_argument("action", choices=["check"])
