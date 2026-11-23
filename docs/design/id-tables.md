@@ -161,6 +161,8 @@ When ids grow past 123: the factory compare and jump table, `enemyDataPathIndex`
 
 **Save-side limits (not tables to move):** a guild quest (specs/extdata.md) stores each monster id in one byte, so ids above 255 can't appear in one; ids up to 255 fit as they are.
 
+**How another project allocates ids (an option, not a decision).** MHGU Definitive Edition, which adds MH4U monsters to MHGU, keeps every game-wide id a ported monster takes in one file (`allocations.toml`: registry index, monster number, file ids, save slots), each from a pool whose bounds were checked in the game, checked by a script and read by both its C module and its converters. Its rule: ids only ever grow, and an installed monster's ids never move, because saves and quests keep them. The same constraints apply here: a hunter's save records monster ids (hunt counts, crowns), and quests name them.
+
 ### Procedure (repeatable from the dump; record results, never bytes)
 
 1. Lay out the code as in step 1 above. List the code's literals that point into `.rodata`/`.data`. For each, take the distance to the next referenced address; keep the ones that are 123, 124 or 125 times a small row size.
