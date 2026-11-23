@@ -8,6 +8,7 @@ import struct
 from collections import Counter
 
 MESH = 0x30
+GROUP = 0x20
 
 
 class ModError(ValueError):
@@ -31,7 +32,7 @@ def meshes(d: bytes, h: dict | None = None) -> list[dict]:
     if at + MESH * h["meshes"] > len(d):
         raise ModError("mesh table outside the file")
     out = []
-    for i in range(h["meshes"]):
+    for i in range(h["meshes"]):  # "group" is a group id (group_ids), not an index: check M3
         o = at + MESH * i
         draw, nverts, data0, data1, vstart, vstream, vfmt, istart, icount, ivoff = struct.unpack_from("<HHIIIIIIII",
                                                                                                     d, o)
@@ -41,6 +42,14 @@ def meshes(d: bytes, h: dict | None = None) -> list[dict]:
                     "vertex_stream_offset": vstream, "vertex_format": vfmt, "index_start": istart,
                     "index_count": icount, "index_value_offset": ivoff, "skin_bone_begin": skin, "envelopes": env})
     return out
+
+
+def group_ids(d: bytes, h: dict | None = None) -> list[int]:
+    """The first u32 of each 0x20-byte group entry: the id a mesh's group field names (check M3)."""
+    h = h or header(d)
+    if h["groups_at"] + GROUP * h["groups"] > len(d):
+        raise ModError("group table outside the file")
+    return [struct.unpack_from("<I", d, h["groups_at"] + GROUP * i)[0] for i in range(h["groups"])]
 
 
 def info(d: bytes) -> dict:
@@ -56,6 +65,7 @@ def check(d: bytes) -> Counter:
     try:
         h = header(d)
         ms = meshes(d, h)
+        ids = set(group_ids(d, h))
     except (ModError, struct.error):
         c["M3 not readable"] += 1
         return c
@@ -64,8 +74,8 @@ def check(d: bytes) -> Counter:
       "M3 mesh vertices don't sum to the header's"] += 1
     c["M3 materials within the count" if all(m["material"] < max(h["materials"], 1) for m in ms) else
       "M3 a material index over the count"] += 1
-    c["M3 groups within the count" if all(m["group"] < max(h["groups"], 1) for m in ms) else
-      "M3 a group index over the count"] += 1
+    c["M3 group ids in the group table" if all(m["group"] in ids for m in ms) or not h["groups"] else
+      "M3 a group id not in the group table"] += 1
     ib_entries = (len(d) - h["index_buffer_at"]) // 2
     c["M3 index ranges inside the index buffer" if all(m["index_start"] + m["index_count"] <= ib_entries
                                                        for m in ms) else "M3 an index range past the buffer"] += 1

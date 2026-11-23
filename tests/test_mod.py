@@ -8,7 +8,7 @@ from mhuc import cli, mod, survey
 
 
 def make_mod(vertices=(3, 3), stride=12) -> bytes:
-    meshes_at, n = 0x40, len(vertices)
+    meshes_at, n = 0x60, len(vertices)             # one 0x20-byte group entry at 0x40 (id 0), then the meshes
     vb_at = meshes_at + mod.MESH * n
     vb_size = stride * sum(vertices)
     ib_at = vb_at + vb_size
@@ -31,6 +31,13 @@ def test_info_and_check():
     assert c["M3 mesh vertices sum to the header's"] == 1
     assert c["M3 index ranges inside the index buffer"] == 1
     assert c["M3 vertex streams inside the vertex buffer"] == 1
+    assert c["M3 group ids in the group table"] == 1
+
+
+def test_group_field_is_an_id():
+    d = bytearray(make_mod())
+    struct.pack_into("<I", d, 0x60 + 4, 7)          # mesh 0's group field (low 12 bits of +4): 7, not an id
+    assert mod.check(bytes(d))["M3 a group id not in the group table"] == 1
 
 
 def test_check_flags_a_bad_sum():
