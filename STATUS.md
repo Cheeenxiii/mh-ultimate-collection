@@ -2,11 +2,11 @@
 
 The one place that says where the project stands. Overwritten at the end of every session (`/handoff`); history is in `docs/reports/`. Keep it under a screen.
 
-**Updated:** 2026-11-24, after a workspace session on the monster port's step 1 (Rathian's engine calls across the three games).
+**Updated:** 2026-11-24, after a workspace session on the monster port's step 1 (Rathian's engine calls across the three games), and the merge of the related-projects web session (PR #4).
 
 ## Where we are
 
-Phase: **engine work with the game files.** Both reference games recompile cleanly (MH3U fully, MHXX v1.4 on a sample), and the RomFS surveys are merged (PR #6).
+Phase: **engine work with the game files.** Both reference games recompile cleanly (MH3U fully, MHXX v1.4 on a sample), and the RomFS surveys are merged (PR #6). The base game is settled as MH4U; every decision now lives in [open-decisions.md](docs/design/open-decisions.md). Audio is in the plan ([audio.md](docs/design/audio.md), [specs/sound.md](specs/sound.md); [report](docs/reports/2026-11-23-reference-projects.md)).
 
 This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results in [monster-port.md](docs/design/monster-port.md)):
 - **MHXX keeps its monsters in CRO modules**: 109 `.cro` files (every monster, weapons, village, quest, title; 6.5 MB of code), outside `code.bin`. So the MHXX recompile has no monster behaviour code. The fork's new `tools/cro.py` loads all 109.
@@ -17,7 +17,7 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 
 ## Branches
 
-- This repo: `monster-port-step1` from `main` (report, STATUS, monster-port.md and reference-recompiles.md), pushed, PR [Cheeenxiii/mh-ultimate-collection#7](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/7) open.
+- This repo: nothing in flight (PRs #4 and #7 merged).
 - Fork: `uc/monster-port-step1` from `uc/main` (`tools/cro.py`, `tools/fnmap.py`, tests, `config/games/README.md`), pushed, PR [Cheeenxiii/MH4UltimateDC-fork#6](https://github.com/Cheeenxiii/MH4UltimateDC-fork/pull/6) open.
 
 ## Next tasks, in order
@@ -26,12 +26,19 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 2. **MHXX module recompiles** (fork): recompile each `.cro` at a fixed base with the static library's addresses resolved, then link at run time in the harness. Done when `roEm001` gametests like the static code (0 differ).
 3. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`. Done when the specs record the results and extra-data.md says which routes work.
 4. **LMT version 66** (MH3U): a layout from the files and Cha-Cha, then L1 again. Unblocks the underwater motions ([underwater.md](docs/design/underwater.md)).
-5. **A first converted GU quest**, then the first table-growing plugin (see the previous STATUS in git for their details).
+5. **Sound survey SN1** (specs/sound.md): sound entries per type and version in the three RomFS, counts only; pair it with the next RomFS job. Then a first converted GU quest and the first table-growing plugin (Definitive Edition's `allocations.toml` and `notes/registry.md` first).
+
+## Housekeeping
+
+- **Fork branches:** delete every remote branch except `main`, `native`, `uc/main` and the heads of open PRs (32 others on 2026-11-23, all upstream's or already merged; re-check with `git branch -r --merged` first). Fast-forward `native` and `main` to upstream's.
+- **Fork default branch:** `uc/main`, if the maintainer agrees (Cheeenxiii/MH4UltimateDC-fork#4).
+- **Merged session branches:** delete them in both repositories (`claude/practical-johnson-jobxzw`, `romfs-surveys`, `monster-port-step1` here).
 
 ## Waiting on the maintainer
 
-- Reviewing and merging PRs #7 (this repo) and #6 (fork).
+- Reviewing and merging the fork's PR #6.
+- Whether to contact MHGU Definitive Edition's maintainers about shared format specs.
 - Running the test kit in game, and saying which region and language the Extra Data's game is.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.
 - A check of the port's pad features with the plugin, on a machine with a display; whether to offer the inline-cache fix to upstream.
-- The open decisions (combat base, monster versions, runtime, progression, star scale and quest ids for converted quests): not ours to settle.
+- The open decisions in [open-decisions.md](docs/design/open-decisions.md) (shared-system, map, music and asset versions, progression, star scale and quest ids for converted quests): not ours to settle.

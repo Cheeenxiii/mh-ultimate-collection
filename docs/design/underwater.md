@@ -14,7 +14,7 @@ Nothing here is verified yet. Every "where it lives" below is a hypothesis for t
 | Water volumes | where the water is, its surface height, which areas are underwater | stage files: collision and area info (rStageAreaInfo-like types) per area | converted stage data; the area loader told which areas are water |
 | Underwater motions | per weapon class: idle, swim, attacks, reactions | motion lists (rMotionList, `.lmt`) for the player, per weapon | converted motion lists; needs the skeleton mapping (3U player skeleton to 4U's) |
 | Monster underwater AI | Leviathans' and others' swimming movement and attacks | monster command data (rEnemyCmd-like, `.emc`) and monster code | monsters arrive with their own data; the engine side needs water-aware movement, from MH3U's code |
-| Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters | converted assets; filters through MH4U's own screen filters where they match |
+| Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters (audio.md) | converted assets; filters through MH4U's own screen filters where they match |
 | HUD | oxygen gauge, depth cues | layout files (rLayout) | converted layout, or drawn by the plugin if layouts don't convert |
 
 ## Other leads
@@ -54,6 +54,9 @@ Things no game has, so they are made rather than extracted (each gets a row in t
 - Charge Blade and Insect Glaive underwater movesets (and the Kinsect underwater).
 - MH4U-era player actions that would happen underwater: mounting from a ledge, the jumping attacks (likely disabled underwater instead: an option, not a decision).
 - MH4U and GU-only monsters entering water, if any are placed in water maps.
+- GU's Hunter Styles and Hunter Arts underwater, if GU's combat comes in at all (open-decisions.md, "Combat base").
+
+Until a weapon class has underwater motions, one option is to keep it out of underwater quests: the quest board refuses the quest, or the quest's equipment check does. That would let 3U's water quests ship before the Charge Blade and Insect Glaive movesets exist. It is an option, not a decision. The same applies to Styles and Arts.
 
 ## In-game checks (later)
 

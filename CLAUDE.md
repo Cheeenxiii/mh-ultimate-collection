@@ -21,7 +21,7 @@ Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Mo
 3. **Stay mergeable with upstream MH4UltimateDC, but never wait on it.** Small focused commits with one-sentence subjects. Update docs in the same commit as the code. Add pytest tests. In the fork, add new files rather than rewriting upstream's, and keep the plugin layer additive.
 4. **Licence.** GPL-3.0-or-later. Check a tool's licence before reusing its code, and credit whatever informs a format spec (mhff, Silvris's templates, Kuriimu2).
 5. **Web sessions have no game files.** Don't try to get them from anywhere.
-6. **Don't settle the open decisions** (combat base, monster versions, runtime, progression). Write up the options and stop there.
+6. **Don't settle the open decisions** listed in [docs/design/open-decisions.md](docs/design/open-decisions.md) (combat base, monster versions, runtime, progression, versions of shared systems, map versions and lighting, music and sound versions, GU Switch assets). Write up the options there and stop. The base game (MH4U) is settled.
 
 ## Conventions
 

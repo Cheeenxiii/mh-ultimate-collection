@@ -26,6 +26,7 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | GMD v2 label hashes against MHXX's tables (G3) | specs/gmd.md | MHXX RomFS | done 2026-11-23 |
 | LMT versions and layout in the three games (L1) | specs/lmt.md | MH4U, MH3U, MHXX RomFS | done 2026-11-23 (MH3U: version 66, not laid out) |
 | `.emd`/`.etd` layout on the 110 pairs (E1) | specs/emd.md | MH4U RomFS | done 2026-11-23 |
+| Sound entries per type and version in the three games (SN1); MH4U sound layouts (SN2) | specs/sound.md | MH4U, MH3U, MHXX RomFS | open |
 | `.mib` header on the game's own 508 quests (Q6) | specs/quest.md | MH4U RomFS | done 2026-11-23 |
 | MH3U `QTDS` on the game's own 365 quests (Q13) | specs/quest.md | MH3U RomFS | done 2026-11-23 |
 | Native plugin in the game | docs/design/plugin-api.md | MH4U dump, the port | open |
