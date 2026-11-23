@@ -49,6 +49,7 @@ mhuc --help
 | `mhuc romfs list ROMFS.BIN` | the files of a RomFS image, read in place |
 | `mhuc survey ROMFS.BIN [--workers N]` | the specs' with-game-files checks over a whole RomFS; prints counts only |
 | `mhuc entropy PATH...` | size, 8-byte alignment and byte entropy of files or folders, to tell encrypted ones (saves, Extra Data) from plain; prints counts only |
+| `mhuc xfs dump FILE` | an MT XFS file (`.supp`, `.pop`, `.list`, …) as JSON, its schema included; either byte order |
 | `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
 ## Tests

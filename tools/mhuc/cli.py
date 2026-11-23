@@ -6,7 +6,7 @@ import json
 import os
 import sys
 
-from . import __version__, arc, classid, entropy, gmd, romfs, survey, tex
+from . import __version__, arc, classid, entropy, gmd, romfs, survey, tex, xfs
 
 
 def _read(path: str) -> bytes:
@@ -83,6 +83,17 @@ def cmd_entropy(args) -> int:
     return 0
 
 
+def cmd_xfs(args) -> int:
+    x = xfs.read(_read(args.file))
+    json.dump({"endian": x.endian, "version": [x.version, x.subversion],
+               "classes": [{"dti_id": f"0x{c.dti_id:08X}",
+                            "props": [{"name": p.name, "type": p.type_name, "attr": p.attr} for p in c.props]}
+                           for c in x.classes],
+               "root": x.root}, sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -130,6 +141,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("entropy", help="size, block alignment and byte entropy of files (encrypted?); counts only")
     p.add_argument("paths", nargs="+", help="files or folders")
     p.set_defaults(func=cmd_entropy)
+
+    p = sub.add_parser("xfs", help="MT XFS serialised objects (.supp, .pop, ...) as JSON, schema included")
+    p.add_argument("action", choices=["dump"])
+    p.add_argument("file")
+    p.set_defaults(func=cmd_xfs)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
                        ("convert", "convert a source game's assets for MH4U (needs game files)"),
