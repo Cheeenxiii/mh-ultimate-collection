@@ -7,7 +7,7 @@ One folder per conversion (`mhxx-mh4u/`: MHXX to MH4U), one CSV per kind of id, 
 | `source` | the id in the source game, as text (see each table) |
 | `target` | the MH4U id, an integer (decimal or `0x` hex) |
 | `source_name`, `target_name` | names, for review (from the games' text or the catalog) |
-| `how` | how the row was established: a catalog match, a check in docs/checks/, or a decision; a new MH4U id says where it was allocated (docs/design/id-tables.md) |
+| `how` | how the row was established (`mhuc idnames`, check Q22 in specs/quest.md, gives candidate names for ids from your own quests): a catalog match, a check in docs/checks/, or a decision; a new MH4U id says where it was allocated (docs/design/id-tables.md) |
 
 | Table | `source` key | `target` |
 |---|---|---|

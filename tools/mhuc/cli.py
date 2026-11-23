@@ -328,6 +328,40 @@ def cmd_convert(args) -> int:
     return 0
 
 
+def cmd_idnames(args) -> int:
+    import csv as _csv
+
+    from . import catalog, idnames
+    out_real = os.path.realpath(args.out)
+    repo = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if out_real == repo or out_real.startswith(repo + os.sep):
+        print("mhuc idnames: the table is derived from the game's files; write it outside the repository",
+              file=sys.stderr)
+        return 2
+    game = {"mh4u": "MH4U", "mh3u": "MH3U"}[args.kind]
+    known = {r["monster"] for r in catalog.read_table(os.path.join(repo, "data", "catalog", "monsters.csv"))
+             if r["game"] == game}
+    obs = []
+    for p in args.paths:
+        for _, q in _quest_files(args.kind, p):
+            if args.kind == "mh4u":
+                ids, title = {d["monster"] for w in q["large_waves"] for d in w}, q["text"]["eng"]["title"]
+            else:
+                ids, title = {m["type"] for m in q["monsters"] if m["type"]}, q["name"]["eng"]
+            text = idnames.fetch_page(f"{title} ({game} Quest)", args.cache)
+            if text and ids:
+                obs.append((ids, idnames.categories(text, game, known)))
+    res = idnames.infer(obs)
+    with open(args.out, "w", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        w.writerow(["id", "name", "candidates"])
+        for i, c in res.items():
+            w.writerow([i, c[0] if len(c) == 1 else "", "; ".join(c)])
+    one = sum(1 for c in res.values() if len(c) == 1)
+    print(f"{len(obs)} quests with a wiki page; {len(res)} ids, {one} with one name; table in {args.out}")
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -441,6 +475,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dir", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "catalog"))
     p.add_argument("--out", help="write the Markdown here instead of printing it")
     p.set_defaults(func=cmd_catalog)
+
+    p = sub.add_parser("idnames", help="monster ids to names from quests and the wiki's quest pages (table "
+                                       "written outside the repository)")
+    p.add_argument("kind", choices=["mh4u", "mh3u"])
+    p.add_argument("paths", nargs="+", help="decrypted Extra Data quest files (or .mib / QTDS files)")
+    p.add_argument("--cache", required=True, help="a folder for the fetched wiki pages")
+    p.add_argument("--out", required=True, help="the CSV to write, outside the repository")
+    p.set_defaults(func=cmd_idnames)
 
     p = sub.add_parser("convert", help="convert a source game's quest into an MH4U .mib model (JSON)")
     p.add_argument("what", nargs="?", choices=["quest"])

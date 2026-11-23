@@ -60,6 +60,7 @@ mhuc --help
 | `mhuc extdata testkit EXTDATA_DIR --key FILE --out DIR` | from an encrypted MH4U Extra Data folder, the encrypted files for the in-game checks Q17, Q19 and E4 (a copied quest, a rebuilt quest, a renamed Palico) and a TESTKIT.txt saying what to look for |
 | `mhuc extdata rename otomo FILE --slot N --name NAME --out OUT [--last-byte V]` | rename one DLC Palico in a decrypted `otomo1`, for the in-game check E4 |
 | `mhuc catalog overlap [--out F]` | which 3U and GU monsters and locales MH4U already has, from data/catalog (writes data/catalog/overlap.md) |
+| `mhuc idnames mh4u\|mh3u QUESTS... --cache DIR --out F.csv` | monster ids to names, inferred from your quests and the wiki's quest pages; the table is yours and is refused inside the repository (specs/quest.md Q22) |
 | `mhuc convert quest Q.json --from mhxx --template T.json --texts X.json --id N --out M.json` | an MHXX quest (from `mhuc quest dump mhxx`) as an MH4U `.mib` model, ids through data/idmap/; refuses unmapped ids and lists what came from the MH4U template |
 | `mhuc ingest`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
