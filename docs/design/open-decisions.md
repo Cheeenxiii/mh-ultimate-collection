@@ -71,11 +71,15 @@ Some locales exist in more than one game, in different versions. The catalog lis
 - **Which version:** the 3U version keeps the underwater areas and the routes through them. The GU version changes the layout (camp, ledges, connections) and drops the water.
 - **Lighting:** each game lights the same locale differently, and the difference touches everything in the scene, not only the textures. Options: each map keeps its own game's lighting; or 4U's lighting style is applied to imported maps.
 
+### Music and sound versions
+
+Many themes and monster sounds exist in several games, sometimes rearranged or remixed (GU revisits older games' themes). Options for each one: its first game's version, the version of the game the content is taken from, or MH4U's where MH4U has it. Where a monster has no theme in one game but has one in another, the question is whether it gets one. The conventions differ between games: some give most large monsters a theme, others play the area's music. [audio.md](audio.md) has the formats and the work; this is only the choice.
+
 ### GU Switch assets
 
 MHGU on Switch has HD textures and a single-screen interface. Rule 2 takes only English text from it, and GU-era models and textures from MHXX 3DS. Options:
 - keep the rule as it is;
-- offer Switch textures and interface as a separate, optional pack built from the player's own Switch dump, with the base mod unchanged;
+- offer Switch textures, interface and audio (48 kHz Opus) as a separate, optional pack built from the player's own Switch dump, with the base mod unchanged;
 - change the rule.
 
 Changing it is a change to CLAUDE.md's rule 2 and to [docs/sources/README.md](../sources/README.md).

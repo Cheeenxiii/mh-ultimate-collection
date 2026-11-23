@@ -16,7 +16,7 @@
 | Stage (map) table | stage id | new 3U maps | `rStageInfoSet`, `rStageAreaInfo`, `rStageCameraData` per stage plus a master list of stage ids → folders |
 | Area tables | stage id, area id | per-area files, transitions | resources per stage |
 | Quest ids | quest id | 3U and GU quests | `rQuestData` (`.mib`) per quest, and quest lists (rQuestInfoTbl) |
-| BGM, effects, sounds per monster | monster id | themes, roars | sound request tables (srq, stq) |
+| BGM, effects, sounds per monster | monster id | themes, roars | sound request tables (srq, stq); see audio.md |
 | Unit and resource heaps | — | more monsters loaded or larger ARCs | heap sizes set at start-up (the engine's unit and resource managers) |
 
 ## Found (USA v1.3.0)

@@ -14,7 +14,7 @@ Nothing here is verified yet. Every "where it lives" below is a hypothesis for t
 | Water volumes | where the water is, its surface height, which areas are underwater | stage files: collision and area info (rStageAreaInfo-like types) per area | converted stage data; the area loader told which areas are water |
 | Underwater motions | per weapon class: idle, swim, attacks, reactions | motion lists (rMotionList, `.lmt`) for the player, per weapon | converted motion lists; needs the skeleton mapping (3U player skeleton to 4U's) |
 | Monster underwater AI | Leviathans' and others' swimming movement and attacks | monster command data (rEnemyCmd-like, `.emc`) and monster code | monsters arrive with their own data; the engine side needs water-aware movement, from MH3U's code |
-| Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters | converted assets; filters through MH4U's own screen filters where they match |
+| Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters (audio.md) | converted assets; filters through MH4U's own screen filters where they match |
 | HUD | oxygen gauge, depth cues | layout files (rLayout) | converted layout, or drawn by the plugin if layouts don't convert |
 
 ## Leads from Cha-Cha (MH3U Wii U)

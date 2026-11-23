@@ -22,6 +22,7 @@ It is the same idea in the opposite direction. It keeps GU's systems and brings 
 | Other formats | `arc`, `tex`, `lmt` (animation), `mod` (model), `mrl` (materials), `sbc` (collision), `xfs`, `sdl` | compare with specs/ before writing ours |
 | Growing tables | `allocations.toml` (every game-wide id the port takes: registry slot, em number, file ids, save slots, text, quest ids; ids only grow), `module/port.c` (relocated monster registry), GU's quest list raised from 864 to 1024 and 99 to 255 per star board | the design pattern for STATUS task 2 (first table-growing plugin) and for id-tables.md |
 | Saves | `notes/mod-save-format.md`, `module/modsave.c`: the mod's own save files beside the game's, split and merged per character slot | an option for progression.md's per-era progress |
+| Sound | `tools/snd4u2gu.py`, `wsnd4u2gu.py`, `snd_bgm.py`, `snd_area.py`: 4U waves (`MADP`), banks (`SNDB`), requests (`SREQ`), music streams and area emitters (`SES`), with rules from Capcom's own 4U → GU conversions | specs/sound.md; reversed, possibly the MHXX → 4U conversion (audio.md) |
 | Code mapping | `tools/apimap*.py`, `slotmap.py`: matches 4U functions and vtable slots to GU's | the same need when carrying MHXX code into 4U |
 | Repository | `ARCHITECTURE.md` (what runs, what is tracked, what stays local, every dump path), `CONTRIBUTING.md`, `notes/porting-guide.md`, per-monster folders with their own `build.py` | a model for our own layout and docs |
 
