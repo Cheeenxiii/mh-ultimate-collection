@@ -18,7 +18,7 @@ Each source field falls into one of four kinds:
 | MH4U `.mib` | From MH3U `QTDS` | From MHXX `.mib` | Kind |
 |---|---|---|---|
 | quest id (0xC0, u16) | number (u16) | quest id (0x0C, u32, 7 digits) | id table: a new MH4U id range for each source game; MH4U's DLC quests use 6xxxx, its own quests other ranges |
-| stars (0xC2) | stars (u8) | stars (0x12) | direct, though star meanings differ by rank system (3U: Moga and Tanzia, low/high/G; XX: village and hub, with G rank at rank 5) |
+| stars (0xC2) | stars (u8) | stars (0x12) | value table: MH4U's stars run 1-3 Low, 4-7 High, 8-10 G on one scale (quest.md 0xC2, check Q20); 3U's run 1-8 across Low, High and G (Q21); XX has village and hub stars, with G rank at rank 5. Which source star becomes which MH4U star is a decision |
 | map (0xC4) | map (u8) | map (0x14, +100 at night) | id table: 3U and GU maps get new MH4U stage ids; night is a separate flag in XX |
 | time limit (0xB4, minutes) | time (u16, minutes) | time (0x16, minutes) | direct |
 | fee, reward, faint penalty (0xA4..0xAC) | fee, reward, faint penalty (i32) | fee, main reward (0x31, 0x39) | direct (economy balance is a separate question) |
