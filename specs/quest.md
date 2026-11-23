@@ -254,6 +254,8 @@ Layouts from the mhff wiki's MHX pages ("MHX rSetEmMain/rEmSetList/rRem/rSupplyL
 
 Run on 2026-11-23 with `mhuc survey` and `mhuc romfs list` on the maintainer's dumps (see [arc](arc.md#checks)).
 
+Re-running Q3 to Q15 needs no scratch script: `mhuc decrypt` (with a key file you make from mhef's `mhef/n3ds.py` or goshawk's `utils/constants.py`, kept outside the repositories) and `mhuc quest check|dump` read every file these checks covered. For example: `mhuc decrypt mh4u-save quest1 q1.bin --key mh4u_save.key --mode quest`, then `mhuc quest check mh4u q1.bin`; `mhuc decrypt mh3u-dlc q_20102.quest out.quest --key mh3g.key`; `mhuc quest check mhxx q*.arc`. On 2026-11-23 they read all 120 MH4U, 173 MHXX (with every part) and 38 MH3U quests without a failure.
+
 - **Q1 (done):** MH4U keeps its quests in two archives that hold only `rQuestData`: 207 and 301 entries (the same in EUR). The four language folders' `core_quest.arc` hold the quest screens (effects, layouts, textures), no quest data. MH3U has no quest archives: 365 `.quest`, 353 `.quest_btl` and 196 `.supp` files lie loose in the RomFS, plus quest screens in archives.
 - **Q2 (done):** MHXX JPN has 1,335 archives with quest classes. 1,331 hold all four of `rQuestData`, `rSetEmMain`, `rEmSetList` and `rRem`; 3 hold only `rQuestData`; 1 holds only `rRem`. In 1,334 the last entry is the `rQuestData`. A quest is one archive in MHXX, as mhff describes for MH4U's DLC.
 
