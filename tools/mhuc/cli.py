@@ -300,6 +300,34 @@ def cmd_catalog(args) -> int:
     return 0
 
 
+def cmd_convert(args) -> int:
+    need = (args.what, args.src, args.template, args.texts, args.id, args.out)
+    if args.what != "quest" or None in need:
+        print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
+              "[--tables DIR] --out OUT.json  (docs/design/quest-conversion.md)", file=sys.stderr)
+        return 2
+    from . import convert
+
+    def load(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    src = load(args.src)
+    if isinstance(src, dict) and "mib" not in src and len(src) == 1:  # mhuc quest dump's {name: parts}
+        src = next(iter(src.values()))
+    try:
+        out = convert.convert_mhxx(src, load(args.template), convert.load_tables(args.tables), args.id,
+                                   load(args.texts))
+    except convert.ConvertError as e:
+        print(f"mhuc convert: {e}", file=sys.stderr)
+        return 1
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+    print(f"{args.out}: {len(out['placeholders'])} placeholders to record (docs/sources/authored-register.md); "
+          "build it with mhuc mib import")
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -414,8 +442,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", help="write the Markdown here instead of printing it")
     p.set_defaults(func=cmd_catalog)
 
+    p = sub.add_parser("convert", help="convert a source game's quest into an MH4U .mib model (JSON)")
+    p.add_argument("what", nargs="?", choices=["quest"])
+    p.add_argument("src", nargs="?", help="the quest as `mhuc quest dump mhxx` prints it")
+    p.add_argument("--from", dest="game", choices=["mhxx"], default="mhxx")
+    p.add_argument("--template", help="an MH4U quest as `mhuc mib export` writes it, for what isn't converted")
+    p.add_argument("--texts", help="JSON: for each of eng, fre, spa, ger, ita, the 7 MH4U strings")
+    p.add_argument("--id", type=int, help="the MH4U quest id to give it")
+    p.add_argument("--tables", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "idmap",
+                                                     "mhxx-mh4u"))
+    p.add_argument("--out")
+    p.set_defaults(func=cmd_convert)
+
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
-                       ("convert", "convert a source game's assets for MH4U (needs game files)"),
                        ("build", "build the mod's romfs and plugins (needs game files)")):
         p = sub.add_parser(name, help=text)
         p.add_argument("rest", nargs=argparse.REMAINDER)
