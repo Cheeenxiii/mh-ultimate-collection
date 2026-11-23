@@ -2,7 +2,7 @@
 
 The one place that says where the project stands. Overwritten at the end of every session (`/handoff`); history is in `docs/reports/`. Keep it under a screen.
 
-**Updated:** 2026-11-24, after a workspace session on the monster port's step 1 (Rathian's engine calls across the three games), and the merge of the related-projects web session (PR #4).
+**Updated:** 2026-11-24, after a workspace session on the monster port's step 1 (Rathian's engine calls across the three games), and the merge of the related-projects web session (PR #4). From now on a session takes one coherent area of work and carries it far unattended, with a PR per piece (`/next`).
 
 ## Where we are
 
@@ -17,8 +17,8 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 
 ## Branches
 
-- This repo: nothing in flight (PRs #4 and #7 merged).
-- Fork: `uc/monster-port-step1` from `uc/main` (`tools/cro.py`, `tools/fnmap.py`, tests, `config/games/README.md`), pushed, PR [Cheeenxiii/MH4UltimateDC-fork#6](https://github.com/Cheeenxiii/MH4UltimateDC-fork/pull/6) open.
+- This repo: `long-sessions` (the workspace's `/next`, `/handoff` and CLAUDE.md: one area per session, unattended, a PR per piece; this STATUS fix), PR [#8](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/8) open.
+- Fork: nothing in flight (`uc/main`; PR #6, `cro.py` and `fnmap.py`, squash-merged).
 
 ## Next tasks, in order
 
@@ -32,11 +32,11 @@ This session ([report](docs/reports/2026-11-24-monster-port-step1.md), results i
 
 - **Fork branches:** delete every remote branch except `main`, `native`, `uc/main` and the heads of open PRs (32 others on 2026-11-23, all upstream's or already merged; re-check with `git branch -r --merged` first). Fast-forward `native` and `main` to upstream's.
 - **Fork default branch:** `uc/main`, if the maintainer agrees (Cheeenxiii/MH4UltimateDC-fork#4).
-- **Merged session branches:** delete them in both repositories (`claude/practical-johnson-jobxzw`, `romfs-surveys`, `monster-port-step1` here).
+- **Merged session branches:** delete them in both repositories (`claude/practical-johnson-jobxzw`, `romfs-surveys`, `monster-port-step1` here; `uc/monster-port-step1` in the fork).
 
 ## Waiting on the maintainer
 
-- Reviewing and merging the fork's PR #6.
+- Reviewing and merging the `long-sessions` PR.
 - Whether to contact MHGU Definitive Edition's maintainers about shared format specs.
 - Running the test kit in game, and saying which region and language the Extra Data's game is.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.

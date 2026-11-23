@@ -19,6 +19,6 @@ Work through these in order. Stop and tell the user if a check fails; don't comm
 4. **Checks**, in each repo you changed, with `game_files/work/venv/bin/python`:
    - content repo: `-m pytest -q`, `-m ruff check .`, `tools/check_specs.py`, `tools/check_no_game_data.py`;
    - fork: `-m pytest -q`, `tools/check_no_game_data.py --staged` after staging.
-5. **Commit** in small focused commits with one-sentence subjects (CLAUDE.md conventions), the report and STATUS.md in their own commit. Then ask the user whether to push the branches (name them). Push only on a yes; after pushing, offer to open PRs.
+5. **Commit** in small focused commits with one-sentence subjects (CLAUDE.md conventions), the report and STATUS.md in their own commit. Push the session's branches and open a PR for each one that has none (sessions open PRs as they go; merging is the maintainer's). Name the PRs in the final lines.
 6. **Workspace files:** if this session changed anything under `mh-ultimate-collection/tools/workspace/`, run `doctor.py --install` so the workspace copies match.
 7. Run the doctor again and finish with its result plus the first next task, in two lines.
