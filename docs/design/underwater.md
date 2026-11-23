@@ -17,6 +17,10 @@ Nothing here is verified yet. Every "where it lives" below is a hypothesis for t
 | Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists (rEffectList), sound requests, filters | converted assets; filters through MH4U's own screen filters where they match |
 | HUD | oxygen gauge, depth cues | layout files (rLayout) | converted layout, or drawn by the plugin if layouts don't convert |
 
+## Other leads
+
+Monster Hunter Tri, 3U's Wii base and the first game with underwater combat, has a static recompilation to native ARM and reverse-engineering tools (sepalani's MHTrIDA); see [related-projects](../sources/related-projects.md). They are a reference for behaviour beside Cha-Cha and our MH3U 3DS recompile, never a source (rule 2: MH3U 3DS supplies the swimming code and motions). Neither has been read for this yet.
+
 ## Leads from Cha-Cha (MH3U Wii U)
 
 Cha-Cha, a recompilation of the Wii U build of MH3U, marks some of this already ([docs/sources/cha-cha.md](../sources/cha-cha.md)). Wii U offsets, to re-find on 3DS before use:

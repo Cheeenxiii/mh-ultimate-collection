@@ -22,6 +22,14 @@ A web session with no RomFS or code dumps, run mostly without the maintainer fro
 
 Tests: 139 in this repository (all synthetic), ruff, `check_specs` and `check_no_game_data` clean.
 
+### After the PRs: research on other projects
+
+| Task | Result | Where |
+|---|---|---|
+| Related projects | a survey of 15 projects with licence and what each gives. The big find is Scrimas's MHGU Definitive Edition (GPL-3.0-or-later), which ports MH4U monsters into MHGU with readers for MH4U's `.emd`/`.etd`, models, animations, collision, AI bytecode, stages and quests. Others: MHGURecomp (MHGU Switch recompiled, MIT), the MHGU-Modding wiki, mh4edit, MHX data manager, an MHGU decomp, Tri's recompilation and tools | docs/sources/related-projects.md |
+| `.emd`/`.etd` spec | STATUS's first RomFS task, written from MHGU-DE's readers: header words, body records (bone, shape, hitzone row, part, radius, offsets), visibility rows, the `.etd` part table, hitzone table, sensors, ailments, attack volumes and records, base HP. Its class ids match our registry. All unverified until check E1 on the RomFS | specs/emd.md, id-tables.md |
+| Cross-checks | MHGU-DE agrees with our quest stat rows (and names the stat table), the reward box word, icon 98 = none, and the save key's place in the game's code. Its 0xAC "sub reward" disagrees with Q20 (0xB0), so the spec keeps 0xB0. `mod.md`'s unknown 0x1C-byte entries are skin palettes per MHGU-DE/RevilLib. SBC (collision) and EMC (AI) layouts went into their placeholders | specs/quest.md, extdata.md, mod.md, placeholders/ |
+
 ## What it changes for the plan
 
 - **A mod quest can be written end to end without the RomFS.** The pipeline: export or convert to the JSON model, build the `.mib`, put it in a slot, encrypt. Every step reproduces the game's own form where the game's form is known. What's missing is the game's verdict: Q17, Q19 and E4, which the test kit prepares.

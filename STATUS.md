@@ -12,6 +12,7 @@ This session ([report](docs/reports/2026-11-23-extra-data-records.md)):
 - **A mod quest can be built end to end without the RomFS**: `mhuc convert` (MHXX) or `mhuc mib export`, then `mhuc mib import` (the builder recomputes every offset; Q18 round-trips 120 quests), then `mhuc questslot put` (the stored form, Q16 solved), then `mhuc encrypt` (byte-exact, E5). The game's verdict is the open part: **Q17, Q19, E4**, prepared by `mhuc extdata testkit`.
 - DLC Palicos (`otomo1`) use the same scheme ([extdata.md](specs/extdata.md)). Routes into the game are written up in [extra-data.md](docs/design/extra-data.md) and [dlc-responder.md](docs/design/dlc-responder.md), as options.
 - `.mib` and `QTDS` fields checked against the wiki's quest pages (Q20, Q21): stars are one 1–10 scale in MH4U, map ids, objective types, fees, rewards, time. `mhuc idnames` infers monster ids to names (kept outside the repository).
+- **Other projects** ([related-projects.md](docs/sources/related-projects.md)): MHGU Definitive Edition (GPL-3.0-or-later) ports MH4U monsters to MHGU and reads MH4U's monster data, models, animations, collision and AI. It is the closest prior art, run in the other direction.
 - The cheapest first converted quest: a GU quest on a locale MH4U shares, with shared monsters ([overlap.md](data/catalog/overlap.md)). The id tables in data/idmap/ ship empty.
 - The stored Palicos are `_ger` files: this Extra Data may be from a European game or a German-language system (the base is MH4U USA v1.3.0).
 - Memory: cap big jobs with a cgroup at **6 GB** (one job, 4 workers). Fork recompiler tests need `PATH=/usr/lib/llvm-22/bin:$PATH`.
@@ -24,7 +25,7 @@ This session ([report](docs/reports/2026-11-23-extra-data-records.md)):
 ## Next tasks, in order
 
 1. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`, on a console or in the port after the fork's extdata check (`docs/research/extdata.md`). Done when the specs record the results and extra-data.md says which routes work.
-2. **`.emd`/`.etd` specs** (`rEnemyData`, `rEnemyTuneData`). Needs the RomFS. Done when specs/ has both and id-tables.md's parts row points at them.
+2. **`.emd`/`.etd` check E1**: the spec now exists, from MHGU Definitive Edition's readers ([emd.md](specs/emd.md), all unverified). Run E1 on the 110 pairs with the RomFS. Done when its fields are verified or corrected.
 3. **Quest checks Q6 and Q13** (the game's own 508 `.mib` and MH3U's 365 `.quest`). Needs both RomFS; do them alongside task 2.
 4. **A first converted GU quest**: decrypt the MHXX DLC (maintainer's machine), pick a quest on a shared locale, fill data/idmap/ row by row, run `mhuc convert`, then Q17's procedure. Done when it is listed in game.
 5. **A first table-growing plugin**, then the **MHXX full gametest** and **MH3U targeted studies** (reference-recompiles.md, underwater.md).
