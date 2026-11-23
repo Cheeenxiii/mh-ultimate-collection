@@ -91,7 +91,37 @@ No new analysis pattern was needed: every MH3U jump table matches the patterns t
 | inconclusive | 2 | instruction budget |
 | differ | **0** | |
 
-That is 1,994 of 2,000 (99.7%) agreeing, and no function returns a different state, the same picture as MH4U's runs (the fork's docs/RECOMPILER.md). Next for MH3U: add the two missing targets to `config/games/mh3u/extra_entries.txt` (0x00260914 sits inside the function that jumps to it, so check it's a real entry first), then a full run of every function.
+That is 1,994 of 2,000 (99.7%) agreeing, and no function returns a different state, the same picture as MH4U's runs (the fork's docs/RECOMPILER.md). The two missing targets and the full run are below.
+
+## Step 3 results, MH3U full gametest (2026-11-23)
+
+Every MH3U function, gametested after two fixes in the engine fork (branch `uc/mh3u-full-gametest`). `config/games/mh3u/` still has no `extra_entries.txt`: the recompiler now finds every target the gametest reported by itself.
+
+**The two missing targets of the sample run:**
+- **0x0010853c** reads one byte from a stream (`ldr r1, [r0, #0x10]`, post-increment, `ldrb`), a scanf-style callback. 0x00108550 installs it with `ldr r1, =-0x34; add r1, pc, r1`: MHXX's PC-built callback pattern, in its ARM form. The sample run predates that pattern; rerun under it, the recompiler finds this callback and 4 others (0x001085a0, 0x00110464, 0x00110540, 0x00110580).
+- **0x00260914** is a real function: it zeroes five words, an array element's constructor. 0x002608a8 passes it from a literal to the runtime's array-construct helper (0x00107720). The note above was wrong: 0x002608a8 is not in the function table (Ghidra started that function at 0x002608b8, after the setup), so the recompiler finds it only through a data pointer. It collected literal constants from the table's functions only, so this literal was never a candidate.
+
+**Fix 1, in the recompiler: follow the literals of functions found through data pointers.** The data-pointer scan now runs again over the literals of the functions it found, until nothing new turns up (`data_pointer_closure` in `tools/recompile.py`, with a synthetic test). The first full gametest had found two more cases of the same shape, 0x005ae498 (an empty constructor) and 0x005aebb0 (a constructor that itself builds an array, so the chain nests), and a measurement with the closure gave exactly those three for MH3U, 4 for MHXX (0x001242b4, 0x001242ec, 0x00293fc4, 0x0040cc98, none of which its 2,000 sample had reached) and none for MH4U. MH4U's full recompile (with data pointers) gives byte-identical generated code: 40,577 functions.
+
+**Fix 2, in the runtime: an indirect call to address 1.** The first full gametest had 5 `fail-fault` functions (0x003212ec, 0x00324da8, 0x00324dec, 0x00324e24, 0x00a0e538), about 1 case in 1,000, Unicorn faulting at 0x0 and native code at an address that changed from run to run. Reproduced and traced on 0x00324da8: it calls 0x0013fe28, which runs into 0x0013fe68 and makes a virtual call through a vtable read from random memory; the slot held 1 (Thumb address 0). The other four pass or agree after the same fix. The per-call-site inline cache (`RC_ICALL` in `recomp.h`, upstream code) used target 1 as its "empty" mark with no function behind it, so native code called a null host pointer. The empty cache now holds a stub that sends target 1 to `rc_call` like any miss; a synthetic test fails without it. In the port, the same garbage call would have crashed the host instead of reaching the host's fallback.
+
+**Recompile** (`recompile.py --game mh3u`, 6 GB cgroup): 33,283 functions (8,094 through data pointers), 0 unresolved jump tables, 0 problems, 3 trap instructions, 31 s analysis + 16 s emit.
+
+**Gametest of every function** (harness library at `-O0 -D RC_CHECK_RETURNS`, `--cases 3 --seed 1`, 4 shards in one cgroup, 144 s):
+
+| Verdict | Functions | First full run (before the fixes, 33,281 functions) |
+|---|---|---|
+| pass | 14,044 | 14,058 |
+| agree-fault-only | 19,228 | 19,203 |
+| inconclusive | 9 (instruction budget) | 9 |
+| protocol | 2 (RVCT helpers that read a descriptor after their call site, tested through their callers) | 2 |
+| native-nofunc | **0** | 4 (targets 0x005ae498, 0x005aebb0) |
+| fail-fault | **0** | 5 (the address-1 call) |
+| differ | **0** | 0 |
+
+That is 33,272 of 33,283 functions (99.97%) agreeing on all 99,849 cases, the 11 others being the budget and protocol cases. No function returns a different state.
+
+**MHXX under the same fixes:** 63,087 functions (+4, the ones listed above); the 4 give 3 pass and 1 agree-fault-only (20 cases each); a new `--sample 2000 --cases 3 --seed 1` gives 860 pass, 1,087 agree-fault-only, 53 inconclusive, 0 differ, 0 missing targets.
 
 ## Step 3 results, MHXX v1.4 (2026-11-23)
 
@@ -136,7 +166,7 @@ Memory on this 14 GB machine: the full MH4U recompile (and MH3U's, close to it) 
 
 1. **Class registries (no recompile). Done, results above.** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.
 2. **Function tables.** Ghidra export of each game (the fork's `tools/ghidra/` scripts), then `build_function_table.py` and `find_missing_functions.py`.
-3. **Recompile and gametest. Done for MH3U and MHXX, results above.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
+3. **Recompile and gametest. Done for MH3U (every function) and MHXX (2,000 sample), results above.** `recompile.py --game mhxx`, then `python3 -m recomp.gametest --lib ... --sample 2000`. Record pass rates and unresolved jump tables; add analysis patterns where needed (with tests, as for MH4U's video decoder).
 4. **Targeted studies.** Run single functions (MH3U's swim state machine, oxygen, underwater camera) in the harness from captured states, with hooks for tracing; feed what's learned into [underwater.md](underwater.md).
 
 ## Optional refactor done now?
