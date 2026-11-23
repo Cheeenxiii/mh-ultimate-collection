@@ -53,7 +53,7 @@ port: ARM_Recomp::LoadCode
 
 | Member | Purpose |
 |---|---|
-| `abi`, `size` | `MH4U_PLUGIN_ABI` (1) and the table's size: members are only ever appended |
+| `abi`, `size` | `MH4U_PLUGIN_ABI` (2 since `alloc`/`free`; 1 before) and the table's size: members are only ever appended |
 | `mod_name`, `mod_dir`, `program_id` | who and where, and which game (USA or Europe) |
 | `hook(self, name, fn, user)` | wrap a hook point by name (init only); 0 if the library lacks it |
 | `call_original(call)`, `skip_original(call)` | run the rest of the chain; or return to the game's caller |
@@ -63,6 +63,23 @@ port: ARM_Recomp::LoadCode
 | `log(self, level, text)` | the port's log, prefixed with the mod's name |
 | `config(self, key)` | the mod's setting, or NULL |
 | `on_frame(self, fn, user)` | once per engine frame, at `sMhMain::frame` |
+| `alloc(call, size, align)`, `free(call, addr)` | ABI 2: guest memory from the game's default heap, through the game's own allocator (below); from a hook or frame call, not init; 0 when the heap is full or unknown |
+
+### Guest memory (ABI 2)
+
+`alloc` and `free` call the game's own allocator, so blocks come from the heap the game manages and never collide with its own. MT Framework keeps a table of allocators, one per allocator category (a class's DTI says which; its `operator new` calls that one); entry 0 is the default heap that global allocations use. The host reads entry 0, then calls that allocator's virtual alloc (+0x20, `(this, size, align)`) or free (+0x38, `(this, p)`) as recompiled code, with the guest's registers, flags and VFP state saved around the call. The port gives the host the table's address for MH4U (USA or Europe); for any other game `alloc` returns 0 and the log says once that the heap is unknown.
+
+Found in USA v1.3.0 by static reading, checked in the running game (step 6); names and addresses in the fork's `config/symbols.txt`, section "Heap":
+
+| What | Address (USA v1.3.0) | Notes |
+|---|---|---|
+| `g_mtAllocators` | `0x010bdc88` | `MtAllocator*[64]` by allocator category; the same address in EUR v1.1.0 (its data segments match USA's) |
+| `g_mtDefaultHeap` | `0x010bd718` | entry 0 at run time: an `MtCtrHeapAllocator` named "Heap" in `.bss` |
+| `MtDTI::allocator` | `0x001076cc` | a class's allocator: category = bits 21..26 of the DTI's `+0x18` word |
+| `MtCtrHeapAllocator::alloc` | `0x00341784` | vtable +0x20; takes the heap's lock when it is thread-safe, then the SDK heap at `this+0x4c` (`0x00484dcc`) |
+| `MtCtrHeapAllocator::free` | `0x00341658` | vtable +0x38; null is ignored; SDK heap free `0x00484dac` |
+
+Procedure: in a class's `operator new` (one per `uEm` class, called from `createEnemy`), the allocator comes from `0x001076cc` and the call goes through its vtable at +0x24; `0x001076cc` indexes the table at `0x010bdc88`. The 167 code literals of that address include small global helpers that call entry 0's +0x20 with `(size, 0x10)` and +0x38 with a pointer. `MtAllocator`'s own vtable has pure-virtual stubs at +0x20, +0x24, +0x28, +0x38 and +0x3c; `MtHeapAllocator`'s deleting destructor frees itself through +0x38. A run with `--dump` of the table, then of entry 0's object, gives its vtable, whose type function returns the `MtCtrHeapAllocator` DTI.
 
 The API never exposes `RCtx` or `RCodeInfo`: `MH4UCall` is opaque, so the recompiler's structures can change without breaking plugins.
 
@@ -80,16 +97,16 @@ A native plugin is arbitrary code with the player's permissions. Still to do in 
 
 | File | Change |
 |---|---|
-| `include/mh4u_plugin.h` | new: the C ABI |
-| `port/src/plugin_host.h` | new: chains, dispatchers, host table, plugin list parser (no Azahar) |
-| `port/src/plugins.h`, `port/src/plugins.cpp` | new: Azahar glue (DynamicLibrary, log, list path) |
+| `include/mh4u_plugin.h` | new: the C ABI (ABI 2 appends `alloc`, `free`) |
+| `port/src/plugin_host.h` | new: chains, dispatchers, host table, plugin list parser, guest calls for `alloc`/`free` (no Azahar) |
+| `port/src/plugins.h`, `port/src/plugins.cpp` | new: Azahar glue (DynamicLibrary, log, list path, the allocator table for MH4U) |
 | `port/src/arm_recomp.cpp` | `LoadCode`: `Hooks::Install(Plugins::Begin(info))`, then `Plugins::Load(path)` |
 | `port/CMakeLists.txt` | the three new sources in `mh4u_backend` |
 | `tools/mod_hooks.py` | new: resolve, merge, conflicts, plugin list |
 | `tools/mods.py` | `read_manifest` keeps `hooks`, `plugin`, `config`; plugin-only mods are valid (`layout` "plugin") |
 | `tools/build_game.py` | merges the enabled mods' hooks before recompiling; writes the plugin list next to the library (and the installed copy) |
-| `tools/plugin_sample/sample_plugin.c` | new: a complete sample plugin, configurable for tests |
-| `tests/test_plugin_host.py` | new: chains, order, skip, Thumb, frames + guest memory, missing hook, failed init, bad library, reset, list round trip, on the `rh_set_hook` harness |
+| `tools/plugin_sample/sample_plugin.c` | new: a complete sample plugin, configurable for tests (`frames_at = alloc`, `alloc_in_hook`) |
+| `tests/test_plugin_host.py` | new: chains, order, skip, Thumb, frames + guest memory, missing hook, failed init, bad library, reset, list round trip, and `alloc`/`free` on an `MtAllocator`-shaped heap in the test program, on the `rh_set_hook` harness |
 | `tests/test_mod_hooks.py` | new: merge, conflicts, names, manifest fields, library, build integration |
 | `docs/MODS.md` | new section "Native plugins" |
 
@@ -100,7 +117,7 @@ Not changed: `config/hooks.txt`, `hooks.cpp`, the recompiler, the code-library A
 - Hooks need a rebuild of the code library; there is no run-time hooking of arbitrary functions. That matches how the port works and keeps unhooked functions at full speed.
 - 256 functions can carry plugin chains at once (`PluginHost::SLOTS`); raise it if needed.
 - Frame calls run inside the engine's frame function, before the game's own frame. Calls at other points (area load, quest start) are just hooks on those functions.
-- Plugins can't add new guest code or allocate guest memory yet. The underwater work will need guest allocations: next ABI step, `alloc`/`free` through the game's own heap functions, once found (see [id-tables.md](id-tables.md)).
+- Plugins can allocate guest memory (ABI 2, default heap only) but can't add new guest code. A plugin that wants another category's heap (the unit or resource heaps) would need an `alloc` with a category: not added until something needs it.
 - `mods.py status` doesn't yet flag a plugin list older than the enabled mods; the build record should carry the hook list's fingerprint.
 
 ## In-game check (first session with game files)
@@ -112,7 +129,7 @@ Written for a Windows or Linux PC with the USA v1.3.0 dump and the port installe
 3. `python3 tools/mod_hooks.py`: expect "Sample plugin: hooks sMhPad::update, which config/hooks.txt hooks too".
 4. `python3 tools/build_game.py --dump <dump> --install`: expect "mods' hooks:" and "native plugins: 1".
 5. Start the game. The log shows `plugins: Sample plugin: plugin loaded` and `sample plugin ready`. The game plays normally (value 0 changes nothing), and the port's own pad features (skip button, mouse camera) still work, which proves the chain runs the port's hook.
-6. Set `frames_at` to a free guest address the project knows to be unused, rebuild, and watch it count frames with the runner's memory read. Record pass or fail, not the memory's contents.
+6. Set `frames_at` to `alloc` (the plugin takes a 4-byte block from the game's heap in its first frame call, after taking and freeing a 64-byte one, and logs the block's address), rebuild, and watch it count frames with the runner's memory read (`--dump`) at that address. Record pass or fail, not the memory's contents.
 7. Remove the mod, build again: the `.plugins.tsv` is gone and the log has no plugin lines.
 
 ### Result (2026-11-23, Linux, headless runner)
@@ -126,7 +143,7 @@ Azahar at the pinned commit with the patch, `mh4u_runner` built with clang (no Q
 | 3. `mod_hooks.py` | pass: "Sample plugin: hooks sMhPad::update, which config/hooks.txt hooks too (they run in a chain)"; 32 hook points, 1 native plugin |
 | 4. `build_game.py --install` | pass: "mods' hooks:" with the line above, and "native plugins: 1, listed in 0004000000126300.plugins.tsv next to the library" |
 | 5. Start the game | pass: `plugins: Sample plugin: sample plugin ready`, then `plugin loaded (...)`; the game boots on the recompiled code with no `interpreting` lines and reaches the save-data screen 30 s in, with the chain on `sMhPad::update` every frame. Not covered: the port's own pad features (skip button, mouse camera) live in the app and the Qt frontend, which the headless runner doesn't have |
-| 6. Frame counter at a free address | not run: the project has no guest address known to be unused yet |
+| 6. Frame counter at a free address | pass (2026-11-23, run again with ABI 2): `frames_at = alloc`; the log has `sample plugin: frame counter at 0x…` (a block in the game's heap, no warnings) in the first frame call; `--dump` of it 10 s and 30 s in shows it counting about once per engine frame; the game reaches the same save-data screen 30 s in. Run with the code library from step 4 (unchanged hook points) and the plugin list written by `mod_hooks.plugin_list_text`, in a copy of the user folder |
 | 7. Remove the mod, build again | pass: the build relinks (no recompile: the hook points are unchanged), the `.plugins.tsv` is gone, the log has no plugin lines |
 
-Still to do: step 5's pad features in the app (`port/app`, SDL2) or the Qt build, and step 6 once a free guest address is known (or once the ABI's `alloc` exists).
+Still to do: step 5's pad features in the app (`port/app`, SDL2) or the Qt build.

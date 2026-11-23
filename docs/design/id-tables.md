@@ -87,4 +87,4 @@ Two ways, to choose per table once found (the choice isn't made here):
 - **Relocate:** a plugin allocates a larger table at boot, copies the original rows, appends the new ones, and patches the code's references (hook points on the readers, or tunables for the bounds). Works for tables in `.data`.
 - **Overlay:** hooks on the table's readers return the new rows for new ids and fall through to the original for old ids. Less patching, more hooks.
 
-Both need guest memory allocation from plugins, which the plugin API doesn't offer yet (plugin-api.md, "Limits").
+Both need guest memory allocation from plugins: the plugin API's `alloc`/`free` (ABI 2) take it from the game's default heap ([plugin-api.md](plugin-api.md), "Guest memory").
