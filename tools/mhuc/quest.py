@@ -5,6 +5,7 @@ mh3u-quest-studio). Every reader takes the decrypted bytes (see dlccrypt) and re
 """
 from __future__ import annotations
 
+import hashlib
 import struct
 
 SLOT = 0x2010
@@ -40,14 +41,50 @@ def _utf16(d: bytes, o: int) -> str:
 
 
 def mh4u_slots(data: bytes) -> list[tuple[int, str, bytes]]:
-    """A decrypted MH4U `quest*` file: 40 slots of 0x2010 bytes; a used one holds a `.mib` from offset 0,
-    28 unknown bytes after it, and its file name at 0x2000. Returns (slot, name, the slot's 0x2000 bytes)."""
+    """A decrypted MH4U `quest*` file: 40 slots of 0x2010 bytes; a used one holds the server's file decrypted
+    up to its stated size (see mh4u_slot_mib), and its file name at 0x2000. Returns (slot, name, the slot's
+    0x2000 bytes)."""
     out = []
     for k in range(len(data) // SLOT):
         s = data[k * SLOT:(k + 1) * SLOT]
         if _u32(s, 0) == 0xA0 and s[4:8] == b"v005":
             out.append((k, s[SLOT_DATA:].split(b"\0")[0].decode("ascii"), s[:SLOT_DATA]))
     return out
+
+
+def mh4u_slot_mib(body: bytes) -> bytes:
+    """The `.mib` in a used slot's 0x2000 bytes, checked: the `.mib`, its SHA-1 with bytes 0 and 1 zeroed,
+    padding to 8 (the server file's ciphertext), the `.mib` size + 20 as a u32 BE, then zeros (check Q16)."""
+    for end in range(len(body.rstrip(b"\0")), 0, -1):
+        if end % 8 == 4:
+            break
+    else:
+        raise QuestError("no size trailer")
+    size = struct.unpack(">I", body[end - 4:end])[0]
+    if size < 20 or (size + 7) // 8 * 8 != end - 4:
+        raise QuestError("size trailer doesn't fit the slot")
+    mib, digest = body[:size - 20], body[size - 20:size]
+    if digest[:2] != b"\0\0" or digest[2:] != hashlib.sha1(mib).digest()[2:]:
+        raise QuestError("hash doesn't match the .mib")
+    return mib
+
+
+def mh4u_pack_slot(mib: bytes, name: str, pad: bytes = b"\0" * 8) -> bytes:
+    """A 0x2010-byte slot for `mib`, in the form the game stores a downloaded quest (check Q16). The padding
+    bytes are the server file's ciphertext in the game's own slots; `pad` stands in for them."""
+    size = len(mib) + 20
+    padded = (size + 7) // 8 * 8
+    body = mib + b"\0\0" + hashlib.sha1(mib).digest()[2:] + pad[:padded - size] + struct.pack(">I", size)
+    if len(body) > SLOT_DATA or len(name) > SLOT - SLOT_DATA - 1:
+        raise QuestError("the quest or its name doesn't fit a slot")
+    return body.ljust(SLOT_DATA, b"\0") + name.encode("ascii").ljust(SLOT - SLOT_DATA, b"\0")
+
+
+def mh4u_put_slot(data: bytes, k: int, slot: bytes) -> bytes:
+    """A decrypted `quest*` file with slot k replaced."""
+    if len(slot) != SLOT or not 0 <= k < len(data) // SLOT:
+        raise QuestError("bad slot or index")
+    return data[:k * SLOT] + slot + data[(k + 1) * SLOT:]
 
 
 def mh3u_slots(data: bytes) -> list[tuple[int, str, bytes]]:

@@ -168,6 +168,31 @@ def cmd_quest(args) -> int:
     return 1 if bad else 0
 
 
+def cmd_questslot(args) -> int:
+    if args.action == "check":
+        used = good = 0
+        for p in args.paths:
+            for k, name, body in quest.mh4u_slots(_read(p)):
+                used += 1
+                try:
+                    quest.mh4u_slot_mib(body)
+                    good += 1
+                except quest.QuestError as e:
+                    print(f"{os.path.basename(p)} slot {k} ({name}): {e}", file=sys.stderr)
+        print(f"{used} used slots, {good} with a matching hash and size")
+        return 0 if used == good else 1
+    if len(args.paths) != 1 or args.slot is None or not args.mib or not args.out:
+        print("mhuc questslot put: one quest file, with --slot, --mib and --out", file=sys.stderr)
+        return 2
+    mib = _read(args.mib)
+    name = args.name or os.path.basename(args.mib)
+    new = quest.mh4u_put_slot(_read(args.paths[0]), args.slot, quest.mh4u_pack_slot(mib, name))
+    with open(args.out, "wb") as f:
+        f.write(new)
+    print(f"{name} ({len(mib)} bytes) in slot {args.slot}, {len(new)} bytes to {args.out}")
+    return 0
+
+
 def cmd_extdata(args) -> int:
     from . import extdata
     with open(args.file, "rb") as f:
@@ -269,6 +294,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("kind", choices=["mh4u", "mhxx", "mh3u"])
     p.add_argument("paths", nargs="+")
     p.set_defaults(func=cmd_quest)
+
+    p = sub.add_parser("questslot", help="MH4U Extra Data quest slots (decrypted): check hashes, put a .mib")
+    p.add_argument("action", choices=["check", "put"])
+    p.add_argument("paths", nargs="+")
+    p.add_argument("--slot", type=int)
+    p.add_argument("--mib")
+    p.add_argument("--name", help="the slot's file name (default: the .mib's)")
+    p.add_argument("--out")
+    p.set_defaults(func=cmd_questslot)
 
     p = sub.add_parser("extdata", help="MH4U Extra Data besides quests (decrypted): card* and otomo1")
     p.add_argument("action", choices=["dump", "check", "rename"],

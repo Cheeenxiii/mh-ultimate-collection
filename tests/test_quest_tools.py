@@ -136,6 +136,32 @@ def test_mh4u_slots_and_cli(tmp_path, capsys):
     assert "2 quests read, 0 files failed" in capsys.readouterr().out
 
 
+def test_mh4u_pack_slot_round_trips(tmp_path, capsys):
+    mib = build_mib4(60005)
+    slot = quest.mh4u_pack_slot(mib, "m60005.mib", pad=b"\xAA" * 8)
+    assert len(slot) == quest.SLOT and slot[quest.SLOT_DATA:].rstrip(b"\0") == b"m60005.mib"
+    size = len(mib) + 20
+    assert slot[size - 20:size - 18] == b"\0\0"
+    assert struct.unpack(">I", slot[(size + 7) // 8 * 8:(size + 7) // 8 * 8 + 4])[0] == size
+    assert quest.mh4u_slot_mib(slot[:quest.SLOT_DATA]) == mib
+    bad = bytearray(slot)
+    bad[0x40] ^= 1
+    with pytest.raises(quest.QuestError):
+        quest.mh4u_slot_mib(bytes(bad[:quest.SLOT_DATA]))
+    data = quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 2, slot)
+    assert [(k, n) for k, n, _ in quest.mh4u_slots(data)] == [(2, "m60005.mib")]
+    qf, mf, out = tmp_path / "q", tmp_path / "m60007.mib", tmp_path / "q2"
+    qf.write_bytes(data)
+    mf.write_bytes(build_mib4(60007))
+    assert cli.main(["questslot", "put", str(qf), "--slot", "5", "--mib", str(mf), "--out", str(out)]) == 0
+    capsys.readouterr()
+    assert cli.main(["questslot", "check", str(out)]) == 0
+    assert "2 used slots, 2 with a matching hash and size" in capsys.readouterr().out
+    broken = tmp_path / "broken"
+    broken.write_bytes(quest.mh4u_put_slot(data, 0, bytes(bad)))
+    assert cli.main(["questslot", "check", str(broken)]) == 1
+
+
 # ── MHXX ──────────────────────────────────────────────────────────────────────
 
 

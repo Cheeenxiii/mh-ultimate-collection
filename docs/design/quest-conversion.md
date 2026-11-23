@@ -68,8 +68,8 @@ Objective types share one bit-coded family between MH4U and MH3U: 0x1 hunt, 0x81
 Options, for the open decisions to settle:
 
 1. **The game's own quest archives.** Add converted `.mib` files to `quest00.arc`/`quest01.arc` (or a new archive) and grow the quest lists (`rQuestInfoTbl`) and any quest-id bounds (id-tables.md, "Quest ids"). This fits the mod's progression (village or hub lists), but needs the table growth the plugin layer is meant for.
-2. **Downloaded quests.** Write the quest into an Extra Data slot as the game stores a download: the `.mib`, the 28 unexplained bytes, the name `mNNNNN.mib` (quest.md, "Where quests live"). No tables grow, but the 28 bytes must be understood or shown to be unchecked, and the event-quest list may limit how many quests show.
-3. **A local DLC responder.** Serve converted quests to the game's own DLC screen, as Cha-Cha does for MH3U on Wii U ([cha-cha](../sources/cha-cha.md)). MH4U's server format is now known (standard Blowfish, quest.md Q9), so the game stores them itself and computes the 28 bytes. It needs the port to answer the game's HTTP requests, through the plugin layer or the runtime.
+2. **Downloaded quests.** Write the quest into an Extra Data slot as the game stores a download: the `.mib`, its SHA-1 with two bytes zeroed, padding and the size (the 28 bytes, understood since quest.md check Q16), the name `mNNNNN.mib`. `mhuc questslot put` writes a slot in that form, and `mhuc encrypt` re-encrypts the file byte-exactly. No tables grow; what's left is the in-game check Q17, and the event-quest list may limit how many quests show (40 slots per file, 5 files: 200 at most).
+3. **A local DLC responder.** Serve converted quests to the game's own DLC screen, as Cha-Cha does for MH3U on Wii U ([cha-cha](../sources/cha-cha.md)). MH4U's server format is now known (standard Blowfish, quest.md Q9), so the game stores them itself. It needs the port to answer the game's HTTP requests, through the plugin layer or the runtime.
 
 Routes 2 and 3 suit event-style quests; route 1 suits quests woven into progression. They can coexist.
 
