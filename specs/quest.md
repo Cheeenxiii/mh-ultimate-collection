@@ -102,6 +102,42 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 | text | u32 ×7 | offsets to NUL-terminated UTF-16LE strings: title, success, failure, summary, main monsters, client, sub-quest | verified | mhff wiki; check Q7 (all 7 strings of all 5 languages decode in all 120) |
 | equipment preset | 0x104 bytes | eight 28-byte equipment entries, then an item | unverified | mhff wiki |
 
+## rQuestData (MHXX .mib) and the DLC quest archive
+
+Field names and offsets come from the mhff wiki's "MHXX rQuestData Format" page (GPL-3.0). "Verified" means checked on the 173 DLC quests of MHXX JPN, decrypted from the goshawk mirror (check Q11); the RomFS's 1,334 quest archives (check Q2) are not checked field by field yet.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| file | arc | the server's DLC quests are `arc/quest/qNNNNNNN.arc` (173 for JPN), each an ARC version 0x11 of 12 to 16 entries: 1 to 5 `rSetEmMain` (`.sem`, 32 bytes each), 1 or 2 `rEmSetList` (`.esl`), 4 or 5 `rRem` (`.rem`, 184 bytes each), three entries of classes outside mhuc's table (`supp_N`, `questPlus_N`, `questLink_N`, ids 0x54539AEE, 0x26BEC21C, 0x00E0BB1C), the `_jpn` GMD, and last the `.mib` | verified | ours; check Q11 |
+| file | sem count | the number of `rSetEmMain` entries is the number of boss monsters plus one in 168 of 173 | unverified | ours; check Q11 |
+| whole | bytes | server files: Blowfish in CTR mode (32-bit nonce, little-endian counter) on byte-swapped words over the plaintext plus its SHA-1, then the byte-swapped nonce, then one 0x100-byte RSA signature (mhef's `DLCXCipher` has two, as for MHX); the key is the one the login reply carries | verified | svanheulen/mhef; GrenderG/goshawk; check Q11 |
+| .mib size | 249 bytes | every `.mib` is 249 bytes, the end of mhff's table (0xF5 + 4) | verified | mhff wiki; check Q11 |
+| 0x00 | char[4] | magic (the same 4 bytes in all 173) | verified | mhff wiki; check Q11 |
+| 0x04, 0x08 | u32 ×2 | count (1), index (0) | verified | mhff wiki; check Q11 |
+| 0x0C | u32 | quest id: the archive's number in all 173; decimal digits A (1 = DLC, all 173), B (1 = Palico quest, 34), C (type: 1 or 2 here), then 4 digits. mhff's reading of those as star and number doesn't match the star byte | verified | mhff wiki; check Q11 (id and digit A) |
+| 0x10 | u8 | type: 0 hunt, 1 slay, 2 capture, 3 deliver, 4 hunt-a-thon, 5 marathon (0..5 seen) | unverified | mhff wiki; check Q11 |
+| 0x11 | u8 | village (9 or 10 here) | unverified | mhff wiki |
+| 0x12 | u8 | star (2..14 here) | unverified | mhff wiki |
+| 0x13 | u8 | rank (1, 3 or 5 here; mhff lists 0, 1, 3, from MHX) | unverified | mhff wiki; check Q11 |
+| 0x14 | u8 | map, +100 at night (10 of 173 at night) | unverified | mhff wiki |
+| 0x15..0x17 | u8 ×3 | start area, time (50 in 172), faints allowed (3 or 9) | unverified | mhff wiki |
+| 0x1A..0x1E | u8 ×5 | requirements 1 and 2, entry type, clear type (0, 1, 2), repel HP percent | unverified | mhff wiki |
+| 0x1F | u8, u16, u16 | main objective 1: type, target id, count (unaligned) | unverified | mhff wiki |
+| 0x24 | u8, u16, u16 | main objective 2 (type 0 in 160) | unverified | mhff wiki |
+| 0x29 | u8, u16, u16 | sub objective (type 0 in 111) | unverified | mhff wiki |
+| 0x2E..0x30 | u8 ×3 | carve and drop, mining, fishing levels | unverified | mhff wiki |
+| 0x31..0x51 | u32 ×9 | fee, village points, main and sub rewards, academy points (×3), HR points (×2); all unaligned | unverified | mhff wiki; check Q11 (fee and reward in range) |
+| 0x55..0x63 | mixed | reward lot settings; supply deliveries 1 and 2: label, type (0 none, 1 timed, 2 hunt, 3 deliver, 4 sub-quest), target id, count | unverified | mhff wiki |
+| 0x64 | 13 bytes ×5 | boss monsters 1..5: u16 monster type first (below 0x200 in 825 of 865 blocks: the 13-byte block or its fields don't fit all), sub type, aura, restore count, vital/attack/other tables, difficulty, scale, scale and stamina tables | unverified | mhff wiki; check Q11 |
+| 0xA5..0xA7 | u8 ×3 | small monster HP, attack, other | unverified | mhff wiki |
+| 0xA8..0xCB | mixed | enemy-set 2 and 3 conditions; boss 1..5 appearance conditions (type, target, count) | unverified | mhff wiki |
+| 0xCC..0xD5 | u8 ×10 | intruder chances and extra-time settings | unverified | mhff wiki |
+| 0xD6..0xDA | u8 ×5 | quest icons | unverified | mhff wiki |
+| 0xDB | u32 | "prog number" | unverified | mhff wiki |
+| 0xDF | u32 | message reference: the class id of `rGUIMessage` in all 173 | verified | mhff wiki; check Q11 |
+| 0xE3 | char[] | then the quest id and `_jpn` (11 characters, NUL-terminated): the stem of the archive's own GMD | verified | mhff wiki; check Q11 |
+| 0xF1, 0xF5 | u32 ×2 | `mVillagePointG?`, `mFlag?` | unverified | mhff wiki |
+
 ## MH3U quests (.quest)
 
 The RomFS's own quests are loose `QTDS` files (check Q1); their layout is unknown. MH3U's DLC quests come from the GrenderG/goshawk preservation mirror (check Q10) and are still encrypted: the container is understood, the cipher key isn't.
@@ -143,4 +179,5 @@ Q3 to Q5 were run on 2026-11-23 in a web session on the maintainer's own MH4U (U
 - **Q8 (done):** compare each used slot's last 16 bytes with the quest id at 0xC0. Pass: in all 120 they are exactly `m%05d.mib` of that id, NUL-padded. (Q5 had ruled out the common hashes; the low entropy, 10 printable ASCII characters and digits matching the quest id gave it away.)
 - **Q9 (done):** take the server's quest files from the GrenderG/goshawk preservation mirror (Capcom's server is gone: `goshawk.capcom.co.jp` gives NXDOMAIN as of 2026-11-23): 120 `m*.mib` in `files/3ds/mh4g_us_/` and 120 in `mh4g_eu_/`, outside the repositories. Decrypt with mhef's `DLCCipher` (MH4G NA). Pass: all 240 check against their SHA-1, every encrypted size is the plaintext plus 20, padded to 8, plus 4; every plaintext starts with 0xA0 and `v005`, none is an ARC, all are under 0x2000 bytes; EUR and USA are identical; the 120 names are exactly the 120 quests of the maintainer's Extra Data, and each slot starts with its server file byte for byte, followed by 28 bytes, then zeros.
 - **Q10 (done):** take MH3U's DLC quests from the goshawk mirror (`files/3ds/mh3gu_us`, `mh3gu_eu`, `mh3g`, `files/wiiu/mh3ghd_us`), outside the repositories. Pass: the USA, EUR and Wii U folders hold the same 38 files byte for byte; every file is 8n+4 bytes; in every file the last 4 bytes, big-endian, are 0 to 7 less than the length before them; the aligned 8-byte blocks repeat (a third of them one block) and the first is common to all 85. Fail, so far: Blowfish with goshawk's MH3G key (and mhef's MH4U keys, with simple variants and byte orders) gives no plaintext; the repeated block doesn't decrypt to a constant under any of them.
+- **Q11 (done):** take MHXX JPN's DLC from the goshawk mirror (`files/3ds/mhxx_jp`), outside the repositories, and decrypt with mhef's `DLCXCipher` logic and goshawk's MHXX JPN key. The layout that works ends with one 0x100 signature, not two. Pass: all 188 files check against their SHA-1 (173 quest ARCs, the two quest lists, the GMDs, the Palico and update files); every quest is an ARC 0x11 whose last entry is a 249-byte `.mib`, as in the RomFS (Q2); over the 173 `.mib`, the header rows marked verified hold, and the spreads quoted come from the same files.
 - **Q6 (open):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.
