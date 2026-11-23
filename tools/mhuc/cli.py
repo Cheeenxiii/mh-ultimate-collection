@@ -159,6 +159,23 @@ def cmd_quest(args) -> int:
     return 1 if bad else 0
 
 
+def cmd_extdata(args) -> int:
+    from . import extdata
+    with open(args.file, "rb") as f:
+        data = f.read()
+    if args.kind == "card":
+        out = extdata.card_summary(data)
+        if args.action == "dump":
+            out = {"used": out, "guild_quests": [extdata.parse_guild_quest(r)
+                                                 for r in extdata.card_records(data, "guild_quests") if any(r)]}
+    else:
+        slots = extdata.otomo_slots(data)
+        out = slots if args.action == "dump" else {"palicos": len(slots)}
+    json.dump(out, sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
           "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
@@ -225,6 +242,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("kind", choices=["mh4u", "mhxx", "mh3u"])
     p.add_argument("paths", nargs="+")
     p.set_defaults(func=cmd_quest)
+
+    p = sub.add_parser("extdata", help="MH4U Extra Data besides quests (decrypted): card* and otomo1")
+    p.add_argument("action", choices=["dump", "check"], help="check prints counts only")
+    p.add_argument("kind", choices=["card", "otomo"])
+    p.add_argument("file")
+    p.set_defaults(func=cmd_extdata)
 
     for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
                        ("convert", "convert a source game's assets for MH4U (needs game files)"),
