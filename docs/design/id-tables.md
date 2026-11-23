@@ -10,7 +10,7 @@
 | Monster class factory | monster id → class | MH4U has 55 classes `uEm001`…`uEm118` (config/mt_classes.tsv); new monsters need a class to run as | a switch or table mapping ids to `MtDTI*`; the uniform size 0x8d90 suggests one class can host different monsters' data |
 | Monster names and texts | monster id → text id | names in the hunter's notes, quest texts | found: `emName`/`emExp` `rLayoutMessage` resources, message N = id N (below) |
 | Monster size and crown tables | monster id | size scaling, crowns | found: `crownSizeTable`, an array in `.data` (below) |
-| Monster parts, breaks, rewards | monster id, part id | carves, breaks, quest rewards | drops found: id-indexed index tables into an item-list array in `.data` (below); parts probably in the per-monster `.emd`/`.etd` (unverified); quest rewards in quest data |
+| Monster parts, breaks, rewards | monster id, part id | carves, breaks, quest rewards | drops found: id-indexed index tables into an item-list array in `.data` (below); parts, hitzones and breaks in the per-monster `.emd`/`.etd` ([specs/emd.md](../../specs/emd.md), from MHGU Definitive Edition, unverified until its check E1); quest rewards in quest data |
 | Item and material ids | item id | new monsters bring new materials | item data resource (`rItemData`-like) plus GMD names and icons |
 | Equipment tables | weapon/armor id per class | new monsters' weapons and armour | per-class weapon data (`w00d`… in mhff's table), armour series data |
 | Stage (map) table | stage id | new 3U maps | `rStageInfoSet`, `rStageAreaInfo`, `rStageCameraData` per stage plus a master list of stage ids → folders |
@@ -132,7 +132,7 @@ Readers: `0x00684b40` `(_, id)` and `0x0092600c` use `dropRecordIndex`; `0x00911
 
 ### Parts
 
-No part table indexed by id was found in `.data`. The per-monster resources are the likely place: `data/em_data.arc` holds 110 `rEnemyData` (`.emd`) and 110 `rEnemyTuneData` (`.etd`) files, one pair per monster with files (the same 110 as `enemyDataPaths`). Both are section-offset files (`.emd` magic `emd\0`, `.etd` magic `etd\0`) with no spec yet. **Unverified:** that hitzones, part HP and breaks live there. A new monster brings its own pair, loaded through `enemyDataPathIndex`, so these files don't grow a table.
+No part table indexed by id was found in `.data`. The per-monster resources are the likely place: `data/em_data.arc` holds 110 `rEnemyData` (`.emd`) and 110 `rEnemyTuneData` (`.etd`) files, one pair per monster with files (the same 110 as `enemyDataPaths`). Both are section-offset files (`.emd` magic `emd\0`, `.etd` magic `etd\0`), laid out in [specs/emd.md](../../specs/emd.md) from MHGU Definitive Edition's readers. **Unverified on our files:** that hitzones, part HP and breaks live there (check E1 in that spec). A new monster brings its own pair, loaded through `enemyDataPathIndex`, so these files don't grow a table.
 
 ### Other tables indexed by id, purpose unknown
 

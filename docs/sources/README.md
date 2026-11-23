@@ -12,3 +12,5 @@ The fidelity rule: everything new is extracted from the game it comes from, its 
 Each player supplies their own dumps (LEGAL.md). The tools read them outside the repository and write the converted mod to the player's machine.
 
 Anything not supplied by one of these games is authored and listed in the [authored register](authored-register.md).
+
+Other projects that bear on this one, and what each could give, are listed in [related-projects.md](related-projects.md).
