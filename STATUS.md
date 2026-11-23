@@ -2,43 +2,38 @@
 
 The one place that says where the project stands. Overwritten at the end of every session (`/handoff`); history is in `docs/reports/`. Keep it under a screen.
 
-**Updated:** 2026-11-23, after a web session that decrypted the maintainer's MH4U Extra Data and checked the `.mib` quest layout on 120 DLC quests.
+**Updated:** 2026-11-23, after a long web session on the maintainer's Extra Data: the stored-quest trailer solved, DLC Palicos, a `.mib` writer, quest fields checked against the wiki, an MHXX quest converter, an in-game test kit.
 
 ## Where we are
 
-Phase: **engine work with the game files.** Both reference games recompile cleanly:
-- MH3U: 33,283 functions, every one gametested: 0 differ, 0 fail-fault, 0 missing targets.
-- MHXX v1.4: 63,087 functions; a 2,000-function sample with 0 differing and 0 missing targets.
+Phase: **engine work with the game files.** Both reference games recompile cleanly (MH3U: 33,283 functions, 0 differ; MHXX v1.4: a 2,000-function sample, 0 differ).
 
-The MH4U quest format (`.mib`) is now specified from mhff's wiki and partly verified on the 120 DLC quests in the maintainer's Extra Data. Report: [docs/reports/2026-11-23-dlc-quests-web-session.md](docs/reports/2026-11-23-dlc-quests-web-session.md).
-
-Findings that steer the next steps:
-- Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, each ending with its file name (`mNNNNN.mib`), under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables. Monsters come in waves; objective types are mapped by value, though their meanings aren't confirmed.
-- Capcom's MH4U DLC server is gone (NXDOMAIN). Its files live on in the GrenderG/goshawk preservation mirror (AGPL-3.0, files Capcom's): server quests are bare `.mib`, identical to what the game stores, plus 28 bytes the game adds (unknown; they decide whether mod quests can go in through Extra Data). MHXX's DLC (173 quests) decrypts and fits mhff's MHXX `.mib` layout. MH3U's `QTDS` layout (from mh3u-quest-studio) is verified on the 38 USA DLC quests stored in clear in the maintainer's 3DS Extra Data; its DLC cipher is MT Framework's Blowfish variant (MtCipher, as Cha-Cha documents it): all 38 USA and 47 Japanese MH3G server quests decrypt. Its S-box quirk isn't in MH4U's or MHXX's DLC crypto, which standard Blowfish decrypts.
-- Cha-Cha (MH3U Wii U recompile, GPL-3.0) is a strong lead for MH3U: DLC, formats, ~36,000 class-and-slot function names, and underwater state marks. Its addresses are Wii U PowerPC and must be re-found on 3DS. Assessment: [docs/sources/cha-cha.md](docs/sources/cha-cha.md).
-- Quests are now fully readable and checkable in three games: `mhuc decrypt` and `mhuc quest` reproduce every check, and [docs/design/quest-conversion.md](docs/design/quest-conversion.md) maps 3U and GU fields onto MH4U's `.mib`, with three routes into the game (quest archives, Extra Data slots, a local DLC responder) left as options.
-- No public layout exists for `.emd`/`.etd`; that spec has to come from the files and the code.
-- Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
-- Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
-- Memory: cap big jobs with a cgroup at **6 GB** (one job at a time, 4 workers). Fork recompiler tests need `PATH=/usr/lib/llvm-22/bin:$PATH`.
+This session ([report](docs/reports/2026-11-23-extra-data-records.md)):
+- **A mod quest can be built end to end without the RomFS**: `mhuc convert` (MHXX) or `mhuc mib export`, then `mhuc mib import` (the builder recomputes every offset; Q18 round-trips 120 quests), then `mhuc questslot put` (the stored form, Q16 solved), then `mhuc encrypt` (byte-exact, E5). The game's verdict is the open part: **Q17, Q19, E4**, prepared by `mhuc extdata testkit`.
+- DLC Palicos (`otomo1`) use the same scheme ([extdata.md](specs/extdata.md)). Routes into the game are written up in [extra-data.md](docs/design/extra-data.md) and [dlc-responder.md](docs/design/dlc-responder.md), as options.
+- `.mib` and `QTDS` fields checked against the wiki's quest pages (Q20, Q21): stars are one 1–10 scale in MH4U, map ids, objective types, fees, rewards, time. `mhuc idnames` infers monster ids to names (kept outside the repository).
+- **Other projects** ([related-projects.md](docs/sources/related-projects.md)): MHGU Definitive Edition (GPL-3.0-or-later) ports MH4U monsters to MHGU and reads MH4U's monster data, models, animations, collision and AI. It is the closest prior art, run in the other direction.
+- The cheapest first converted quest: a GU quest on a locale MH4U shares, with shared monsters ([overlap.md](data/catalog/overlap.md)). The id tables in data/idmap/ ship empty.
+- The stored Palicos are `_ger` files: this Extra Data may be from a European game or a German-language system (the base is MH4U USA v1.3.0).
+- Memory: cap big jobs with a cgroup at **6 GB** (one job, 4 workers). Fork recompiler tests need `PATH=/usr/lib/llvm-22/bin:$PATH`.
 
 ## Branches
 
-This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of `main`. It's pushed, with PR [Cheeenxiii/mh-ultimate-collection#3](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/3) open. The fork is unchanged. Nothing else is in flight.
+- This repo: `claude/confident-gates-g95y9s`, pushed, PR [Cheeenxiii/mh-ultimate-collection#5](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/5) open (its first seven commits carry the author `Claude`; a squash merge fixes it).
+- Fork: `claude/confident-gates-g95y9s` from `uc/main` (`tools/extdata_path.py`), pushed, PR [Cheeenxiii/MH4UltimateDC-fork#5](https://github.com/Cheeenxiii/MH4UltimateDC-fork/pull/5) open.
 
 ## Next tasks, in order
 
-1. **`.emd`/`.etd` specs** (`rEnemyData`, `rEnemyTuneData`): parts, hitzones, breaks; trace carves. Needs the RomFS. Done when specs/ has both with verified/unverified fields and id-tables.md's parts row points at them.
-2. **A first table-growing plugin**: grow one id-indexed table with `alloc` and repoint its readers. Done when a procedure in docs/checks/ passes in game.
-3. **Quest check Q6**: run the Q5 checks on the game's 508 `.mib` (specs/quest.md). Needs the RomFS; it's short, so do it alongside task 1.
-4. **MH3U quest check Q13**: run the `QTDS` parse on the RomFS's 365 `.quest` files (specs/quest.md). Needs the MH3U RomFS; short, so pair it with Q6.
-5. **MHXX full gametest** (every function, 4 shards, about 5 minutes). Done when reference-recompiles.md has its verdict counts and every non-agreeing function is explained.
-6. **MH3U targeted studies** (swim state, oxygen, underwater camera in the harness), starting from Cha-Cha's swim and camera marks (underwater.md, "Leads from Cha-Cha"). Done when underwater.md cites what the harness showed.
-7. **Cha-Cha names on the MH3U recompile** (fork): carry its class-and-slot names onto our 3DS vtables. Done when the fork's MH3U config has the names and a count of slots that matched.
+1. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`, on a console or in the port after the fork's extdata check (`docs/research/extdata.md`). Done when the specs record the results and extra-data.md says which routes work.
+2. **One `mhuc survey` per game** (MH4U, MH3U, MHXX RomFS): it now runs every open check at once (Q6, Q13, Q18, E1, L1, M3, A1, S1, G3). Done when each spec records its counts and promotes or corrects its fields ([emd.md](specs/emd.md) and [lmt.md](specs/lmt.md) come from MHGU Definitive Edition, all unverified).
+3. **The monster-port pipeline** ([monster-port.md](docs/design/monster-port.md)): step 1 (map MH3U/MHXX engine calls to MH4U's through a shared monster) can start with the reference recompiles.
+4. **A first converted GU quest**: decrypt the MHXX DLC (maintainer's machine), pick a quest on a shared locale, fill data/idmap/ row by row, run `mhuc convert`, then Q17's procedure. Done when it is listed in game.
+5. **A first table-growing plugin**, then the **MHXX full gametest** and **MH3U targeted studies** (reference-recompiles.md, underwater.md).
 
 ## Waiting on the maintainer
 
-- Reviewing and merging PR #3 (`claude/zealous-wozniak-eip1pk` into `main`).
-- A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
-- Whether to offer the inline-cache fix (fork `recomp.h`) to upstream MH4UltimateDC.
-- The open decisions (combat base, monster versions, runtime, progression): unchanged, not ours to settle.
+- Reviewing and merging the two PRs.
+- Running the test kit in game, and saying which region and language the Extra Data's game is.
+- If server files should be decrypted in web sessions: a `permissions.allow` rule in `.claude/settings.json` (the guard refused it this session, even with the go-ahead in chat).
+- A check of the port's pad features with the plugin, on a machine with a display; whether to offer the inline-cache fix to upstream.
+- The open decisions (combat base, monster versions, runtime, progression), now also which star scale and which quest ids converted quests get: not ours to settle.

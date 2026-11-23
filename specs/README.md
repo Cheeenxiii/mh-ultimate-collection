@@ -17,13 +17,15 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 
 | Source | Licence | Used for |
 |---|---|---|
-| [svanheulen/mhff](https://github.com/svanheulen/mhff) | GPL-3.0 | ARC, TEX, MOD header, quest ARCs; its wiki's "MH4U rQuestData Format" and "MH4U DLC Encryption" pages for the `.mib` layout |
+| [svanheulen/mhff](https://github.com/svanheulen/mhff) | GPL-3.0 | ARC, TEX, MOD header, quest ARCs; its wiki's "MH4U rQuestData Format" and "MH4U DLC Encryption" pages for the `.mib` layout; "MH4U card1 Format", "MH4U Guild Quest Structure", "MH4U Equipment Structure" and "MH4U DLC Palico Format" for specs/extdata.md |
 | [GrenderG/goshawk](https://github.com/GrenderG/goshawk) | AGPL-3.0 (the DLC files in it are Capcom's) | a preservation mirror of Capcom's DLC server; its MH4U quest files were read outside the repositories for check Q9 of quest.md, nothing copied |
 | [svanheulen/mhef](https://gitlab.com/svanheulen/mhef) | GPL-3.0 | MH4U save, Extra Data and DLC encryption (`SavedataCipher`, `DLCCipher`); used outside the repositories, no code or key copied |
 | [BoyClinton/Cha-Cha](https://github.com/BoyClinton/Cha-Cha) | GPL-3.0 | MH3U's DLC wire format and MtCipher's Blowfish variant (`runtime/os/dlc_server.cpp`); the XFS format (`docs/formats/xfs.md`); class ids and loaders (`config/dti.csv`, `symbols.txt`); no code copied |
 | [Matt-Wood-23/mh3u-quest-studio](https://github.com/Matt-Wood-23/mh3u-quest-studio) | MIT | the MH3U `QTDS` record and event-pack slots (`questlib/quest_format.py`, `dlc_pack.py`) |
 | [ArmoredRaven17/mh3u-quest-randomizer](https://github.com/ArmoredRaven17/mh3u-quest-randomizer) | MIT | MH3U `QTDS` tail offsets (`scripts/build_data.py`) |
 | [Silvris/MH-Tools-and-Scripts](https://github.com/Silvris/MH-Tools-and-Scripts) | see repository | MOD (MH3U, MHGU), TEX (mobile), GMD |
+| [beeequeue/gmd](https://github.com/beeequeue/gmd) | MIT | the GMD v2 label hash functions (`src/encode.ts`); no code copied |
+| [Scrimas/MHGU-Definitive-Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) | GPL-3.0-or-later | MH4U `.emd`/`.etd` layouts (`tools/emdata4u.py`, `tools/dt_convert.py`, `notes/data.md`), read from its MH4U-to-MHGU monster ports; no code copied |
 | [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2) (`plugin_mt_framework`) | GPL-3.0 | ARC header variants, GMD v1/v2 |
 | [3dbrew: GPU/Textures](https://www.3dbrew.org/wiki/GPU/Textures) | wiki | PICA200 texture formats and tiling |
 | MH4UltimateDC `config/mt_classes.tsv`, `docs/research/mt-classes.md` | GPL-3.0 | class names, ids, sizes |
@@ -38,5 +40,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [gmd](gmd.md) | rGUIMessage | layouts verified (MH3U v1-short, MHXX v2 and v2-32); v2 hashes open |
 | [mod](mod.md) | rModel | version and header shape verified, the same in all three games; fields partial |
 | [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem, rQuestBattleData, rSuppItem | MH4U, MHXX `.mib` and MH3U `QTDS` headers verified on DLC quests; DLC crypto of all three; `.quest_btl` unknown |
+| [lmt](lmt.md) | rMotionList | animations: from MHGU Definitive Edition (MH4U version 67), unchecked here (L1) |
+| [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, unchecked here (E1) |
 | [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, … | from Cha-Cha (Wii U); 3DS magic verified, the rest open (X1) |
 | [placeholders/](placeholders/) | enemy, stage and quest classes | unknown |

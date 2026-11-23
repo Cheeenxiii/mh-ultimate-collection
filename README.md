@@ -19,7 +19,7 @@ Everything new is extracted from the game it comes from, both its assets and its
 
 | Path | What |
 |---|---|
-| `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression |
+| `docs/design/` | design documents: plugin API, underwater, ID tables, reference recompiles, progression, quest conversion, Extra Data, DLC responder, monster port |
 | `docs/sources/` | what each source game supplies; the authored register |
 | `specs/` | one spec per file type (`.ksy` + notes), each field marked verified or unverified |
 | `STATUS.md` | where the project stands and what's next; rewritten every session |
@@ -52,7 +52,19 @@ mhuc --help
 | `mhuc xfs dump FILE` | an MT XFS file (`.supp`, `.pop`, `.list`, …) as JSON, its schema included; either byte order |
 | `mhuc decrypt KIND IN OUT --key FILE [--mode M]` | DLC and Extra Data crypto: `mh4u-save` (modes normal, card, quest), `mh4u-dlc`, `mhxx-dlc`, `mh3u-dlc` (MtCipher). The key comes from a file you supply; none is in this repository |
 | `mhuc quest dump\|check KIND PATH...` | quests as JSON or as counts: `mh4u` (a `.mib` or a decrypted Extra Data `quest*` file), `mhxx` (a quest `.arc`, every part), `mh3u` (a `QTDS` file or a 3DS Extra Data `quest*` file) |
-| `mhuc ingest`, `mhuc convert`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
+| `mhuc questslot check FILE...` / `mhuc questslot get FILE --slot K --out M.mib` / `mhuc questslot put FILE --slot K (--mib M \| --from-slot J) [--id N] [--title T] --out OUT` | MH4U Extra Data quest slots, decrypted: check each stored quest's hash and size, or put a `.mib` (or a copy of a stored quest, with a new id and title) into a slot in the game's stored form (specs/quest.md checks Q16, Q17) |
+| `mhuc mib export M.mib M.json` / `mhuc mib import M.json M.mib` | an MH4U `.mib` as editable JSON (header fields, texts, supplies, rewards, monsters decoded; unknown bytes kept as hex) and back, through the builder |
+| `mibwrite.mib4_model` / `mib4_build` (Python) | split an MH4U `.mib` into an editable model and lay it out again with every offset recomputed (specs/quest.md, "Writing a .mib") |
+| `mhuc encrypt mh4u-save IN OUT --key FILE [--mode M] [--seed N]` | encrypt a decrypted MH4U save or Extra Data file again; with the file's own seed the result is byte-identical to the original (specs/extdata.md check E5) |
+| `mhuc extdata dump\|check card\|otomo FILE` | MH4U Extra Data besides quests, decrypted first: a `card*` file (used records per section, guild quests) or `otomo1` (the DLC Palicos) |
+| `mhuc extdata testkit EXTDATA_DIR --key FILE --out DIR` | from an encrypted MH4U Extra Data folder, the encrypted files for the in-game checks Q17, Q19 and E4 (a copied quest, a rebuilt quest, a renamed Palico) and a TESTKIT.txt saying what to look for |
+| `mhuc extdata rename otomo FILE --slot N --name NAME --out OUT [--last-byte V]` | rename one DLC Palico in a decrypted `otomo1`, for the in-game check E4 |
+| `mhuc catalog overlap [--out F]` | which 3U and GU monsters and locales MH4U already has, from data/catalog (writes data/catalog/overlap.md) |
+| `mhuc mod info FILE.mod` | a model's header and mesh summary (vertex formats, strides, materials used); `mhuc survey` adds check M3 |
+| `mhuc emd check EM_DATA.ARC` | check E1 of specs/emd.md on MH4U's `.emd`/`.etd` pairs; counts only (also part of `mhuc survey`) |
+| `mhuc idnames mh4u\|mh3u QUESTS... --cache DIR --out F.csv` | monster ids to names, inferred from your quests and the wiki's quest pages; the table is yours and is refused inside the repository (specs/quest.md Q22) |
+| `mhuc convert quest Q.json --from mhxx --template T.json --texts X.json --id N --out M.json` | an MHXX quest (from `mhuc quest dump mhxx`) as an MH4U `.mib` model, ids through data/idmap/; refuses unmapped ids and lists what came from the MH4U template |
+| `mhuc ingest`, `mhuc build` | the pipeline from a dump to a mod (skeletons for now) |
 
 ## Tests
 

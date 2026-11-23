@@ -10,7 +10,7 @@
 | Monster class factory | monster id → class | MH4U has 55 classes `uEm001`…`uEm118` (config/mt_classes.tsv); new monsters need a class to run as | a switch or table mapping ids to `MtDTI*`; the uniform size 0x8d90 suggests one class can host different monsters' data |
 | Monster names and texts | monster id → text id | names in the hunter's notes, quest texts | found: `emName`/`emExp` `rLayoutMessage` resources, message N = id N (below) |
 | Monster size and crown tables | monster id | size scaling, crowns | found: `crownSizeTable`, an array in `.data` (below) |
-| Monster parts, breaks, rewards | monster id, part id | carves, breaks, quest rewards | drops found: id-indexed index tables into an item-list array in `.data` (below); parts probably in the per-monster `.emd`/`.etd` (unverified); quest rewards in quest data |
+| Monster parts, breaks, rewards | monster id, part id | carves, breaks, quest rewards | drops found: id-indexed index tables into an item-list array in `.data` (below); parts, hitzones and breaks in the per-monster `.emd`/`.etd` ([specs/emd.md](../../specs/emd.md), from MHGU Definitive Edition, unverified until its check E1); quest rewards in quest data |
 | Item and material ids | item id | new monsters bring new materials | item data resource (`rItemData`-like) plus GMD names and icons |
 | Equipment tables | weapon/armor id per class | new monsters' weapons and armour | per-class weapon data (`w00d`… in mhff's table), armour series data |
 | Stage (map) table | stage id | new 3U maps | `rStageInfoSet`, `rStageAreaInfo`, `rStageCameraData` per stage plus a master list of stage ids → folders |
@@ -132,7 +132,7 @@ Readers: `0x00684b40` `(_, id)` and `0x0092600c` use `dropRecordIndex`; `0x00911
 
 ### Parts
 
-No part table indexed by id was found in `.data`. The per-monster resources are the likely place: `data/em_data.arc` holds 110 `rEnemyData` (`.emd`) and 110 `rEnemyTuneData` (`.etd`) files, one pair per monster with files (the same 110 as `enemyDataPaths`). Both are section-offset files (`.emd` magic `emd\0`, `.etd` magic `etd\0`) with no spec yet. **Unverified:** that hitzones, part HP and breaks live there. A new monster brings its own pair, loaded through `enemyDataPathIndex`, so these files don't grow a table.
+No part table indexed by id was found in `.data`. The per-monster resources are the likely place: `data/em_data.arc` holds 110 `rEnemyData` (`.emd`) and 110 `rEnemyTuneData` (`.etd`) files, one pair per monster with files (the same 110 as `enemyDataPaths`). Both are section-offset files (`.emd` magic `emd\0`, `.etd` magic `etd\0`), laid out in [specs/emd.md](../../specs/emd.md) from MHGU Definitive Edition's readers. **Unverified on our files:** that hitzones, part HP and breaks live there (check E1 in that spec). A new monster brings its own pair, loaded through `enemyDataPathIndex`, so these files don't grow a table.
 
 ### Other tables indexed by id, purpose unknown
 
@@ -158,6 +158,10 @@ The 123-entry tables (the nine i16 tables, `0x00fcd71c`, `emName`, `emExp`) stop
 ### Bounds to move, all together
 
 When ids grow past 123: the factory compare and jump table, `enemyDataPathIndex`, `enemyDataById` (above); `crownSizeTable`, `monsterListOrder` (and the three loops over it), `monsterIconIndex` (and the two 124-byte stack copies), `enemyResourceIndex` and its records, `dropRecordIndex`, `dropBaseA`, `dropBaseB` and `itemListTable` (for new lists); the unknown-purpose tables above; and every language's `emName`/`emExp`.
+
+**Save-side limits (not tables to move):** a guild quest (specs/extdata.md) stores each monster id in one byte, so ids above 255 can't appear in one; ids up to 255 fit as they are. The character save (`user1`..`user3`) has a monster log of 82 fixed 10-byte entries (mhff "MH4U user1 Format", unverified): a fixed-size block in the save, so new monsters' hunt records need room outside it (a separate mod save, as MHGU Definitive Edition keeps; its notes/mod-save-format.md) or a save layout change.
+
+**How another project allocates ids (an option, not a decision).** MHGU Definitive Edition, which adds MH4U monsters to MHGU, keeps every game-wide id a ported monster takes in one file (`allocations.toml`: registry index, monster number, file ids, save slots), each from a pool whose bounds were checked in the game, checked by a script and read by both its C module and its converters. Its rule: ids only ever grow, and an installed monster's ids never move, because saves and quests keep them. The same constraints apply here: a hunter's save keeps per-monster records (mhff's "MH4U user1 Format" lists a monster log of 82 entries of 10 bytes, whose indexing by id is unverified), and quests name monsters by id.
 
 ### Procedure (repeatable from the dump; record results, never bytes)
 

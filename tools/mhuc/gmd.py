@@ -39,6 +39,7 @@ class Gmd:
     unknown: int = 0
     layout: str = ""          # "v1", "v1-short", "v2", "v2-32"; empty: the version's default
     raw_index: tuple | None = None   # (labels, entries+buckets, label bytes) as read, for round trips
+    stored_hashes: dict[int, tuple[int, int]] = field(default_factory=dict)  # v2: section -> (hash1, hash2) as read
 
 
 def _cstr(data: bytes, pos: int) -> tuple[str, int]:
@@ -83,13 +84,16 @@ def read(data: bytes) -> Gmd:
     pos += name_len + 1
     index_at = pos
     entries = []
+    hashes = {}
     for _ in range(nlabels):
         if esize == 8:
             sec, off = struct.unpack_from("<iI", data, pos)
         elif esize == 0x14:
-            sec, _h1, _h2, off, _link = struct.unpack_from("<iIIII", data, pos)
+            sec, h1, h2, off, _link = struct.unpack_from("<iIIII", data, pos)
+            hashes[sec] = (h1, h2)
         else:
-            sec, _h1, _h2, _z, off, _link = struct.unpack_from("<iIIIQQ", data, pos)
+            sec, h1, h2, _z, off, _link = struct.unpack_from("<iIIIQQ", data, pos)
+            hashes[sec] = (h1, h2)
         pos += esize
         entries.append((sec, off))
     if nlabels:
@@ -106,13 +110,24 @@ def read(data: bytes) -> Gmd:
     for _ in range(nsections):
         s, pos = _cstr(data, pos)
         strings.append(s)
-    return Gmd(name, strings, labels, version, language, unknown, layout, (dict(labels), index, label_blob))
+    return Gmd(name, strings, labels, version, language, unknown, layout, (dict(labels), index, label_blob),
+               hashes)
 
 
-def _label_hashes(label: str) -> tuple[int, int]:
-    # placeholders: the real hash functions are unknown (specs/gmd.md)
+def label_hashes(label: str) -> tuple[int, int]:
+    """The v2 label hashes as beeequeue/gmd (MIT) writes them for MHGU: the inverted CRC-32 of the label twice and
+    three times over. Check G3 (specs/gmd.md) compares them with the game's tables."""
     b = label.encode("utf-8")
-    return zlib.crc32(b) ^ 0xFFFFFFFF, zlib.crc32(b + b) ^ 0xFFFFFFFF
+    return zlib.crc32(b + b) ^ 0xFFFFFFFF, zlib.crc32(b + b + b) ^ 0xFFFFFFFF
+
+
+_label_hashes = label_hashes
+
+
+def hash_check(g: Gmd) -> tuple[int, int]:
+    """(labels whose stored hashes match label_hashes, labels checked)"""
+    ok = sum(1 for sec, h in g.stored_hashes.items() if sec in g.labels and label_hashes(g.labels[sec]) == h)
+    return ok, len(g.stored_hashes)
 
 
 def write(g: Gmd) -> bytes:

@@ -32,10 +32,10 @@ Class names and extensions come from mhff's table. MH4U's registry (MH4UltimateD
 | file | mib | a DLC quest as served by Capcom's server (MH4U USA and EUR) is one bare `.mib` named `mNNNNN.mib` after its quest id, with no ARC around it (mhff's convert_quest.py describes an ARC: not so for these) | verified | ours; check Q9 |
 | file | mib | the EUR server's 120 quest files are byte-identical to the USA server's | verified | ours; check Q9 |
 | whole | bytes | the server's DLC files: Blowfish on byte-swapped 32-bit words over the plaintext plus its SHA-1, zero-padded to 8 bytes, then the plaintext-plus-hash size as a u32 (mhef `DLCCipher`, the NA/EU key) | verified | svanheulen/mhef; mhff wiki "MH4U DLC Encryption"; check Q9 |
-| file | extdata | downloaded quests are kept in Extra Data, in five files `quest1`..`quest5` of 328,704 bytes each, beside `card1`..`card3`, `cardbox` and `otomo1` | verified | ours; check Q3 |
+| file | extdata | downloaded quests are kept in Extra Data, in five files `quest1`..`quest5` of 328,704 bytes each, beside `card1`..`card3`, `cardbox` and `otomo1` (specs/extdata.md) | verified | ours; check Q3 |
 | whole | bytes | every Extra Data file, and the save's `system`, is encrypted: mhef's `SavedataCipher` (MH4G) decrypts all of them with a matching checksum, in mode "quest" for `quest*`, "card" for `card*` and "normal" for the rest | verified | svanheulen/mhef; ours, check Q4 |
 | quest file | slots | a decrypted `quest*` file is 40 slots of 0x2010 bytes, then 120 zero bytes; a slot is all zero (empty) or holds one bare `.mib` from its offset 0 (no ARC around it): the server's decrypted file, byte for byte | verified | ours; checks Q5, Q9 |
-| slot, after the `.mib` | 28 bytes | added by the game when it stores a quest: 2 zero bytes, 22 bytes that look random, 2 zero bytes, 2 small bytes; then zeros up to 0x2000. Not an MD5, SHA-1 or SHA-256 (either byte order) of the plain file, the server file or the name: a signature or MAC, perhaps | unknown | ours; check Q9 |
+| slot, after the `.mib` | 28 bytes | the rest of the server file, decrypted up to its stated size, as MH3U stores its quests: the `.mib`'s SHA-1 with bytes 0 and 1 set to zero (20 bytes), the padding to 8 (4 bytes in all 120, since every `.mib` is a multiple of 8) left as the server file's ciphertext, then the `.mib` size + 20 as a u32 BE; then zeros up to 0x2000. `mhuc questslot check` checks it; `mhuc questslot put` writes it | verified | ours; check Q16 |
 | slot 0x2000 | char[16] | the quest's file name, `m` + the quest id in five decimal digits + `.mib`, NUL-padded (`m6NNNN.mib` for every DLC quest); the `.mib` body before it ends well short of 0x2000 and is zero-padded | verified | ours; check Q8 |
 
 ### Header
@@ -55,36 +55,36 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 | 0x28 | u32 | offset to the large monsters | verified | mhff wiki; check Q5 |
 | 0x2C | u32 | offset to the small monsters | verified | mhff wiki; check Q7 |
 | 0x30 | u32 | offset to the intruder monsters | verified | mhff wiki; check Q5 |
-| 0x34..0x5B | stats ×5 | large monster stats, 8 bytes each: u16 size percentage (0 or 50..200 in 596 of 600), then size variation, health, attack, defense, stamina, unknown. Over the 120 quests the bytes reach at most 40, 90, 119, 140, 4 and 2: table indices, not percentages | unverified | mhff wiki; check Q5, Q7 |
+| 0x34..0x5B | stats ×5 | large monster stats, 8 bytes each: u16 size percentage (0 or 50..200 in 596 of 600), then size variation, health, attack, defense, stamina, unknown. Over the 120 quests the bytes reach at most 40, 90, 119, 140, 4 and 2: table indices, not percentages. MHGU Definitive Edition reads bytes +3, +4 and +5 as row numbers into the game's monster stat table `em_nando_tbl` (32-byte rows of floats: HP, attack, then defense and five statuses; at 0xF3A330 in the European v1.1 code, to be found in USA v1.3.0) | unverified | mhff wiki; MHGU-DE `quest4u.py`; check Q5, Q7 |
 | 0x5C | stats | small monster stats | unverified | mhff wiki |
 | 0x64..0x70 | u32 ×4 | unknown: 0x64 and 0x6C always 0, 0x68 and 0x70 never 0 | unknown | mhff wiki; check Q7 |
 | 0x74 | u32 | main hunter rank points | unverified | mhff wiki |
 | 0x78 | u32 | hunter rank penalty | unverified | mhff wiki |
 | 0x7C | u32 | sub-quest hunter rank points | unverified | mhff wiki |
 | 0x88 | u8 | unknown (0 in 111 of 120; else 1, 2, 5 or 7) | unknown | mhff wiki; check Q7 |
-| 0x89 | u8 | gathering rank (1..4) | unverified | mhff wiki; check Q7 |
-| 0x8A | u8 | carve table: 0 arena, 1 low, 2 high, 3 G rank (0..3 in all 120) | unverified | mhff wiki; check Q5 |
-| 0x8B | u8 | AI level (1, 3, 5 or 6) | unverified | mhff wiki; check Q7 |
+| 0x89 | u8 | gathering rank (1..4): 1 in Low, 2 in High, 3 in G Rank quests, 4 in the 24 quests whose carve table is the arena's (check Q20) | verified | mhff wiki; checks Q7, Q20 |
+| 0x8A | u8 | carve table: 0 arena, 1 low, 2 high, 3 G rank. Against the wiki's rank: 1, 2 and 3 match Low, High and G in all 92 quests that use them, and 0 occurs only on maps 11 and 12 (Arena, Slayground), 24 quests of all three ranks | verified | mhff wiki; checks Q5, Q20 |
+| 0x8B | u8 | AI level (1, 3, 5 or 6): 1 in all 8 Low Rank quests, 3 in 42 of 44 High, 5 in 62 of 64 G (2 High quests use 5, 2 G quests 6) | unverified | mhff wiki; checks Q7, Q20 |
 | 0x8C | u8 | spawn area: 0 camp, 1 random, 2 elder dragon fight | unverified | mhff wiki |
 | 0x8D | u8 | arena fence: 0 off, 1 on | unverified | mhff wiki |
 | 0x8F | u8 | unknown (0 in 112; else 40 to 210, multiples of 10) | unknown | mhff wiki; check Q7 |
-| 0xA0..0xA3 | u8 ×4 | flags: quest type, repel, sub-quest, ship integrity (0x08). Each is a bit set: 0xA0 is one of 0x01, 0x02, 0x03, 0x04, 0x08, 0x10; 0xA1 0, 0x01, 0x02 or 0x04; 0xA2 0, 0x04, 0x40 or 0x84; 0xA3 0, 0x04, 0x08 or 0x0C | unverified | mhff wiki; check Q7 |
-| 0xA4 | u32 | posting fee | unverified | mhff wiki |
-| 0xA8 | u32 | main reward (zenny) | unverified | mhff wiki |
+| 0xA0..0xA3 | u8 ×4 | flags: quest type, repel, sub-quest, ship integrity (0x08). Each is a bit set; for 0xA0, the quest types the wiki gives agree with bits 0x01 slay (and arena), 0x02 capture, 0x04 delivery, 0x10 special, 0x03 hunt, with 0x08 on 8 hunts and 3 arena quests (check Q20): 0xA0 is one of 0x01, 0x02, 0x03, 0x04, 0x08, 0x10; 0xA1 0, 0x01, 0x02 or 0x04; 0xA2 0, 0x04, 0x40 or 0x84; 0xA3 0, 0x04, 0x08 or 0x0C | unverified | mhff wiki; checks Q7, Q20 |
+| 0xA4 | u32 | posting fee (zenny): equals the wiki's contract fee in 104 of the 116 quests it lists; the other 12 differ by 100 to 1,300 | verified | mhff wiki; check Q20 |
+| 0xA8 | u32 | main reward (zenny): equals the wiki's reward in 115 of 116 | verified | mhff wiki; check Q20 |
 | 0xAC | u32 | reward lost per faint | unverified | mhff wiki |
-| 0xB0 | u32 | sub-quest reward | unverified | mhff wiki |
-| 0xB4 | u32 | time limit in minutes (1..50 in all 120) | unverified | mhff wiki; check Q5 |
+| 0xB0 | u32 | sub-quest reward (zenny): equals the wiki's second reward (the "+ N" part, 0 when absent) in all 116 | verified | mhff wiki; check Q20 |
+| 0xB4 | u32 | time limit in minutes (1..50 in all 120): equals the wiki's in 115 of 116 | verified | mhff wiki; checks Q5, Q20 |
 | 0xB8 | u32 | intruder probability | unverified | mhff wiki |
 | 0xBC | u32 | offset to the text languages | verified | mhff wiki; check Q5 |
 | 0xC0 | u16 | quest id (60000..69999 for all 120 DLC quests) | unverified | mhff wiki; check Q5 |
-| 0xC2 | u16 | star rank (1..10 in all 120) | unverified | mhff wiki; check Q5 |
-| 0xC4 | u8 | map (19 different values, 1..17 among them) | unverified | mhff wiki; check Q7 |
+| 0xC2 | u16 | star rank, one scale across ranks: 1..3 Low Rank, 4..7 High Rank (the same number), 8..10 G Rank ★1..★3; agrees with the wiki's rank and level in all 116 that state them | verified | mhff wiki; checks Q5, Q20 |
+| 0xC4 | u8 | map. The wiki's locale for each quest gives: 1 Ancestral Steppe, 2 Sunken Hollow, 3 Primal Forest, 4 Frozen Seaway, 5 Heaven's Mount, 6 Great Desert, 7 Tower Summit, 8 Speartip Crag, 9 Ingle Isle, 10 Castle Schrade, 11 Arena, 12 Slayground, 15 Volcanic Hollow, 16 Sanctuary, 17 and 18 Dunes (two ids, perhaps day and night or the Old Desert variant), 19 Battlequarters, 20 Polar Field, 21 Great Sea; each id has one locale in all 116 | verified | mhff wiki; checks Q7, Q20 |
 | 0xC5, 0xC6 | u8 ×2 | requirements to post or join | unverified | mhff wiki |
-| 0xCC | u32, u16, u16 | main objective 1: type, target id, count. Types seen: 0x1, 0x81, 0x101, 0x204 (target always a monster of the quest's waves), 0x2 (never one: an item, presumably), 0x2004 (sub only); 0x101 also targets ids outside the waves with counts of 10 to 50, small monsters presumably | unverified | mhff wiki; check Q7 |
+| 0xCC | u32, u16, u16 | main objective 1: type, target id, count. Types seen, with the wiki's quest type of each quest (check Q20): 0x1 hunt (53 of 53), 0x81 capture, 0x101 slay (29 slay, 24 arena), 0x2 delivery (5, and 1 hunt whose second objective is a hunt), 0x204 special (3). 0x1, 0x81, 0x101, 0x204 (target always a monster of the quest's waves), 0x2 (never one: an item, presumably), 0x2004 (sub only); 0x101 also targets ids outside the waves with counts of 10 to 50, small monsters presumably | verified | mhff wiki; checks Q7, Q20 |
 | 0xD4 | u32, u16, u16 | main objective 2 (type 0 = none, in 91 of 120) | unverified | mhff wiki; check Q7 |
 | 0xDC | u32, u16, u16 | sub objective (type 0 = none, in 68; 0x204 in 37) | unverified | mhff wiki; check Q7 |
 | 0xE4 | u32 | offset to equipment and item presets (0 in 96) | unverified | mhff wiki |
-| 0xE8..0xF0 | u16 ×5 | objective icon ids | unverified | mhff wiki |
+| 0xE8..0xF0 | u16 ×5 | objective icon ids (98 = none, per MHGU-DE) | unverified | mhff wiki; MHGU-DE `quest4u.py` |
 
 ### Sub-structures
 
@@ -92,15 +92,29 @@ Field names and the layout come from the mhff wiki's "MH4U rQuestData Format" pa
 |---|---|---|---|---|
 | supply box | 8 bytes | u8 box id, u8 slot count, u16 ?, u32 offset to items; the list ends at box id 0xFF | verified | mhff wiki; check Q5 (the end marker) |
 | supply item | 4 bytes | u16 item id, u16 count; the box's slot count gives the number of items | verified | mhff wiki; check Q7 (every count of a non-zero item is 1..99) |
-| reward box | 8 bytes | u8, u8, u16 unknown, u32 offset to items | verified | mhff wiki; check Q5 (the item offset) |
+| reward box | 8 bytes | read as u32 0x8000 by MHGU-DE (the bytes 00 80 00 00 in 188 of 267 boxes here; 03 80 00 00 in 79), then u32 offset to items | verified | mhff wiki; MHGU-DE `quest4u.py`; check Q5 (the item offset) |
 | reward item | 6 bytes | u16 probability (0xFFFF ends the list), u16 item id, u16 count | verified | mhff wiki; check Q5 (stride and end marker) |
 | large monsters | u32 ×n | offsets to waves, ending at 0; each wave is a list of definitions. 109 quests have one wave, 3 two, 7 three, 1 four; a wave can be empty (9 quests have only an empty one, and the last wave of a multi-wave quest often is) | verified | mhff wiki (one list); ours, check Q7 (the waves) |
 | monster definition | 0x28 bytes | u32 monster id (0xFFFFFFFF ends the list), u32 spawn count, u8 condition, u8 area, sizes, u8 frenzy, f32 x/y/z | verified | mhff wiki; check Q5 (stride, end marker, ids all < 124) |
-| small monsters | u32 ×3 | offset to a list of area offsets, then two equal words; the area list ends at 0 and each area is a list of definitions (1 to 11 areas, 3 in 80 quests) | verified | mhff wiki; check Q7 |
+| small monsters | u32 ×3 | the offset of a list of area offsets, three times (the second and third words equal the first in all 120); the area list ends at 0 and each area is a list of definitions (1 to 11 areas, 3 in 80 quests) | verified | mhff wiki; checks Q7, Q18 |
 | intruder | 0x2C bytes | u32 probability (a u16 0xFFFF ends the list), then a monster definition | verified | mhff wiki; check Q5 (stride and end marker) |
 | text languages | u32 ×5 | offsets to English (or Japanese, Korean), French, Spanish, German, Italian | verified | mhff wiki; check Q7 (all five) |
 | text | u32 ×7 | offsets to NUL-terminated UTF-16LE strings: title, success, failure, summary, main monsters, client, sub-quest | verified | mhff wiki; check Q7 (all 7 strings of all 5 languages decode in all 120) |
 | equipment preset | 0x104 bytes | eight 28-byte equipment entries, then an item | unverified | mhff wiki |
+
+### Writing a .mib
+
+Observed on the 120 DLC quests (check Q18) and used by `tools/mhuc/mibwrite.py`:
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| layout | blocks | always in this order: header (0xF4 bytes), each language's 7 strings then its table, the language table, the equipment presets (when present), the supply item lists, the supply boxes, each reward's items then its box, the small monsters' areas, their area list, the small-monster header, each wave's definitions, the wave list, the intruders | verified | ours; check Q18 |
+| alignment | — | strings start on 0x20 boundaries in most quests and are packed in others; tables on 4; the file length is a multiple of 0x20 | verified | ours; check Q18 |
+| terminators | bytes | supply boxes end with `FF` and 7 zero bytes; reward items with `FFFF` + 2 bytes; definition lists with `FFFFFFFF` and 4 zero bytes; intruders with `FFFF0000`, then zeros to the end | verified | ours; check Q18 |
+
+The model (`mib4_model`) keeps the header with its offsets zeroed, the strings, and every list entry as raw bytes, so nothing the readers don't explain is lost. The builder (`mib4_build`) lays the blocks out in the order above, each on a 0x20 boundary, and recomputes every offset. It doesn't reproduce the packed layouts byte for byte; whether the game minds is check Q19.
+
+`mhuc mib export` writes the model as JSON: the header fields of the table above decoded (they override the raw header on import), the texts by language, supply and reward items as numbers, each monster definition's id, count, condition, area, frenzy and position decoded, with its raw bytes kept as hex for the rest. `mhuc mib import` builds it back. The JSON round trip gives back the same model for all 120 DLC quests (check Q18).
 
 ## rQuestData (MHXX .mib) and the DLC quest archive
 
@@ -166,9 +180,9 @@ All integers little-endian. A "text" is five strings, English, French, German, I
 | 0x08 | text | name | verified | mh3u-quest-studio; check Q12 |
 | next | u16 | quest number: the file's `q_NNNNN` in all 38 (20xxx and 6xxxx here) | verified | mh3u-quest-studio; check Q12 |
 | next | text | main objective | verified | mh3u-quest-studio; check Q12 |
-| next | u8, u8 | stars (1..8 here), map | verified | mh3u-quest-studio; check Q12 (layout) |
+| next | u8, u8 | stars (1..8 here: the wiki's rank level, in all 36 quests it lists), map. The wiki's locales give: 1 Deserted Island, 2 Sandy Plains, 3 Flooded Forest, 4 Tundra (day and night alike), 5 Volcano, 6 Great Desert, 7 Underwater Ruin, 8 Land Arena, 11 Sacred Land, 12 Water Arena, 14 Tower, 15 Tainted Sea; each id one locale | verified | mh3u-quest-studio; checks Q12, Q21 |
 | next | text | sub objective | verified | mh3u-quest-studio; check Q12 |
-| next | u16 | time limit in minutes (30 or 50 here) | verified | mh3u-quest-studio; check Q12 |
+| next | u16 | time limit in minutes (30 or 50 here; equals the wiki's in all 36) | verified | mh3u-quest-studio; checks Q12, Q21 |
 | next | text | failure conditions | verified | mh3u-quest-studio; check Q12 |
 | next | u16 ×3 | special flag and two conditions | unverified | mh3u-quest-studio |
 | next | text ×2 | client, description | verified | mh3u-quest-studio; check Q12 |
@@ -177,7 +191,7 @@ All integers little-endian. A "text" is five strings, English, French, German, I
 | tail +0x0A | 11 bytes ×5 | large monsters: type, set type, start type, number, HP, attack and other table rows (0..127, rows of a table in the code), a fourth row, size, size parameter, stamina; type 0 = empty slot | verified | mh3u-quest-studio; check Q12 (stride; table rows all ≤ 127) |
 | tail +0x41 | u8 ×6 | intruder settings | unverified | mh3u-quest-studio |
 | tail +0x47 | 4 bytes ×64 | rewards: u16 item, u8 count, u8 chance; even slots are table A, odd slots table B, each ending at item 0 | verified | mh3u-quest-studio; check Q12 (both tables end; chances ≤ 100) |
-| tail +0x147 | i32 ×5 | fee, reward, reward lost per faint, main HRP, failure HRP | verified | mh3u-quest-studio; randomizer; check Q12 (first three in range) |
+| tail +0x147 | i32 ×5 | fee, reward, reward lost per faint, main HRP, failure HRP; fee and reward equal the wiki's in all 36 | verified | mh3u-quest-studio; randomizer; checks Q12 (first three in range), Q21 (fee, reward) |
 | tail +0x15B | mixed | u8 ×4, u16 ×8, u32 ×4, u16 ×6, u32 ×2: gathering, progress, enemy level, supply and small-monster settings | unverified | mh3u-quest-studio |
 | tail +0x193 | u16 | clear pattern: 0 one objective, 1 both, 2 either | verified | mh3u-quest-studio; randomizer; check Q12 (0..2) |
 | tail +0x195 | (u32, u16, i16) ×2 | objectives: type in the low u16 (0x1 hunt, 0x2 deliver, item id as target, 0x81 capture, 0x101 slay, 0x8101 slay small, 0x404 repel, 0x2515 and 0x4014 siege repel, 0x2000 siege damage), target, count | verified | mh3u-quest-studio; check Q12 (every type seen is in that list) |
@@ -246,9 +260,10 @@ Layouts from the mhff wiki's MHX pages ("MHX rSetEmMain/rEmSetList/rRem/rSupplyL
 ## Open questions
 
 - MH4U's `.mib`: the header's remaining unverified fields (Q6 against the game's own quests; in-game checks for meanings).
-- The 28 bytes the game adds after a stored quest. Writing a mod quest into Extra Data needs them (or needs the game not to check them); the code that stores a downloaded quest is where to look.
+- Whether the game checks a stored quest's hash or its padding bytes when it lists or loads the quest (check Q17, in game). The 28 bytes themselves are understood (Q16), so a mod quest can be stored in the same form either way.
 - MH3U's quest format: the `QTDS` record is now laid out (above); Q13 checks it on the RomFS's own quests. `.quest_btl` (`QTDB`) and `.supp` (`XFS`) are still unknown. Why the game zeroes the first two bytes of a stored quest's SHA-1 is open (a "checked" mark, perhaps).
 - How MHXX's `.sem`/`.esl`/`.rem` map onto `.mib` sections.
+- MHGU Definitive Edition's `quest4u.py` names 0xAC the sub-quest reward; Q20 found the sub-quest reward at 0xB0 in all 116 quests the wiki lists, so this spec keeps 0xB0 and leaves 0xAC as the faint penalty (unverified).
 
 ## Checks
 
@@ -270,7 +285,16 @@ Q3 to Q5 were run on 2026-11-23 in a web session on the maintainer's own MH4U (U
 - **Q10 (done):** take MH3U's DLC quests from the goshawk mirror (`files/3ds/mh3gu_us`, `mh3gu_eu`, `mh3g`, `files/wiiu/mh3ghd_us`), outside the repositories. Pass: the USA, EUR and Wii U folders hold the same 38 files byte for byte; every file is 8n+4 bytes; in every file the last 4 bytes, big-endian, are 0 to 7 less than the length before them; the aligned 8-byte blocks repeat (a third of them one block) and the first is common to all 85. Fail, so far: Blowfish with goshawk's MH3G key (and mhef's MH4U keys, with simple variants and byte orders) gives no plaintext; the repeated block doesn't decrypt to a constant under any of them.
 - **Q11 (done):** take MHXX JPN's DLC from the goshawk mirror (`files/3ds/mhxx_jp`), outside the repositories, and decrypt with mhef's `DLCXCipher` logic and goshawk's MHXX JPN key. The layout that works ends with one 0x100 signature, not two. Pass: all 188 files check against their SHA-1 (173 quest ARCs, the two quest lists, the GMDs, the Palico and update files); every quest is an ARC 0x11 whose last entry is a 249-byte `.mib`, as in the RomFS (Q2); over the 173 `.mib`, the header rows marked verified hold, and the spreads quoted come from the same files.
 - **Q12 (done):** the maintainer's MH3U 3DS Extra Data (USA), uploaded by them, outside the repositories. Pass: no file is encrypted (`mhuc entropy`: all plain); each `quest*` file starts with a u32, then `QTDS` at 4 + 0x2010·k; 38 quests in 80 slots, all 38 on the goshawk mirror. Parsing each with quest-studio's layout reads to the end of the arena gear sets without error; the fixed tail is 442 bytes in all; the record ends 20 bytes before the mirror file's plaintext size, and the slot then holds the padding and the size exactly as the mirror file's last bytes, the same length as the file. Pairing slot and mirror blocks gives a consistent codebook (10,095 of 10,098), which shows ECB with one key; Blowfish, DES, CAST and RC2 under the known keys don't reproduce it.
-- **Q13 (open):** parse the 365 RomFS `.quest` files of MH3U USA with the same layout (no arena block outside 201xx..203xx and 6xxxx). Needs the MH3U RomFS.
+- **Q13 (open; `mhuc survey` runs it):** parse the 365 RomFS `.quest` files of MH3U USA with the same layout (no arena block outside 201xx..203xx and 6xxxx). Needs the MH3U RomFS.
 - **Q14 (done):** decrypt the goshawk mirror's MH3U files with MtCipher as Cha-Cha describes it (standard pi tables computed, not copied; little-endian words; the S-box quirk) under goshawk's MH3G key. Pass: all 38 USA (`mh3gu_us`) and all 47 Japanese MH3G (`mh3g`) files decrypt to `QTDS` with a matching SHA-1. Against the maintainer's 38 stored quests: every record is byte-identical to its server file; the 20 bytes after it are the SHA-1 with bytes 0 and 1 zeroed; the padding bytes equal the server file's ciphertext; the size trailer is the same.
 - **Q15 (done):** over the 173 decrypted MHXX JPN quest archives (Q11), read every `rSetEmMain`, `rEmSetList`, `rRem` and supply-list entry with the tables above. Pass: sizes, magics and counts as stated for 430 `.sem`, 249 `.esl` (631 areas, 1,815 entries), 786 `.rem` and 173 supply lists; every `.esl` area is `ESD\0` + version + u16 count + 36-byte entries, back to back, to the file end.
-- **Q6 (open):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.
+- Slot use isn't sequential: in the maintainer's data `quest1` is full (40), `quest2` holds 38, `quest3` none, `quest4` 24 and `quest5` 18, each from slot 0 up.
+- **Q16 (done, 2026-11-23, a second web session on the same Extra Data):** for each of the 120 used slots, read the last non-zero 4 bytes before 0x2000 as a u32 BE size. Pass, in all 120: the slot's non-zero bytes end exactly at the size padded to 8, plus 4; the first size − 20 bytes are the `.mib`; the 20 bytes after it equal the `.mib`'s SHA-1 except bytes 0 and 1, which are zero; the 4 padding bytes equal the bytes at the same offset in the goshawk mirror's still-encrypted server file of the same name (compared as stored, nothing decrypted), and that file has the slot's length. So a slot is the server file decrypted up to its stated size, exactly as in MH3U (Q14). Q5 had ruled out the hashes because it hashed the whole file and compared all 20 bytes. Re-run: `mhuc questslot check quest1.bin ... quest5.bin` prints "120 used slots, 120 with a matching hash and size".
+- **Q17 (open, in game):** back up the Extra Data, decrypt `quest1` (`mhuc decrypt mh4u-save quest1 q.bin --key K --mode quest`), copy one stored quest into an empty slot under a new id and title (`mhuc questslot put q.bin --slot N --from-slot 0 --id 60999 --title "UC test" --out q2.bin`: the id at 0xC0, the five titles in place and the name `m60999.mib`; `put` refuses a used slot without `--replace`), encrypt again (`mhuc encrypt mh4u-save q2.bin quest1 --key K --mode quest`; specs/extdata.md check E5 shows the round trip is exact) and put it back with a save manager. Pass: the game lists both quests and the new one starts. Then repeat with the hash bytes changed: if the quest vanishes or the game reports corrupt data, the hash is checked (and `questslot put` already writes it correctly).
+- **Q18 (done):** split each of the 120 `.mib` into the model and build it again. Pass: for all 120, `parse_mib4` of the rebuilt file equals `parse_mib4` of the original, the rebuilt file's model equals the original's, a second rebuild is byte-identical to the first, and every rebuilt quest fits a slot (sizes change by −512 to +160 bytes). The block order, the alignments and terminators in "Writing a .mib", and the small-monster header's three equal offsets were read from the same files. The JSON form (`model_to_json`, then `model_from_json`) gives back an equal model for all 120.
+- **The test kit:** `mhuc extdata testkit <Extra Data folder> --key K --out kit/` builds Q17's, Q19's and E4's files in one go, encrypted and ready to copy over a backed-up Extra Data, with a TESTKIT.txt listing the quest ids (60999, 61000), titles and slots it used. On the maintainer's data it fills `quest2`'s last two slots and renames the first Palico.
+- **Q19 (open, in game):** as Q17, but with a title longer than the original (`questslot put ... --title "<a long title>"` lays the quest out again with the builder). Pass: the quest is listed with the new title and plays like the original. A pass means the builder's layout is one the game takes, so a converter can write quests from scratch.
+- **Q20 (done):** for each of the 120 DLC quests, take its English title and read the public Monster Hunter Wiki page "<title> (MH4U Quest)" (monsterhunterwiki.org, through its API, on 2026-11-23): rank, rank level, contract fee, time limit, reward money, locale and quest type. 116 pages exist. Pass: the counts in the rows for 0x89, 0x8A, 0x8B, 0xA0, 0xA4, 0xA8, 0xB0, 0xB4, 0xC2, 0xC4 and 0xCC. The wiki is a secondary source (its fee differs in 12 quests), so a field counts as verified where the two agree in all or nearly all quests and the exceptions are listed.
+- **Q21 (done):** the same as Q20 for the 38 MH3U quests in the maintainer's 3DS Extra Data, with the pages "<title> (MH3U Quest)": 36 exist. Pass: fee, reward and time limit equal the wiki's in all 36; the stars byte equals the wiki's rank level in all 36 (MH3U numbers them 1..8 across Low, High and G, the wiki labelling some levels with two ranks); each map id has one locale.
+- **Q22 (done, results kept outside the repository):** `mhuc idnames` takes each quest's large-monster ids (MH4U: the waves; MH3U: the `QTDS` monster types), reads the wiki's page for the quest, keeps the monster names among its "<game> <monster> Quests" categories, and intersects and eliminates across quests. MH4U: 108 quests with a page, 77 ids, 68 of them left with one name; the 9 names left on two ids each look like Apex variants and Dalamadur's two ids (the wiki files an Apex quest under the base monster's category). MH3U: 34 quests, 38 ids, 27 with one name. The id-to-name table is derived from the game's files, so the tool writes it only outside the repository: it is the starting point for data/idmap/'s `target_name` and `source_name` columns, row by row, with `how` naming this check.
+- **Q6 (open; `mhuc survey` runs it, with Q18's builder round trip on each quest):** run the Q5 checks over the 508 `.mib` in `quest00.arc` and `quest01.arc` (MH4U USA v1.3.0 RomFS). Needs the RomFS.
