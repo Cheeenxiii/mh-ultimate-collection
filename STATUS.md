@@ -24,7 +24,7 @@ Findings that steer the next steps:
 
 ## Branches
 
-This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of `main`. It's pushed, with no PR open. The fork is unchanged. Nothing else is in flight.
+This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of `main`. It's pushed, with PR [Cheeenxiii/mh-ultimate-collection#3](https://github.com/Cheeenxiii/mh-ultimate-collection/pull/3) open. The fork is unchanged. Nothing else is in flight.
 
 ## Next tasks, in order
 
@@ -38,7 +38,7 @@ This repo: `claude/zealous-wozniak-eip1pk` has this session's commits on top of 
 
 ## Waiting on the maintainer
 
-- Merging `claude/zealous-wozniak-eip1pk` into `main`.
+- Reviewing and merging PR #3 (`claude/zealous-wozniak-eip1pk` into `main`).
 - A check of the port's pad features with the plugin in the app or Azahar's Qt build (plugin-api.md step 5), on a machine with a display.
 - Whether to offer the inline-cache fix (fork `recomp.h`) to upstream MH4UltimateDC.
 - The open decisions (combat base, monster versions, runtime, progression): unchanged, not ours to settle.
