@@ -23,4 +23,5 @@ Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `conf
 
 ## Checks
 
-- **A1 (open, needs each game's RomFS):** `mhuc survey` counts every `rEnemyCmd`: its magic and version, whether its group and script tables stay inside the file, and its scripts. Pass for MH4U: `EMC\0` and 0x20120804 throughout (MHGU Definitive Edition's reading). MH3U's and MHXX's versions say whether converted monsters' AI can be read the same way.
+- **A1 (done, 2026-11-23):** every `rEnemyCmd` has magic `EMC\0` and its group and script tables inside the file. MH4U: 124 files, all version 0x20120804, 13,501 scripts. MHXX JPN: 139, all 0x20120804 (the same as MH4U), 19,424 scripts. MH3U USA: 91, all **0x20110601**, 6,864 scripts, with the same header shape. So GU monsters' AI files share MH4U's version; MH3U's are an older version whose script contents may differ.
+- *As first written:* `mhuc survey` counts every `rEnemyCmd`: its magic and version, whether its group and script tables stay inside the file, and its scripts. Pass for MH4U: `EMC\0` and 0x20120804 throughout (MHGU Definitive Edition's reading). MH3U's and MHXX's versions say whether converted monsters' AI can be read the same way.

@@ -23,4 +23,5 @@ Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `conf
 
 ## Checks
 
-- **S1 (open, needs each game's RomFS):** `mhuc survey` counts every `rCollision`: its magic, inner class hash (0x77CF8DF8 in MH4U per MHGU Definitive Edition) and whether it has one part or several. MH3U's and MHXX's values say whether their stages' collision shares MH4U's layout.
+- **S1 (done, 2026-11-23):** every `rCollision` has magic `SBC\xFF`. MH4U: 626 files, all inner class 0x77CF8DF8 (as MHGU Definitive Edition says), 469 with one part, 157 with several. MH3U USA: 344, all **0x77CF8DF8** too (340 one part, 4 several): 3U stage collision is MH4U's class. MHXX JPN: 1,052, all **0x781ACA20**, another class (852 one part, 200 several), so GU collision needs its own layout or a conversion.
+- *As first written:* `mhuc survey` counts every `rCollision`: its magic, inner class hash (0x77CF8DF8 in MH4U per MHGU Definitive Edition) and whether it has one part or several. MH3U's and MHXX's values say whether their stages' collision shares MH4U's layout.
