@@ -14,7 +14,7 @@ The MH4U quest format (`.mib`) is now specified from mhff's wiki and partly veri
 
 Findings that steer the next steps:
 - Downloaded quests sit in Extra Data as bare `.mib` files, 40 slots of 0x2010 bytes per `quest*` file, each ending with its file name (`mNNNNN.mib`), under mhef's `SavedataCipher`. That's a possible way in for mod quests without growing quest tables. Monsters come in waves; objective types are mapped by value, though their meanings aren't confirmed.
-- Capcom's MH4U DLC server is gone: `goshawk.capcom.co.jp` gives NXDOMAIN from public DNS (checked by the maintainer, 2026-11-23). The maintainer's Extra Data is the only source of DLC quests; the server-form rows in specs/quest.md stay unverified.
+- Capcom's MH4U DLC server is gone (NXDOMAIN). Its files live on in the GrenderG/goshawk preservation mirror (AGPL-3.0, files Capcom's): server quests are bare `.mib`, identical to what the game stores, plus 28 bytes the game adds (unknown; they decide whether mod quests can go in through Extra Data). The mirror also has MH3U and MHXX DLC quests.
 - No public layout exists for `.emd`/`.etd`; that spec has to come from the files and the code.
 - Chase every missing target and every rare `fail-fault` the gametest reports by tracing the reference. The inline-cache runtime fix is a candidate to offer upstream.
 - Adding a monster id means moving every bound in id-tables.md's "Bounds to move" list.
