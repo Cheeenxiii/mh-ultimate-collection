@@ -40,7 +40,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [gmd](gmd.md) | rGUIMessage | layouts verified (MH3U v1-short, MHXX v2 and v2-32); v2 hashes open |
 | [mod](mod.md) | rModel | version and header shape verified, the same in all three games; fields partial |
 | [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem, rQuestBattleData, rSuppItem | MH4U, MHXX `.mib` and MH3U `QTDS` headers verified on DLC quests; DLC crypto of all three; `.quest_btl` unknown |
-| [lmt](lmt.md) | rMotionList | animations: from MHGU Definitive Edition (MH4U version 67), unchecked here (L1) |
-| [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, unchecked here (E1) |
+| [lmt](lmt.md) | rMotionList | animations: MHGU Definitive Edition's version-67 layout, read on every MH4U and MHXX file (L1); MH3U is version 66 |
+| [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, structure checked on all 110 pairs and hitzone columns laid out (E1) |
 | [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, … | from Cha-Cha (Wii U); 3DS magic verified, the rest open (X1) |
 | [placeholders/](placeholders/) | enemy, stage and quest classes | unknown |

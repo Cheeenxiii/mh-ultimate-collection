@@ -14,6 +14,7 @@ EMD_WORDS = {8: "body", 9: "camera body", 13: "w13", 16: "arena points", 20: "ma
              22: "w22", 33: "breaks", 34: "visibility", 35: "severs", 38: "w38", 40: "slope fit", 43: "joints"}
 ETD_PTRS = range(5, 35)
 BODY, VIS, HIT, ATTACK = 44, 16, 40, 40
+HITZONE_ROWS, HITZONE_ROW = 8, 10
 
 
 def _w(d: bytes, i: int) -> int:
@@ -106,14 +107,19 @@ def check_etd(d: bytes) -> Counter:
         c["E1 etd word 27/28 not a group table"] += 1
     if b:
         end = _w(d, 29) or _block_end(d, b, range(29, 35))
-        c["E1 etd attack records whole" if (end - b) % ATTACK == 0 else "E1 etd attack records NOT whole"] += 1
+        if (end - b) % ATTACK == 0:
+            c["E1 etd attack records whole"] += 1
+        elif not _w(d, 29) and end == len(d):
+            c["E1 etd attack records run to an unpointed tail"] += 1  # word 29 is 0 and no block follows
+        else:
+            c["E1 etd attack records NOT whole"] += 1
         c["E1 etd attack records"] += (end - b) // ATTACK
     return c
 
 
 def check_pair(emd: bytes, etd: bytes) -> Counter:
-    """Body records against the .etd: parts within the part table (8 parts), and the hitzone table's size divided by
-    the number of rows the body records use (a histogram of candidate row sizes)."""
+    """Body records against the .etd: parts within the part table (8 parts), the hitzone table's size (8 rows of 10
+    bytes: check E1) and the body records' rows within it."""
     c = Counter()
     recs = (body_records(emd, 8) or []) + (body_records(emd, 9) or [])
     if not recs:
@@ -125,7 +131,7 @@ def check_pair(emd: bytes, etd: bytes) -> Counter:
         c["E1 pair no hitzone table"] += 1
         return c
     size = _block_end(etd, start, ETD_PTRS) - start
-    rows = max(r[3] for r in recs) + 1
-    c[f"E1 pair hitzone table bytes / rows used = {size // rows}" if size % rows == 0 else
-      "E1 pair hitzone table bytes not a multiple of rows used"] += 1
+    c["E1 pair hitzone table 8 x 10 bytes" if size == HITZONE_ROWS * HITZONE_ROW else
+      f"E1 pair hitzone table {size} bytes"] += 1
+    c["E1 pair hitzone rows within 8" if max(r[3] for r in recs) < HITZONE_ROWS else "E1 pair hitzone row >= 8"] += 1
     return c
