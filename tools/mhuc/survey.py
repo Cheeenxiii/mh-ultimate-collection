@@ -83,6 +83,27 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
         c["G2 round trip ok" if gmd.write(g) == data else "G2 round trip differs"] += 1
     elif type_name == "rMotionList" or data[:4] == b"LMT\0":
         st.setdefault("lmt", Counter()).update(lmt.check(data))
+    elif type_name == "rEnemyCmd" or data[:4] == b"EMC\0":
+        c = st.setdefault("emc", Counter())
+        if data[:4] != b"EMC\0" or len(data) < 16:
+            c[f"A1 other magic {data[:4]!r}"] += 1
+            return
+        version, groups = struct.unpack_from("<II", data, 4)
+        c[f"A1 version 0x{version:08x}"] += 1
+        if 16 + 16 * groups > len(data):
+            c["A1 group table OUTSIDE"] += 1
+            return
+        tables = [struct.unpack_from("<II", data, 16 + 16 * g) for g in range(groups)]
+        inside = all(o + 16 * n <= len(data) for n, o in tables)
+        c["A1 groups and script tables inside" if inside else "A1 a script table OUTSIDE"] += 1
+        c["A1 scripts"] += sum(n for n, _ in tables)
+    elif type_name == "rCollision" or data[:4] == b"SBC\xff":
+        c = st.setdefault("sbc", Counter())
+        if data[:4] != b"SBC\xff" or len(data) < 0x20:
+            c[f"S1 other magic {data[:4]!r}"] += 1
+            return
+        c[f"S1 inner class 0x{struct.unpack_from('<I', data, 4)[0]:08x}"] += 1
+        c[f"S1 parts {'1' if struct.unpack_from('<H', data, 0x10)[0] == 1 else 'several'}"] += 1
     elif type_name == "rEnemyData":
         st.setdefault("emd", Counter()).update(emd.check_emd(data))
     elif type_name == "rEnemyTuneData":
@@ -166,7 +187,7 @@ def report(total: dict) -> str:
     lines = [f"files in image: {total['files']}"]
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
-    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "lmt"):
+    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "lmt", "emc", "sbc"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]

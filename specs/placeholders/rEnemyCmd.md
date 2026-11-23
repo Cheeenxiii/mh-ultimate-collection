@@ -20,3 +20,7 @@ Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `conf
 - Its file extension and where its files are in the RomFS (an ARC listing with `mhuc arc list` shows the class id).
 - Its loader: the class's `load` virtual, found from the registry's DTI address in Ghidra; the fields it reads give the layout.
 - Whether MH3U and MHXX have the same class (their reference recompiles' registries, docs/design/reference-recompiles.md).
+
+## Checks
+
+- **A1 (open, needs each game's RomFS):** `mhuc survey` counts every `rEnemyCmd`: its magic and version, whether its group and script tables stay inside the file, and its scripts. Pass for MH4U: `EMC\0` and 0x20120804 throughout (MHGU Definitive Edition's reading). MH3U's and MHXX's versions say whether converted monsters' AI can be read the same way.

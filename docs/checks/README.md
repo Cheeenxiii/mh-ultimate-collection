@@ -21,6 +21,7 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | A rebuilt quest in game (Q19) | specs/quest.md | MH4U save, a save manager, the game | open |
 | A mod quest through an Extra Data slot (Q17) | specs/quest.md | MH4U save, a save manager, the game | open |
 | A local DLC responder with its own key (D1), the DLC list files (D2) | docs/design/dlc-responder.md | the port; the goshawk mirror | open |
+| AI (EMC) and collision (SBC) versions in the three games (A1, S1) | specs/placeholders/rEnemyCmd.md, rCollision.md | MH4U, MH3U, MHXX RomFS | open |
 | LMT versions and layout in the three games (L1) | specs/lmt.md | MH4U, MH3U, MHXX RomFS | open |
 | `.emd`/`.etd` layout on the 110 pairs (E1) | specs/emd.md | MH4U RomFS | open |
 | `.mib` header on the game's own 508 quests (Q6) | specs/quest.md | MH4U RomFS | open |

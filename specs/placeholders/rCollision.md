@@ -20,3 +20,7 @@ Placeholder: only the class is known. MH4U's class registry (MH4UltimateDC `conf
 - Its file extension and where its files are in the RomFS (an ARC listing with `mhuc arc list` shows the class id).
 - Its loader: the class's `load` virtual, found from the registry's DTI address in Ghidra; the fields it reads give the layout.
 - Whether MH3U and MHXX have the same class (their reference recompiles' registries, docs/design/reference-recompiles.md).
+
+## Checks
+
+- **S1 (open, needs each game's RomFS):** `mhuc survey` counts every `rCollision`: its magic, inner class hash (0x77CF8DF8 in MH4U per MHGU Definitive Edition) and whether it has one part or several. MH3U's and MHXX's values say whether their stages' collision shares MH4U's layout.

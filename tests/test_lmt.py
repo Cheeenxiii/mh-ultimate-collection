@@ -42,3 +42,19 @@ def test_check_and_survey():
     st: dict = {}
     survey.survey_entry("rMotionList", make_lmt(), st)
     assert st["lmt"]["L1 tracks"] == 1
+
+
+def test_survey_emc_and_sbc():
+    emc = bytearray(0x60)
+    emc[:4] = b"EMC\0"
+    struct.pack_into("<II", emc, 4, 0x20120804, 1)
+    struct.pack_into("<II", emc, 16, 2, 0x20)            # group 0: 2 scripts at 0x20
+    st: dict = {}
+    survey.survey_entry("rEnemyCmd", bytes(emc), st)
+    assert st["emc"]["A1 version 0x20120804"] == 1 and st["emc"]["A1 scripts"] == 2
+    assert st["emc"]["A1 groups and script tables inside"] == 1
+    sbc = bytearray(0x48)
+    sbc[:4] = b"SBC\xff"
+    struct.pack_into("<IIIH", sbc, 4, 0x77CF8DF8, 0, 2, 1)
+    survey.survey_entry("rCollision", bytes(sbc), st)
+    assert st["sbc"]["S1 inner class 0x77cf8df8"] == 1 and st["sbc"]["S1 parts 1"] == 1
