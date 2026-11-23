@@ -24,6 +24,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [Matt-Wood-23/mh3u-quest-studio](https://github.com/Matt-Wood-23/mh3u-quest-studio) | MIT | the MH3U `QTDS` record and event-pack slots (`questlib/quest_format.py`, `dlc_pack.py`) |
 | [ArmoredRaven17/mh3u-quest-randomizer](https://github.com/ArmoredRaven17/mh3u-quest-randomizer) | MIT | MH3U `QTDS` tail offsets (`scripts/build_data.py`) |
 | [Silvris/MH-Tools-and-Scripts](https://github.com/Silvris/MH-Tools-and-Scripts) | see repository | MOD (MH3U, MHGU), TEX (mobile), GMD |
+| [beeequeue/gmd](https://github.com/beeequeue/gmd) | MIT | the GMD v2 label hash functions (`src/encode.ts`); no code copied |
 | [Scrimas/MHGU-Definitive-Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) | GPL-3.0-or-later | MH4U `.emd`/`.etd` layouts (`tools/emdata4u.py`, `tools/dt_convert.py`, `notes/data.md`), read from its MH4U-to-MHGU monster ports; no code copied |
 | [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2) (`plugin_mt_framework`) | GPL-3.0 | ARC header variants, GMD v1/v2 |
 | [3dbrew: GPU/Textures](https://www.3dbrew.org/wiki/GPU/Textures) | wiki | PICA200 texture formats and tiling |

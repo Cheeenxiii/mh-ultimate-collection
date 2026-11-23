@@ -84,6 +84,10 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
         c[f"language {g.language}"] += 1
         c[f"layout {g.layout}"] += 1
         c["G2 round trip ok" if gmd.write(g) == data else "G2 round trip differs"] += 1
+        ok, n = gmd.hash_check(g)
+        if n:
+            c["G3 label hashes match"] += ok
+            c["G3 label hashes differ"] += n - ok
     elif type_name == "rMotionList" or data[:4] == b"LMT\0":
         st.setdefault("lmt", Counter()).update(lmt.check(data))
     elif data[:4] == b"QTDS":

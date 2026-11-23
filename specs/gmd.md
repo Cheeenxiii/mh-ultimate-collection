@@ -47,7 +47,7 @@ The same fields as the long header without the u64. Silvris's GMDPy reads an MH3
 | v1 +0x00 | s32 | section index | verified | Kuriimu2 Gmdv1LabelEntry; check G1 (MH3U) |
 | v1 +0x04 | u32 | label offset; offsets count from the first entry's value | verified | Kuriimu2 Gmdv1.ReadLabels; check G1 (MH3U) |
 | v2 +0x00 | s32 | section index | verified | Kuriimu2 Gmdv2MobileLabelEntry; check G1 |
-| v2 +0x04 | u32, u32 | two hashes (functions unknown) | unverified | Kuriimu2 Gmdv2MobileLabelEntry |
+| v2 +0x04 | u32, u32 | two hashes: the inverted CRC-32 of the label repeated twice, then three times, as beeequeue/gmd writes them for MHGU (its tests round-trip MHGU's files); check G3 compares them with every MHXX table | unverified | Kuriimu2 Gmdv2MobileLabelEntry; beeequeue/gmd `encode.ts` |
 | v2 +0x0C | u32 | zero | verified | Kuriimu2 Gmdv2MobileLabelEntry; check G1 |
 | v2 +0x10 | u64 | label offset | verified | Kuriimu2 Gmdv2MobileLabelEntry; check G1 |
 | v2 +0x18 | u64 | list link | unverified | Kuriimu2 Gmdv2MobileLabelEntry |
@@ -64,7 +64,7 @@ Then the labels, NUL-terminated, then the strings, NUL-terminated, in section or
 
 ## Open questions
 
-- The v2 hash functions, needed before mhuc can write a v2 table with new labels that the game accepts. Tables read from the game keep their index byte for byte while their labels are unchanged, so changing strings alone is safe.
+- The v2 hash functions: now taken from beeequeue/gmd (above), to confirm with check G3. The buckets' fill rule is still unknown (beeequeue/gmd copies them from the file it read), and is needed too before mhuc can write a v2 table with new labels that the game accepts. Tables read from the game keep their index byte for byte while their labels are unchanged, so changing strings alone is safe.
 - The game's control codes inside strings (colours, icons, line breaks).
 - Where MH4U keeps the text MH3U and MHXX keep in GMDs (`rLayoutMessage` and others).
 
@@ -78,3 +78,4 @@ Run on 2026-11-23 with `mhuc survey` on the maintainer's dumps (see [arc](arc.md
   - MHXX JPN: 3,251 tables, all version 0x00010302, all language 0; 3,105 in layout v2 and 146 in layout v2-32 (82 in archives, 64 loose). All decode as UTF-8. No obfuscation in any game.
   - The fan-translated MHXX keeps language 0 in its English tables, and a few of its rebuilt tables fit neither layout: the translation's tools, not the game.
 - **G2 (done): round trip.** `gmd.write(gmd.read(data)) == data` for all 3,115 MH3U tables. All 3,251 MHXX tables too, both layouts, with their label index kept.
+- **G3 (open, needs the MHXX RomFS):** `mhuc survey` compares each v2 label entry's two stored hashes with `gmd.label_hashes` of its label and counts matches and differences. Pass: every label matches, which verifies the functions for MHXX.
