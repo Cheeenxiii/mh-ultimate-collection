@@ -61,6 +61,10 @@ config/games/mhxx/          MHXX (3DS), reference only
 - No class in MH3U's registry is named for swimming, water or oxygen: the swim state lives inside `uPlayer` (0x26a8) and friends, not in classes of its own. Step 4 has to find it in code, not by name.
 - 593 class names are shared between MH4U and MH3U, and 654 between MH4U and MHXX.
 
+## Step 2 results (2026-11-23)
+
+MH3U's function table is in the engine fork, `config/games/mh3u/functions.tsv`: 24,869 functions (800 DTI initialisers, 493 SDK), made with Ghidra 12.1.4 headless in two passes (20,281 from the first, then `find_missing_functions.py`'s 4,510 candidates added; 347 candidates are left for a third pass). The commands are in the fork's `config/games/README.md`. Ghidra 12.2 needs JDK 25; 12.1.4, the version `ExportForAgents.java` was verified on, runs on JDK 21. MHXX's table is not made yet; the official v1.4 (v4.8.0) update now has a clean dump, whose code is the same as the fan-repackaged copy's.
+
 ## Steps, in order (first session with game files)
 
 1. **Class registries (no recompile). Done, results above.** `mt_dti.py --exheader <mh3u exheader> --code <mh3u code.bin> -o config/games/mh3u/mt_classes.tsv`, the same for MHXX. Compare their `uEm*` classes, sizes and parents with MH4U's: the size-0x8d90 pattern of MH4U's monsters says much of a monster may be data; whether MH3U's and MHXX's monsters share one size per game is the first test of that.

@@ -114,3 +114,19 @@ Written for a Windows or Linux PC with the USA v1.3.0 dump and the port installe
 5. Start the game. The log shows `plugins: Sample plugin: plugin loaded` and `sample plugin ready`. The game plays normally (value 0 changes nothing), and the port's own pad features (skip button, mouse camera) still work, which proves the chain runs the port's hook.
 6. Set `frames_at` to a free guest address the project knows to be unused, rebuild, and watch it count frames with the runner's memory read. Record pass or fail, not the memory's contents.
 7. Remove the mod, build again: the `.plugins.tsv` is gone and the log has no plugin lines.
+
+### Result (2026-11-23, Linux, headless runner)
+
+Azahar at the pinned commit with the patch, `mh4u_runner` built with clang (no Qt, software renderer); the code library built by `build_game.py` from the USA v1.3.0 update, `-O1`, 209 objects in 17 minutes on 4 jobs. Runs with the USA cartridge and the update installed in a user folder inside the workspace.
+
+| Step | Result |
+|---|---|
+| 1. Build the sample plugin | pass (`cc -shared -fPIC`, no warnings) |
+| 2. Mod folder, `mods.py add` | pass (needs `--program-id 0004000000126300`, the game's id, not the update's `0004000E…`; the error says so) |
+| 3. `mod_hooks.py` | pass: "Sample plugin: hooks sMhPad::update, which config/hooks.txt hooks too (they run in a chain)"; 32 hook points, 1 native plugin |
+| 4. `build_game.py --install` | pass: "mods' hooks:" with the line above, and "native plugins: 1, listed in 0004000000126300.plugins.tsv next to the library" |
+| 5. Start the game | pass: `plugins: Sample plugin: sample plugin ready`, then `plugin loaded (...)`; the game boots on the recompiled code with no `interpreting` lines and reaches the save-data screen 30 s in, with the chain on `sMhPad::update` every frame. Not covered: the port's own pad features (skip button, mouse camera) live in the app and the Qt frontend, which the headless runner doesn't have |
+| 6. Frame counter at a free address | not run: the project has no guest address known to be unused yet |
+| 7. Remove the mod, build again | pass: the build relinks (no recompile: the hook points are unchanged), the `.plugins.tsv` is gone, the log has no plugin lines |
+
+Still to do: step 5's pad features in the app (`port/app`, SDL2) or the Qt build, and step 6 once a free guest address is known (or once the ABI's `alloc` exists).
