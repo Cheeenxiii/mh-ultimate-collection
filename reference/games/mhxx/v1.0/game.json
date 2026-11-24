@@ -1,0 +1,16 @@
+{
+  "_comment": "Reference game, not a port target: hashes and layout of the dump the tables here were made from. Never commit the files themselves.",
+  "name": "MHXX JPN (cartridge, v1.0)",
+  "reference": true,
+  "program_id": "0004000000197100",
+  "exheader_sci_sha1": "e39360f1f01071110a72295e55ed7714c301e6da",
+  "code_sha1": "a88fbb044f78fcd3f9e274a7c2be57fca8f16d45",
+  "code_size": "0xC65000",
+  "segments": {
+    "text": ["0x00100000", "0x00AE5700"],
+    "ro": ["0x00BE6000", "0x0013DF1C"],
+    "data": ["0x00D24000", "0x00040BE0"],
+    "bss": ["0x00D64BE0", "0x00072564"]
+  },
+  "dti_ctor": "0x0083fd00"
+}

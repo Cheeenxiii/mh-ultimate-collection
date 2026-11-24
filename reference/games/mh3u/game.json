@@ -1,0 +1,16 @@
+{
+  "_comment": "Reference game, not a port target: hashes and layout of the dump the tables here were made from. Never commit the files themselves.",
+  "name": "MH3U USA (cartridge)",
+  "reference": true,
+  "program_id": "00040000000AE400",
+  "exheader_sci_sha1": "ec45bcfb6f1b7d17056ebc22606b78b60420eaea",
+  "code_sha1": "fa3c347c61a61ed85a163d24192e822d9e73948a",
+  "code_size": "0xBBA000",
+  "segments": {
+    "text": ["0x00100000", "0x009FF5D0"],
+    "ro": ["0x00B00000", "0x000834F0"],
+    "data": ["0x00B84000", "0x001351A8"],
+    "bss": ["0x00CB91A8", "0x000E0A0C"]
+  },
+  "dti_ctor": "0x0054c8b8"
+}

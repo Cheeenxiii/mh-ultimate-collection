@@ -2,6 +2,36 @@
 
 MH3U, MHXX and MHGU recompiled with the fork's tools, as references to read and test against. They are never played and never shipped: a monster is ported by translating its source code onto MH4U's engine, and these recompiles are where that source code comes from.
 
+## Running the tools
+
+The scripts reuse the fork's recompiler. They find it in a sibling checkout named `MH4UltimateDC-fork`, or wherever `MH4U_FORK` points. They also need the fork's Python requirements (`unicorn`, `capstone`).
+
+| Script | Does |
+|---|---|
+| `recompile_game.py <game>` | recompiles a reference game from its tables in `games/` |
+| `recompile_module.py` | recompiles MHXX's CRO modules with its static code into one library |
+| `modtest.py` | tests every recompiled module function against the original, in Unicorn |
+| `cro.py` | reads a CRO module: segments, relocations, imports |
+| `mt_vtables.py` | recovers every MT class's vtable, modules included |
+| `fnmap.py` | maps functions between two games |
+| `monster_actions.py` | lists a monster's actions from its dispatcher, and pairs handlers across games by action id |
+| `extract_nsp.py` | extracts a Switch NSP's program code with your own keys |
+
+Typical MHXX run, with `<work>` holding your own extraction:
+
+```bash
+python3 reference/recompile_game.py mhxx --exheader <work>/exheader.bin --code <work>/code.bin -o build/recomp-mhxx
+(cd ../MH4UltimateDC-fork/tools && python3 -m recomp.build ../../mh-ultimate-collection/build/recomp-mhxx --harness --opt O0 -o game.so)
+```
+
+A new game's tables come from the fork's own tools, run from its checkout:
+
+1. `tools/extract_ncch.py` on your dump, then `tools/mt_dti.py` for the class registry.
+2. A Ghidra export with the fork's `tools/ghidra/` scripts, then `tools/find_missing_functions.py` and a second export.
+3. `tools/build_function_table.py ... --symbols "" --text-only`. The empty `--symbols` matters: the default file names MH4U's addresses.
+
+`games/<name>/` holds each game's `game.json` (the hash and layout of the dump the tables fit), its function table, its extra entry points and its class registry. They are addresses and names only.
+
 This page also records what has been established about the engines. Addresses are USA v1.3.0 for MH4U unless stated. Nothing here is game data: only addresses, sizes, counts and names.
 
 ## The reference games

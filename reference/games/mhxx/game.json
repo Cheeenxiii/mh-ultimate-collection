@@ -1,0 +1,18 @@
+{
+  "_comment": "Reference game, not a port target: hashes and layout of the dump the tables here were made from. Never commit the files themselves.",
+  "name": "MHXX JPN v1.4 (update v4.8.0)",
+  "reference": true,
+  "program_id": "0004000000197100",
+  "update_id": "0004000E00197100",
+  "update_version": 4224,
+  "exheader_sci_sha1": "ce32ad1c9ef060bc9d3eb06b401e28de154c2569",
+  "code_sha1": "94819d0901a37d072825abd6128f29fc07088197",
+  "code_size": "0xC71000",
+  "segments": {
+    "text": ["0x00100000", "0x00AF2438"],
+    "ro": ["0x00BF3000", "0x0013EF64"],
+    "data": ["0x00D32000", "0x0003ECA8"],
+    "bss": ["0x00D70CA8", "0x00072624"]
+  },
+  "dti_ctor": "0x0084c5f4"
+}

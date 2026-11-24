@@ -8,7 +8,7 @@ printed with the rule it broke; exit status 1):
                  code.bin, exheader.bin, anything under baserom/ build/ dumps/ export/
     binary       a file with a NUL byte in its first 8 KiB or that isn't UTF-8 text
                  (game assets are binary; ours are text)
-    size         a file over 1 MB
+    size         a file over 1 MB (except the reference games' function tables)
     listing      more than 50 lines of hex dump or C byte arrays
 
 Usage: check_no_game_data.py [PATH...]   (default: `git ls-files` of the current repository)
@@ -24,6 +24,8 @@ FORBIDDEN_EXT = {".3ds", ".cci", ".cia", ".cxi", ".cfa", ".nsp", ".xci", ".arc",
                  ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".ppm", ".wav", ".elf", ".zip", ".7z"}
 FORBIDDEN_DIRS = {"baserom", "build", "dumps", "export"}
 MAX_SIZE = 1 << 20
+# Function tables of the reference games: addresses and names only, larger than any other text.
+LARGE_TABLES = re.compile(r"^reference/games/[a-z0-9_]+/[a-z_]+\.tsv$")
 HEX_LINE = re.compile(r"^\s*(?:[0-9a-fA-F]{4,8}[:\s]\s*)?(?:[0-9a-fA-F]{2}\s+){8,}")
 C_BYTES = re.compile(r"(?:0x[0-9a-fA-F]{2}\s*,\s*){16,}")
 
@@ -36,7 +38,7 @@ def problems(path: str, data: bytes) -> list[str]:
     if ext in FORBIDDEN_EXT or parts[-1].lower() in {"code.bin", "exheader.bin"} \
             or any(p in FORBIDDEN_DIRS for p in parts[:-1]):
         out.append("name")
-    if len(data) > MAX_SIZE:
+    if len(data) > MAX_SIZE and not LARGE_TABLES.match("/".join(parts)):
         out.append("size")
     try:
         if b"\0" in data[:8192]:

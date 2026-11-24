@@ -26,3 +26,8 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+# reference/fork.py puts the engine fork's tools on sys.path, so it is imported before them.
+section-order = ["future", "standard-library", "fork", "third-party", "first-party", "local-folder"]
+sections = { fork = ["fork"] }
