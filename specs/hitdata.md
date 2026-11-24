@@ -67,14 +67,51 @@ Rebuilt into MH4U's layout (`mhuc monsterdata`), MHXX's records equal MH4U's on 
 
 ## HTD: MH3U attack records (`em_hitdata00`)
 
-`count` records of 32 bytes from 0x10. An older layout than MH4U's 40 bytes: the first four u16 line up with MH4U's (bytes 0..17 equal in 19 of Rathian's 45 records), the rest doesn't.
+`count` records of 32 bytes from 0x10. The game fetches one by attack id: `rHitData`'s loader (slot 11, 0x951d8c) checks the magic and puts the records at the object's +0x64, and the monster's attack setup (0x844a40) reads record `base + attack id × 32` and copies it into a 124-byte attack state. The setup reads the volume group and the two times itself and calls 0x987d50 for the rest; 0x987d50 is shared by the monster, player and shell setups.
+
+**Placement.** The offsets below are the game's own readers'. E4 checks the 32-byte stride on every file (125 HTD files) and E6 checks the values MH4U shares. A field E6 does not reach is unverified even though a reader places it; a byte no reader touches is unknown.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u16 ×4 | MH4U's first four u16; the third (bytes 4-5) differs more often than the others | unverified | check E5 |
-| +0x08 | 24 bytes | doesn't line up with MH4U's bytes 8..39 | unknown | check E5 |
+| +0x00 | s16 | time A: 0x844a40 compares it with the monster's animation time and starts the attack's time window at the attack state's +0x3c | verified | ours, 0x844a40; check E6 (bytes 0x00-0x11) |
+| +0x02 | s16 | time B: the window's length, to the attack state's +0x40 as a float | verified | ours, 0x844a40; check E6 |
+| +0x04 | s16 | read as a signed value, converted to a float, to the attack state's +0x44 | verified | ours, 0x987d50; check E6 |
+| +0x06 | u8 | attack kind, to the attack state's +0x48 | verified | ours, 0x987d50; check E6 |
+| +0x08 | u16 | flags, to the attack state's +0x4a | verified | ours, 0x987d50; check E6 |
+| +0x0a | u8 | to the attack state's +0x4c | verified | ours, 0x987d50; check E6 |
+| +0x0b | u8 | to the attack state's +0x4d | verified | ours, 0x987d50; check E6 |
+| +0x0c | u16 | to the attack state's +0x4e; MH4U widens it to a u32 at +0x0c | verified | ours, 0x987d50; check E6 |
+| +0x0e | u16 | 0 in every Rathian record; no reader reads it | unknown | ours, 0x987d50 |
+| +0x10 | u32 | to the attack state's +0x50; MH4U carries bytes 0x10-0x11 only | unverified | ours, 0x987d50; check E6 |
+| +0x14 | u8 | converted to a float, to the attack state's +0x54 | unverified | ours, 0x987d50; check E6 |
+| +0x15 | u8 | attack-volume group: index into `rHitSize`'s group pointer table at the object's +0x64, whose count is the HTS header's count (loader 0x951f64) | verified | ours, 0x844a40; checks E6 (below the group count), E6 (equals MH4U's +0x19) |
+| +0x16 | u8 | to the attack state's +0x5a as a u16; MH4U's +0x1a is one more in 40 of Rathian's 45 records | verified | ours, 0x987d50; check E6 |
+| +0x17 | u8 | to the attack state's +0x5c | unverified | ours, 0x987d50 |
+| +0x18 | s8 | to the attack state's +0x5d, clamped at 0; MH4U's +0x1d carries it | verified | ours, 0x987d50; check E6 |
+| +0x19 | u8 | 0xff means the default, else converted to a float at the attack state's +0x60 | unverified | ours, 0x987d50 |
+| +0x1a | u8 | 0xff means the default, else converted to a float at the attack state's +0x64 | unverified | ours, 0x987d50 |
+| +0x1b | u8 | to the attack state's +0x68 | unverified | ours, 0x987d50 |
+| +0x1c | u8 | to the attack state's +0x69 | unverified | ours, 0x987d50 |
+| +0x1d | u8 | to the attack state's +0x6a | unverified | ours, 0x987d50 |
+| +0x1e | u8 | to the attack state's +0x6c | unverified | ours, 0x987d50 |
+| +0x1f | u8 | 0 in every Rathian record; no reader reads it | unknown | ours, 0x987d50 |
+
+**What MH4U carries.** MH4U's 40-byte record (specs/emd.md, `.etd` word 28) is a later layout, read by MH4U's own setup (0xb6d09c and 0xb700a8). Only part of the HTD record comes back:
+
+| MH3U | MH4U | Rathian (of 45) | other shared monsters |
+|---|---|---|---|
+| bytes 0x00-0x11 | bytes 0x00-0x11 | 19 | Diablos 41/46, Deviljho 48/67, Great Jaggi 8/8, Lagombi 12/30 |
+| +0x0c u16 (+0x0e u16 high) | +0x0c u32 | 45 | the high u16 is 0 in the same files |
+| +0x15 group | +0x19 group | 38 | Diablos 46/46, Deviljho 67/67, Great Jaggi 8/8, Lagombi 30/30 |
+| +0x16 u8 | +0x1a u16, one more | 40 | Diablos 42/46, Deviljho 64/67, Great Jaggi 7/8, Lagombi 29/30 |
+| +0x18 s8 | +0x1d s8 | 37 | Diablos 46/46, Deviljho 67/67, Great Jaggi 8/8, Lagombi 30/30 |
+
+The rest of MH3U's tail (+0x10's high u16, +0x14, +0x17, +0x19..+0x1e) has no MH4U counterpart at those offsets, and MH4U's +0x10 f32, +0x14 f32, +0x18 u8, +0x1c u8 and +0x20..+0x27 are not in MH3U's record: MH4U retuned or remade that part. The pairs above are the same monster by name, not the same id: MH4U em001/em006/em007/em012/em015/em042/em047/em100 and MH3U em001/em006/em007/em012/em043 (the games' monster-name tables give the ids; the files' hitzones agree for these five).
+
+`mhuc monsterdata` rebuilds MH4U's record from MH3U's where the table says it can: bytes 0x00-0x11 as they are, the group at +0x19, the +0x16 value one more at +0x1a, and the signed byte at +0x1d; the bytes with no counterpart stay 0. On Rathian 11 of the 55 MH4U records come back whole, and 19 on the shared bytes.
 
 ## Checks
 
 - **E4 (done, MHXX JPN v1.0 and MH3U USA RomFS):** `mhuc survey` counts, per kind and version, the files whose records tile the file exactly (`E4 … tiles the file`) and those that don't. Results: every file tiles: MHXX 314 BDD entries (309 distinct files), 542 HTS, 151 HDE; MH3U 182 BDD, 125 HTS, 125 HTD; every BDD list and every MH3U attack volume group ends with its 0xFFFF record. The histograms quoted above come from the same files, read with `mhuc.formats.hitdata`.
 - **E5 (done):** `mhuc monsterdata` (specs/dttune.md, specs/emstatus.md) rebuilds MH4U's body records, attack volumes and attack records from these files and counts the equal records. Results are in the tables above.
+- **E6 (done, MH3U USA RomFS and the shared monsters):** two runs. `mhuc survey` counts `E6 htd volume group below the HTS group count` for every MH3U archive that holds both `em_hitdata00` and `em_hitsize00`: in all 91 set sizes the result is on the "below" side, which places the +0x15 group index against the HTS group table. `mhuc monsterdata --mh4u data/em_data.arc --id em001 --mh3u arc/enemy/em001.arc` prints, per field, how many of MH3U's records rebuild MH4U's: on Rathian bytes 0x00-0x11 19 of 45, the group 38 of 45, the +0x16 value one more at +0x1a 40 of 45 and the signed byte at +0x1d 37 of 45. The same command with `--id em006`/`arc/enemy/em006.arc` (Diablos), `em042`/`em007.arc` (Deviljho), `em015`/`em012.arc` (Great Jaggi) and `em047`/`em043.arc` (Lagombi) gives the counts in the table above.
