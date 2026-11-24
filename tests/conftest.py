@@ -1,6 +1,7 @@
 """Tests marked `game_files` read the player's own files from the folder in MHUC_DUMPS:
 
-    mh4u/romfs.bin      MH4U USA v1.3.0's RomFS
+    mh4u/romfs.bin      MH4U USA's RomFS from the game itself, not the v1.3.0 update's: the update's
+                        RomFS holds only the 20 archives it patches, and no quest
     mh4u/extdata/       its Extra Data files, encrypted (quest1, card1, otomo1, ...)
     mh4u/save.key       the save cipher's key
 
