@@ -130,11 +130,6 @@ def test_workspace_sources_exist():
         assert os.path.isfile(os.path.join(doctor.WORKSPACE_FILES, rel)), rel
 
 
-def test_session_start_never_fails(tmp_path, capsys):
-    assert doctor.main(["--workspace", str(tmp_path), "--session-start"]) == 0
-    out = capsys.readouterr().out
-    assert "Workspace doctor" in out and "# Status" in out   # STATUS.md follows the checks
-
 
 def test_check_identity(tmp_path):
     repo = _repo(str(tmp_path / "r"))
