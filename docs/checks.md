@@ -54,3 +54,15 @@ Status: open. goshawk documents the protocol but is AGPL-3.0, so a server here w
 | R1 | force the same action id on a Rathian in MH4U and in MHXX, for a sample of ids in categories 3 and 7 | each forced id plays the same move in both games |
 
 Needs a plugin that writes the two action bytes (MH4U: bytes 0x1ca and 0x1cb of the block at `this+0xe28`; MHXX: `this+0x6bf0` and `+0x6bf1`). Status: open, the plugin doesn't exist yet.
+
+## Tracing engine calls in MHXX
+
+Shows which code calls an engine function at run time, and with which arguments, when reading the code doesn't settle it (the open entries of [reference/README.md](../reference/README.md#the-62-imports-one-by-one)). The maintainer plays; the tracer and the recording run beside the game.
+
+1. Build Azahar's Qt frontend with the GDB stub (`-DENABLE_QT=ON -DENABLE_GDBSTUB=ON`; Debian needs `qt6-base-dev`, `qt6-multimedia-dev` and `qt6-base-private-dev`).
+2. In a separate Azahar user folder, install the MHXX v4.8.0 update and turn the stub on (`[Debugging] use_gdbstub=true` in `config/qt-config.ini`). The update must be a decrypted CIA whose `code.bin` equals the official one, or the addresses won't match.
+3. MHXX's game save is ExtData 0x1971: `sdmc/Nintendo 3DS/<id>/<id>/extdata/00000000/00001971/user/system` and `system_backup`. Put it there before the first boot, or the game creates a blank one.
+4. Start the game, then `reference/trace_calls.py ADDR=label ...`. A function called every frame slows the game until `--max` retires it.
+5. Play to the situation that should call the functions. A row's caller (LR) names the code using the function; matching the caller to a class through the vtables says who it is.
+
+Last result (2026-11-24, a low-rank and a Hyper Rathian fight, Verdant Hills and Primal Forest): 5 of the 7 open functions ran, with their callers recorded in reference/README.md; `0x008a1ed8` and `0x008eb1c0` never ran.
