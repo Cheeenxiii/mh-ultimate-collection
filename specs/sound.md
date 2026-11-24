@@ -1,7 +1,7 @@
 ---
-class: rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rLtSoundStreamRequest, rMHSoundEmitter (MH4U, MH3U); rSoundSourceADPCM, rSoundBank, rSoundRequest, rSoundStreamRequest (MHXX)
+class: rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rLtSoundStreamRequest, rMHSoundEmitter, rMHSoundSequence (MH4U, MH3U); rSoundSourceADPCM, rSoundBank, rSoundRequest, rSoundStreamRequest, rFestaSoundEmitter, rFestaSoundSequence, rSoundReverb, rSoundEQ (MHXX)
 extension: mca (waves and music streams), and sound entries inside ARCs (banks, requests, emitters)
-games: MH4U (from MHGU Definitive Edition's tools, EUR v1.1); MH3U and MHXX by class registry only
+games: MH4U (from MHGU Definitive Edition's tools, EUR v1.1); MH3U and MHXX by class registry; every file's magic and version checked (SN1)
 status: unknown
 ---
 
@@ -17,20 +17,47 @@ Music is a long stereo wave played through a stream request (`.stq`).
 
 Sources:
 - The MH4U layouts below come from MHGU Definitive Edition (Scrimas, GPL-3.0-or-later): `tools/snd4u2gu.py` (waves, banks, requests), `tools/snd_bgm.py` (music streams) and `tools/snd_area.py` (emitters). It read them from MH4U EUR v1.1's RomFS and checked them against the MHGU files Capcom converted from the same 4U monsters.
-- The class names and ids come from the engines' class registries: MH4UltimateDC `config/mt_classes.tsv` for MH4U, and the fork's `config/games/mh3u/` and `config/games/mhxx/`.
+- The class names and ids come from the engines' class registries: MH4UltimateDC `config/mt_classes.tsv` for MH4U, and this repository's `reference/games/mh3u/mt_classes.tsv` and `reference/games/mhxx/mt_classes.tsv` for the other two.
 
 ## Which class, which game
 
 | Kind | MH4U | MH3U (3DS) | MHXX (3DS) | Source |
 |---|---|---|---|---|
-| wave | `rLtSoundSourceADPCM` 0x67195a2e, magic `MADP` | same class and id | `rSoundSourceADPCM` 0x79c47b59 | registries |
-| bank | `rLtSoundBank` 0x14b5c8e6, magic `SNDB` | same | `rSoundBank` 0x15d782fb | registries; magics from Definitive Edition |
-| request | `rLtSoundRequest` 0x2618de3f, magic `SREQ` | same | `rSoundRequest` 0x1bcc4966 | registries; magics from Definitive Edition |
-| stream request (music) | `rLtSoundStreamRequest` 0x3a6a5a4d | same | `rSoundStreamRequest` 0x167dbbff | registries |
-| area emitters | `rMHSoundEmitter` 0x68cd2933, magic `SES\0` | same | not in the registry under that name | registries |
-| reverb, EQ | `rLtSoundReverb` (no EQ class) | `rLtSoundReverb` | `rSoundReverb`, `rSoundEQ` | registries |
+| wave | `rLtSoundSourceADPCM` 0x67195a2e, magic `MADP` | same class and id, magic `MADP` | `rSoundSourceADPCM` 0x79c47b59, magic `MADP` | registries; magics seen in every file (SN1) |
+| bank | `rLtSoundBank` 0x14b5c8e6, magic `SNDB` | same | `rSoundBank` 0x15d782fb, magic `SBKR` | registries; magics seen in every file (SN1) |
+| request | `rLtSoundRequest` 0x2618de3f, magic `SREQ` | same | `rSoundRequest` 0x1bcc4966, magic `SRQR` | registries; magics seen in every file (SN1) |
+| stream request (music) | `rLtSoundStreamRequest` 0x3a6a5a4d, magic `STRQ` | same, magic `STRQ` | `rSoundStreamRequest` 0x167dbbff, magic `STQR` | registries; magics seen in every file (SN1) |
+| area emitters | `rMHSoundEmitter` 0x68cd2933, magic `SES\0` | same class and id, but no file | `rFestaSoundEmitter` 0x2543b93e, magic `SES\0` | registries; magics seen in every file (SN1) |
+| sequence | `rMHSoundSequence` 0x6e171a6e, magic `MSS\0` | same | `rFestaSoundSequence` 0x10ebe843, magic `MSS\0` | registries; magics seen in every file (SN1) |
+| reverb, EQ | `rLtSoundReverb` 0x4a4b677c, magic `REV\0` (no EQ class) | same, magic `REV\0` | `rSoundReverb` 0x232e228c (`REVR`), `rSoundEQ` 0x2b40ae8f (`EQUR`) | registries; magics seen in every file (SN1) |
+| category filter | `rLtSoundCategoryFilter` 0x7bea3086, magic `CFL\0` | same | none in its registry or RomFS | registries; SN1 |
+| sound attribute se | `rSoundAttributeSe` 0x07437cce, an `XFS\0` container | same | none in its registry or RomFS | registries; SN1 |
 
-MH3U's classes are MH4U's, with slightly smaller instance sizes, so their file versions may differ. MHXX's ids are the same as MHGU Switch's in Definitive Edition's notes (`SBKR` 0x15d782fb, `SRQR` 0x1bcc4966, wave 0x79c47b59). That suggests Definitive Edition's 4U → GU rules, run in reverse, describe MHXX → MH4U; check S3 decides it.
+MH3U's classes are MH4U's, with slightly smaller instance sizes, but the file versions are older (SN1). MHXX's ids are the same as MHGU Switch's in Definitive Edition's notes (`SBKR` 0x15d782fb, `SRQR` 0x1bcc4966, wave 0x79c47b59). That suggests Definitive Edition's 4U → GU rules, run in reverse, describe MHXX → MH4U; check S3 decides it.
+
+## Versions and counts in the three games (SN1)
+
+Every resource above starts with its magic, then a u32 version at 0x04; the survey prints a version below 0x100 in decimal, so MH4U's stream requests show as 34 (0x22). `mhuc survey` counted them in all three RomFS (check SN1), loose files and ARC entries together:
+
+| Kind | MH4U | MH3U | MHXX |
+|---|---|---|---|
+| wave | 27,146 (`MADP` v5) | 10,132 (`MADP` v4) | 52,204 (`MADP` v5) |
+| bank | 3,582 (`SNDB` v11) | 1,225 (`SNDB` v10) | 3,010 (`SBKR` v4) |
+| request | 2,828 (`SREQ` v8) | 1,004 (`SREQ` v6) | 2,845 (`SRQR` v5) |
+| stream request | 214 (`STRQ` 0x22) | 106 (`STRQ` 0x20) | 88 (`STQR` v4) |
+| area emitter | 132 (`SES\0` 0x20120623) | 0 | 248 (`SES\0` 0x20160706) |
+| sequence | 451 (`MSS\0` 0x20120123) | 240 (`MSS\0` 0x20110404) | 236 (`MSS\0` 0x20131015) |
+| reverb | 82 (`REV\0`) | 26 (`REV\0`) | 119 (`REVR`) |
+| category filter | 46 (`CFL\0`) | 9 (`CFL\0`) | 0 |
+| EQ | 0 | 0 | 62 (`EQUR`) |
+| sound attribute se | 8 (`XFS\0`) | 26 (`XFS\0`) | 0 |
+
+Loose files, the rest being ARC entries: MH4U 571 waves, 13 banks, 16 requests and 50 stream requests; MH3U 289 waves, 106 stream requests and 94 sequences; MHXX 511 waves and 44 stream requests. Every ARC entry's class id was the one its magic's class has in that game's registry, so the class table above holds for every file counted.
+
+What the versions say about conversion:
+
+- **MH3U** has MH4U's classes but each file version is one older: wave 4 against 5, bank 10 against 11, request 6 against 8, stream request 0x20 against 0x22. 3U's sound needs readers for those versions or a conversion for all four kinds, not just new request ids; its RomFS holds no area emitter file at all.
+- **MHXX**'s waves are `MADP` version 5, the version MH4U reads, but its banks and requests are the next generation's (`SBKR` 4, `SRQR` 5, the magics and versions of MHGU's in Definitive Edition's notes) and its stream requests are `STQR` version 4. Its waves may therefore convert as-is, while its banks and requests follow GU's layouts if S3 confirms them. Its area emitters are a different class on both sides (`rFestaSoundEmitter`, version 0x20160706, against `rMHSoundEmitter`, 0x20120623), and it has an EQ class where MH4U has none.
 
 ## Wave (`MADP`, version 5): header 0x60 bytes, then data
 
@@ -93,7 +120,7 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 
 ## Checks (with game files)
 
-- **SN1:** survey the sound entries of the three RomFS (`mhuc survey`): the count per type id and per version for each kind above, MH4U against MH3U against MHXX. That tells whether MH3U's versions are MH4U's.
+- **SN1 (done, 2026-11-25):** `mhuc survey <romfs.bin>` on MH4U USA (cartridge), MH3U USA and MHXX JPN v1.0 counts every sound resource in its report's `sound` section, by kind, magic and version, and by class id inside ARCs. Result: the versions and counts table above. Every sound file in every game matched one magic and one version of its kind, and every ARC entry's class id was that game's registry class for the kind. MH3U's versions are not MH4U's: each is one older (wave 4 against 5, bank 10 against 11, request 6 against 8, stream 0x20 against 0x22), so 3U's files need version-aware readers or a conversion. MHXX keeps MH4U's wave version (5) but has GU's banks and requests (`SBKR` 4, `SRQR` 5), so only its waves may convert unchanged; S3 checks whether the GU layouts really fit. MH3U ships no area emitter file; MHXX's emitters are `rFestaSoundEmitter`, version 0x20160706.
 - **SN2:** parse every MH4U `MADP`, `SNDB`, `SREQ` and `SES` with this layout. Count files whose sizes and offsets close exactly, and record the counts, never bytes. A field becomes verified when every file agrees.
-- **S3:** MHXX's wave, bank and request against Definitive Edition's GU layouts (`SBKR` v4, `SRQR` v5, wave v2). If they agree, the XX → 4U conversion is the 4U → GU rule run backwards.
+- **S3:** MHXX's bank and request against Definitive Edition's GU layouts (`SBKR` v4, `SRQR` v5). SN1 already matches their magics and versions; if the layouts agree, the XX → 4U conversion is the 4U → GU rule run backwards. MHXX's wave is `MADP` version 5, MH4U's version and not GU's 2, so it needs no GU layout.
 - **S4:** the `.stq` layout, from `rLtSoundStreamRequest`'s loader in the MH4U recompile.

@@ -43,7 +43,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem, rQuestBattleData, rSuppItem | MH4U, MHXX `.mib` and MH3U `QTDS` headers verified on DLC quests; DLC crypto of all three; `.quest_btl` unknown |
 | [lmt](lmt.md) | rMotionList | animations: MHGU Definitive Edition's version-67 layout, read on every MH4U and MHXX file (L1); MH3U is version 66 |
 | [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, structure checked on all 110 pairs and hitzone columns laid out (E1) |
-| [sound](sound.md) | rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rMHSoundEmitter, … | MH4U layouts from MHGU Definitive Edition, unverified; class ids from the registries |
+| [sound](sound.md) | rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rMHSoundEmitter, … | MH4U layouts from MHGU Definitive Edition, unverified; class ids from the registries; every file's magic and version counted in all three games (SN1): MH3U one version older, MHXX's banks and requests GU's |
 | [dttune](dttune.md) | rEnemyDtTune | MHXX HP, parts, hitzones, tuning: layout from MHXX's loader, checked on all 138 files (E2); blocks matched to MH4U's `.etd` on three monsters (E5) |
 | [dtbase](dtbase.md) | rEnemyDtBase | MHXX map-hit spheres, joint points, part groups and the `.emd` scalars: layout from MHXX's loader, checked on all 138 files (E7); matched to MH4U's `.emd` on three monsters (E5) |
 | [dtbparts](dtbparts.md) | rEnemyDtBaseParts | MHXX break and joint records: layout from MHXX's loader, checked on all 138 files (E7); break parts and joint records matched to MH4U's `.emd` on three monsters (E5); MH4U's sever records absent |
