@@ -19,21 +19,25 @@ Both files start with a header of u32 words, most of them offsets of blocks insi
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x0C, 0x10, 0x14 | u32 or f32 | scalars copied into MHGU's `dtbase` object (+0x64, +0x68, +0xA0); 0x14 also into `dttune` +0xEC | unverified | MHGU-DE `dt_convert.py` |
+| 0x0C, 0x10, 0x14 | u32 or f32 | scalars: 0x0C and 0x10 into MHXX's `dtbase` object +0x60 and +0x64, 0x14 into `dttune` +0xEC (and MHGU's `dtbase` +0xA0); equal to MHXX's on the three pairs | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
 | word 8 (0x20) | offset | body data: the hurt (and push) volumes, 44-byte records until a record whose first u16 is 0xFFFF (table "Body record"); set in all 110, every list ends | verified | MHGU-DE `emdata4u.bodydata`; check E1 |
 | word 9 (0x24) | offset | camera body data: the same records, for the camera (0 in 3 of 110) | verified | MHGU-DE `emdata4u.bodydata`; check E1 |
-| word 13 (0x34) | offset | a 32-byte block (into `dtbase` +0x70; 39 of 40 shared monsters equal to MHGU's) | unverified | MHGU-DE `dt_convert.py` |
-| 0x30 | u32 | a scalar (into `dtbase` +0x6C) | unverified | MHGU-DE `dt_convert.py` |
+| word 13 (0x34) | offset | a 32-byte block: MHXX's `dtbase` block +0x6C, 16 u16; equal on the three pairs | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
+| 0x30 | u32 | a scalar: MHXX's `dtbase` object +0x68; equal on the three pairs | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
 | word 16 (0x40) | offset | arena point table (the game uses another on stage 13) | unverified | MHGU-DE porting-guide.md |
-| word 20 (0x50) | offset | map-hit sphere: 4 offsets and a radius, 52 bytes (`dtbase` +0x84) | unverified | MHGU-DE `dt_convert.py`, porting-guide.md |
-| word 21, 22 | offset | 52-byte and 4-byte blocks (`dtbase` +0x88, +0x8C) | unverified | MHGU-DE `dt_convert.py` |
-| 0x6C, 0x70, 0x78, 0x7C | u32 or f32 | scalars (`dtbase` +0x98, +0x9C, +0xA4, +0xA8) | unverified | MHGU-DE `dt_convert.py` |
-| word 33 (0x84) | offset | break list (part groups that change when a part breaks) | unverified | MHGU-DE notes/data.md |
+| word 20 (0x50) | offset | map-hit sphere: 52 bytes, four offsets then a radius; MHXX's `dtbase` map-hit sphere record, equal on Kushala Daora and Teostra and 51 of 52 bytes on Rathian | verified | MHGU-DE `dt_convert.py`, porting-guide.md; specs/dtbase.md; check E5 |
+| word 21 (0x54) | offset | a second 52-byte block: MHXX's `dtbase` +0x84; equal on Kushala Daora and Teostra, 51 of 52 bytes on Rathian | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
+| word 22 (0x58) | offset | a 4-byte block: MHXX's `dtbase` +0x88; equal on all three pairs | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
+| 0x6C, 0x70, 0x78, 0x7C | u32 or f32 | scalars, in this order with 0x14: MHXX's `dtbase` block +0x94; equal on the three pairs | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
+| word 32 (0x80) | offset | part break table: 32-byte records (u8 part, u8 break count, u8, u8, u8 group, u32 joint at +8, f32 at +0xC, u8 0xFF, RGB at +0x1D) until a part of 0xFF; its breakable parts equal MHXX's `dtbparts` break records on the three pairs | unverified | MHGU-DE `dala_break.c`; specs/dtbparts.md; check E5 |
+| word 33 (0x84) | offset | break list: (s32 group, u32 param) pairs until group −1; no counterpart found in MHXX's `dtbase` or `dtbparts` | unverified | MHGU-DE notes/data.md; specs/dtbparts.md; check E5 |
 | word 34 (0x88) | offset | part visibility rows, 16 bytes each until a group of −1 (table "Visibility row"); 0 in 6 of 110, every list ends | verified | MHGU-DE `emdata4u.part_rows`; check E1 |
-| word 35 (0x8C) | offset | sever and detach records (bones of the tail, for instance) | unverified | MHGU-DE notes/data.md |
-| word 38 (0x98) | offset | a 64-byte block (`dtbase` +0x74; MHGU retunes it) | unverified | MHGU-DE `dt_convert.py` |
+| word 35 (0x8C) | offset | joint and sever records: 24-byte records (s32 joint, u32 kind, u32 index, u32 limit, u32 255, u32 0) until a joint of −1. The records whose kind isn't 0 are MHXX's `dtbparts` joint records (6 of 6 on Rathian); the kind-0 records after a (255, 0, 0, −1) marker are the sever/detach records, which no `dtbase` or `dtbparts` block holds | verified | MHGU-DE notes/data.md; ours, `mhuc monsterdata`; specs/dtbparts.md; check E5 |
+| word 38 (0x98) | offset | a 64-byte block: MHXX's `dtbase` +0x70; equal on Rathian, 54 and 55 of 64 bytes on Kushala Daora and Teostra (MHGU retunes it) | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
+| word 39 (0x9C) | offset | a 12-byte block: MHXX's `dtbase` +0x74; equal on Rathian, absent on both sides for Kushala Daora and Teostra | verified | specs/dtbase.md; check E5 |
 | word 40 (0xA0) | offset | slope fit: records, a u8 shift, 3 floats, then 44-byte joint records | unverified | MHGU-DE `dt_convert.py` |
-| word 43 (0xAC) | offset | joint points, 56 bytes | unverified | MHGU-DE `dt_convert.py` |
+| word 43 (0xAC) | offset | joint points: 56 bytes = two 28-byte records, MHXX's `dtbase` +0xA8; equal on all three pairs | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
+| word 44 (0xB0) | offset | 32-byte records closed by one whose first u32 is 0xFF: MHXX's `dtbase` +0xAC, equal on Rathian and absent on both sides for Kushala Daora and Teostra | verified | specs/dtbase.md; check E5 |
 
 ### Body record (44 bytes)
 
@@ -96,7 +100,7 @@ Rathian's row 7 is 100 in all ten bytes and no body record uses it.
 ## What this means for the mod
 
 - **A monster's hitzones, parts and breaks travel with its own `.emd`/`.etd`.** A new monster brings its pair, loaded by id through `enemyDataPathIndex` (id-tables.md), with no shared table to grow. MHGU's equivalents (`dtbase`, `dttune`, `dtbparts`, `bodydata`, `hitsize`, `attackdata`) map onto MH4U's per word, and MHGU-DE converts them in the GU direction. The GU-to-4U direction this mod needs is the same mapping run backwards: the reverse of `emdata4u.py` and `dt_convert.py`.
-- **The source games split the same data over several files.** MHXX's `dttune` holds the `.etd`'s HP, part table, hitzones, ranges, rage and ailments in a stream (specs/dttune.md); MH3U's `em_status00` holds HP, part HP and hitzones in an aligned walk (specs/emstatus.md); both keep hurt volumes, attack volumes and attack records in files of their own (specs/hitdata.md). `mhuc monsterdata` rebuilds MH4U's values from them and compares.
+- **The source games split the same data over several files.** MHXX's `dttune` holds the `.etd`'s HP, part table, hitzones, ranges, rage and ailments in a stream (specs/dttune.md); its `dtbase` holds the `.emd` blocks named above and its `dtbparts` the break and joint records (specs/dtbase.md, specs/dtbparts.md); the break records and joint records are not byte-equal to MH4U's, and MH4U's sever records have no counterpart found (specs/dtbparts.md). MH3U's `em_status00` holds HP, part HP and hitzones in an aligned walk (specs/emstatus.md); both keep hurt volumes, attack volumes and attack records in files of their own (specs/hitdata.md). `mhuc monsterdata` rebuilds MH4U's values from them and compares.
 - **Bone ids are the model's.** MHGU-DE keeps 4U's bone ids and remap table when converting models, so the data needs no remap, except where a bone is missing from the target skeleton.
 
 ## Checks

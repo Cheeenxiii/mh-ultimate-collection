@@ -9,7 +9,7 @@ import pytest
 from mhuc import monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
-from mhuc.formats import arc, dttune, emstatus, hitdata, romfs
+from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, romfs
 from mhuc.quests import mibwrite, quest
 
 pytestmark = pytest.mark.game_files
@@ -71,10 +71,10 @@ def monster_entries(path: str):
 
 
 def test_every_mhxx_and_mh3u_monster_data_file_is_laid_out_to_its_last_byte(dump):
-    """dttune.blocks and emstatus.blocks raise unless the layout ends exactly at the file's end; hitdata raises unless
-    the records tile the file (checks E2 to E4)"""
+    """dttune.blocks, dtbase.blocks, dtbparts.blocks and emstatus.blocks raise unless the layout ends exactly at the
+    file's end; hitdata raises unless the records tile the file (checks E2 to E4, E7)"""
     kinds = {b"BDD\0": "bdd", b"HTS\0": "hts", b"HDE\0": "hde", b"HTD\0": "htd"}
-    counts = {"dttune": 0, "em_status": 0, "hit data": 0}
+    counts = {"dttune": 0, "dtbase": 0, "dtbparts": 0, "em_status": 0, "hit data": 0}
     for game in ("mhxx", "mh3u"):
         for name, entries in monster_entries(dump(game, "romfs.bin")):
             for e in entries:
@@ -82,6 +82,12 @@ def test_every_mhxx_and_mh3u_monster_data_file_is_laid_out_to_its_last_byte(dump
                     if e.data[:4] == dttune.MAGIC:
                         dttune.blocks(e.data)
                         counts["dttune"] += 1
+                    elif e.data[:4] == dtbase.MAGIC:
+                        dtbase.blocks(e.data)
+                        counts["dtbase"] += 1
+                    elif e.data[:4] == dtbparts.MAGIC:
+                        dtbparts.blocks(e.data)
+                        counts["dtbparts"] += 1
                     elif e.data[:4] == emstatus.MAGIC:
                         emstatus.blocks(e.data)
                         counts["em_status"] += 1
@@ -107,11 +113,16 @@ def test_rathian_hp_parts_and_hitzones_rebuild_from_mhxx_and_mh3u(dump):
     em_data = next(arc.read(image.read(f)).entries for f in image.files() if f.path.endswith("em_data.arc"))
     mh4u = monsterdata.from_mh4u(_entry(em_data, 0x0A0E48D4, "em001"), _entry(em_data, 0x3D8BBBAC, "em001"))
     xx = dict(monster_entries(dump("mhxx", "romfs.bin")))["/arc/enemy/em001_00.arc"]
-    rebuilt = monsterdata.from_mhxx(_entry(xx, 0x48E8AC29, "dt_tune/"), _entry(xx, 0x1AC7B52D, "/body_data/"),
-                                    _entry(xx, 0x1AC7B52D, "cam_body_data/"), _entry(xx, 0x5653C1B0, "enemy/hit_data/"),
-                                    _entry(xx, 0x70BB64BA, "hit_data/"))
-    for field in ("base HP", "part table", "hitzone table"):
+    rebuilt = monsterdata.from_mhxx(_entry(xx, 0x48E8AC29, "dt_tune/"), _entry(xx, 0x59D9C3DA, "dt_base/"),
+                                    _entry(xx, 0x1BBC291E, "dt_base/"), _entry(xx, 0x1AC7B52D, "/body_data/"),
+                                    _entry(xx, 0x1AC7B52D, "cam_body_data/"),
+                                    _entry(xx, 0x5653C1B0, "enemy/hit_data/"), _entry(xx, 0x70BB64BA, "hit_data/"))
+    for field in ("base HP", "part table", "hitzone table", "joint points", "joint records", "break parts"):
         assert rebuilt[field] == mh4u[field], f"MHXX {field} isn't MH4U's"
+    assert len(mh4u["sever records"]) == 3 and rebuilt["sever records"] is None, \
+        "MHXX's dtbase/dtbparts hold a block for MH4U's kind-0 (sever) records"
+    sphere = sum(a == b for a, b in zip(rebuilt["map-hit sphere"], mh4u["map-hit sphere"], strict=False))
+    assert sphere == 51, f"MHXX's map-hit sphere has {sphere} of 52 bytes in common with MH4U's, expected 51"
     u3 = dict(monster_entries(dump("mh3u", "romfs.bin")))["/arc/enemy/em001.arc"]
     status = _entry(u3, 0x4DEE8265, "em_status")
     rows = emstatus.block(status, "hitzone table")

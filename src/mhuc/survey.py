@@ -4,7 +4,8 @@ It reads the image in place (mhuc.romfs) and every ARC inside it, and reports on
 versions and pass/fail tallies: nothing from the files themselves, so its output can go into
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
-em_status), E4 (body, attack volume and attack record files), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
+em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), L1 (lmt), A1
+(rEnemyCmd), S1 (rCollision).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -15,7 +16,7 @@ import struct
 from collections import Counter
 from multiprocessing import Pool
 
-from .formats import arc, classid, dttune, emd, emstatus, gmd, hitdata, lmt, pica, romfs, tex
+from .formats import arc, classid, dtbase, dtbparts, dttune, emd, emstatus, gmd, hitdata, lmt, pica, romfs, tex
 from .formats import mod as modfile
 from .quests import quest as questfile
 
@@ -146,6 +147,20 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
             c["E2 dttune layout ends at the file's end"] += 1
         except dttune.DttuneError as e:
             c[f"E2 dttune {str(e).split(',')[0]}"] += 1
+    elif data[:4] == dtbase.MAGIC:
+        c = st.setdefault("monster data", Counter())
+        try:
+            dtbase.blocks(data)
+            c["E7 dtbase layout ends at the file's end"] += 1
+        except dtbase.DtBaseError as e:
+            c[f"E7 dtbase {str(e).split(',')[0]}"] += 1
+    elif data[:4] == dtbparts.MAGIC:
+        c = st.setdefault("monster data", Counter())
+        try:
+            dtbparts.blocks(data)
+            c["E7 dtbparts layout ends at the file's end"] += 1
+        except dtbparts.DtbPartsError as e:
+            c[f"E7 dtbparts {str(e).split(',')[0]}"] += 1
     elif data[:4] == emstatus.MAGIC:
         c = st.setdefault("monster data", Counter())
         try:
