@@ -70,7 +70,7 @@ Both files start with a header of u32 words, most of them offsets of blocks insi
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
 | word 4 (0x10) | u32 | base HP (Kushala Daora 4200, Gogmazios 17500; a quest scales it by its own table); 1..100,000 in all 110 | unverified | MHGU-DE notes/data.md |
-| word 5 (0x14) | offset | part table: 8 × 10 bytes, one per part: u16 part HP, u8 break levels, u8 ×3, u16 second-level HP (0xFFFF none), u16 kind | unverified | MHGU-DE `dt_convert.py` |
+| word 5 (0x14) | offset | part table: 8 × 10 bytes, one per part: u16 part HP, u8 break levels, u8 ×3, u16 second-level HP (0xFFFF none), u16 kind. MH3U rebuilds the same ten bytes from its part HP, second-level HP and break record, field by field ([emstatus.md](emstatus.md#part-record-mapping)); on Rathian every break-record byte and the second-level HP's "none" agree, and the kind has no 3U source | verified | MHGU-DE `dt_convert.py`; specs/emstatus.md; check E5 |
 | word 7 (0x1C) | offset | hitzone table: 80 bytes in all 110, **8 rows of 10 bytes** (table "Hitzone row"); the body record's +0x06 picks a row (`dttune` +0x70 in MHGU). Find it by this word rather than at a fixed offset | verified | MHGU-DE `dt_convert.py`, porting-guide.md; check E1 |
 | word 8 (0x20) | offset | an 80-byte table beside it (`dttune` +0x74) | unknown | MHGU-DE `dt_convert.py` |
 | word 9 (0x24) | offset | sensor (eye) records, 28 bytes each, ending at an s32 0xFFFF: joint, range, near radius, angles | unverified | MHGU-DE `dt_convert.py` |
