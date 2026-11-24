@@ -69,18 +69,10 @@ Every 3U and GU quest is the source game's own quest, rewritten as an MH4U `.mib
 
 - **Readers:** `mhuc quest dump` reads MH4U `.mib`, MHXX quest archives and MH3U `QTDS` into JSON.
 - **Writer:** the `.mib` builder lays a quest out with every offset recomputed. Rebuilding any of the 120 MH4U DLC quests gives back every field it had.
-- **Converter:** `mhuc convert quest --from mhxx` maps ids through `data/idmap/`, which ships empty. It refuses any quest with an unmapped id. Fields it can't convert come from an MH4U template quest and are listed as placeholders.
-- **MH3U quests** wait for stage data, because `QTDS` doesn't hold monster positions.
+- **Converter:** `mhuc convert quest --from mhxx` maps ids through `data/idmap/`, which ships empty. It refuses any quest with an unmapped id.
+- **Routes into the game:** the quest archives, an Extra Data slot as a download, or a local DLC server answering the game's DLC screen.
 
-A quest can reach the game three ways:
-
-| Route | Suits | Needs |
-|---|---|---|
-| The game's quest archives | quests woven into progression | growing the quest lists |
-| An Extra Data slot, as a download | event quests, 200 at most | in-game checks Q17 and Q19 |
-| A local DLC server answering the game's DLC screen | event quests | the port answering the game's HTTP requests (checks D1, D2) |
-
-**Extra Data** is the quickest way to show content in game. MH4U stores downloaded quests, DLC Palicos and guild quests there. All three record kinds can be read, written in the game's own stored form and re-encrypted byte for byte. None has been tried in the game yet.
+The field-by-field mapping, the three routes, the Extra Data records and the DLC protocol are in [quests.md](quests.md).
 
 ## Underwater
 
