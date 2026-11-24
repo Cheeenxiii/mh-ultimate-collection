@@ -2,7 +2,7 @@
 
 Underwater play comes from MH3U, which has it in full. Each part is read from MH3U's files or its recompiled code, and carried into MH4U as data plus plugin hooks. Only what no game ever had is authored.
 
-Where a part is not marked as checked, "where it likely lives" is a hypothesis to confirm in the reference recompile.
+Where a part is not marked as checked, "where it likely lives" is a hypothesis to confirm in the reference recompile. The hunter skeleton comparison below is checked against both games' files.
 
 ## What comes from MH3U
 
@@ -12,7 +12,7 @@ Where a part is not marked as checked, "where it likely lives" is a hypothesis t
 | Oxygen | the gauge, drain, refill on surfacing, damage at zero, items and skills | player status code, item and skill data | gauge logic in the plugin, values from MH3U's tables |
 | Camera | the free 3D camera underwater | MH3U's camera classes | a hook on MH4U's camera (`sMhCamera`, which the port already hooks) |
 | Water volumes | where the water is, its surface, which areas are underwater | stage collision and area info, per area | converted stage data; the area loader told which areas are water |
-| Underwater motions | idle, swim, attacks, reactions, per weapon class | motion lists (`.lmt`) for the player, per weapon | converted motion lists, with a 3U-to-4U skeleton mapping |
+| Underwater motions | idle, swim, attacks, reactions, per weapon class | motion lists (`.lmt`) for the player, per weapon | converted motion lists, with the 3U bone ids rewritten to 4U's |
 | Monster behaviour | swimming movement and attacks | monster AI scripts (`.emc`) and monster code | monsters bring their own data; water-aware movement translated from MH3U |
 | Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists, sound requests, filters | converted assets; MH4U's own screen filters where they match |
 | HUD | oxygen gauge, depth cues | layout files | converted layout, or drawn by the plugin |
@@ -26,6 +26,19 @@ Where a part is not marked as checked, "where it likely lives" is a hypothesis t
   - camera: a mark at +0x12D of the camera block is 1 under water, the game handles pitch itself there, and the turn ramp is 10 frames instead of 5;
   - carving: a carve spot is kind 6 under water, 4 on land.
 - Monster Hunter Tri, 3U's Wii base, has a static recompilation and reverse-engineering tools (MHTrIDA). They are a reference for behaviour, never a source.
+
+## Hunter skeletons
+
+The two hunters are the same rig with one bone dropped and one renumbered.
+
+- **Bones.** MH3U's hunter body has 20 bones, ids 0 to 19; MH4U's has 19, ids 0 to 12 and 14 to 19. In every armour set checked, each MH4U bone has the same parent as its MH3U counterpart, and in the base set (armour id 1) the same rest position and parent distance too. MH4U id 0 is MH3U id 13, the pelvis (it carries the body's mesh); every other id is itself. MH3U id 0 is an empty root whose record is all zeroes; MH4U dropped it, and the torso (id 1) and the two leg chains (ids 14 and 17) hang off the pelvis.
+- **Parts.** Arm (9 bones), face (1) and hair (3) are identical. Leg (7) and waist (6) have the same ids and tree with the root renumbered 13 → 0. Helm is ids 2 to 4, and some sets add ids 20 and 21; those two are outside the motion rig.
+- **No names.** No hunter model stores bone names: the bone block is exactly bone count × 0x98 + 0x100 + skin count × 0x1C bytes and the file ends at the index buffer. The id is the only identity a model and a motion share.
+- **Motions name bones by id.** MH4U's player motion lists, common and per weapon, rotate every hunter id (0 to 12 and 14 to 19) and translate id 0; none carries id 13 (check L2). MH3U's 50 player motion lists, read with version 67's 0x24-byte track table, rotate ids 1 to 21 and translate id 0, with ids 20 and 21 never given a keyframe; both games keep track 255 for root motion. The version-66 buffers aren't decoded, so for MH3U this reads the tracks only.
+
+**The mapping.** Rewrite each MH3U track's bone id: 1 to 12 and 14 to 19 stay; 13 becomes 0; 0 stays 0; 20 and 21 are dropped; 255 stays. MH3U's translation track on id 0 and its rotation track on id 13 become MH4U's two tracks on id 0, so no keyframe has to be composed. Converting the version-66 keyframe buffers is still open (first known bullet above); this mapping only says where each track goes.
+
+Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k "hunter_skeleton or address_bones_by_id"` ([specs/mod.md](../specs/mod.md), check M4; [specs/lmt.md](../specs/lmt.md), check L2).
 
 ## What MH4U kept
 
@@ -67,7 +80,6 @@ The oxygen gauge's role is inferred from its name and its cockpit siblings, not 
 
 1. Whether MH4U kept any of MH3U's water code: answered for the class level in [What MH4U kept](#what-mh4u-kept) — the water surface survives, the underwater systems do not. The function-level question stays with unknown 2.
 2. How MH3U's player state machine is organised (one class per state, or one big switch). This decides whether the swim state can be ported function by function.
-3. Whether the 3U and 4U hunter skeletons match: bone counts and names.
 
 ## Approach
 

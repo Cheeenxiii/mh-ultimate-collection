@@ -1,6 +1,6 @@
 """MT Framework Mobile models (`.mod`, rModel, version 0xE6), as specs/mod.md lays them out: the header (verified,
 check M2) and the 48-byte mesh records (fields from MHGU Definitive Edition's `mod.py`, after RevilLib: unverified,
-check M3). `info` gives a summary of counts; `check` gives check M3's counts.
+check M3). `info` gives a summary of counts, `bones` the bone records (check M4) and `check` check M3's counts.
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from collections import Counter
 
 MESH = 0x30
 GROUP = 0x20
+BONE = 0x18
 
 
 class ModError(ValueError):
@@ -50,6 +51,31 @@ def group_ids(d: bytes, h: dict | None = None) -> list[int]:
     if h["groups_at"] + GROUP * h["groups"] > len(d):
         raise ModError("group table outside the file")
     return [struct.unpack_from("<I", d, h["groups_at"] + GROUP * i)[0] for i in range(h["groups"])]
+
+
+def bones(d: bytes, h: dict | None = None) -> list[dict]:
+    """The bone records at `bones_at` (check M4), one 0x18-byte record per bone. `parent` is the
+    index of the parent's entry (0xFF at the root) and `parent_id` resolves it to the parent's bone
+    id. `mirror`, `furthest`, `parent_distance` and `position` are the names MHGU-DE's `mod.py` gives
+    the rest of the record; check M4 reads them but doesn't explain them."""
+    h = h or header(d)
+    n, at = h["bones"], h["bones_at"]
+    if n and (at < 0x40 or at + n * BONE > len(d)):
+        raise ModError("bone table outside the file")
+    out = []
+    for i in range(n):
+        o = at + i * BONE
+        bid, parent, mirror = d[o], d[o + 1], d[o + 2]
+        furthest, distance = struct.unpack_from("<ff", d, o + 4)
+        x, y, z = struct.unpack_from("<3f", d, o + 0x0C)
+        out.append({"index": i, "id": bid, "parent": parent, "mirror": mirror,
+                    "furthest": furthest, "parent_distance": distance, "position": (x, y, z)})
+    ids = [b["id"] for b in out]
+    for b in out:
+        if b["parent"] != 0xFF and b["parent"] >= n:
+            raise ModError(f"bone {b['index']} has parent {b['parent']}, past the {n} bones")
+        b["parent_id"] = 0xFF if b["parent"] == 0xFF else ids[b["parent"]]
+    return out
 
 
 def info(d: bytes) -> dict:
