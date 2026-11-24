@@ -81,50 +81,62 @@ compared. The run covers MH4U USA v1.3.0, MHXX v1.4 `roEm001` and MH3U USA.
 | MHXX | 301 | 178 | 0 | 96 | 27 |
 | MH3U | 191 | 132 | 0 | 50 | 9 |
 
-| Pair | Common ids | Compared | Same motion | Different motion | Not compared |
+| Pair | Common ids | Compared | Same index | Different index | Not compared |
 |---|---|---|---|---|---|
 | MH4U / MHXX | 273 | 167 | 167 | 0 | 106 |
 | MH4U / MH3U | 174 | 117 | 2 | 115 | 57 |
 | MHXX / MH3U | 145 | 84 | 0 | 84 | 61 |
 
-Last result (2026-11-24): MH4U and MHXX start the same motion for every one of their 167
-comparable ids; the two ids that agree between MH4U and MH3U are 1/11 and 1/12, and every
-other compared id differs. The not-compared ids are those where one side (or both) is
-`computed`, `none` or `no-handler`; the run prints the reason counts.
+The index says little about the motion: MH4U and MHXX pack a motion index as LMT file << 8 |
+slot, MH3U as file * 100 + slot, and the LMT files group the animations differently.
+Comparing the animation each handler starts (its frame count, loop frame and track count; the
+MH3U version-66 files use the same animation header and track table as version 67 for this
+comparison, while their keyframe encodings are still unlaid-out, specs/lmt.md) splits the
+differing ids:
 
-Ids that differ, MH4U / MH3U (115):
+| Pair | Differing ids | Same motion, another index | Different motion | Not resolved |
+|---|---|---|---|---|
+| MH4U / MH3U | 115 | 93 | 3 | 19 |
+| MHXX / MH3U | 84 | 67 | 3 | 14 |
 
-```
-1/4 1/5 1/6 1/7 1/8 1/13 1/14 2/4 2/5 2/6
-3/0 3/1 3/2 3/4 3/6 3/7 3/8 3/12 3/13 3/16
-3/17 3/18 3/19 3/20 3/21 3/24 3/25 3/27 3/28 3/29
-7/0 7/1 7/3 7/4 7/5 7/6 7/7 7/8 7/9 7/12
-7/14 7/16 7/17 7/18 7/19 7/20 7/21 7/22 7/23 7/24
-7/25 7/26 7/27 7/28 7/29 7/30 7/31 7/32 7/33 7/34
-7/36 7/38 7/39 7/40 7/41 7/42 7/43 7/44 7/45 7/49
-7/50 7/51 7/52 7/53 7/54 7/55 7/56 7/57 7/59 7/60
-7/61 7/62 7/66 7/67 7/68 7/69 7/70 7/71 7/72 7/73
-7/74 7/75 7/76 7/77 7/78 7/80 7/83 7/85 7/88 7/89
-7/90 7/91 7/94 7/95 8 9/1 9/2 12 13/0 13/1
-13/2 13/4 13/5 13/6 13/8
-```
+The same-motion class is 86 exact signatures in MH4U/MH3U (64 in MHXX/MH3U), 2 with one extra
+MH4U track (the skeleton, specs/mod.md), and 5 (3) whose handler's index decodes to an empty
+MH4U/MHXX slot but whose animation is found at another index by its signature. The 3 different
+are 13/5, 13/6 and 13/8 in both pairs: their frame or loop frame counts differ. The not-resolved
+ids decode to an empty slot with no unique signature match; their handlers are category 7,
+whose code is shared and can start more than one motion, so the first constant is not enough.
 
-Ids that differ, MHXX / MH3U (84):
+Different motion (both pairs, 3):
 
 ```
-1/4 1/5 1/6 1/7 1/8 2/4 2/5 2/6 3/0 3/2
-3/4 3/6 3/7 3/8 3/12 3/13 3/16 3/17 3/18 3/19
-3/20 3/21 3/24 3/25 3/27 3/28 3/29 7/0 7/1 7/4
-7/5 7/6 7/7 7/8 7/9 7/12 7/14 7/16 7/17 7/18
-7/19 7/20 7/21 7/22 7/23 7/24 7/25 7/26 7/27 7/28
-7/29 7/30 7/31 7/32 7/33 7/34 7/36 7/38 7/39 7/40
-7/42 7/45 7/49 7/50 7/51 7/52 7/57 7/59 7/60 7/61
-7/62 7/66 7/67 7/68 9/1 9/2 9/3 9/4 13/0 13/1
-13/2 13/5 13/6 13/8
+13/5 13/6 13/8
 ```
 
-The lists are action ids only; a bare number is a category with one action. The two motion
-indices are printed by `compare --values` and stay outside the repository.
+Not resolved, MH4U / MH3U (19):
+
+```
+7/36 7/38 7/39 7/40 7/49 7/50 7/51 7/52 7/59 7/60
+7/62 7/66 7/67 7/68 7/69 7/70 7/74 7/90 7/91
+```
+
+Not resolved, MHXX / MH3U (14):
+
+```
+7/36 7/38 7/39 7/40 7/49 7/50 7/51 7/52 7/59 7/60
+7/62 7/66 7/67 7/68
+```
+
+The other differing ids (93 and 67) are the same motion at another index. The per-id mapping
+(action id, the two motion indices and the class) is written by `compare --mapping`; the motion
+indices stay outside the repository.
+
+Last result (2026-11-24): MH4U and MHXX start the same index for every one of their 167
+comparable ids. The two ids whose index also agrees with MH3U are 1/11 and 1/12; the content
+comparison above shows that the rest are mostly the same motion at another index, not different
+moves. The not-compared ids are those where one side (or both) is `computed`, `none` or
+`no-handler`; the run prints the reason counts. The port must map MH3U's motion indices (its
+packing and LMT grouping), not reuse them; 13/5, 13/6 and 13/8 are the entries whose motion
+itself differs.
 
 To rerun, write the TSVs outside the repository (for example under `build/`):
 
@@ -136,6 +148,16 @@ python3 reference/monster_motions.py list --game mhxx --module roEm001.cro --crs
 python3 reference/monster_motions.py list --game mh3u --exheader <MH3U exheader> \
     --code <MH3U code.bin> --range 0x686000 0x69b000 --dispatcher 0x00687d30 -o build/mh3u.tsv
 python3 reference/monster_motions.py compare build/mh4u.tsv build/mhxx.tsv
+```
+
+For the motion content, pass each game's LMT files in file order (MH4U/MHXX `_0` to `_4`,
+MH3U `mot_em001_000`, `_100`, `_200`; extracted from the monster's archive):
+
+```bash
+python3 reference/monster_motions.py compare build/mh4u.tsv build/mh3u.tsv \
+    --game-a mh4u --lmt-a build/lmt/em001_{0,1,2,3,4} \
+    --game-b mh3u --lmt-b build/lmt/mot_em001_{000,100,200} \
+    --mapping build/mh4u-mh3u-map.tsv
 ```
 
 For another monster, change `--range` to its code (or `--module`/`--crs` to its MHXX

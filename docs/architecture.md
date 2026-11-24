@@ -61,7 +61,7 @@ A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source g
 
 What makes this tractable:
 
-- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U.
+- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most ids, so a port maps the indices instead of reusing them; 13/5, 13/6 and 13/8 are the ids whose motion itself differs.
 - **A GU monster's code assumes MHXX's enemy layer.** Rathian's MHXX module calls 330 engine functions, and MH4U lacks 262 of them. That is why handlers are rewritten instead of linked.
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.
