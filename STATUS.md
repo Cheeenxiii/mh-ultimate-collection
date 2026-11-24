@@ -16,7 +16,7 @@ This session ([report](docs/reports/2026-11-24-rathian-actions.md), results in [
 ## Branches
 
 - All four of the last sessions' PRs merged on 2026-11-24 at the maintainer's request (content #9, #10; fork #7, #8). No session branch is in flight.
-- Fork: `claude/practical-johnson-jobxzw` (PR #4, the fork README) is still open.
+- Fork PR #4 (the fork README) is merged, and `uc/main` is the fork's default branch.
 
 ## Next tasks, in order
 
@@ -33,7 +33,6 @@ This session ([report](docs/reports/2026-11-24-rathian-actions.md), results in [
 
 ## Waiting on the maintainer
 
-- PR #4 in the fork, and whether `uc/main` becomes the fork's default branch.
 - Check R1 (an action id is the same move in both games), once the test aid exists; the in-game checks Q17, Q19, E4, and which region and language the Extra Data's game is.
 - Whether to contact MHGU Definitive Edition's maintainers about shared format specs.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.
