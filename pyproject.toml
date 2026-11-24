@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mhuc"
 version = "0.0.1"
-description = "Tools for the MH Ultimate Collection mod: MT Framework archives, 3DS textures, GMD text"
+description = "MH Ultimate Collection's toolkit: reads, writes and converts the files of MH4U, MH3U and MHXX"
 license = { text = "GPL-3.0-or-later" }
 requires-python = ">=3.10"
 dependencies = []

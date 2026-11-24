@@ -1,7 +1,7 @@
-"""mhuc: tools for the MH Ultimate Collection mod (MT Framework Mobile formats).
+"""mhuc: MH Ultimate Collection's toolkit for the files of MH4U, MH3U and MHXX.
 
-Standard library only. Every format here is described in specs/ with each field marked verified
-or unverified; the code follows the specs, not the other way round.
+Standard library only. Each format follows its spec in specs/, where every field is marked
+verified or unverified.
 """
 
 __version__ = "0.0.1"

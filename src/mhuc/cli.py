@@ -1,4 +1,4 @@
-"""mhuc's command line: `mhuc <command> ...` (README.md lists the commands)."""
+"""mhuc's command line: `mhuc <command> ...`; `mhuc --help` lists the commands."""
 from __future__ import annotations
 
 import argparse
@@ -395,7 +395,9 @@ def cmd_pipeline(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="mhuc", description="MH Ultimate Collection tools")
+    ap = argparse.ArgumentParser(
+        prog="mhuc",
+        description="MH Ultimate Collection's toolkit: read, write and convert the files of MH4U, MH3U and MHXX")
     ap.add_argument("--version", action="version", version=f"mhuc {__version__}")
     sub = ap.add_subparsers(dest="command", required=True)
 
