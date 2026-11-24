@@ -26,6 +26,10 @@ It is the same idea in the opposite direction. It keeps GU's systems and brings 
 | Code mapping | `tools/apimap*.py`, `slotmap.py`: matches 4U functions and vtable slots to GU's | the same need when carrying MHXX code into 4U |
 | Repository | `ARCHITECTURE.md` (what runs, what is tracked, what stays local, every dump path), `CONTRIBUTING.md`, `notes/porting-guide.md`, per-monster folders with their own `build.py` | a model for our own layout and docs |
 
+## Checked against our dumps (2026-11-24)
+
+Its two code inputs are byte-identical to ours: its GU v1.4 `main` (flat image) has the same SHA-256 as our `main` from fork `tools/extract_nsp.py`, and its MH4U EUR v1.1 `code.bin` (decompressed) the same as ours. Its GU and EUR addresses therefore apply unchanged; EUR `.text` addresses go to USA v1.3.0 through `config/shifts/eur_v110.txt` (all 85 of its recorded 4U↔GU pairs land on USA function starts). Results in [monster-port.md](../design/monster-port.md), "MHGU Switch as a bridge".
+
 ## What it doesn't cover
 
 - MH3U: two 3U monsters are on its wish list (Jhen Mohran, Dire Miralis), none ported.

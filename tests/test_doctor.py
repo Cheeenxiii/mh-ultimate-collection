@@ -46,6 +46,27 @@ def test_extraction_state(tmp_path):
     assert doctor.extraction_state(str(tmp_path / "part")) == "partial"
 
 
+def test_extraction_state_switch(tmp_path):
+    w = tmp_path / "sw"
+    w.mkdir()
+    for n in ("main.text.bin", "main.rodata.bin", "main.data.bin"):
+        (w / n).write_bytes(b"")
+    assert doctor.extraction_state(str(w), "switch") == "partial"
+    (w / "info.txt").write_text("exefs: 5 files, 663 hash blocks verified\n")
+    assert doctor.extraction_state(str(w), "switch") == "ok"
+    assert doctor.extraction_state(str(w)) == "partial"           # not a 3DS extraction
+
+
+def test_check_dumps_switch_never_extracted(tmp_path, monkeypatch):
+    games = tmp_path / "game_files"
+    games.mkdir()
+    (games / "s.nsp").write_bytes(b"")
+    monkeypatch.setattr(doctor, "load_dumps", lambda: {"s": {"file": "s.nsp", "role": "r", "kind": "switch"}})
+    monkeypatch.setattr(doctor, "_run", lambda *a, **k: pytest.fail("must not run an extractor"))
+    res = doctor.check_dumps(str(tmp_path), fix=True)
+    assert res[0].level == "warn" and "keys" in res[0].text
+
+
 def test_check_dumps(tmp_path, monkeypatch):
     assert doctor.check_dumps(str(tmp_path), fix=False)[0].level == "warn"   # no game_files/
     games = tmp_path / "game_files"

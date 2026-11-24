@@ -75,15 +75,21 @@ def load_dumps(path: str = os.path.join(WORKSPACE_FILES, "dumps.json")) -> dict:
         return json.load(f)["dumps"]
 
 
-def extraction_state(workdir: str) -> str:
-    """'ok', 'missing', 'partial' or 'encrypted' for one work/<name>/ folder."""
+def extraction_state(workdir: str, kind: str = "3ds") -> str:
+    """'ok', 'missing', 'partial' or 'encrypted' for one work/<name>/ folder.
+
+    kind "3ds": extract_ncch.py's output. kind "switch": extract_nsp.py's (code only).
+    """
     if not os.path.isdir(workdir):
         return "missing"
-    needed = ("exheader.bin", "code.bin", "romfs.bin", "info.txt")
+    needed = ("main.text.bin", "main.rodata.bin", "main.data.bin", "info.txt") if kind == "switch" \
+        else ("exheader.bin", "code.bin", "romfs.bin", "info.txt")
     if not all(os.path.isfile(os.path.join(workdir, n)) for n in needed):
         return "partial"
     with open(os.path.join(workdir, "info.txt")) as f:
         info = f.read()
+    if kind == "switch":
+        return "ok" if "hash blocks verified" in info else "partial"
     return "ok" if "none (decrypted)" in info else "encrypted"
 
 
@@ -96,7 +102,13 @@ def check_dumps(ws: str, fix: bool) -> list[Result]:
     for name, d in load_dumps().items():
         src = os.path.join(games, d["file"])
         work = os.path.join(games, "work", name)
-        state = extraction_state(work)
+        kind = d.get("kind", "3ds")
+        state = extraction_state(work, kind)
+        if kind == "switch" and state != "ok":
+            # Needs the maintainer's keys: never extracted automatically.
+            out.append(Result("warn", "dumps", f"{name}: not extracted ({state}); needs the maintainer's keys, "
+                              f"see extract_nsp.py in the fork"))
+            continue
         if state != "ok" and fix and os.path.isfile(src) and os.path.isfile(extractor):
             code, msg = _run([sys.executable, extractor, src, "-o", work, "--romfs"], timeout=1800)
             state = extraction_state(work) if code == 0 else "encrypted" if "encrypted" in msg else "partial"
