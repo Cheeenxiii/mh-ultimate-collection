@@ -1,6 +1,6 @@
 """MT Framework Mobile models (`.mod`, rModel, version 0xE6), as specs/mod.md lays them out: the header (verified,
 check M2) and the 48-byte mesh records (fields from MHGU Definitive Edition's `mod.py`, after RevilLib: unverified,
-check M3). `info` gives a summary of counts; `check` gives check M3's counts.
+check M3). `info` gives a summary of counts, `bones` the bone records (check M4) and `check` check M3's counts.
 """
 from __future__ import annotations
 

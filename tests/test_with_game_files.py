@@ -199,31 +199,47 @@ HUNTER_PARTS = (  # part, MH3U bone ids, MH4U bone ids; MH4U's id 0 is MH3U's pe
     ("wst", {1, 13, 14, 15, 17, 18}, {0, 1, 14, 15, 17, 18}),
     ("helm", {2, 3, 4}, {2, 3, 4}),
 )
+HUNTER_ARMOUR = (1, 2, 3, 10, 20, 50, 100, 150, 200, 212)
 
 
 def test_the_mh4u_hunter_skeleton_is_mh3us_with_the_pelvis_renumbered(dump):
-    """specs/mod.md check M4: MH4U's hunter is MH3U's with the empty root dropped and the pelvis
-    renumbered 13 to 0, so a 3U motion needs its bone ids rewritten (docs/underwater.md)"""
+    """specs/mod.md check M4: MH4U's hunter has MH3U's ids and parent tree with the empty root
+    dropped and the pelvis renumbered 13 to 0, so a 3U motion needs its bone ids rewritten
+    (docs/underwater.md); the bind pose is MH3U's too, except on MH4U's remodelled armour"""
     games = _images(dump)
-    extra = {20, 21}   # some helmet models carry two more bones, in both games
+    extra = {20, 21}   # some helmets carry two more bones, in both games
     for gender in ("f", "m"):
         for part, want3, want4 in HUNTER_PARTS:
-            d3 = _r_model(*games["mh3u"], f"/arc/player/mod/{gender}/pl001/{gender}_{part}001.arc")
-            d4 = _r_model(*games["mh4u"], f"/data/pl_{gender}_{part}001.arc")
-            b3 = {b["id"]: b for b in mod.bones(d3)}
-            b4 = {b["id"]: b for b in mod.bones(d4)}
-            assert want3 <= set(b3) <= want3 | extra, (gender, part, sorted(set(b3)))
-            assert want4 <= set(b4) <= want4 | extra, (gender, part, sorted(set(b4)))
-            if 0 in b3:     # the MH3U-only empty root: no mesh, at the origin
-                assert b3[0]["furthest"] == b3[0]["parent_distance"] == 0 and b3[0]["position"] == (0, 0, 0), \
-                    (gender, part)
-            for i, u4 in b4.items():
-                u3 = b3[13 if i == 0 else i]
-                assert u4["parent_distance"] == pytest.approx(u3["parent_distance"], abs=1e-3), (gender, part, i)
-                assert u4["position"] == pytest.approx(u3["position"], abs=1e-3), (gender, part, i)
-                want_parent = 0 if u3["parent_id"] in (0, 13) else u3["parent_id"]
-                assert u4["parent_id"] == (0xFF if i == 0 else want_parent), \
-                    (gender, part, i, want_parent, u4["parent_id"])
+            checked = 0
+            for armour in HUNTER_ARMOUR:
+                path3 = f"/arc/player/mod/{gender}/pl{armour:03d}/{gender}_{part}{armour:03d}.arc"
+                d3 = _r_model(*games["mh3u"], path3) if path3 in games["mh3u"][1] else None
+                path4 = f"/data/pl_{gender}_{part}{armour:03d}.arc"
+                d4 = _r_model(*games["mh4u"], path4) if path4 in games["mh4u"][1] else None
+                if d3 is None or d4 is None:
+                    continue
+                checked += 1
+                b3 = {b["id"]: b for b in mod.bones(d3)}
+                b4 = {b["id"]: b for b in mod.bones(d4)}
+                assert want3 <= set(b3) <= want3 | extra, (gender, part, armour, sorted(set(b3)))
+                assert want4 <= set(b4) <= want4 | extra, (gender, part, armour, sorted(set(b4)))
+                if 0 in b3:     # the MH3U-only empty root: no mesh, at the origin
+                    assert b3[0]["furthest"] == b3[0]["parent_distance"] == 0 and b3[0]["position"] == (0, 0, 0), \
+                        (gender, part, armour)
+                if part == "body":
+                    assert b4[0]["furthest"] > 0, (gender, armour)   # MH4U's id 0 is the pelvis, mesh and all
+                for i, u4 in b4.items():
+                    if i in extra:      # outside the motion rig; the two games don't always agree
+                        continue
+                    u3 = b3[13 if i == 0 else i]
+                    want_parent = 0 if u3["parent_id"] in (0, 13) else u3["parent_id"]
+                    assert u4["parent_id"] == (0xFF if i == 0 else want_parent), \
+                        (gender, part, armour, i, want_parent, u4["parent_id"])
+                    if armour == 1:     # MH3U's bind pose, on the one set every part has
+                        assert u4["parent_distance"] == pytest.approx(u3["parent_distance"], abs=1e-3), \
+                            (gender, part, i)
+                        assert u4["position"] == pytest.approx(u3["position"], abs=1e-3), (gender, part, i)
+            assert checked >= 8, (gender, part, checked)
 
 
 def test_mh4u_motion_tracks_address_bones_by_id(dump):
