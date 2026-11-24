@@ -2,19 +2,27 @@
  * force_action.c: makes a monster perform a chosen action, for the plugin's check R1p
  * (docs/checks.md). It is the mod's first native plugin.
  *
- * The game runs a monster's current action from two bytes of its work block: the action's
- * category and its index. uEnemy's action dispatcher (vtable slot 44, 0x006e9cac) loads the
- * work block from this+0xe28 and branches on the category byte at +0x1ca; the case block it
- * reaches switches on the index byte at +0x1cb. The plugin wraps the dispatcher and writes
- * the two bytes before the game reads them, so the chosen action plays instead of whatever
- * the AI picked.
+ * The game's action setter is uEnemy::setAction (0x0090ef74): it takes (this, category,
+ * index, mode), and the AI calls it when it changes a monster's action. It is also what
+ * initializes the action's state. The plugin wraps it and, for the chosen monster, replaces
+ * its category and index arguments with the forced pair, so the AI's change becomes the
+ * forced action and the handler gets its state. That is what lets the move play.
+ *
+ * The action dispatcher (vtable slot 44, 0x006e9cac) is only the fallback, for a code
+ * library built without the setter hook. Writing the pair there cannot win: the AI's setter
+ * has already reset the action state, so the handler stays on its first frame and the
+ * monster holds a pose. The log says when the fallback is in use, and that library needs
+ * rebuilding.
  *
  * Settings (mod.json "config", the player's config.ini over it):
  *   action   the action to force, "category/index" (decimal or 0x...); default 3/17
  *   monster  the id of the monster to force it on (the work block's byte at +0x1c0), or
  *            "any"; default 1, Rathian (uEm001)
- *   hold     "1": force the action again each time the AI changes it, so it replays
- *            (default); "0": force it once, then leave the monster to the AI
+ *   hold     "1": replace the AI's action with the forced pair on every setter call
+ *            (default); "0": force the first setter call once, then leave the AI alone
+ *
+ * Logging: one "first force" line and one line each time the AI's action changes, never
+ * one per frame.
  *
  * Build: cc -shared -fPIC -I<fork>/include src/force_action.c -o force_action.so
  * Licence: GPL-3.0-or-later.
@@ -27,9 +35,10 @@
 
 #include "mh4u_plugin.h"
 
-/* A hook point's name, as mod.json lists it: the dispatcher has no name in the project's
- * symbols, so the mod gives it one. */
-#define HOOK_NAME "uEnemy::dispatchAction"
+/* The hook points, as mod.json lists them. Neither function has a name in the project's
+ * symbols, so the mod gives them names. */
+#define HOOK_SETTER   "uEnemy::setAction"
+#define HOOK_DISPATCH "uEnemy::dispatchAction"
 
 /* Offsets in uEnemy, and in the work block its +0xe28 points to (docs/checks.md, R1p). */
 #define ENEMY_WORK 0xe28u
@@ -40,7 +49,8 @@
 static const MH4UPluginHost *host;
 static uint8_t category = 3, index = 17;
 static int monster_id = 1;
-static int hold = 1, forced;
+static int hold = 1, forced, logged, via_setter;
+static int last_ai_category = -1, last_ai_index = -1;
 
 /* "3/17", "0x03/0x11": two bytes, decimal or hexadecimal. */
 static int parse_action(const char *text, uint8_t *out_category, uint8_t *out_index) {
@@ -68,29 +78,73 @@ static void say(int level, const char *text) {
     host->log(host, level, text);
 }
 
-/* Wraps the dispatcher: r0 is the enemy (the game reads this+0xe28 in the function itself). */
-static void dispatch(MH4UCall *call, void *user) {
-    (void)user;
+/* The enemy is in r0; its work block is the pointer at this+0xe28. -1 when there is none. */
+static int monster_work(MH4UCall *call, uint32_t *work_out) {
     const uint32_t enemy = host->reg(call, 0);
     const uint32_t work = host->read32(call, enemy + ENEMY_WORK);
     if (!work) {
+        return -1;
+    }
+    *work_out = work;
+    return (int)host->read8(call, work + WORK_ID);
+}
+
+/* The first force, then one line per change of the action the AI asked for. */
+static void log_force(int id, int ai_category, int ai_index) {
+    char line[160];
+    if (!logged) {
+        snprintf(line, sizeof line, "first force: monster %d %u/%u over %u/%u", id,
+                 (unsigned)category, (unsigned)index, (unsigned)ai_category, (unsigned)ai_index);
+        logged = 1;
+    } else {
+        snprintf(line, sizeof line, "monster %d: %u/%u over %u/%u", id,
+                 (unsigned)category, (unsigned)index, (unsigned)ai_category, (unsigned)ai_index);
+    }
+    last_ai_category = ai_category;
+    last_ai_index = ai_index;
+    say(MH4U_LOG_INFO, line);
+}
+
+/* uEnemy::setAction(this, category, index, mode). Overriding its arguments makes the game's
+ * own setter initialize the forced action, which is what the dispatcher hook cannot do. */
+static void set_action(MH4UCall *call, void *user) {
+    (void)user;
+    uint32_t work;
+    const int id = monster_work(call, &work);
+    const int ai_category = (int)(host->reg(call, 1) & 0xffu);
+    const int ai_index = (int)(host->reg(call, 2) & 0xffu);
+    if (id >= 0 && (monster_id < 0 || id == monster_id) && (hold || !forced)) {
+        host->set_reg(call, 1, category);
+        host->set_reg(call, 2, index);
+        if (!logged || ai_category != last_ai_category || ai_index != last_ai_index) {
+            log_force(id, ai_category, ai_index);
+        }
+        forced = 1;
+    }
+    host->call_original(call);
+}
+
+/* Fallback: uEnemy::dispatchAction (vtable slot 44, 0x006e9cac). It writes the pair after
+ * the AI's setter has reset the action, so it cannot make a move play; keep it only for a
+ * library built before the setter hook existed. */
+static void dispatch_action(MH4UCall *call, void *user) {
+    (void)user;
+    uint32_t work;
+    const int id = monster_work(call, &work);
+    if (id < 0) {
         host->call_original(call);
         return;
     }
-    const int id = (int)host->read8(call, work + WORK_ID);
-    const int match = monster_id < 0 || id == monster_id;
-    const uint8_t was_category = (uint8_t)host->read8(call, work + WORK_CATEGORY);
-    const uint8_t was_index = (uint8_t)host->read8(call, work + WORK_INDEX);
-    const int unchanged = was_category == category && was_index == index;
-    if (match && (hold ? !unchanged : !forced)) {
+    const int ai_category = (int)host->read8(call, work + WORK_CATEGORY);
+    const int ai_index = (int)host->read8(call, work + WORK_INDEX);
+    if ((monster_id < 0 || id == monster_id) && (hold || !forced)) {
         host->write8(call, work + WORK_CATEGORY, category);
         host->write8(call, work + WORK_INDEX, index);
-        char line[128];
-        snprintf(line, sizeof line, "monster %d: forced %u/%u over %u/%u", id,
-                 (unsigned)category, (unsigned)index, (unsigned)was_category, (unsigned)was_index);
-        say(MH4U_LOG_INFO, line);
+        if (!logged || ai_category != last_ai_category || ai_index != last_ai_index) {
+            log_force(id, ai_category, ai_index);
+        }
+        forced = 1;
     }
-    forced = forced || match;
     host->call_original(call);
 }
 
@@ -129,17 +183,25 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
         }
         hold = strcmp(holding, "1") == 0;
     }
-    if (!host->hook(host, HOOK_NAME, dispatch, NULL)) {
-        say(MH4U_LOG_WARNING, "the dispatcher isn't a hook point: the code library needs building with this mod");
+    via_setter = host->hook(host, HOOK_SETTER, set_action, NULL);
+    if (!via_setter && !host->hook(host, HOOK_DISPATCH, dispatch_action, NULL)) {
+        say(MH4U_LOG_ERROR, "neither the action setter nor the dispatcher is a hook point: "
+                            "the code library needs building with this mod");
         return 0;
     }
-    char line[160];
+    if (!via_setter) {
+        say(MH4U_LOG_WARNING, "the action setter isn't a hook point: the code library needs "
+                              "rebuilding; using the dispatcher, which cannot stop the AI "
+                              "resetting the action each frame");
+    }
+    char line[200];
+    const char *route = via_setter ? "the action setter" : "the dispatcher";
     if (monster_id < 0) {
-        snprintf(line, sizeof line, "ready: forcing action %u/%u on every monster", (unsigned)category,
-                 (unsigned)index);
+        snprintf(line, sizeof line, "ready: forcing action %u/%u on every monster via %s",
+                 (unsigned)category, (unsigned)index, route);
     } else {
-        snprintf(line, sizeof line, "ready: forcing action %u/%u on monster %d", (unsigned)category,
-                 (unsigned)index, monster_id);
+        snprintf(line, sizeof line, "ready: forcing action %u/%u on monster %d via %s",
+                 (unsigned)category, (unsigned)index, monster_id, route);
     }
     say(MH4U_LOG_INFO, line);
     return 1;

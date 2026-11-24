@@ -1,6 +1,9 @@
 {
   "name": "Force a monster action",
-  "hooks": [{"name": "uEnemy::dispatchAction", "address": "0x006e9cac"}],
+  "hooks": [
+    {"name": "uEnemy::setAction", "address": "0x0090ef74"},
+    {"name": "uEnemy::dispatchAction", "address": "0x006e9cac"}
+  ],
   "plugin": {"linux": "force_action.so", "windows": "force_action.dll", "macos": "force_action.dylib"},
   "config": {"action": "3/17", "monster": "1", "hold": "1"}
 }
