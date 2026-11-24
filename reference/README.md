@@ -55,6 +55,8 @@ This page also records what has been established about the engines. Addresses ar
 
 MH3U's base enemy is a quarter of MH4U's size, and each monster adds its own state. MHXX's `uEnemy` has three times MH4U's virtual methods.
 
+The only class either registry names for water is `uOcean` (`0x7e124a29`), which both games have with the same parent, size and vtable. The only other water-related name is MH3U's `uIDCockpitAir`, the air gauge, which MH4U lacks ([underwater.md](../docs/underwater.md#what-mh4u-kept)).
+
 ## Cross-game function maps
 
 | Map | Functions paired | Check |

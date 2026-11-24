@@ -2,7 +2,7 @@
 
 Underwater play comes from MH3U, which has it in full. Each part is read from MH3U's files or its recompiled code, and carried into MH4U as data plus plugin hooks. Only what no game ever had is authored.
 
-Nothing here is verified yet: "where it likely lives" is a hypothesis to confirm in the reference recompile.
+Where a part is not marked as checked, "where it likely lives" is a hypothesis to confirm in the reference recompile.
 
 ## What comes from MH3U
 
@@ -27,9 +27,43 @@ Nothing here is verified yet: "where it likely lives" is a hypothesis to confirm
   - carving: a carve spot is kind 6 under water, 4 on land.
 - Monster Hunter Tri, 3U's Wii base, has a static recompilation and reverse-engineering tools (MHTrIDA). They are a reference for behaviour, never a source.
 
+## What MH4U kept
+
+MH4U kept the water surface's code and none of the underwater systems' code (unknown 1).
+
+**Neither game names a class for the water behaviour.** MH3U's class registry names 1,218 classes and MH4U's 992; in both, exactly one class carries a water word, `uOcean`. MH3U has one more water-related name, `uIDCockpitAir`, one of 19 `uIDCockpit*` HUD classes; MH4U has no `uIDCockpit` class at all and builds its HUD from layouts (`uLayout`, `sLayout`). The swim state, oxygen, the underwater camera and the water volumes were never classes of their own, so the classes that carry them are the generic ones.
+
+**The water surface survives whole.** `uOcean` (class id `0x7e124a29`) is a `cUnit`, `0x108` bytes and 18 vtable slots in MH3U; MH4U keeps the class id, parent, size and slot count. All 15 of MH3U's slot functions have an MH4U counterpart in the MH4U↔MH3U function map, 14 at a ratio of 0.96 or better and the last at 0.83; 14 of MH4U's 15 map back. It is the one piece of MH3U's water code MH4U kept. What it draws is unverified: its name and its being a `cUnit` are all that say it is the ocean.
+
+**The classes the underwater systems live in**, looked up by class id:
+
+| MH3U class (class id) | Carries | MH3U | MH4U |
+|---|---|---|---|
+| `uIDCockpitAir` (`0x3db8d448`) | the oxygen gauge | `uIDCockpit` subclass, `0x238`, 65 vtable slots | **lacks** it: no class with this id or name, and no `uIDCockpit` class at all |
+| `uPlayer` (`0x72b401fd`) | the swim state, dive and surface | `uCharacter` subclass, `0x26a8`, 46 slots | **name only**: same id, now a `uPlChar` subclass, `0xace0`, 89 slots, and 25 of its 82 code slots pair with MH3U's |
+| `uPlayerGuest` (`0x47916456`) | the guest player's copy of the same state | `uPlayer` subclass, `0x26b8`, 48 slots | **lacks** it |
+| `sCamera` (`0x3261a0a7`) | the camera; Cha-Cha's underwater-camera mark is in a camera block | `cSystem` subclass, `0xd90`, 11 slots | **kept**: `0xe10`, 11 slots, 6 paired; MH4U adds `sMhCamera` (`0x576b8b6f`), the quest camera the port hooks |
+| `uGameCamera` (`0x3361a524`) | MH3U's in-game camera | `uAppCameraBase` subclass, `0x8f0`, 20 slots | **lacks** it; `uAppCameraBase` (`0x75744321`) too |
+| `uStage` (`0x504d895e`) | the stage, where the water volumes and area info are read | `uCharacter` subclass, `0xef8`, 42 slots | **name only**: same id, a `uModel` subclass, `0xc78`, 29 slots; `uStageAnimation` (`0x28ac1e52`) lacks |
+
+**What MH4U's own water names are not.** MH4U's code still names the water element and a water area colour: `DMATTR_WATER` with `pw->mRegupTimer[DMATTR_WATER]` and `pw->mWaterDmTimer` (the element's damage and blight timers), `d_water`, and `area_color_water` (a stage tint). Those are water-element and rendering names, not swimming, and none of them is MH3U's water code.
+
+**Answer.** MH4U kept the water surface, and of the underwater systems it kept no class that can be hooked into: the oxygen-gauge class, the guest-player class and MH3U's in-game camera classes are absent, and the player and stage classes survive only as names on rewritten layers. The swim state goes on MH4U's own `uPlayer` and the camera on `sMhCamera`, as the "How it reaches MH4U" column above says; only the water surface can be reused as it is, by letting the converted stage create `uOcean` or by hooking it.
+
+**How this was checked.** Nothing here is bytes from a dump; the results are class ids, sizes, slot counts and pair counts.
+
+1. Decompress each game's `code.bin` with the fork's `tools/blz.py`; the result's SHA-1 matches the dump's entry (`reference/games/mh3u/game.json`, and the fork's `config/versions.json` for MH4U USA v1.3.0).
+2. Recover each game's class registry with `reference/mt_dti.py` (`reference/games/mh3u/mt_classes.tsv` and the fork's `config/mt_classes.tsv`) and each class's instance vtable with `reference/mt_vtables.py`.
+3. Pair the functions with `reference/fnmap.py`; the MH4U↔MH3U map used here holds 6,866 pairs ([reference/README.md](../reference/README.md#cross-game-function-maps)).
+4. Look each class up by name and class id in the other game's registry. For a class both games have, read its parent, size and vtable, and count how many of its vtable's functions the map pairs.
+5. Search both name lists for water, swim, dive, oxygen, breath, ocean, sea, aqua, submerge, drown, buoy, tide, wave, bubble, splash and air, each followed by a capital letter or the end of the name, so that `Search` does not count.
+6. Read the identifiers in the paragraph above with `strings` over the decompressed images.
+
+The oxygen gauge's role is inferred from its name and its cockpit siblings, not read in code or seen in game. Whether MH4U's stages instantiate `uOcean` is likewise unverified; the class and its code are present, but the data side is not checked.
+
 ## Unknowns
 
-1. Whether MH4U kept any of MH3U's water code: no water-related class name has turned up in MH4U's class registry so far.
+1. Whether MH4U kept any of MH3U's water code: answered for the class level in [What MH4U kept](#what-mh4u-kept) — the water surface survives, the underwater systems do not. The function-level question stays with unknown 2.
 2. How MH3U's player state machine is organised (one class per state, or one big switch). This decides whether the swim state can be ported function by function.
 3. Whether the 3U and 4U hunter skeletons match: bone counts and names.
 
