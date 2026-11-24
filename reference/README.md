@@ -249,7 +249,7 @@ Every engine function falls into one of these:
 | The same call in a paired handler (role, not body) | 37 | the two handlers of a shared action call at the same point; these are candidates to confirm one by one, as in GU's table |
 | **With a counterpart** | **73** | |
 | MH4U lacks it | 9 | the class or helper has no MH4U equivalent |
-| Not found yet | 19 | no MH4U function with these steps was found; listed for the next pass |
+| Needs an in-game trace | 19 | no MH4U function with these steps was found: the whole-code token index's candidates are too short to be evidence, and the paired handlers have no call left for it; a trace of an MH4U Rathian fight ([docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx), on MH4U's addresses) says which MH4U code runs where it does the same job |
 | **Without** | **28** | |
 
 **By MH3U class.** Each callee is labelled with the class whose vtable first introduces it, or its callers' nearest common ancestor (a heuristic, as in the table above):
@@ -356,13 +356,13 @@ Addresses are MH3U's `code.bin` and MH4U v1.3.0's. "Map" means `fnmap.py` pairs 
 
 ### The 28 with no MH4U counterpart
 
-Read in MH3U's code; the last column says what MH4U does instead, or that nothing was found yet.
+Read in MH3U's code; the last column says what MH4U does instead, or that a trace in the running game is needed to find the MH4U function.
 
 | MH3U | Class | What it does | MH4U |
 |---|---|---|---|
 | 0x0016052c | `uEnemy` | spawns a `uEffect039` (0xe0 bytes: allocated through 0x1d9844, constructed by 0x1d97b8, registered with 0x5a16fc) | MH4U lacks it: it has no `uEffect039` class (its effect classes stop at `uEffect021` and `uEffect022`), and its effect factory 0x00c0760c has no type for one |
-| 0x00161798 | `uEnemy` | forwards the object at +0x3f0 to 0x25e264 when it is set | Not found yet: no MH4U function with these steps was found. |
-| 0x00257628 | `uEnemy` | sets a byte at +0x1c8 of the object at +0x14, from r1 (-1, 0 or 1) | Not found yet: no MH4U function with these steps was found. |
+| 0x00161798 | `uEnemy` | forwards the object at +0x3f0 to 0x25e264 when it is set | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x905384, 0.53; the paired handlers 0x006dc274 and 0x006deabc have no spare call (best 0xb0704c, 0.0). |
+| 0x00257628 | `uEnemy` | sets a byte at +0x1c8 of the object at +0x14, from r1 (-1, 0 or 1) | Needs an in-game trace: no MH4U function with these steps was found. No token candidate; the paired handlers 0x006e9770, 0x006ea05c and 0x006dcfcc have no spare call (best 0.0). |
 | 0x005bf66c | `uEnemy` | sets the byte at +0xd61 of the block passed in r1 | MH4U lacks it: the paired handlers (0x006dbffc for action 13/8, 0x006dc274) call none of these aim helpers; MH4U's same actions spawn a factory shell (0x00661bc4), which takes the point in its setup block |
 | 0x005bf77c | `uEnemy` | stores a 3-float point at (r1+0xc00)+0x198 and copies a point from +0xd60+0x38 to +0xda8 | MH4U lacks it: the paired handler (0x006dc274) calls none of these aim helpers; MH4U's same action spawns a factory shell (0x00661bc4) |
 | 0x005bf7bc | `uEnemy` | turns three floats into values through 0x5c4080 and stores them at +0xde0, +0xde4 and +0xde8 | MH4U lacks it: as above, no such call in the paired handler |
@@ -371,23 +371,25 @@ Read in MH3U's code; the last column says what MH4U does instead, or that nothin
 | 0x005c3f88 | `uEm024` | builds a point from a speed, a table entry and two positions, then stores it at +0xc00+0x198 | MH4U lacks it: no such call in the paired handlers (0x006dbffc, 0x006dc274) |
 | 0x005c6938 | `uEnemy` | compares a point's coordinate (copied by 0x886ef8) with r1 scaled by a constant | MH4U lacks it: no such call in the paired handler (0x006dc274) |
 | 0x005c7270 | `uEm024` | a trajectory setup: switches on a type (1 to 7) and builds points through 0x584e18 | MH4U lacks it: no such call in the paired handler (0x006dc274) |
-| 0x0064325c | `uEnemy` | maps the byte at +0xed through a 0xff table and returns an address in the block | Not found yet: no MH4U function with these steps was found. |
-| 0x00829620 | `uEnemy` | a per-frame helper: reads a signed byte at +0x940 and walks the action table | Not found yet: no MH4U function with these steps was found. |
-| 0x00833234 | `uEnemy` | walks the monster list at the global manager and resets an entry per index | Not found yet: no MH4U function with these steps was found. |
-| 0x00835f10 | `uEm066` | a large helper (130 tokens) around the positions at +0x1800+0x248, not read to the end | Not found yet: no MH4U function with these steps was found. |
-| 0x0083771c | `uEnemy` | tests bit 2 of +0x8c and sets up a position and a timer | Not found yet: no MH4U function with these steps was found. |
-| 0x00839598 | `uEnemy` | returns the signed byte at +0xef of the monster's data block | Not found yet: no MH4U function with these steps was found. |
-| 0x0083c6cc | `uEm066` | returns the float at this+0x284 times a constant | Not found yet: no MH4U function with these steps was found. |
-| 0x0083db24 | `uEnemy` | sets the byte at +0x259 to 1 | Not found yet: no MH4U function with these steps was found. |
-| 0x0083dc14 |  | walks the monster list and tests entries by their state at +0xd5c | Not found yet: no MH4U function with these steps was found. |
-| 0x0084161c | `uEm056` | calls 0xa07d48 and copies a point from +0x30, then stores it | Not found yet: no MH4U function with these steps was found. |
-| 0x00842a7c | `uEnemy` | a large function (710 tokens): a hit reaction or attack resolution, not read to the end | Not found yet: no MH4U function with these steps was found. |
-| 0x00843c20 | `uEnemy` | sets a scale at +0x894 and the byte at +0x923 to 1 | Not found yet: no MH4U function with these steps was found. |
-| 0x0084512c | `uEnemy` | walks the monster list, reads +0xd5c and picks an entry by a state byte | Not found yet: no MH4U function with these steps was found. |
-| 0x00847798 | `uEnemy` | forwards to 0x59070c when r2 is 0, with a global | Not found yet: no MH4U function with these steps was found. |
-| 0x0085162c | `uEnemy` | sets the float at +0x97c to 1.0 | Not found yet: no MH4U function with these steps was found. |
-| 0x00853c70 | `uEnemy` | sets the halfword at +0x89c to 2 | Not found yet: no MH4U function with these steps was found. |
-| 0x00a347bc | `uCharacter` | maps r1 (0 to 0x1c) through a 0xff table and returns the entry | Not found yet: no MH4U function with these steps was found. |
+| 0x0064325c | `uEnemy` | maps the byte at +0xed through a 0xff table and returns an address in the block | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x7b9dd4, 0.39; the paired handler 0x006d6be0 has no spare call (best 0.0). |
+| 0x00829620 | `uEnemy` | a per-frame helper: reads a signed byte at +0x940 and walks the action table | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x911f20, 0.48, itself the best spare call of 0x006dbd8c; the paired handlers 0x006ea05c and 0x006dcfcc have none. |
+| 0x00833234 | `uEnemy` | walks the monster list at the global manager and resets an entry per index | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x910480, 0.45; the paired handler 0x006d5e98's spare calls top out at 0x945584, 0.35. |
+| 0x00835f10 | `uEm066` | a large helper (130 tokens) around the positions at +0x1800+0x248, not read to the end | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x852d3c, 0.51; the paired handlers 0x006d5e98, 0x006db948 and 0x006dbbe4 have no spare call above 0.48. |
+| 0x0083771c | `uEnemy` | tests bit 2 of +0x8c and sets up a position and a timer | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x9008bc, 0.42; the paired handler 0x006dc274 has no spare call (best 0.0). |
+| 0x00839598 | `uEnemy` | returns the signed byte at +0xef of the monster's data block | Needs an in-game trace: no MH4U function with these steps was found. No token candidate over 5 tokens; its 9 paired handlers have no spare call (best 0x911c7c, 0.40). |
+| 0x0083c6cc | `uEm066` | returns the float at this+0x284 times a constant | Needs an in-game trace: no MH4U function with these steps was found. No token candidate over 4 tokens; its 4 paired handlers have no spare call (best 0.0). |
+| 0x0083db24 | `uEnemy` | sets the byte at +0x259 to 1 | Needs an in-game trace: no MH4U function with these steps was found. Closest token matches 0x970674, 1.0 over 6 tokens, and 0x8618c0, 0.86; the paired handler 0x006d5e98's best spare call is 0x93c690, 0.6. |
+| 0x0083dc14 |  | walks the monster list and tests entries by their state at +0xd5c | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0xc1efa0, 0.46; the paired handler 0x006d5e98's spare calls top out at 0x916b94, 0.24. |
+| 0x0084161c | `uEm056` | calls 0xa07d48 and copies a point from +0x30, then stores it | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x90b640, 0.45; the paired handlers 0x006e148c and 0x006e0794 have no spare call (best 0.0). |
+| 0x00842a7c | `uEnemy` | a large function (710 tokens): a hit reaction or attack resolution, not read to the end | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x93aae8, 0.53 over 710 tokens; its 11 paired handlers have no spare call (best 0.0). |
+| 0x00843c20 | `uEnemy` | sets a scale at +0x894 and the byte at +0x923 to 1 | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x9a8b34, 0.86; the paired handlers 0x006db3dc, 0x006db540 and 0x006db948 have no spare call (best 0.0). |
+| 0x0084512c | `uEnemy` | walks the monster list, reads +0xd5c and picks an entry by a state byte | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0xc1aa40, 0.43; the paired handlers 0x006e9770, 0x006dcb10 and 0x006dcd7c have no spare call above 0x92b2b0, 0.35. |
+| 0x00847798 | `uEnemy` | forwards to 0x59070c when r2 is 0, with a global | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0xa8e1dc, 0.71; the paired handlers 0x006dbec0, 0x006dec6c and 0x006ded84 have no spare call (best 0.0). |
+| 0x0085162c | `uEnemy` | sets the float at +0x97c to 1.0 | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0x9a9238, 0.92; the paired handler 0x006dbd8c has no spare call (best 0.0). |
+| 0x00853c70 | `uEnemy` | sets the halfword at +0x89c to 2 | Needs an in-game trace: no MH4U function with these steps was found. Closest token match 0xb1c0cc, 0.92; the paired handlers 0x006e9770, 0x006dcb10 and 0x006dcd7c have no spare call (best 0.0). |
+| 0x00a347bc | `uCharacter` | maps r1 (0 to 0x1c) through a 0xff table and returns the entry | Needs an in-game trace: no MH4U function with these steps was found. No token candidate; the paired handlers 0x006db3dc, 0x006db540 and 0x006db948 have no spare call (best 0.0). |
+
+**What was searched for the 19.** `fnmap.py`'s instruction-token index (NGRAM) over both games' whole code gives each of them its closest MH4U bodies, scoring 0.39 to 1.0, the highest only over 4 to 10 tokens where a score says little; some have no candidate at all. Aligning her handlers with their MH4U counterparts (the call-site method above) shows no unmatched call left where one should be: the nearest spare call in each paired handler scores 0.0 to 0.6, and none is the function in question. An in-game trace is what settled the joint sound and the quest manager for MHXX (same tracer, MH4U's addresses); these 19 need it too. They are tracked in issue #55.
 
 ### Lessons from MHGU Definitive Edition's ports
 
