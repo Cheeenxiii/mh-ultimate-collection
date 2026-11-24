@@ -31,8 +31,8 @@ SOUND_MAGIC: dict[bytes, str] = {
     b"STRQ": "stream request", b"STQR": "stream request",
     b"SES\x00": "area emitter",
     b"MSS\x00": "sequence",
-    b"REV\x00": "reverb",
-    b"CFL\x00": "category filter",
+    b"REV\x00": "reverb", b"REVR": "reverb",
+    b"CFL\x00": "category filter", b"EQUR": "EQ",
 }
 SOUND_VERSIONED = {"wave", "bank", "request", "stream request", "area emitter", "sequence"}
 # The class each game's registry gives a sound kind (specs/sound.md "Which class, which game"):
@@ -42,10 +42,10 @@ _SOUND_CLASS_NAMES = (
     ("rLtSoundBank", "bank"), ("rSoundBank", "bank"),
     ("rLtSoundRequest", "request"), ("rSoundRequest", "request"),
     ("rLtSoundStreamRequest", "stream request"), ("rSoundStreamRequest", "stream request"),
-    ("rMHSoundEmitter", "area emitter"),
+    ("rMHSoundEmitter", "area emitter"), ("rFestaSoundEmitter", "area emitter"),
     ("rLtSoundReverb", "reverb"), ("rSoundReverb", "reverb"), ("rSoundEQ", "EQ"),
     ("rLtSoundCategoryFilter", "category filter"),
-    ("rMHSoundSequence", "sequence"),
+    ("rMHSoundSequence", "sequence"), ("rFestaSoundSequence", "sequence"), ("rSoundSequence", "sequence"),
     ("rSoundAttributeSe", "sound attribute se"),
 )
 SOUND_CLASSES: dict[int, str] = {classid.class_id(name): kind for name, kind in _SOUND_CLASS_NAMES}

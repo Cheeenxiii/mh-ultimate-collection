@@ -16,10 +16,12 @@ def test_survey_counts_the_same_sound_kind_in_both_games_class_namespaces():
     mh4u_bank = classid.class_id("rLtSoundBank")
     mhxx_bank = classid.class_id("rSoundBank")
     mhxx_wave = classid.class_id("rSoundSourceADPCM")
+    mhxx_emitter = classid.class_id("rFestaSoundEmitter")
     data = arc.write(arc.Archive(version=0x13, entries=[
         arc.Entry(path="a\\snd", type_id=mh4u_bank, data=sound(b"SNDB", 11)),
         arc.Entry(path="a\\snd", type_id=mhxx_bank, data=sound(b"SBKR", 4)),
         arc.Entry(path="a\\wav", type_id=mhxx_wave, data=sound(b"MADP", 5)),
+        arc.Entry(path="a\\ses", type_id=mhxx_emitter, data=sound(b"SES\x00", 0x20160706)),
     ]))
     st: dict = {}
     survey.survey_arc(data, st)
@@ -29,6 +31,8 @@ def test_survey_counts_the_same_sound_kind_in_both_games_class_namespaces():
     assert counts["wave MADP v5"] == 1
     assert counts[f"bank SBKR type 0x{mhxx_bank:08x} rSoundBank"] == 1
     assert counts[f"wave MADP type 0x{mhxx_wave:08x} rSoundSourceADPCM"] == 1
+    assert counts["area emitter SES v0x20160706"] == 1
+    assert counts[f"area emitter SES type 0x{mhxx_emitter:08x} rFestaSoundEmitter"] == 1
     assert sum(n for k, n in counts.items() if k == "wave MADP v5") == 1
 
 
