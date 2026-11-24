@@ -134,6 +134,80 @@ Through MHGU, with Definitive Edition's pairs:
 
 The 28 placed in GU and not in MH4U are mostly projectile code (`uShell`, `uShellEnemy`, `uShellEmBase*`, 17) and GU-era framework slots: candidates for "MH4U lacks it". The 32 with no GU counterpart are mostly `uEnemy` and `uEnemyActCustom` functions without strings, where the next lever is Rathian's own code: pairing `roEm001` with GU's `uEm001_00` by the shared action ids, then reading the imports off aligned call sites.
 
+### The 62 imports, one by one
+
+Each of the 62 called imports with no counterpart in the map, read in MHXX's code (addresses in MHXX v1.4's `code.bin` and MH4U v1.3.0's). Two things make the list shorter than it looks:
+
+- **"Festa" is MHXX's framework name, not a feature.** `sFestaMain` is the game's main object, `uFestaChar` the base of its characters (MH4U's `uMHchar`) and `uFestaEnemy` the layer between `uEnemy` and each monster, which MH4U doesn't have.
+- **MH4U has no shell framework like MHXX's.** MHXX builds Rathian's projectiles on `uShellEnemy` and `uShellEmBase*` classes driven by an `rShell` resource of parameters per shell type. MH4U has none of these classes: its projectiles are numbered classes (`uShell000` to `uShell059`) made by one factory, 0x660e60, which takes a type number and a setup block; uEm001's handlers reach it through 0x661bc4 (type 1) and 0x661cf0 (type 5). A ported Rathian's projectiles become MH4U shell types, so the MHXX shell functions below have no one-to-one counterpart.
+
+| MHXX | Class | What it does | MH4U |
+|---|---|---|---|
+| 0x001d7c7c | `uFestaChar` | releases up to three material references and clears them | 0x001a64c0 (through GU, Definitive Edition's pair) |
+| 0x00add36c | `uEnemy` | reads one byte from a table of 12-byte entries in the monster's work block | 0x009473e4 (through GU, Definitive Edition's pair) |
+| 0x0089f01c | `uFestaEnemy` | constructor: calls `uEnemy`'s, sets the vtable, clears the layer's fields | 0x00955eac, `uEnemy`'s constructor, which uEm001's own chains to directly |
+| 0x008f2a20 | | `uEm001_00`'s operator delete: frees through its class's allocator | 0x006ec8dc, uEm001's operator delete |
+| 0x008b7978 | | whether target point *n* lies on the monster's left: angle from the monster to the point, minus its heading, under 0x8000 | 0x0091e0f8, the same steps on MH4U's layout |
+| 0x008c50a4 | | angle from the monster to target point *n* relative to its heading, optionally folded to one side | 0x009307f8, the same steps on MH4U's layout |
+| 0x0089f018 | `uFestaEnemy` | vtable slot 2, forwards to `uEnemy`'s slot 2 | MH4U lacks it: slot 2 is empty in MH4U's `uEnemy` and uEm001 |
+| 0x008ea160 | `uFestaEnemy` | vtable slot 6, empty | MH4U lacks it: nothing to port |
+| 0x008eb0b4 | `uEnemy` | vtable slot 240, empty | MH4U lacks it: nothing to port |
+| 0x008eb3d8 | `uEnemy` | vtable slot 239, empty | MH4U lacks it: nothing to port |
+| 0x0046dfb0 | | operator new of `uShellEmBase00::cSetupParamEmBase00`, the setup block each fireball spawn builds (51 actions) | MH4U lacks it: MH4U fills a setup block on the stack for its factory |
+| 0x0046f070 | | operator new of `uShellEmBase01::cSetupParamEmBase01` (40 actions) | MH4U lacks it, as above |
+| 0x0046ebac | | `uShellEmBase00`'s constructor | MH4U lacks it: no `uShellEmBase*` classes |
+| 0x0046ecdc | `uShellEmBase00` | `uShellEmBase00`'s destructor | MH4U lacks it |
+| 0x0046fe80 | | `uShellEmBase01`'s constructor | MH4U lacks it |
+| 0x0046ffa8 | `uShellEmBase01` | `uShellEmBase01`'s destructor | MH4U lacks it |
+| 0x00476130 | | `uShellEmBase11`'s constructor | MH4U lacks it |
+| 0x005a6920 | | operator delete of `uShellEm001_sp_00`, one of Rathian's three projectile classes | MH4U lacks it: Rathian's projectiles are factory shell types |
+| 0x005a6950 | | operator delete of `uShellEm001_sp_01` | MH4U lacks it, as above |
+| 0x005a6980 | | operator delete of `uShellEm001_sp_11` | MH4U lacks it, as above |
+| 0x008cdfbc | `uShellEmBase54` | a long `uShellEmBase54` method, not read | MH4U lacks the class |
+| 0x00265a9c | `uShellEnemy` | plays a sound at the shell when its owner is the local player | MH4U lacks it: each `uShellNNN` plays its own sounds |
+| 0x00265bf8 | `uShellEnemy` | sets the shell's scale and scales its two hit spheres by it and an `rShell` factor | MH4U lacks it |
+| 0x009285b0 | `uFestaChar` | registers a shell with its owner (up to 144) and checks its type against the shell-type table (58 actions) | MH4U lacks it: no shell registry or `rShell` |
+| 0x00928e70 | `uPlayerQuest` | puts a shell in its owner's slots for that type (16 per type) and loads the type's `rShell` resource the first time | MH4U lacks it |
+| 0x009649a4 | `uShellPlayer` | the shell's `rShell` hit parameters, or none | MH4U lacks it |
+| 0x009651a4 | `uShell` | whether the shell's `rShell` entry has hit data | MH4U lacks it |
+| 0x00aed660 | `sHitcheck` | the shell's type id from its setup block | MH4U lacks it |
+| 0x00aed6d4 | `uShell` | the shell's owner index from its setup block | MH4U lacks it |
+| 0x00aed6e8 | `uShell` | the shell's owner, if it is a character | MH4U lacks it |
+| 0x00aedc40 | `uShell` | whether the shell's owner is still active | MH4U lacks it |
+| 0x00aed824 | `uShell` | queries the attack parameters of the owner's `rShell` entry | MH4U lacks it |
+| 0x00aed8a8 | `uShell` | queries a second parameter set of the same entry | MH4U lacks it |
+| 0x00aed928 | `uShell` | reads a float from the entry's effect parameters | MH4U lacks it |
+| 0x00aed9b8 | `uShellPlayer` | queries the entry's effect parameters | MH4U lacks it |
+| 0x00aedac4 | `uShell` | reads a float from the resource's own effect parameters | MH4U lacks it |
+| 0x00aedb64 | `uShell` | another query of the entry's effect parameters | MH4U lacks it |
+| 0x008d0d7c | `uEnemyActCustom` | turns the monster towards target point *n* by a step scaled from its speed, and says when it faces it | not found yet |
+| 0x008d4928 | `uEnemyActCustom` | sets up a turn: stores its parameters and picks left or right from the angle to the target | not found yet |
+| 0x008db468 | `uEnemy` | the attack target's position: from the lock-on object if there is one, else the monster's own target point | not found yet |
+| 0x008cc434 | | among the 10 loaded monsters, claims the first active one of a given species outside the given area and flags it | not found yet |
+| 0x008d0ec8 | | among the 10 loaded monsters, sends a message to each active one of a species in an area, optionally within a radius | not found yet |
+| 0x008e3628 | | checks a linked monster in the same area and its distance (500 units); under action 13/1 only | not found yet |
+| 0x008ae1c8 | | plays a sound at a joint (or the monster's root) for the local player | not found yet |
+| 0x008a1fc8 | `uEnemy` | forwards a request with a position to a manager | not found yet |
+| 0x008a1ed8 | `uEmXXX` | calls a manager with no arguments (44 actions) | not found yet |
+| 0x008a1934 | `sHitPush` | asks the hit-push manager about a player (GU's label: player absent) | not found yet; 0x006832a0 is a candidate the map left unclear |
+| 0x008a7844 | `uEnemyBase` | applies a model part group: sets each part's visibility bit in the monster's mask | not found yet |
+| 0x008d8768 | `uEnemy` | saves or clears the monster's status flag sets, by mode | not found yet |
+| 0x008ddad8 | | selects a parameter set by index, from one of two tables chosen by the quest's state | not found yet |
+| 0x008f1c1c | | reacts to a hit from one shell type by its owner, with one of three reactions | not found yet |
+| 0x0089e698 | `uFestaEnemy` | vtable slot 76: builds a capability mask from two of the monster's states | not found yet |
+| 0x0089eb70 | | a rate for a part condition, from two part entries or a default | not found yet |
+| 0x008bb4c0 | `uEnemy` | raises a request flag with an id in the work block | not found yet |
+| 0x008c86d4 | `uEnemy` | clears one flag when called with 0 | not found yet |
+| 0x00adb338 | `uEnemy` | one of two entries of a table, chosen by the work block's state 0x67 | not found yet |
+| 0x00adcd4c | `uEnemy` | a mask from the work block's state flags and kind | not found yet |
+| 0x00adcf38 | `uEnemy` | a second mask of the same kind | not found yet |
+| 0x008eb1c0 | | a long function, not read | not found yet |
+| 0x00a56ee0 | `MtObject` | calls a virtual method with the 16-bit id at +0x24c | not found yet |
+| 0x008ad638 | `uPlayerQuest` | a player's 16-bit field at +0x24c | not found yet |
+| 0x001e3950 | `uPlayerLobby` | sets a player speed and recomputes two ratios from it | not found yet |
+
+Of the 62: 6 have an MH4U function, 31 are things MH4U lacks (27 of them the shell framework), 25 are not found yet. The two angle helpers were found by translating the field offsets (MHXX's work block at +0x10a8 is MH4U's at +0xe28), the way to try on the other `uEnemy` functions.
+
 ### Lessons from MHGU Definitive Edition's ports
 
 - **Keep the source's bone ids and remap table.** Then the monster data needs no bone remap, except where a bone is missing from the target skeleton.
