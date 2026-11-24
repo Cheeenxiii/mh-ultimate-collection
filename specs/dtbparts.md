@@ -14,7 +14,7 @@ in MHXX's registry). MH4U's registry has no class of this name.
 **Layout.** A 0x4D-byte header (magic, version, 16 count bytes, a run of scalars and one more count), then blocks read
 one after another with no offsets; a count byte of 0 means its block is absent. The order and sizes are MHXX's own
 loader's (`rEnemyDtBaseParts` vtable slot 11, 0x0058e424 in the v1.4 code): it reads the header, copies the 16 count
-bytes to object +0x88, then reads each block into memory it allocates. Check E6 runs our reader
+bytes to object +0x88, then reads each block into memory it allocates. Check E7 runs our reader
 (`mhuc.formats.dtbparts`) on every file and `reference/loader_trace.py` runs the loader itself on every file: the
 layout below ends exactly at the file's end in all 138, and its blocks are the loader's reads.
 
@@ -27,14 +27,14 @@ only where MHGU Definitive Edition's own `dtbparts` work says what they are, and
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | char[4] | magic `DTP\0` | verified | ours, loader 0x0058e424; check E6 |
-| 0x04 | u32 | version 0x01339ECB (the loader rejects any other) | verified | ours, loader; check E6 |
-| 0x08 | u8 ×16 | c0..c15, copied to object +0x88..+0x97: c0..c8 size the blocks below; c9..c15 are stored and not read by this loader | verified | ours, loader; check E6 |
-| 0x18 | u32 | scalar (object +0x98) | verified | ours, loader; check E6 |
-| 0x1C | u32 | scalar (object +0x9C) | verified | ours, loader; check E6 |
-| 0x20 | u16 ×14 | scalars (object +0xA0..+0xBA) | verified | ours, loader; check E6 |
-| 0x3C | u32 ×4 | scalars (object +0xBC..+0xC8); MHGU Definitive Edition reads the first three as floats | verified | ours, loader; check E6 |
-| 0x4C | u8 | c16, copied to object +0xCC: the count of the last block | verified | ours, loader; check E6 |
+| 0x00 | char[4] | magic `DTP\0` | verified | ours, loader 0x0058e424; check E7 |
+| 0x04 | u32 | version 0x01339ECB (the loader rejects any other) | verified | ours, loader; check E7 |
+| 0x08 | u8 ×16 | c0..c15, copied to object +0x88..+0x97: c0..c8 size the blocks below; c9..c15 are stored and not read by this loader | verified | ours, loader; check E7 |
+| 0x18 | u32 | scalar (object +0x98) | verified | ours, loader; check E7 |
+| 0x1C | u32 | scalar (object +0x9C) | verified | ours, loader; check E7 |
+| 0x20 | u16 ×14 | scalars (object +0xA0..+0xBA) | verified | ours, loader; check E7 |
+| 0x3C | u32 ×4 | scalars (object +0xBC..+0xC8); MHGU Definitive Edition reads the first three as floats | verified | ours, loader; check E7 |
+| 0x4C | u8 | c16, copied to object +0xCC: the count of the last block | verified | ours, loader; check E7 |
 
 "Verified" on a scalar covers its place and size only; what it means is not known.
 
@@ -72,7 +72,7 @@ the kind and two of the four following words into 13.
 
 ## Checks
 
-- **E6 (done, MHXX JPN v1.0 RomFS):** `mhuc survey <romfs.bin>` counts `E6 dtbparts layout ends at the file's end`.
+- **E7 (done, MHXX JPN v1.0 RomFS):** `mhuc survey <romfs.bin>` counts `E7 dtbparts layout ends at the file's end`.
   Result: 140 entries (138 distinct files) end exactly at their last byte.
 - **Loader trace (done, MHXX v1.4 code, same RomFS):** `python3 reference/loader_trace.py mhxx-dtbparts --exheader
   <exheader.bin> --code <code.bin> --romfs <romfs.bin>` runs the game's loader in Unicorn on each file and logs every

@@ -16,7 +16,7 @@ its monster data is the `.emd`/`.etd` pair.
 **Layout.** An 8-byte header, 13 count/flag bytes, a run of scalars, then blocks read one after another with no offsets;
 a block with a count of 0 is absent, and a flag byte of 0 means present. The order and sizes are MHXX's own loader's
 (`rEnemyDtBase` vtable slot 11, 0x002b6f88 in the v1.4 code): it reads the 8-byte header, copies the 13 bytes to object
-+0xB8, then reads the scalars and blocks into memory it allocates or into fixed object fields. Check E6 runs our reader
++0xB8, then reads the scalars and blocks into memory it allocates or into fixed object fields. Check E7 runs our reader
 (`mhuc.formats.dtbase`) on every file and `reference/loader_trace.py` runs the loader itself on every file: the layout
 below ends exactly at the file's end in all 138, and its blocks are the loader's reads.
 
@@ -31,9 +31,9 @@ and `notes/data.md` name the same MH4U side, and its object offsets are 4 bytes 
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | char[4] | magic `DTB\0` | verified | ours, loader 0x002b6f88; check E6 |
-| 0x04 | u32 | version 0x15022601 (the loader rejects any other) | verified | ours, loader; check E6 |
-| 0x08 | u8 ×13 | c0..c12, copied to object +0xB8..+0xC4: counts where a loop reads that many records, presence flags (0 = present) at c7, c8, c10, c11 and c12 | verified | ours, loader; check E6 |
+| 0x00 | char[4] | magic `DTB\0` | verified | ours, loader 0x002b6f88; check E7 |
+| 0x04 | u32 | version 0x15022601 (the loader rejects any other) | verified | ours, loader; check E7 |
+| 0x08 | u8 ×13 | c0..c12, copied to object +0xB8..+0xC4: counts where a loop reads that many records, presence flags (0 = present) at c7, c8, c10, c11 and c12 | verified | ours, loader; check E7 |
 | 0x15 | f32 | MH4U `.emd` byte 0x0C (object +0x60) | verified | ours, loader; check E5 |
 | 0x19 | u8 ×4 | MH4U `.emd` byte 0x10 (object +0x64..+0x67; the four bytes are that u32) | verified | ours, loader; check E5 |
 | 0x1D | u32 | MH4U `.emd` byte 0x30 (object +0x68) | verified | ours, loader; check E5 |
@@ -81,7 +81,7 @@ are 28-byte records; MH4U's word 43 (56 bytes) is two of them.
 
 ## Checks
 
-- **E6 (done, MHXX JPN v1.0 RomFS):** `mhuc survey <romfs.bin>` counts `E6 dtbase layout ends at the file's end`.
+- **E7 (done, MHXX JPN v1.0 RomFS):** `mhuc survey <romfs.bin>` counts `E7 dtbase layout ends at the file's end`.
   Result: 140 entries (138 distinct files) end exactly at their last byte.
 - **Loader trace (done, MHXX v1.4 code, same RomFS):** `python3 reference/loader_trace.py mhxx-dtbase --exheader
   <exheader.bin> --code <code.bin> --romfs <romfs.bin>` runs the game's loader in Unicorn on each file and logs every

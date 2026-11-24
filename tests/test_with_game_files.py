@@ -72,7 +72,7 @@ def monster_entries(path: str):
 
 def test_every_mhxx_and_mh3u_monster_data_file_is_laid_out_to_its_last_byte(dump):
     """dttune.blocks, dtbase.blocks, dtbparts.blocks and emstatus.blocks raise unless the layout ends exactly at the
-    file's end; hitdata raises unless the records tile the file (checks E2 to E4, E6)"""
+    file's end; hitdata raises unless the records tile the file (checks E2 to E4, E7)"""
     kinds = {b"BDD\0": "bdd", b"HTS\0": "hts", b"HDE\0": "hde", b"HTD\0": "htd"}
     counts = {"dttune": 0, "dtbase": 0, "dtbparts": 0, "em_status": 0, "hit data": 0}
     for game in ("mhxx", "mh3u"):

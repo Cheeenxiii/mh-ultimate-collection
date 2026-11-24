@@ -45,8 +45,8 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, structure checked on all 110 pairs and hitzone columns laid out (E1) |
 | [sound](sound.md) | rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rMHSoundEmitter, … | MH4U layouts from MHGU Definitive Edition, unverified; class ids from the registries |
 | [dttune](dttune.md) | rEnemyDtTune | MHXX HP, parts, hitzones, tuning: layout from MHXX's loader, checked on all 138 files (E2); blocks matched to MH4U's `.etd` on three monsters (E5) |
-| [dtbase](dtbase.md) | rEnemyDtBase | MHXX map-hit spheres, joint points, part groups and the `.emd` scalars: layout from MHXX's loader, checked on all 138 files (E6); matched to MH4U's `.emd` on three monsters (E5) |
-| [dtbparts](dtbparts.md) | rEnemyDtBaseParts | MHXX break and joint records: layout from MHXX's loader, checked on all 138 files (E6); break parts and joint records matched to MH4U's `.emd` on three monsters (E5); MH4U's sever records absent |
+| [dtbase](dtbase.md) | rEnemyDtBase | MHXX map-hit spheres, joint points, part groups and the `.emd` scalars: layout from MHXX's loader, checked on all 138 files (E7); matched to MH4U's `.emd` on three monsters (E5) |
+| [dtbparts](dtbparts.md) | rEnemyDtBaseParts | MHXX break and joint records: layout from MHXX's loader, checked on all 138 files (E7); break parts and joint records matched to MH4U's `.emd` on three monsters (E5); MH4U's sever records absent |
 | [emstatus](emstatus.md) | rEnemyStatus | MH3U HP, parts, hitzones, tuning: layout from MH3U's walk, checked on all 91 files (E3); HP and hitzones matched on Rathian (E5) |
 | [hitdata](hitdata.md) | rBodyData, rHitSize, rHitDataEnemy, rHitData | MH3U and MHXX hurt volumes, attack volumes, attack records: record sizes tile every file (E4); MHXX's match MH4U's (E5) |
 | [emc](emc.md) | rEnemyCmd | header verified in all three games (A1); bytecode from MHGU Definitive Edition |
