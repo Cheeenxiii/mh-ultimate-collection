@@ -51,6 +51,9 @@ def from_mh4u(emd: bytes, etd: bytes) -> dict[str, object]:
         b = _etd_block(etd, word)
         out[name] = b[:80] if b else None
     out["part HP"] = [struct.unpack_from("<H", out["part table"], 10 * i)[0] for i in range(8)]
+    parts = [struct.unpack_from("<HBBBBHH", out["part table"], 10 * i) for i in range(8)]
+    out["second part HP"] = [r[5] for r in parts]
+    out["break parts"] = [i for i, r in enumerate(parts) if r[1] or r[5] != 0xFFFF]
     out["sensor records"] = _terminated(etd, _w(etd, 9), 28, b"\xff\xff\0\0") if _w(etd, 9) else []
     rows = _terminated(etd, _w(etd, 10), 16, struct.pack("<f", -1.0) * 4) if _w(etd, 10) else []
     out["distance ranges"] = rows
@@ -210,6 +213,9 @@ def from_mh3u(status: bytes, body: bytes, cambody: bytes, hitsize: bytes, attack
                               "hitzone table": blk["hitzone table"]}
     if "part table" in blk:
         out["part HP"] = list(struct.unpack("<8H", blk["part table"]))
+    records = emstatus.part_break_records(status)
+    out["break parts"] = None if records is None else [i for i, r in enumerate(records) if r[:4] != bytes(4)]
+    out["second part HP"] = emstatus.second_part_hp(status)
     out["distance ranges"] = [blk["block 0x100"]]
     for name, word, n in (("ailment 0xa4", 17, 16), ("ailment 0xa8", 18, 12), ("ailment 0xac", 19, 12),
                           ("ailment 0xb0", 20, 12), ("ailment 0xb4", 21, 12), ("ailment 0xb8", 24, 8)):
@@ -249,10 +255,11 @@ def compare(src: dict[str, object], mh4u: dict[str, object]) -> list[tuple[str, 
             mask = _mask_volume if any(len(r) == 40 and r[8:12] != bytes(4) for r in got) else (lambda r: r)
             eq = sum(mask(a) == mask(b) for a, b in zip(got, want, strict=False))
             out.append((name, f"{verdict} {eq} of {len(want)} records equal"))
-        elif isinstance(value, list) and name == "break parts":
-            ref = set(ref or [])
-            common = sorted(set(value) & ref)
-            out.append((name, "equal" if set(value) == ref else f"{len(common)} of {len(ref)} parts equal"))
+        elif name == "break parts":
+            if value is None or ref is None:
+                out.append((name, "absent in the source" if value is None else "absent in MH4U"))
+            else:
+                out.append((name, "same parts" if value == ref else f"source parts {value}, MH4U's {ref}"))
         elif isinstance(value, list) and (not value or isinstance(value[0], tuple)):
             ref = ref or []
             equal = sum(a == b for a, b in zip(value, ref, strict=False))

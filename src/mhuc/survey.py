@@ -164,8 +164,20 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
     elif data[:4] == emstatus.MAGIC:
         c = st.setdefault("monster data", Counter())
         try:
-            emstatus.blocks(data)
+            walk = emstatus.blocks(data)
             c["E3 em_status walk ends at the file's end"] += 1
+            names = {n for n, _, _ in walk}
+            if "block 0x74" in names:
+                records = emstatus.part_break_records(data) or []
+                c["E6 em_status break block 8 x 6 bytes"] += 1
+                c["E6 em_status break block with its 3-byte companion (0x70)"
+                  if "block 0x70" in names else "E6 em_status break block WITHOUT its companion"] += 1
+                c["E6 em_status parts with a non-default break record"] += sum(
+                    1 for r in records if r[:4] != bytes(4))
+            if "block 0x6c" in names:
+                hp = emstatus.second_part_hp(data) or []
+                c["E6 em_status second part HP block 8 x s16"] += 1
+                c["E6 em_status parts with a non-zero second HP"] += sum(1 for v in hp if v)
         except emstatus.EmStatusError as e:
             c[f"E3 em_status {str(e).split(':')[0]}"] += 1
     elif data[:4] in (hitdata.BDD[0], hitdata.HTS[0], hitdata.HDE[0], hitdata.HTD[0]):

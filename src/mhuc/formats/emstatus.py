@@ -144,3 +144,28 @@ def block(d: bytes, name: str) -> bytes | None:
         if n == name:
             return d[off:off + size]
     return None
+
+
+PART_COUNT = 8
+BREAK_RECORD = 6
+
+
+def part_break_records(d: bytes) -> list[bytes] | None:
+    """The parts' break records (walk block "block 0x74"), 8 records of 6 bytes, or None when absent.
+
+    The code returns one shared default record for every part when the block is absent (0x84c56c); the records
+    themselves are read by the part break test 0x835ebc and the update 0x837a60 (specs/emstatus.md).
+    """
+    b = block(d, "block 0x74")
+    if b is None:
+        return None
+    return [b[BREAK_RECORD * i:BREAK_RECORD * (i + 1)] for i in range(PART_COUNT)]
+
+
+def second_part_hp(d: bytes) -> list[int] | None:
+    """The parts' second-level HP (walk block "block 0x6c"), 8 s16, or None when absent. Copied into the part's
+    secondary HP slot by 0x8525a8 (specs/emstatus.md)."""
+    b = block(d, "block 0x6c")
+    if b is None:
+        return None
+    return list(struct.unpack("<8h", b))
