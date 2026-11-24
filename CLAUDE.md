@@ -4,8 +4,9 @@ Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Mo
 
 ## Start and end of a session
 
-- **Start:** read [README.md](README.md) and [docs/architecture.md](docs/architecture.md). They describe the project as it is today; `git log` tells what changed and why.
-- **End:** run the tests, commit. Write no session report, status file or task list anywhere in either repository.
+- **Start:** read [README.md](README.md) and [docs/architecture.md](docs/architecture.md). They describe the project as it is today; `git log` tells what changed and why. `/next` picks the task.
+- **Tasks** are GitHub issues in this repository, grouped by milestone, each with a "Done when". One session works on one issue; `/plan` adds issues and milestones.
+- **End:** `/done` runs the checks, commits, and opens a pull request that closes the issue. Write no session report, status file or task list anywhere in either repository.
 
 ## Ground rules (every session starts from these)
 
@@ -37,7 +38,8 @@ Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Mo
 | what the project is and does now | README.md, docs/architecture.md, specs/, reference/README.md, updated in the same commit as the change |
 | why a change was made | the commit message |
 | a structural decision, settled or open | docs/decisions.md |
-| results of a session, progress, next steps, dated "results (YYYY-MM-DD)" sections | nowhere in the repository |
+| a task, its progress, next steps | a GitHub issue |
+| results of a session, dated "results (YYYY-MM-DD)" sections | nowhere in the repository |
 | a command's options | its `--help`, not the docs |
 
 The 2026-11-24 cleanup removed 14 session reports, a STATUS.md rewritten by every session, and design docs whose dated results had grown to 170 lines. Don't recreate them under another name.
