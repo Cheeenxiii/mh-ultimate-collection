@@ -16,17 +16,16 @@ This session ([report](docs/reports/2026-11-24-gu-switch-bridge.md), results in 
 
 ## Branches
 
-- Content: `claude/gu-switch-map` (doctor, dumps.json, docs, this handoff), PR open.
-- Fork: `uc/nsp-extract` (PR #9, the extractor).
-- Both were merged at the end of the session at the maintainer's request, if the merge succeeded (see the PRs).
+- No session branch is in flight. This session's PRs merged on 2026-11-24 at the maintainer's request: fork #9 (`uc/nsp-extract`, the extractor), content #11 (`claude/gu-switch-map`).
+- Scratch work to carry on from: `game_files/work/gusw/` (matcher, GU analysis) and `game_files/work/mport/actions/roEm001_imports_gu.tsv` (the worklist through GU); the report's checklist has the commands.
 
 ## Next tasks, in order
 
 1. **The 62 GU engine functions Rathian calls:** pair `roEm001` with GU's `uEm001_00` by the shared action ids (a GU dispatcher reader for clang's switch forms), read the unplaced imports off aligned call sites, then write each one's entry (what it does, MH4U's way or "MH4U lacks it"). Done when all 62 have an entry and the 25 unchecked call-site matches are confirmed or dropped.
-2. **The matcher into the fork:** the GU-side analysis (functions, classes by `getDTI`) and `xmap` as tools with synthetic tests. Done when `game_files/work/gusw/` results reproduce from fork commands.
-3. **Rathian's monster data** (step 3), MHXX's and MH3U's, then the action-forcing test aid and check R1.
-4. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`. Done when the specs record the results and extra-data.md says which routes work.
-5. **LMT version 66** (MH3U): a layout from the files and Cha-Cha, then L1 again.
+2. **Definitive Edition's `match4u.py` on our dumps** (numpy is now in the venv, at the maintainer's yes): its 4U↔GU pairs and ratings, read in its own folder `game_files/work/de/src/` with its `dump/` paths pointed at our identical files (read its `tools/setup.py` first). Done when its pairs are checked against our MH4U↔GU map and the worklist rerun with them.
+3. **The matcher into the fork:** the GU-side analysis (functions, classes by `getDTI`) and `xmap` as tools with synthetic tests. Done when `game_files/work/gusw/` results reproduce from fork commands.
+4. **Rathian's monster data** (step 3), MHXX's and MH3U's, then the action-forcing test aid and check R1.
+5. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`. Done when the specs record the results and extra-data.md says which routes work.
 
 ## Housekeeping
 
@@ -35,7 +34,6 @@ This session ([report](docs/reports/2026-11-24-gu-switch-bridge.md), results in 
 
 ## Waiting on the maintainer
 
-- Whether to install numpy in the workspace venv (to run Definitive Edition's `match4u.py` on our identical dumps).
 - Check R1 (an action id is the same move in both games), once the test aid exists; the in-game checks Q17, Q19, E4, and which region and language the Extra Data's game is.
 - Whether to contact MHGU Definitive Edition's maintainers about shared format specs.
 - If server files should be decrypted: a `permissions.allow` rule for `Bash(python3 -m tools.mhuc.cli decrypt:*)` in `.claude/settings.json`.
