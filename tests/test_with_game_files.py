@@ -9,7 +9,7 @@ import pytest
 from mhuc import monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
-from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, romfs
+from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, lmt, mod, romfs
 from mhuc.quests import mibwrite, quest
 
 pytestmark = pytest.mark.game_files
@@ -178,3 +178,75 @@ def test_rathian_part_record_rebuilds_from_mh3u(dump):
     second = sum(a[5] == b[5] for a, b in zip(got, want, strict=True))
     assert second == 7, f"MH3U's second-level HP agrees with MH4U's on {second} of 8 parts, expected 7"
     assert all(a[6] == 0 for a in got), "MH3U has no kind field, so the rebuilt kind must stay 0"
+
+def _images(dump) -> dict:
+    """Each game's RomFS image and its file paths, so a model can be read without rescanning."""
+    out = {}
+    for game in ("mh3u", "mh4u"):
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        out[game] = (image, {f.path: f for f in image.files()})
+    return out
+
+
+def _r_model(image, files, arc_path: str) -> bytes:
+    return next(e.data for e in arc.read(image.read(files[arc_path])).entries if e.type_name == "rModel")
+
+
+HUNTER_PARTS = (  # part, MH3U bone ids, MH4U bone ids; MH4U's id 0 is MH3U's pelvis, id 13
+    ("body", set(range(20)), set(range(13)) | set(range(14, 20))),
+    ("arm", {2, 5, 6, 7, 8, 9, 10, 11, 12}, {2, 5, 6, 7, 8, 9, 10, 11, 12}),
+    ("leg", {13, 14, 15, 16, 17, 18, 19}, {0, 14, 15, 16, 17, 18, 19}),
+    ("wst", {1, 13, 14, 15, 17, 18}, {0, 1, 14, 15, 17, 18}),
+    ("helm", {2, 3, 4}, {2, 3, 4}),
+)
+
+
+def test_the_mh4u_hunter_skeleton_is_mh3us_with_the_pelvis_renumbered(dump):
+    """specs/mod.md check M4: MH4U's hunter is MH3U's with the empty root dropped and the pelvis
+    renumbered 13 to 0, so a 3U motion needs its bone ids rewritten (docs/underwater.md)"""
+    games = _images(dump)
+    extra = {20, 21}   # some helmet models carry two more bones, in both games
+    for gender in ("f", "m"):
+        for part, want3, want4 in HUNTER_PARTS:
+            d3 = _r_model(*games["mh3u"], f"/arc/player/mod/{gender}/pl001/{gender}_{part}001.arc")
+            d4 = _r_model(*games["mh4u"], f"/data/pl_{gender}_{part}001.arc")
+            b3 = {b["id"]: b for b in mod.bones(d3)}
+            b4 = {b["id"]: b for b in mod.bones(d4)}
+            assert want3 <= set(b3) <= want3 | extra, (gender, part, sorted(set(b3)))
+            assert want4 <= set(b4) <= want4 | extra, (gender, part, sorted(set(b4)))
+            if 0 in b3:     # the MH3U-only empty root: no mesh, at the origin
+                assert b3[0]["furthest"] == b3[0]["parent_distance"] == 0 and b3[0]["position"] == (0, 0, 0), \
+                    (gender, part)
+            for i, u4 in b4.items():
+                u3 = b3[13 if i == 0 else i]
+                assert u4["parent_distance"] == pytest.approx(u3["parent_distance"], abs=1e-3), (gender, part, i)
+                assert u4["position"] == pytest.approx(u3["position"], abs=1e-3), (gender, part, i)
+                want_parent = 0 if u3["parent_id"] in (0, 13) else u3["parent_id"]
+                assert u4["parent_id"] == (0xFF if i == 0 else want_parent), \
+                    (gender, part, i, want_parent, u4["parent_id"])
+
+
+def test_mh4u_motion_tracks_address_bones_by_id(dump):
+    """specs/lmt.md check L2: a track's bone field is the model's bone id, not its index, so a
+    3U-to-4U motion only needs the ids rewritten. MH4U's Rathian model has 43 bones with ids up to
+    202 and its motions carry ids 60 to 145, which no 43-entry list could index."""
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    files = {f.path: f for f in image.files()}
+    entries = arc.read(image.read(files["/data/em001.arc"])).entries
+    ids = {b["id"] for b in mod.bones(next(e.data for e in entries if e.file_name.endswith("em001.mod")))}
+    seen = set()
+    for e in entries:
+        if e.type_name == "rMotionList":
+            _version, anims = lmt.read(e.data)
+            seen |= {t.bone for an in anims if an for t in an.tracks}
+    high = {i for i in ids if 60 <= i <= 145}   # ids a 43-entry list cannot hold
+    assert len(ids) == 43 and max(ids) == 202 and len(high) == 18 and high <= seen, \
+        (len(ids), max(ids), len(high), sorted(high - seen))
+    # the player's common motions use exactly the hunter body's ids (13 is absent), not 0..18
+    human = {b["id"] for b in mod.bones(_r_model(image, files, "/data/pl_f_body001.arc"))}
+    seen = set()
+    for e in arc.read(image.read(files["/data/pl_mot_lco.arc"])).entries:
+        if e.type_name == "rMotionList":
+            _version, anims = lmt.read(e.data)
+            seen |= {t.bone for an in anims if an for t in an.tracks}
+    assert seen - {255} == human, sorted(seen - {255} ^ human)
