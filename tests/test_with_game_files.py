@@ -258,11 +258,12 @@ def test_mh4u_motion_tracks_address_bones_by_id(dump):
     high = {i for i in ids if 60 <= i <= 145}   # ids a 43-entry list cannot hold
     assert len(ids) == 43 and max(ids) == 202 and len(high) == 18 and high <= seen, \
         (len(ids), max(ids), len(high), sorted(high - seen))
-    # the player's common motions use exactly the hunter body's ids (13 is absent), not 0..18
+    # the player's common and per-weapon motions use exactly the hunter body's ids (13 is absent)
     human = {b["id"] for b in mod.bones(_r_model(image, files, "/data/pl_f_body001.arc"))}
-    seen = set()
-    for e in arc.read(image.read(files["/data/pl_mot_lco.arc"])).entries:
-        if e.type_name == "rMotionList":
-            _version, anims = lmt.read(e.data)
-            seen |= {t.bone for an in anims if an for t in an.tracks}
-    assert seen - {255} == human, sorted(seen - {255} ^ human)
+    for path in ["/data/pl_mot_lco.arc"] + [f"/data/pl_w{i:02d}.arc" for i in range(14)]:
+        seen = set()
+        for e in arc.read(image.read(files[path])).entries:
+            if e.type_name == "rMotionList" and e.file_name.startswith("player/"):
+                _version, anims = lmt.read(e.data)
+                seen |= {t.bone for an in anims if an for t in an.tracks}
+        assert seen - {255} == human, (path, sorted(seen - {255} ^ human))
