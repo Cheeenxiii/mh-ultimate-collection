@@ -19,7 +19,8 @@ def class_id(name: str) -> int:
 EXTENSIONS: dict[str, str] = {
     "rArchive": "arc", "rCameraList": "lcm", "rChainCol": "ccl", "rCnsTinyChain": "ctc",
     "rCollision": "sbc", "rEffectAnim": "ean", "rEffectList": "efl", "rEnemyCmd": "emc",
-    "rEnemyData": "emd", "rEnemyTuneData": "etd", "rEventActorTbl": "evt", "rGrass2": "gr2",
+    "rEnemyData": "emd", "rEnemyDtBase": "dtbase", "rEnemyDtBaseParts": "dtbparts", "rEnemyTuneData": "etd",
+    "rEventActorTbl": "evt", "rGrass2": "gr2",
     "rGrass2Setting": "gr2s", "rGrassWind": "grw", "rItemPopList": "ipl", "rItemPopSet": "ips",
     "rLayout": "lyt", "rLayoutAnimeList": "lanl", "rLayoutFont": "lfd", "rLayoutMessage": "lmd",
     "rLtProceduralTexture": "ptex", "rLtShader": "lfx", "rLtSoundBank": "sbk",

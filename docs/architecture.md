@@ -32,7 +32,7 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 
 | Module | Does |
 |---|---|
-| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), models (MOD), monster data (MH4U EMD, MHXX `dttune`, MH3U `em_status`, hurt and attack volumes), serialised objects (XFS), RomFS images, class ids |
+| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), serialised objects (XFS), RomFS images, class ids |
 | `crypto/` | Blowfish and the save, Extra Data and DLC ciphers of the three games |
 | `quests/` | quest readers for the three games, the MH4U `.mib` writer, conversion from MHXX, monster ids by name |
 | `extdata.py` | MH4U Extra Data records: guild quest cards, DLC Palicos, the in-game test kit |
@@ -50,7 +50,7 @@ A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source g
 |---|---|---|
 | 1. Study the source | class, vtable, action dispatcher, engine calls | done for Rathian in all three games |
 | 2. Assets | models, textures, motions, AI scripts, collision, sounds | MOD is the same version in all three games; MHXX's LMT and EMC match MH4U's, MH3U's are older |
-| 3. Monster data | hitzones, parts, attacks, stats | known in all three games ([emd](../specs/emd.md), [dttune](../specs/dttune.md), [emstatus](../specs/emstatus.md), [hitdata](../specs/hitdata.md)); `mhuc monsterdata` rebuilds MH4U Rathian's HP, parts and hitzones from MHXX, and her HP and most hitzone rows from MH3U |
+| 3. Monster data | hitzones, parts, breaks, attacks, stats | known in all three games ([emd](../specs/emd.md), [dttune](../specs/dttune.md), [dtbase](../specs/dtbase.md), [dtbparts](../specs/dtbparts.md), [emstatus](../specs/emstatus.md), [hitdata](../specs/hitdata.md)); `mhuc monsterdata` rebuilds MH4U Rathian's HP, parts, hitzones, break parts and joint records from MHXX, and her HP and most hitzone rows from MH3U; MH4U's sever records have no MHXX counterpart found |
 | 4. Register | a new monster id and the tables it indexes | MH4U's tables are found ([reference/](../reference/README.md#mh4u-monster-tables)) |
 | 5. Behaviour | each action handler, translated onto `uEnemy` | not started |
 | 6. Quests, arena | the monster's quests and map | quest conversion exists for MHXX |

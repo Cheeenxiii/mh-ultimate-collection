@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Check mhuc's monster-data readers against the games' own loaders (specs/dttune.md, specs/emstatus.md).
+"""Check mhuc's monster-data readers against the games' own loaders (specs/dttune.md, specs/dtbase.md,
+specs/dtbparts.md, specs/emstatus.md).
 
-For every MHXX `rEnemyDtTune` or MH3U `rEnemyStatus` file in a RomFS, run the game's loader in Unicorn and log
-where it reads, then compare with the blocks `mhuc.formats.dttune` / `mhuc.formats.emstatus` find:
+For every MHXX `rEnemyDtTune`, `rEnemyDtBase` or `rEnemyDtBaseParts` file or MH3U `rEnemyStatus` file in a RomFS, run
+the game's loader in Unicorn and log where it reads, then compare with the blocks `mhuc.formats.dttune`, `dtbase`,
+`dtbparts` / `emstatus` find:
 
-  mhxx  the stream loader (vtable slot 11, 0x002b7f80): every call to the stream read 0x0028140c logs
-        (file offset, size); the reader's blocks must cover the same bytes, each starting where a read starts
-  mh3u  the walk after the load (0x0029c744): every call to the cursor step 0x00298918 logs (offset, size); the
-        reader's blocks must be the same list
+  mhxx           the stream loader (vtable slot 11): every call to the stream read 0x0028140c logs (file offset, size),
+                 and the reader's blocks must be the loader's reads. The loaders: dttune 0x002b7f80, dtbase
+                 0x002b6f88, dtbparts 0x0058e424.
+  mh3u           the walk after the load (0x0029c744): every call to the cursor step 0x00298918 logs (offset, size);
+                 the reader's blocks must be the same list
 
-usage: loader_trace.py {mhxx,mh3u} --exheader exheader.bin --code code.bin --romfs romfs.bin
+usage: loader_trace.py {mhxx,mhxx-dtbase,mhxx-dtbparts,mh3u} --exheader exheader.bin --code code.bin --romfs romfs.bin
 
 The code must be the version the addresses belong to: MHXX v1.4 (the v4.8.0 update's code.bin; the data comes from
 the game's RomFS, which the update doesn't patch for these files), MH3U USA. Prints counts only.
@@ -29,14 +32,21 @@ import fork  # noqa: E402,F401  (the fork's tools on sys.path)
 import codebin2elf  # noqa: E402
 import exheader as exh  # noqa: E402
 
-from mhuc.formats import arc, dttune, emstatus, romfs  # noqa: E402
+from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, romfs  # noqa: E402
 
 GAMES = {
-    "mhxx": dict(type_id=0x48E8AC29, loader=0x002B7F80, read=0x0028140C, stream=0x002819D8, alloc=0x0012C420),
+    "mhxx": dict(type_id=0x48E8AC29, loader=0x002B7F80, read=0x0028140C, stream=0x002819D8, alloc=0x0012C420,
+                 ctor=0x002E4408),
+    "mhxx-dtbase": dict(type_id=0x59D9C3DA, loader=0x002B6F88, read=0x0028140C, stream=0x002819D8,
+                        alloc=0x0012C420, new=0x00B071B4, new_arr=0x00B07170, ctor=0x002E4408),
+    "mhxx-dtbparts": dict(type_id=0x1BBC291E, loader=0x0058E424, read=0x0028140C, stream=0x002819D8,
+                          new=0x00B07170, ctor=0x002E4408),
     "mh3u": dict(type_id=0x4DEE8265, walk=0x0029C744, step=0x00298918, flag=0x00298970),
 }
+READERS = {"mhxx": dttune, "mhxx-dtbase": dtbase, "mhxx-dtbparts": dtbparts}
 OBJ, FILE, STACK, FAKE = 0x20000000, 0x30000000, 0x40000000, 0x50000000
 RET = FAKE + 0x100
+VTABLE = FAKE + 0x400
 BX_LR = b"\x1e\xff\x2f\xe1"
 
 
@@ -55,8 +65,10 @@ class Machine:
             self.uc.mem_map(at, size)
         self.uc.mem_write(RET, BX_LR)
         self.uc.mem_write(FAKE + 0x200, BX_LR)
+        self.uc.mem_write(FAKE + 0x300, BX_LR)                  # returns from the loader's own vtable call
         self.uc.mem_write(FAKE, struct.pack("<I", FAKE + 0x40))                  # fake allocator object:
         self.uc.mem_write(FAKE + 0x40, struct.pack("<16I", *[FAKE + 0x200] * 16))  # every slot allocates
+        self.uc.mem_write(VTABLE, struct.pack("<16I", *[FAKE + 0x300] * 16))     # every slot is a no-op
 
     def run(self, start: int, hook, obj: dict[int, int] | None = None) -> str | None:
         """run `start` with r0 = a zeroed object (words of `obj` set first) and r1 = a stream object"""
@@ -88,6 +100,11 @@ def trace_mhxx(m: Machine, g: dict, data: bytes) -> list[tuple[int, int]]:
         uc.reg_write(UC_ARM_REG_R0, value)
         uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
 
+    def alloc(uc, size_reg):
+        p = (st["heap"] + 15) & ~15
+        st["heap"] = p + max(uc.reg_read(size_reg), 1) + 64
+        back(uc, p)
+
     def hook(uc, addr, _size, _):
         if addr == g["stream"]:
             uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
@@ -98,15 +115,19 @@ def trace_mhxx(m: Machine, g: dict, data: bytes) -> list[tuple[int, int]]:
             st["log"].append((st["pos"], n))
             st["pos"] += n
             back(uc, len(chunk))
-        elif addr == g["alloc"]:
+        elif addr == g.get("alloc"):
             back(uc, FAKE)
+        elif addr == g.get("new"):
+            alloc(uc, UC_ARM_REG_R0)
+        elif addr == g.get("new_arr"):
+            alloc(uc, UC_ARM_REG_R0)
+        elif addr == g.get("ctor"):
+            uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))   # an array constructor: no data read
         elif addr == FAKE + 0x200:
-            p = (st["heap"] + 15) & ~15
-            st["heap"] = p + max(uc.reg_read(UC_ARM_REG_R1), 1) + 64
-            back(uc, p)
+            alloc(uc, UC_ARM_REG_R1)
         elif addr == RET:
             uc.emu_stop()
-    m.run(g["loader"], hook)
+    m.run(g["loader"], hook, {0: VTABLE})       # the loaders call their object's vtable slot 15 first
     return st["log"]
 
 
@@ -137,6 +158,32 @@ def merged(spans) -> list[tuple[int, int]]:
     return out
 
 
+def covers(ours: list[tuple[int, int]], log: list[tuple[int, int]], size: int) -> bool:
+    """True when the loader read the whole file and `ours` splits the same bytes: every block starts where a read
+    starts, every read starts inside a block, and both cover the file from the first block on."""
+    if not log or merged(log)[0][0] != 0 or sum(n for _, n in log) != size:
+        return False
+    first = min((o for o, _ in ours), default=size)
+    starts = {o for o, _ in ours}
+    if not all(n > 0 for _, n in ours) or sum(n for _, n in ours) != size - first:
+        return False
+    if sum(n for o, n in log if o + n <= first) != first:
+        return False
+    for o, n in log:
+        if o + n <= first:
+            continue
+        if o < first:
+            return False
+        if o not in starts and not any(a < o < a + b for a, b in ours):
+            return False
+    for a, b in ours:
+        if not any(o == a for o, _ in log):
+            return False
+        if a + b > size:
+            return False
+    return True
+
+
 def files(image: str, type_id: int):
     img = romfs.open_image(image)
     seen = set()
@@ -165,15 +212,14 @@ def main(argv: list[str] | None = None) -> int:
     c: Counter = Counter()
     for data in files(args.romfs, g["type_id"]):
         c["files"] += 1
-        if args.game == "mhxx":
+        if args.game.startswith("mhxx"):
             log = trace_mhxx(m, g, data)
-            ours = [(o, n) for _, o, n in dttune.blocks(data)]
-            c["loader reads the whole file" if sum(n for _, n in log) == len(data) else "loader stops early"] += 1
-            same = merged(ours) == merged(log[1:]) and {o for o, _ in ours} <= {o for o, _ in log}
+            ours = [(o, n) for _, o, n in READERS[args.game].blocks(data)]
         else:
             log = trace_mh3u(m, g, data)
             ours = [(o, n) for name, o, n in emstatus.blocks(data) if not name.endswith((" head", " count"))]
-            same = ours == log
+        c["loader reads the whole file" if sum(n for _, n in log) == len(data) else "loader stops early"] += 1
+        same = ours == log if args.game == "mh3u" else covers(ours, log, len(data))
         c["mhuc's blocks are the loader's" if same else "mhuc's blocks DIFFER"] += 1
     for k, v in sorted(c.items()):
         print(f"{k}: {v}")

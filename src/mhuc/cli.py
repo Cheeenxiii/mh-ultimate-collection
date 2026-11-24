@@ -408,7 +408,8 @@ def cmd_monsterdata(args) -> int:
             continue
         ents = entries(path)
         if game == "mhxx":
-            src = monsterdata.from_mhxx(pick(ents, 0x48E8AC29, "dt_tune/"), pick(ents, 0x1AC7B52D, "/body_data/"),
+            src = monsterdata.from_mhxx(pick(ents, 0x48E8AC29, "dt_tune/"), pick(ents, 0x59D9C3DA, "dt_base/"),
+                                        pick(ents, 0x1BBC291E, "dt_base/"), pick(ents, 0x1AC7B52D, "/body_data/"),
                                         pick(ents, 0x1AC7B52D, "cam_body_data/"),
                                         pick(ents, 0x5653C1B0, "enemy/hit_data/"), pick(ents, 0x70BB64BA, "hit_data/"))
         else:
@@ -542,7 +543,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_emd)
 
     p = sub.add_parser("monsterdata", help="rebuild an MH4U monster's .etd/.emd values from MHXX's or MH3U's own "
-                                           "files and compare (counts only; specs/dttune.md, specs/emstatus.md)")
+                                           "files and compare (counts only; specs/dttune.md, specs/dtbase.md, "
+                                           "specs/dtbparts.md, specs/emstatus.md)")
     p.add_argument("--mh4u", required=True, help="MH4U data/em_data.arc")
     p.add_argument("--id", required=True, help="the monster's MH4U name in em_data.arc, e.g. em001")
     p.add_argument("--mhxx", help="the monster's MHXX archive, e.g. arc/enemy/em001_00.arc")

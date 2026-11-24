@@ -69,8 +69,8 @@ What the lists mean is unknown: MH4U's stamina block (`.etd` word 16) is not thi
 ## What this means for the mod
 
 - **A GU monster's HP, part HP and hitzones come straight from its `dttune`.** They are byte for byte MH4U's layout: `mhuc monsterdata` rebuilds MH4U's base HP, part table and hitzone table, and the ranges, rage and most ailment blocks.
-- **A GU monster also needs what MH4U's `.etd` has and GU's file lacks** (the break records of `.emd` word 33, the stamina of `.etd` word 16) and drops what GU added (the rest of rage, the blocks marked unknown). Where GU retuned MH4U's monsters, the GU values are the source game's and stay (fidelity rule).
-- MHXX's other monster files: hurt volumes, attack volumes and attack records are in specs/hitdata.md. `dtbase` (rEnemyDtBase, loader 0x002b6f88) and `dtbparts` (rEnemyDtBaseParts, loader 0x0058e424) are not specced here.
+- **A GU monster also needs what MH4U's files have and GU's lack** (the break list of `.emd` word 33 and the sever records of word 35, the stamina of `.etd` word 16) and drops what GU added (the rest of rage, the blocks marked unknown). Where GU retuned MH4U's monsters, the GU values are the source game's and stay (fidelity rule).
+- MHXX's other monster files: hurt volumes, attack volumes and attack records are in specs/hitdata.md; the `.emd` blocks that are not in `dttune` are in specs/dtbase.md, and the break and joint records in specs/dtbparts.md.
 
 ## Checks
 
