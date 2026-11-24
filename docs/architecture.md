@@ -84,7 +84,7 @@ Known so far:
 - MH3U's stage collision uses MH4U's format ([specs/sbc.md](../specs/sbc.md)).
 - Cha-Cha (MH3U on Wii U) marks the swim state, the underwater camera and underwater carving. Its offsets must be re-found on 3DS.
 
-The first target is the Water Arena: enter water, swim, surface, oxygen, with Sword and Shield motions, then Lagiacrus. Charge Blade and Insect Glaive never had underwater movesets, so theirs would be authored ([sources.md](sources.md#authored-register)).
+The first target is the Water Arena: enter water, swim, surface, oxygen, with Sword and Shield motions, then Lagiacrus. Charge Blade and Insect Glaive never had underwater movesets, so theirs would be authored. What comes from MH3U, the leads and the unknowns: [underwater.md](underwater.md).
 
 ## Audio
 
@@ -93,6 +93,8 @@ Sounds and music come from each piece of content's own game and play through MH4
 - MH3U uses MH4U's sound classes, with the same class ids.
 - MHXX uses the next generation of classes, shared with MHGU on Switch.
 - MH4U's layouts come from MHGU Definitive Edition and are unverified ([specs/sound.md](../specs/sound.md)).
+
+What the mod needs, what is known and the unknowns: [audio.md](audio.md).
 
 ## Progression
 
