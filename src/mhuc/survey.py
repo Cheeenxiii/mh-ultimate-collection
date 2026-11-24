@@ -5,7 +5,8 @@ versions and pass/fail tallies: nothing from the files themselves, so its output
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
-records against their hit volumes), E9 (MH3U em_status break blocks), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
+records against their hit volumes), E9 (MH3U em_status break blocks), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision),
+SN1 (sound resources by kind, version and class id).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -21,6 +22,35 @@ from .formats import mod as modfile
 from .quests import quest as questfile
 
 QUEST_TYPES = ("rQuestData", "rSetEmMain", "rEmSetList", "rRem")
+
+# Sound resources (specs/sound.md, check SN1), keyed by their first four bytes. The u32 after the
+# magic is a version for the kinds in SOUND_VERSIONED; the rest pack flags into it.
+SOUND_MAGIC: dict[bytes, str] = {
+    b"MADP": "wave", b"SNDB": "bank", b"SREQ": "request",
+    b"SBKR": "bank", b"SRQR": "request",
+    b"STRQ": "stream request", b"STQR": "stream request",
+    b"SES\x00": "area emitter",
+    b"MSS\x00": "sequence",
+    b"REV\x00": "reverb",
+    b"CFL\x00": "category filter",
+}
+SOUND_VERSIONED = {"wave", "bank", "request", "stream request", "area emitter", "sequence"}
+# The class each game's registry gives a sound kind (specs/sound.md "Which class, which game"):
+# MH4U and MH3U share the rLt* classes, MHXX has the next generation's rSound* ones.
+_SOUND_CLASS_NAMES = (
+    ("rLtSoundSourceADPCM", "wave"), ("rSoundSourceADPCM", "wave"),
+    ("rLtSoundBank", "bank"), ("rSoundBank", "bank"),
+    ("rLtSoundRequest", "request"), ("rSoundRequest", "request"),
+    ("rLtSoundStreamRequest", "stream request"), ("rSoundStreamRequest", "stream request"),
+    ("rMHSoundEmitter", "area emitter"),
+    ("rLtSoundReverb", "reverb"), ("rSoundReverb", "reverb"), ("rSoundEQ", "EQ"),
+    ("rLtSoundCategoryFilter", "category filter"),
+    ("rMHSoundSequence", "sequence"),
+    ("rSoundAttributeSe", "sound attribute se"),
+)
+SOUND_CLASSES: dict[int, str] = {classid.class_id(name): kind for name, kind in _SOUND_CLASS_NAMES}
+SOUND_CLASS_NAMES: dict[int, str] = {classid.class_id(name): name for name, _ in _SOUND_CLASS_NAMES}
+
 _IMG: romfs.Romfs | None = None
 
 
@@ -47,7 +77,29 @@ def tex_expected_size(data: bytes) -> int | None:
     return size
 
 
-def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
+def _sound(st: dict, data: bytes, kind: str, type_id: int | None) -> None:
+    """Count one sound resource by kind, magic and version, and by class id when it sits in an ARC."""
+    c = st.setdefault("sound", Counter())
+    magic = data[:4].decode("latin-1").rstrip("\x00")
+    if kind in SOUND_VERSIONED and len(data) >= 8:
+        version = struct.unpack_from("<I", data, 4)[0]
+        c[f"{kind} {magic} v{version if version < 0x100 else f'0x{version:x}'}"] += 1
+    else:
+        c[f"{kind} {magic}"] += 1
+    if type_id is None:
+        c[f"{kind} {magic} loose"] += 1
+    else:
+        name = SOUND_CLASS_NAMES.get(type_id) or classid.name_of(type_id) or "?"
+        c[f"{kind} {magic} type 0x{type_id:08x} {name}"] += 1
+
+
+def survey_entry(type_name: str | None, data: bytes, st: dict, type_id: int | None = None) -> None:
+    kind = SOUND_MAGIC.get(data[:4])
+    if kind is None and type_id is not None:
+        kind = SOUND_CLASSES.get(type_id)
+    if kind is not None:
+        _sound(st, data, kind, type_id)
+        return
     if type_name == "rTexture" or data[:4] == b"TEX\0":
         c = st.setdefault("tex", Counter())
         if data[:4] != b"TEX\0" or len(data) < 16:
@@ -228,7 +280,7 @@ def survey_arc(data: bytes, st: dict) -> None:
             c["C3 entry over 0x00FFFFFF"] += 1
         name = classid.name_of(e.type_id)
         types.append(name)
-        survey_entry(name, e.data, st)
+        survey_entry(name, e.data, st, e.type_id)
     pairs: dict = {}
     for e, name in zip(a.entries, types, strict=True):
         if name in ("rEnemyData", "rEnemyTuneData"):
@@ -281,7 +333,7 @@ def report(total: dict) -> str:
     lines = [f"files in image: {total['files']}"]
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
-    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "emc", "sbc"):
+    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "emc", "sbc", "sound"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]
