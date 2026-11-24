@@ -124,6 +124,7 @@ def test_rathian_attack_records_rebuild_from_mh3u(dump):
 
     assert sum(shared(a) == shared(b) for a, b in zip(got, want, strict=False)) == 19
     assert sum(a[0x19] == b[0x19] for a, b in zip(got, want, strict=False)) == 38
+    assert sum(a[0x1A] == b[0x1A] for a, b in zip(got, want, strict=False)) == 42
     assert sum(a[0x1D] == b[0x1D] for a, b in zip(got, want, strict=False)) == 37
 
 
