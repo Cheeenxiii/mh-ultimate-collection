@@ -64,6 +64,29 @@ MH3U's base enemy is a quarter of MH4U's size, and each monster adds its own sta
 
 Monster code itself doesn't pair function by function: MHXX rewrote Rathian into more, smaller functions. Pairing works through shared action ids instead.
 
+### MHGU Definitive Edition's pairs
+
+[MHGU Definitive Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) pairs MH4U's functions with MHGU's, the other way round from us. Its `tools/match4u.py build` reads its own analysis of the two games and writes `dump/match4u/pairs.tsv`, with a rating per pair: C (a class seed whose name and parent match), S, W. Run in its own clone on our dumps it writes 7,108 pairs: 1,366 C, 1,404 S and 4,338 W. Its own `check`, against its API map, its slot pairs and its `game.h` brackets, calls 129 of the 132 slot pairs it can test right, 17 of 17 API C pairs, 22 of 22 `game.h` pairs and 20 of 21 API S pairs.
+
+For the pairs alone, its `tools/setup.py` needs the steps `4u_exefs`, `4u_asm`, `gu_code`, `gu_reloc`, `gu_plt` and `gu_pcrefs`; its RomFS extraction and monster builds are not needed.
+
+Its 4U side is the **EUR v1.1** build, ours the **USA v1.3.0** build. They are the same code with small layout shifts (0 to 0x54 bytes across `.text`) and some functions changed between the versions. A local byte shift, confirmed by the same instruction tokens at the shifted address, carries 6,620 of its 7,108 4U addresses into our build; 488 (7 %) cannot be anchored that way and are left out.
+
+Of the 6,620, our maps pair 2,922 4U functions:
+
+| Its rating | Its pairs | On a function we pair | Same GU function | Different GU function |
+|---|---|---|---|---|
+| C | 1,366 | 1,058 | 1,046 | 12 |
+| S | 1,404 | 377 | 332 | 45 |
+| W | 4,338 | 1,487 | 1,357 | 130 |
+| **all** | **7,108** | **2,922** | **2,735** | **187** |
+
+The other 3,698 are on 4U functions our maps don't pair. From our side, the composed MH4U → MHXX → MHGU map (3,192 pairs) has 2,026 on functions it pairs too (1,894 same, 132 different) and 1,099 on functions it never pairs; the direct MH4U ↔ MHGU map (4,057 pairs) has 2,701 (2,550 same, 151 different) and 1,276.
+
+The 187 disagreements are mostly neighbours: 24 point within 0x100 bytes of each other, 36 more within 0x1000, 41 more within 0x10000, and 86 at unrelated code. Its 12 C-rated disagreements pair the same class slot in both games; where our own vtable recovery has that class and slot, it points at a different GU function, usually a thunk a few bytes away. They are places to read, not a verdict against either pair set.
+
+Rathian's unmatched engine calls, seen through its pairs, are in the "Through MHGU" table below; the full account is on [#14](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/14).
+
 ## Rathian, the first port
 
 | | MH4U | MH3U | MHXX |
@@ -130,8 +153,8 @@ Through MHGU, with Definitive Edition's pairs:
 
 | Set | Through GU to MH4U | GU counterpart only | No GU counterpart |
 |---|---|---|---|
-| 62 called imports with no MH4U counterpart (the "61" plus one with use `unknown`) | 2 (DE C pairs: a `uFestaChar` material-dirty flag, a `uEnemy` rank-table getter) | 28 | 32 |
-| 33 call-site matches | confirmed 7 (5 by DE pairs, 2 by our MH4U↔GU map), 1 differs, 25 unchecked | | |
+| 62 called imports with no MH4U counterpart (the "61" plus one with use `unknown`) | 2 (its full pair set: a `uFestaChar` material-dirty flag, rated S, and a `uEnemy` rank-table getter, rated W) | 28 | 32 |
+| 33 call-site matches | 9 confirmed by its pairs, 7 differ, 3 with no pair of its own, 14 not checkable (no 4U address or no GU partner) | | |
 
 The 28 placed in GU and not in MH4U are mostly projectile code (`uShell`, `uShellEnemy`, `uShellEmBase*`, 17) and GU-era framework slots: candidates for "MH4U lacks it". The 32 with no GU counterpart are mostly `uEnemy` and `uEnemyActCustom` functions without strings, where the next lever is Rathian's own code: pairing `roEm001` with GU's `uEm001_00` by the shared action ids, then reading the imports off aligned call sites.
 
