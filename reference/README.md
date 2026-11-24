@@ -76,6 +76,72 @@ Monster code itself doesn't pair function by function: MHXX rewrote Rathian into
 - Each of the 80 MH4U handlers reached by a shared action meets exactly one MHXX handler.
 - `roEm001` imports 330 engine functions. 61 of those it calls have no MH4U counterpart. Through MHGU, 2 more resolve to MH4U and 28 are placed in GU only, mostly projectile code.
 
+### Enemy class hierarchies
+
+| Enemy hierarchy, slots per vtable | | | | |
+|---|---|---|---|---|
+| MH4U | `uMHchar` 38 | `uEnemy` 95 | `uEm001` 95 | |
+| MH3U | `uCharacter` 42 | `uEnemy` 82 | `uEm002` 82 | |
+| MHXX | `uEnemyCharacter` 79 | `uEnemyBase` 118 | `uEnemy` 283 | `uFestaEnemy` 287, `uEm001_00` 293 (in `roEm001`) |
+
+MHXX's `uEnemy` has three times MH4U's virtual methods, and two classes MH4U lacks sit on either side of it (`uEnemyBase` below, `uFestaEnemy` above).
+
+### Rathian's engine calls
+
+**Rathian's MH4U engine calls by class.** Each callee is labelled with the class whose vtable first introduces it, or for a non-virtual function, the nearest common ancestor of its callers' classes (a heuristic):
+
+| MH4U class | Callees | Calls | Placed in MHXX | in MH3U |
+|---|---|---|---|---|
+| `uEnemy` | 130 | 983 | 40 | 27 |
+| `uCoord` (position, transforms) | 13 | 101 | 5 | 2 |
+| `uEm001` (its own slots, also called from outside) | 18 | 70 | 2 | 1 |
+| other monsters' classes (`uEm032`, `uEm103`, `uEm068`, `uEm089`...; code they share with Rathian) | 19 | 129 | 9 | 3 |
+| `uMHchar` | 6 | 37 | 1 | 1 |
+| `cUnit` | 2 | 19 | 2 | 1 |
+| `MtObject` and the rest | 9 | 11 | 4 | 4 |
+| **All** | **197** | **1,350** | **63** (550 calls; 51 land on `roEm001` imports) | **39** (302 calls) |
+
+**What a GU Rathian needs from MHXX's engine.** `roEm001` imports 330 static functions. By MHXX class, with how many have an MH4U counterpart in the map:
+
+| MHXX class | Imports | With MH4U counterpart | Without | Class in MH4U? |
+|---|---|---|---|---|
+| `uEnemy` | 93 | 9 | 84 | yes, much smaller |
+| `uFestaEnemy` | 26 | 0 | 26 | no |
+| `uFestaChar` | 24 | 3 | 21 | no |
+| `uEmXXX` (the template enemy) | 19 | 17 | 2 | yes |
+| `uShell` and `uShellEnemy`, `uShellEmBase*`, `uShellPlayer` (projectiles) | 50 | 2 | 48 | `uShell` only |
+| `uEnemyBase`, `uEnemyCharacter`, `uEnemyActCustom`, `uEnemyOption` | 23 | 2 | 21 | no |
+| `cUnit`, `MtObject` | 24 | 17 | 7 | yes |
+| others (`uMonsterUnitConductor`, `sHitcheck`, `sHitPush`, `uPlayerQuest`, `uPlayerLobby`) | 9 | 1 | 8 | partly |
+| no class (library and free functions) | 62 | 17 | 45 | |
+| **All** | **330** | **68** | **262** | |
+
+**What the handlers need from MHXX's engine.** | MH4U counterpart | Called by `roEm001`'s code | Not called (vtable slots, other data) |
+|---|---|---|
+| by code (map) | 86 | 12 |
+| at the same call site of a mapped pair (role, not body) | 33 | 2 |
+| none | **61** | 136 |
+| **All** | 180 | 150 |
+
+Step 1 had 68 with a counterpart; merging the module gives 91, the seeds 98, and call sites add 35. The 136 that are neither matched nor called are mostly `uEm001_00`'s inherited vtable slots (96), and pointers in the module's other data (39, the projectile classes' vtables among them). A port onto MH4U's `uEnemy` doesn't translate them: MH4U's base class provides its own. **The translation worklist is the 61 called functions with no counterpart:** 11 `uEnemy`, 17 projectile classes (`uShell` 9, `uShellEnemy` 3, `uShellEmBase*` 3, `uShellPlayer` 2), 19 with no class, 5 `uFestaEnemy`/`uFestaChar`, and 9 others (`uEnemyActCustom` 2, `uPlayerQuest` 2, `uEnemyBase`, `uEmXXX`, `sHitcheck`, `sHitPush`, `uPlayerLobby`). 9 of the 61 sit under an action that has an MH4U pair, so the MH4U handler shows how MH4U does the same. The other 52 are called outside the action handlers (update, setup and per-frame code). The 33 call-site matches are candidates to confirm one by one.
+
+Through MHGU, with Definitive Edition's pairs:
+
+| Set | Through GU to MH4U | GU counterpart only | No GU counterpart |
+|---|---|---|---|
+| 62 called imports with no MH4U counterpart (the "61" plus one with use `unknown`) | 2 (DE C pairs: a `uFestaChar` material-dirty flag, a `uEnemy` rank-table getter) | 28 | 32 |
+| 33 call-site matches | confirmed 7 (5 by DE pairs, 2 by our MH4U↔GU map), 1 differs, 25 unchecked | | |
+
+The 28 placed in GU and not in MH4U are mostly projectile code (`uShell`, `uShellEnemy`, `uShellEmBase*`, 17) and GU-era framework slots: candidates for "MH4U lacks it". The 32 with no GU counterpart are mostly `uEnemy` and `uEnemyActCustom` functions without strings, where the next lever is Rathian's own code: pairing `roEm001` with GU's `uEm001_00` by the shared action ids, then reading the imports off aligned call sites.
+
+### Lessons from MHGU Definitive Edition's ports
+
+- **Keep the source's bone ids and remap table.** Then the monster data needs no bone remap, except where a bone is missing from the target skeleton.
+- **A handler that never ends its action freezes the AI.** Translate the source handlers literally, timers and all.
+- **Ids only ever grow.** Never move an installed monster's ids: saves and quests keep them.
+- **Add, never replace.** No shipped file should be a copy of a game file another mod might also ship; patch the loaded resource instead.
+- **Check a converted file by rebuilding the target game's own file** for a monster both games have, then count equal bytes. MHGU-DE reaches 95 to 99.7 % on the volume tables this way; the remainder points at real format differences.
+
 ## MH4U monster tables
 
 Monster ids run 0 to 123. Id N's files are `emNNN`. Every table below has to grow when ids do.
@@ -100,6 +166,132 @@ Monster ids run 0 to 123. Id N's files are `emNNN`. Every table below has to gro
 
 The game's heap allocator, which plugins use, is named in the fork's `config/symbols.txt`, section "Heap".
 
+### Ids and classes
+
+**Id to class.** The rule is id N → `uEmN`. These ids reuse another monster's class (variants, subspecies and ids with no files):
+
+| Class | Extra ids | Class | Extra ids |
+|---|---|---|---|
+| uEm001 | 2-6 | uEm048 | 49, 114 |
+| uEm007 | 8 | uEm052 | 53, 54, 55 |
+| uEm009 | 10 | uEm058 | 59, 60 |
+| uEm011 | 12, 80, 121 | uEm065 | 66 |
+| uEm016 | 13, 14 | uEm068 | 69-71 |
+| uEm017 | 18 | uEm073 | 74-76 |
+| uEm019 | 45, 112 | uEm077 | 78, 79, 117 |
+| uEm020 | 90 | uEm081 | 84-87, 104, 123 |
+| uEm022 | 21, 91, 92 | uEm083 | 111 |
+| uEm023 | 93, 120 | uEm088 | 122 |
+| uEm024 | 110 | uEm099 | 100, 119 |
+| uEm025-027 | 94-96 | uEm101 | 102 |
+| uEm028 | 29, 97 | uEm105 | 106 |
+| uEm031 | 82 | uEm107 | 108, 109 |
+| uEm034 | 35 | uEm038 | 39-41, 115 |
+| uEm036 | 37 | uEm042 | 43, 113 |
+| uEm044 | 98 | | |
+
+Id 0 creates `uEmXXX` (size `0x8d88`). Every other class is `0x8d90` bytes, so one slot size fits all monsters, as `mt_classes.tsv` suggested.
+
+### Item drops
+
+Reward items are lists in `.data`, reached through one master pointer array and three id-indexed index tables. The rank offset comes from `0x006bc528`, which returns 0..3 from the current quest. Each index table gives a base index into the master array, and the code adds `4 × slot + rank` to it.
+
+| What | Address | Shape | Bound | Status |
+|---|---|---|---|---|
+| `itemListTable` | `0x01002a5c` .. `0x01003bec` | 1124 pointers (281 groups of 4, one per rank), 853 non-null, each to an item list: 4-byte entries (u8, u8, u16 item id) ended by `0xffff` | none in code; set by the largest index the tables below produce (`0x460 + 3`) | address and bound verified; the entry fields are unverified (the u16 ranges over item ids, below `itemName`'s 1937) |
+| `dropRecordIndex` | `0x01003bec` | 124 pointers by id (114 non-null) to records at `0x01003fcc`.. of 16-byte entries; an entry's u16 at `+0` is a base index into `itemListTable` and its byte at `+0xb` another index (`0xff` none) | 124 | verified for the shape and the indexing; what the entries describe (the floats suggest parts or drop points) is unverified |
+| `dropBaseA` | `0x01003ddc` | 124 u16 by id, `0xffff` = none (81 used) | 124 | verified |
+| `dropBaseB` | `0x01003ed4` | 124 u16 by id, `0xffff` = none (12 used) | 124, followed by the records at `0x01003fcc` | verified |
+
+Readers: `0x00684b40` `(_, id)` and `0x0092600c` use `dropRecordIndex`; `0x00911f20` uses `dropBaseA` (after a percentage roll and a per-monster counter at data-block offset `0x7a64`, so probably shiny drops: unverified); `0x009357b4` uses `dropBaseB`. All four create an item-pop object through the manager at `*0x00fb8a1c` (`0x005b90d4`) and store the item list in it at `+0x28`. **Which of these are carves, captures, breaks and shiny drops is unverified**; carving was not traced.
+
+### Other tables indexed by id
+
+Each is read with the monster id from the data block (`ldrb [x, #0x1c0]`) as its index. Bounds are the gap to the next referenced address and are verified; meanings are not.
+
+| Address | Shape | Reader |
+|---|---|---|
+| `0x00deef04` | 124 bytes | `0x00b9b340` |
+| `0x00e067f4` | 124 u16 | `0x00696878` |
+| `0x00e070a4`, `0x00e07120` | 124 bytes each | `0x006b8290`, `0x006b40dc` |
+| `0x00fc96dc` | 124 bytes | `0x006a69e4` |
+| `0x00fcd71c` | 123 rows × 8 bytes (two floats) | `0x0030f4cc` (`cmp #0x7c`) |
+| `0x00ffeaa4` | 124 pointers to small records at `0x00ffea88`.. | `0x0093f350` |
+| `0x00ffecb8` .. `0x00fff55e` | **nine tables of 123 i16** (stride `0xf6`), one picked by quest type; the result goes to data-block offset `0x7af4` | `0x0094813c`, `0x0094829c`, `0x0094c840`, `0x0094c948` |
+| `0x00f384d0` | 124 words, `-1` = none | `0x0068efc8` |
+
+The 123-entry tables (the nine i16 tables, `0x00fcd71c`, `emName`, `emExp`) stop one short of id 123: reading them for id 123 reads the next table's first entry.
+
+### Not monster tables
+
+`0x00f029e4` (20-byte rows; byte 6 counts up) is the item table: it is indexed by item id, and its `cmp #0x7c`/`#0x7d` are item ids. The 124-entry tables at `0x01017980`..`0x0101b214` are read by `0x00c4c4fc` with an index from `this+0xfd` that isn't a monster id. `0x00ecf1d8` and its neighbours are gathering lists chosen by stage.
+
+### How tables grow
+
+Two ways, to choose per table:
+
+- **Relocate:** a plugin allocates a larger table at boot, copies the original rows, appends the new ones, and patches the code's references (hook points on the readers, or tunables for the bounds). Works for tables in `.data`.
+- **Overlay:** hooks on the table's readers return the new rows for new ids and fall through to the original for old ids. Less patching, more hooks.
+
+Both need guest memory allocation from plugins: the plugin API's `alloc`/`free` (ABI 2) take it from the game's default heap (the fork's docs/PLUGINS.md).
+
+**Allocating ids, an option:** MHGU Definitive Edition, which adds MH4U monsters to MHGU, keeps every game-wide id a ported monster takes in one file (`allocations.toml`: registry index, monster number, file ids, save slots), each from a pool whose bounds were checked in the game, checked by a script and read by both its C module and its converters. Its rule: ids only ever grow, and an installed monster's ids never move, because saves and quests keep them. The same constraints apply here: a hunter's save keeps per-monster records (mhff's "MH4U user1 Format" lists a monster log of 82 entries of 10 bytes, whose indexing by id is unverified), and quests name monsters by id.
+
 ## MH3U's factory
 
 0x005bbc5c: `cmp r1, #0x56`, then an 86-word jump table. Rathian (id 1) runs on `uEm002` with Rathalos and the colour variants (ids 2, 62 to 65). MH4U does the reverse, with ids 1 to 6 on `uEm001`.
+
+**Id to class** follows MH4U's rule: id N runs `uEmN`, or another monster's class when there's no `uEmN`. The shared classes:
+
+| Class | Ids | Class | Ids |
+|---|---|---|---|
+| uEm002 | 1, 2, 62-65 | uEm025 | 25, 85 |
+| uEm003 | 3, 51 | uEm027 | 27, 28, 49, 78 |
+| uEm004 | 4, 52 | uEm030 | 30, 31 |
+| uEm005 | 5, 53 | uEnemy (the base class itself) | 32, 50 |
+| uEm006 | 6, 58 | uEm034 | 34, 77 |
+| uEm007 | 7, 71 | uEm036 | 36-39 |
+| uEm008 | 8, 54 | uEm040 | 40, 79-84 |
+| uEm009 | 9, 55 | uEm041 | 41, 72 |
+| uEm010 | 10, 13 | uEm042 | 42-44 |
+| uEm011 | 11, 48 | uEm046 | 46, 73 |
+| uEm012 | 12, 14, 45 | uEm059 | 59-61 |
+| uEm015 | 15, 68, 69 | uEm066 | 66, 67 |
+| uEm017 | 16, 17, 21 | | |
+| uEm019 | 19, 57 | | |
+| uEm020 | 20, 70 | | |
+
+The others (18, 22-24, 26, 29, 33, 35, 47, 56, 74-76) have a class of their own. **Rathian (id 1) runs on `uEm002`**, Rathalos's class, with ids 62-65 (the colour variants). `uEm002`'s vtable slot 14 (`0x006918a4`) names their files by id: 1 → em001, 2 → em002, 62-65 → em062-em065. MH4U does it the other way round: ids 1-6 all run `uEm001`.
+
+## Procedures
+
+Repeatable from the dump. Record results, never bytes.
+
+### Finding the id table and the factory
+
+1. Decompress `code.bin` (`tools/blz.py`) and lay out `.text`, `.rodata` and `.data` at the exheader's addresses.
+2. In `.rodata`, find the `enemy\emNNN\data\emNNN` strings. In `.data`, find the run of pointers to them (stride 8: the path table), and the pointer array right after it whose entries point into that run (the index).
+3. Find the code literal that points at index − 4, and therefore at entry 0: one function, `loadEnemyData`. Its `ldr rX, [base, id, lsl #2]` shows that the index is by id, 0-based, and its use of the `rEnemyData` DTI shows what it loads.
+4. Count the `.text` literals equal to `0x8d90` (the `uEnemy` size from `config/mt_classes.tsv`). Apart from the 0x50-byte per-class DTI functions at `0x00d00df8`..., one large function (`0x1058` bytes) holds one: that's `createEnemy`. Its `cmp id, #0x7c; ldrlo pc, [pc, id, lsl #2]` gives the count and the jump table.
+5. For each `uEm` class, read the vtable its DTI's create function stores. For each jump-table case, follow the init call to the vtable it stores, which gives the class. A case that only allocates and then branches into another case's tail takes that case's class (its `operator new` is that class's too).
+6. Check that the two tables agree: for each id, the path the index gives and the class the factory makes should be the same `emNNN`, or the same neighbour for an id with no files of its own.
+
+The procedure is enough to rewrite the scripts, which stay outside the repository because they read the dump.
+
+### Finding the other per-monster tables
+
+1. Lay out the code as for the id table. List the code's literals that point into `.rodata`/`.data`. For each, take the distance to the next referenced address; keep the ones that are 123, 124 or 125 times a small row size.
+2. Find the functions that read the id (`ldrb [x, #0x1c0]` after `ldr [this, #0xe28]`) or compare a register with `#0x7c`. Keep the literal tables they index with that register; the shift or multiply gives the row size.
+3. Names: find `msg\emName_jpn` in `.rodata`, the pointer list that holds it (`0x00f006c4`), and its loader (one function with a `cmp #0x47` loop storing `rLayoutMessage` pointers). The functions that read the stored pointer at `+0x18` are the getters. Count the messages from the `.lmd` file's header in `core_common.arc`.
+4. Crowns: the function that indexes a 16-byte-row table by an id it compares with `#0x7c` and compares floats.
+5. Drops: scan `.data` for runs of pointers whose targets are lists of 4-byte entries ending in `0xffff`. The long run is `itemListTable`; the functions that read it show the index tables and the `0x006bc528` rank offset.
+6. For each table, check its count against the id tables (each id in range, the list order a permutation of 0..123).
+
+### Finding the tables still unknown
+
+1. **Start from a known monster.** Pick one MH4U monster whose files are known by name in the RomFS (its ARC folder, `em/emXXX/`-style). Its id is in the folder name. Search `.data` and `.rodata` for that id next to its path string: the record that holds the path is a row of the monster table; its neighbours are the other rows, and the table's start and end bound the count.
+2. **From the class registry.** `config/mt_classes.tsv` gives each `uEm` class's DTI address. In Ghidra, the code that references many `uEm*` DTIs in one function is the factory: its switch or table maps ids to classes, and its bound is the monster count.
+3. **From resource loaders.** For each resource class in the placeholders (specs/placeholders/), its loader's callers index by id: their array bounds and the constants compared against are the table sizes.
+4. **From GMD tables.** The monster-name GMD's string count is an upper bound for monster ids that have names.
+5. **Heaps.** The resource and unit managers are created early in start-up (MH4UltimateDC's docs/research/system-services.md covers the main systems); their sizes are constants passed to their constructors. Record which heap a monster's resources come from.
+6. **Record each table** as: name, address (USA v1.3.0), row size, row count, what indexes it, the functions that read it. Addresses and sizes are fine to commit (LEGAL.md); contents are not.
