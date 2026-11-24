@@ -59,6 +59,7 @@ Run on 2026-11-23 with `mhuc survey <romfs.bin>` on the maintainer's dumps: MH4U
 
 - **C1 (done): class ids.** `mhuc.classid.class_id` was run over every class name in MH4UltimateDC's `config/mt_classes.tsv`, whose ids were recovered from MH4U's own class registry: 989 of 990 match. The one mismatch, `uShell052`, is a registry row to look at, not a hash question.
 - **C2 (done): round trip.** For every `.arc` in the RomFS: `arc.read` succeeds, and `arc.write(arc.read(data)) == data`.
+  - `tests/test_with_game_files.py::test_every_mh4u_archive_repacks_byte_for_byte` runs it on MH4U's RomFS, and fails when the image holds no archive.
   - MH4U USA: 10,592 archives, all version 0x13, all round trip. EUR: the same 10,592. Update v1.3.0: 20, all round trip.
   - MH3U USA: 4,386 archives, all version 0x10, all round trip; the first stream is always at 0x8000.
   - MHXX JPN: 12,255 archives, all version 0x11, all round trip.
