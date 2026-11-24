@@ -44,7 +44,7 @@ INSTALL = {
     ".claude/skills/next/SKILL.md": "skills/next/SKILL.md",
     ".claude/skills/handoff/SKILL.md": "skills/handoff/SKILL.md",
 }
-VENV_MODULES = ("pytest", "ruff", "unicorn", "capstone", "elftools")
+VENV_MODULES = ("pytest", "ruff", "unicorn", "capstone", "elftools", "numpy")
 # the project's git identity: both repos set it locally so the machine's global identity never leaks
 GIT_NAME = "Cheeenxiii"
 GIT_EMAIL = "342393699+Cheeenxiii@users.noreply.github.com"
@@ -132,7 +132,7 @@ def check_venv(ws: str, fix: bool) -> list[Result]:
         os.makedirs(work, exist_ok=True)
         _run([sys.executable, "-m", "venv", os.path.join(work, "venv")], timeout=300)
         req = os.path.join(ws, FORK, "requirements.txt")
-        _run([py, "-m", "pip", "install", "-q", "-r", req, "ruff"], timeout=900)
+        _run([py, "-m", "pip", "install", "-q", "-r", req, "ruff", "numpy"], timeout=900)   # numpy: MHGU-DE tools
     if not os.path.isfile(py):
         return [Result("warn", "venv", "game_files/work/venv missing; doctor --fix creates it")]
     code, msg = _run([py, "-c", "import " + ", ".join(VENV_MODULES)])
