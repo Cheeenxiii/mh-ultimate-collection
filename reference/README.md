@@ -206,7 +206,7 @@ Each of the 62 called imports with no counterpart in the map, read in MHXX's cod
 | 0x008ad638 | `uPlayerQuest` | a player's 16-bit field at +0x24c | not found yet |
 | 0x001e3950 | `uPlayerLobby` | sets a player speed and recomputes two ratios from it | not found yet |
 
-Of the 62: 19 have an MH4U function, 36 are things MH4U lacks (26 of them the shell framework), 7 are not found yet. Those 7 go through MHXX managers or fields with no structural twin in MH4U: a quest-level getter, sound requests at a joint, a part damage state, a player's speed and a 16-bit player field, and one flag.
+Of the 62: 19 have an MH4U function, 36 are things MH4U lacks (26 of them the shell framework), 7 are not found yet. Those 7 go through MHXX managers or fields with no structural twin in MH4U: a quest-level getter, sound requests at a joint, a part damage state, a player's speed, a 16-bit player field and a virtual call made with it, and one flag.
 
 Two ways found the matches. Translating field offsets: MHXX's work block at +0x10a8 is MH4U's at +0xe28; within it MHXX's +0x40 (position) and +0x54 (heading) are MH4U's +0x198 and +0x1ac, +0x1d0 (target points) is +0x218, +0x1a8 and +0x1ba are +0x1b4 and +0x1c8, and the +0x5900 area is about 0x2160 further on in MH4U. Aligning call sequences: the handlers of a shared action call the same engine functions in the same order, so an import sits where its MH4U counterpart, or nothing, does. The alignment also confirms two of the call-site matches above (0x008a200c with 0x002b9cb4, 0x008a2298 with 0x002bab8c).
 
