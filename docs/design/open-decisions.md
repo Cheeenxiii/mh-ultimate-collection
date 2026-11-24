@@ -32,6 +32,10 @@ These are code, not data, so they are the costliest content of the mod. Underwat
 
 A monster that appears in more than one game is listed once per game in [data/catalog/monsters.md](../../data/catalog/monsters.md). Which version the mod uses (data, moves, AI, model) is open.
 
+Facts for GU monsters (2026-11-24, [monster-port.md](monster-port.md), "Step 1 continued"): a GU monster's code lives in its CRO module and depends on MHXX's enemy layer. Rathian's module imports 330 engine functions, 262 of them with no MH4U counterpart, mostly in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, GU's projectile classes). How a GU monster runs is open:
+- its module recompiled together with that part of MHXX's engine, beside MH4U's;
+- its handlers reimplemented on MH4U's `uEnemy` (MHGU-DE's way, turned around).
+
 ### Runtime
 
 The engine runs the game's code natively, but on Azahar's 3DS core for system services, graphics, audio and multiplayer. The fork's `native` branch works towards a build with no Azahar.
