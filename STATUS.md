@@ -2,7 +2,7 @@
 
 The one place that says where the project stands. Overwritten at the end of every session (`/handoff`); history is in `docs/reports/`. Keep it under a screen.
 
-**Updated:** 2026-11-24, after an unattended session that finished the monster port's step 1 (classes and vtables).
+**Updated:** 2026-11-24, after an unattended session that finished the monster port's step 1 (classes and vtables) and recompiled all of MHXX's modules.
 
 ## Where we are
 
@@ -11,16 +11,17 @@ Phase: **engine work with the game files.** Both reference games recompile, and 
 This session ([report](docs/reports/2026-11-24-monster-port-classes.md), results in [monster-port.md](docs/design/monster-port.md), "Step 1 continued"):
 - **Every class's vtable**, in all three games (99%), with MHXX's monster classes found through their CRO modules (fork `tools/mt_vtables.py`). Used as anchors, they double the function maps: 7,542 pairs with MHXX, 6,866 with MH3U, all held-out checks correct.
 - **A GU monster needs MHXX's enemy layer.** `roEm001` imports 330 engine functions. 262 have no MH4U counterpart, mostly in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, GU's projectile classes). The maintainer settled it: monsters are ported onto MH4U's `uEnemy`, so the source code is a reference to translate, not code the mod runs.
+- **All 109 MHXX modules recompile and gametest** with no differences (20,746 pass, 15,697 shared faults; 40 edge cases with fixes in, full rerun to do). Fork `tools/recompile_module.py`, `recomp.modtest`; also 956 static functions only modules call, and a determinism fix in the analyser.
 - **MH3U runs Rathian on `uEm002`** (ids 1, 2, 62-65), found through MH3U's enemy factory (id-tables.md has its id-to-class table). The three Rathians are three codebases.
 
 ## Branches
 
-- This repo: `monster-port-classes` (monster-port.md, id-tables.md, open-decisions.md, this report and STATUS), pushed, PR open.
-- Fork: `uc/monster-port-classes` (`tools/mt_vtables.py`, `fnmap.py --vtables`, tests, `config/games/README.md`), pushed, PR open.
+- This repo: `monster-port-classes` (PR #9) and `monster-port-module-recompiles` from it (the settled decision, module recompile docs), pushed, PR open.
+- Fork: `uc/monster-port-classes` (PR #7) and `uc/module-recompiles` from it (`recompile_module.py`, `recomp.modtest`, analyser determinism, `config/games/mhxx/extra_entries.txt`), pushed, PR open.
 
 ## Next tasks, in order
 
-1. **MHXX module recompiles** (fork): recompile each `.cro` at a fixed base with the static library's addresses resolved, then link at run time in the harness. Done when `roEm001` gametests like the static code (0 differ). The report's checklist has the starting points.
+1. **Finish module recompiles, then prepare Rathian's port** (monster-port.md, "Next, towards step 5"): rerun the full module build and modtest after the last three fixes (done when the 40 edge cases are gone or explained); then Rathian's action inventory in each source, and an MH4U way for each of the 262 GU engine calls.
 2. **In-game checks Q17, Q19, E4** with `mhuc extdata testkit`. Done when the specs record the results and extra-data.md says which routes work.
 3. **LMT version 66** (MH3U): a layout from the files and Cha-Cha, then L1 again. Unblocks the underwater motions ([underwater.md](docs/design/underwater.md)).
 4. **Sound survey SN1** (specs/sound.md): sound entries per type and version in the three RomFS, counts only. Then a first converted GU quest and the first table-growing plugin (Definitive Edition's `allocations.toml` and `notes/registry.md` first).
