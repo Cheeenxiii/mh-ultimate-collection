@@ -26,7 +26,7 @@ In walk order; every block starts on a 16-byte boundary. "Flag" marks a block be
 | 0x40, 0x60 | 0x18 bytes each | two blocks (+0xF8, +0xFC) | unknown | ours, walk |
 | flag | 8 × u16 | part HP (+0x68): 5 of Rathian's 8 equal MH4U's part HP by index; MH4U's part table also has break levels, which 3U keeps in the break records below | unverified | ours, walk; check E5 |
 | flag | 0x10 bytes | second part HP (+0x6C): 8 × s16, a second HP for each part; see [Break and sever records](#break-and-sever-records) | verified | ours, walk; code 0x8525a8; check E3 |
-| flag | 3 bytes | break ids (+0x70): up to three ids, 0xFF for an unused one; 0x84c480 returns the position of a value among them | unverified | ours, walk; code 0x84c480; check E6 |
+| flag | 3 bytes | break ids (+0x70): up to three ids, 0xFF for an unused one; 0x84c480 returns the position of a value among them | unverified | ours, walk; code 0x84c480; check E9 |
 | flag | 0x30 bytes | break records (+0x74): 8 × 6 bytes, one per part; see [Break and sever records](#break-and-sever-records) | verified | ours, walk; code 0x84c56c; check E3 |
 | always | 8 × 10 bytes | hitzone table (+0x78): MH4U `.etd` word 7, the same rows of 10 bytes (specs/emd.md); 6 of Rathian's 8 rows equal, and the other two differ in one column each (MH4U retuned them) | verified | ours, walk; checks E3, E5 |
 | flag | 0x50 bytes | a second table of the hitzone table's size (+0x7C), as MH4U `.etd` word 8 and MHXX's | unverified | ours, walk |
@@ -67,10 +67,10 @@ MH4U keeps a part's break data in its `.etd` part table (word 5: part HP, break 
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u16 | break counter: the test 0x835ebc returns true while the part's counter is below it; 0 on the shared default | unverified | ours, 0x835ebc, 0x837a60; check E6 |
+| +0x00 | u16 | break counter: the test 0x835ebc returns true while the part's counter is below it; 0 on the shared default | unverified | ours, 0x835ebc, 0x837a60; check E9 |
 | +0x02 | u8 | break kind: 0x835ebc compares it with the damage call's kind, and 0x837a60 matches it against block 0x70 | unverified | ours, 0x835ebc, 0x837a60, 0x84c480 |
 | +0x03 | u8 | a second break id matched against block 0x70 (0xFF when unused) | unverified | ours, 0x837a60, 0x84c480 |
-| +0x04 | u16 | a value the part initializer 0x84cb10 scales and stores beside the part's HP; on Rathian's one break part it is higher than MH4U's second-level HP | unverified | ours, 0x84cb10; check E6 |
+| +0x04 | u16 | a value the part initializer 0x84cb10 scales and stores beside the part's HP; on Rathian's one break part it is higher than MH4U's second-level HP | unverified | ours, 0x84cb10; check E9 |
 
 The block's place and size are the walk's (check E3); each field's meaning is our reading of that code and has not been checked in the game, so all four stay unverified. A file without block 0x74 (45 of 91) gives every part the shared default record, whose counter and kind are 0: no part of its own beyond the HP.
 
@@ -78,7 +78,7 @@ The block's place and size are the walk's (check E3); each field's meaning is ou
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00, +0x02, … +0x0E | s16 ×8 | one second-level HP per part; the update uses it as a part's active HP when the class says the part has a second level (vtable slot 0x120) | unverified | ours, 0x8525a8, 0x837a60; check E6 |
+| +0x00, +0x02, … +0x0E | s16 ×8 | one second-level HP per part; the update uses it as a part's active HP when the class says the part has a second level (vtable slot 0x120) | unverified | ours, 0x8525a8, 0x837a60; check E9 |
 
 ### Severing
 
@@ -111,4 +111,4 @@ What calls slot 45, and at which break level, is unverified: no function calls 0
 - **E3 (done, MH3U USA RomFS):** `mhuc survey` counts `E3 em_status walk ends at the file's end`. Result: the walk ends exactly at the end of all 91 files.
 - **Loader trace (done, MH3U USA code, same RomFS):** `python3 reference/loader_trace.py mh3u --exheader … --code … --romfs …` runs the game's walk in Unicorn on each file and logs every cursor step. Result: our reader's blocks are the game's steps, in order, in all 91.
 - **E5 (done, Rathian):** `mhuc monsterdata --mh4u data/em_data.arc --id em001 --mh3u arc/enemy/em001.arc` prints, per field, whether MH3U's value equals MH4U's. Results are in the tables above, as counts. It also prints `break parts` (the parts with a non-default break record against MH4U's parts with break levels) and `second part HP` (block 0x6C against MH4U's second-level HP): on Rathian, `break parts: same parts` and `second part HP: absent in the source`.
-- **E6 (done, MH3U USA RomFS):** `mhuc survey <romfs.bin>` counts, per `em_status` file, the break blocks and their contents (`E6 …`). Result: 46 of the 91 files have block 0x74 as 8 × 6 bytes and block 0x70 with it; their records name 50 parts with a non-default record. 4 files have block 0x6C as 8 s16 and 20 of their parts have a non-zero second HP. The other 45 files have no block 0x74 and use the shared default record. Block sizes are the walk's, which E3 checks in all 91.
+- **E9 (done, MH3U USA RomFS):** `mhuc survey <romfs.bin>` counts, per `em_status` file, the break blocks and their contents (`E9 …`). Result: 46 of the 91 files have block 0x74 as 8 × 6 bytes and block 0x70 with it; their records name 50 parts with a non-default record. 4 files have block 0x6C as 8 s16 and 20 of their parts have a non-zero second HP. The other 45 files have no block 0x74 and use the shared default record. Block sizes are the walk's, which E3 checks in all 91.
