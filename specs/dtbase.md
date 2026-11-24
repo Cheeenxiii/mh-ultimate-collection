@@ -76,7 +76,9 @@ are 28-byte records; MH4U's word 43 (56 bytes) is two of them.
 - **The blocks without a counterpart are the mod's to author or to carry from MHXX unread.** They are marked unknown,
   not guessed at.
 - What MH4U keeps in `.emd` and MHXX splits into `dtbase` and `dtbparts`: this spec (the `.emd` blocks above) and
-  [dtbparts](dtbparts.md) (the break records and joint records). The hitzones, HP and parts are in
+  [dtbparts](dtbparts.md) (the break records and joint records). The `.emd` word 35 sever records are in neither: a
+  monster class passes its joint to the engine and ships the cut part as a `_tail.mod`
+  ([dtbparts](dtbparts.md#sever-and-detach-records-not-in-these-files)). The hitzones, HP and parts are in
   [dttune](dttune.md); hurt and attack volumes in [hitdata](hitdata.md).
 
 ## Checks

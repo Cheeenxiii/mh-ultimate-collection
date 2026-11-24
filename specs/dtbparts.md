@@ -58,15 +58,65 @@ In loader order; "Object" is where the loader puts the block. c_i is the byte at
 The joint record's fields after the 13 bytes are not in the file: MH4U's record is 24 bytes, and MHXX packs the joint,
 the kind and two of the four following words into 13.
 
+## Sever and detach records: not in these files
+
+MH4U's `.emd` word 35 keeps, after a (255, 0, 0, −1) marker in most files, one kind-0 record per bone a part
+detaches or severs at (check E11; [emd](emd.md)). Neither MHXX file has one, and MHXX does not keep them as data:
+the joint is a constant in the monster class's own code, and the cut part is a model beside the body model in the
+monster's archive.
+
+**The search.** Three places could hold such a record, and none does:
+
+| Searched | Result |
+|---|---|
+| `dtbparts` joint records, every file | 31 of the 140 entries have the block, 103 records: kinds 1 (75), 3 (1), 4 (21) and 255 (6, all six in one file, joints 200 to 205). Not one kind 0, and no (255, 0, 0, −1) marker (E11) |
+| `dtbase`, the three pairs | no block matches the `.emd` word 35 records (E5) |
+| every entry of `em001_00.arc` (546) | no u32 143 outside one texture's pixels: no data block spells out a joint (E11) |
+
+**The cut part is a model.** Each of the three paired monsters' MHXX archive holds a `_tail.mod` beside its body
+model (`enemy/em001/em001_00/mod/em001_00_tail.mod`, likewise em024_00 and em027_00), and MH4U and MH3U ship the
+same pair (`em001_tail.mod` and so on): the cut piece travels as a model in all three games. MHXX's and MH4U's are
+rigid (0 bones); MH3U's is skinned with three bones, 143 to 145 ([emstatus](emstatus.md#severing)).
+
+**The joint is in the class's code.** MHXX v1.4 keeps each monster's class in its own `.cro` module, and each of
+the three paired monsters' modules calls one static function with the joint:
+
+| Monster | MHXX module | Call site | Joint in r3 |
+|---|---|---|---|
+| em001_00 Rathian | roEm001.cro | 0x0201c718 | 143 |
+| em024_00 Kushala Daora | roEm024.cro | 0x0200e120 | 143 |
+| em027_00 Teostra | roEm027.cro | 0x0200afa8 | 143 |
+
+The callee is 0x008de84c in the v1.4 code. The call passes 0 in r1 and r2, the joint in r3, and a fifth argument on
+the stack. Rathian's sits in its action-114 case (a compare against 0x72) after the handler has checked that the
+severed part is 7, the tail. 29 of the 87 `roEm*.cro` modules call the same function, 35 calls in all; the value they
+put in r3 is 143 in 15 of them and 3, 4, 138, 142, 144 or 145 in the rest (a single-digit bone is a part one monster
+severs elsewhere than its tail).
+
+The function's name is MHGU Definitive Edition's: their GU code calls `spawnCutPart` (0xc2330) as
+`spawnCutPart(this, 0, 0, joint, 0)` from Kushala's action (10, 114), the same argument shape and the same action
+id (their `monsters/gogmazios/notes/port-checklist.md`). What our check adds is the same call in MHXX's own module
+and the joint it passes; the name stays theirs.
+
+**What a port authors.** The kind-0 records themselves, laid out as MH4U's are: the (255, 0, 0, −1) marker where
+MH4U has one, then one record per bone, then the −1 terminator. The joints are the one the source class passes and
+the bones that hang off it in the source model's chain: MH4U's own are 143, 144 and 145 on Rathian and 143 and 144
+on Kushala Daora and Teostra, and both games' Rathian body models carry the same 43 bone ids with the same parents
+([mod](mod.md), check M2). The record's `kind` is 0, its `a` is 0, its `index` is 1 on the first bone and 2 on the
+ones after it in most files, its `limit` is usually the bone id, and its `b` is 0 or a number that steps by 24 across
+a file's records (meaning unknown): MH4U's 94 records over 43 files are the only source for those four fields, so
+a port copies the shape, not a known value.
+
 ## What this means for the mod
 
 - **A GU monster's break records and joint records come from `dtbparts`.** `mhuc monsterdata` rebuilds the break parts
   and the joint records into MH4U's layout and compares them: the break parts are equal on the three monster pairs, and
   the joint records are 6 of 6 on Rathian and absent on both sides for Kushala Daora and Teostra.
-- **MH4U's sever records have no counterpart in `dtbparts` or `dtbase`.** MH4U's `.emd` word 35 stores, after a
-  (255, 0, 0, −1) marker, the kind-0 records that sever or detach a bone (3 on Rathian, 2 each on Kushala Daora and
-  Teostra). No block of either file holds a kind-0 record: the joint-record block never has one, and the pairs' sever
-  joints are not stored as records. Where MHXX keeps them is open.
+- **MH4U's sever records have no counterpart in `dtbparts` or `dtbase`; they are code on MHXX's side.** MH4U's
+  `.emd` word 35 stores, after a (255, 0, 0, −1) marker, the kind-0 records that sever or detach a bone (3 on
+  Rathian, 2 each on Kushala Daora and Teostra). No block of either file holds a kind-0 record, and the pairs' sever
+  joints are not stored as records: the monster class passes the joint to the engine's cut-part spawner, and the cut
+  part is a separate `_tail.mod`. A port therefore authors the records ("Sever and detach records").
 - The part break HP records and the visibility state records are named from MHGU Definitive Edition's `dtbparts`
   work and stay unverified here; the blocks with no counterpart are the mod's to author or to leave alone.
 
@@ -74,6 +124,16 @@ the kind and two of the four following words into 13.
 
 - **E7 (done, MHXX JPN v1.0 RomFS):** `mhuc survey <romfs.bin>` counts `E7 dtbparts layout ends at the file's end`.
   Result: 140 entries (138 distinct files) end exactly at their last byte.
+- **E11 (done, MHXX JPN v1.0 RomFS and v1.4 code):** three parts.
+  `mhuc survey <romfs.bin> --workers 2` counts `E11 dtbparts joint records` and `E11 dtbparts [no] joint record of
+  kind 0`. Result: 103 joint records over 31 of the 140 entries, kinds 1 (75), 3 (1), 4 (21) and 255 (6), and those 31
+  entries report no kind-0 record.
+  `python3 reference/cro.py calls <module> --game mhxx` loads a monster module at recompile_module.py's base with the
+  static segment bases in `reference/games/mhxx/game.json` and prints its calls into the static code with the nearest
+  constant in r0..r3; `--arg r3=0x8f` keeps only the calls that pass 143. Result: one call each in roEm001
+  (0x0201c718 -> 0x008de84c), roEm024 (0x0200e120 -> 0x008de84c) and roEm027 (0x0200afa8 -> 0x008de84c), every one
+  with 143 in r3; without the filter, 29 of the 87 `roEm*.cro` modules call 0x008de84c (35 calls).
+  A scan of the 546 entries of `em001_00.arc` for a u32 of 143 finds one, in a texture's pixels.
 - **Loader trace (done, MHXX v1.4 code, same RomFS):** `python3 reference/loader_trace.py mhxx-dtbparts --exheader
   <exheader.bin> --code <code.bin> --romfs <romfs.bin>` runs the game's loader in Unicorn on each file and logs every
   stream read. Result: it reads the whole file in all 138, and our reader's blocks split the same bytes (every block

@@ -11,7 +11,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `recompile_game.py <game>` | recompiles a reference game from its tables in `games/` |
 | `recompile_module.py` | recompiles MHXX's CRO modules with its static code into one library |
 | `modtest.py` | tests every recompiled module function against the original, in Unicorn |
-| `cro.py` | reads a CRO module: segments, relocations, imports |
+| `cro.py` | reads a CRO module: segments, relocations, imports; `calls` lists a module's calls into the static code with the nearest constant in r0..r3, to find where a class passes a value the engine uses |
 | `mt_vtables.py` | recovers every MT class's vtable, modules included |
 | `fnmap.py` | maps functions between two games |
 | `monster_actions.py` | lists a monster's actions from its dispatcher, and pairs handlers across games by action id |

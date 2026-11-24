@@ -5,8 +5,8 @@ versions and pass/fail tallies: nothing from the files themselves, so its output
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
-records against their hit volumes), E9 (MH3U em_status break blocks), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision),
-SN1 (sound resources by kind, version and class id).
+records against their hit volumes), E9 (MH3U em_status break blocks), E11 (MHXX dtbparts joint record kinds),
+L1 (lmt), A1 (rEnemyCmd), S1 (rCollision), SN1 (sound resources by kind, version and class id).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -211,6 +211,13 @@ def survey_entry(type_name: str | None, data: bytes, st: dict, type_id: int | No
         try:
             dtbparts.blocks(data)
             c["E7 dtbparts layout ends at the file's end"] += 1
+            kinds = [r[4] for r in dtbparts.records(data, "joint records", 13)]   # s32 joint, then kind
+            if kinds:
+                c["E11 dtbparts joint records"] += len(kinds)
+                for kind in kinds:
+                    c[f"E11 dtbparts joint record kind {kind}"] += 1
+                c["E11 dtbparts no joint record of kind 0" if 0 not in kinds
+                  else "E11 dtbparts SEVER RECORD of kind 0"] += 1
         except dtbparts.DtbPartsError as e:
             c[f"E7 dtbparts {str(e).split(',')[0]}"] += 1
     elif data[:4] == emstatus.MAGIC:

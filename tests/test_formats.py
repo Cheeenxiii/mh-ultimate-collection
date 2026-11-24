@@ -76,6 +76,33 @@ def test_emd_attack_records_end_at_the_terminator_not_at_an_unpointed_block():
     assert "E10 etd attack lists with no terminator" not in counts
 
 
+def test_emd_word_35_records_end_at_the_minus_one_record_and_count_the_sever_ones():
+    """specs/emd.md word 35, check E11: the kind-0 records after the marker are the sever/detach ones"""
+    d = bytearray(0x140)
+    d[:4] = b"emd\0"
+    struct.pack_into("<I", d, 4 * 35, 0xC0)                                # after the 0xB8 header
+    struct.pack_into("<iIIIII", d, 0xC0, 4, 4, 0, 0, 255, 0)               # a dtbparts joint record
+    struct.pack_into("<iIIIII", d, 0xD8, 255, 0, 0, 0xFFFFFFFF, 0, 0)      # the (255, 0, 0, -1) marker
+    struct.pack_into("<iIIIII", d, 0xF0, 143, 0, 1, 143, 0, 0)             # a sever record
+    struct.pack_into("<iIIIII", d, 0x108, -1, 0, 0, 0, 255, 0)             # the terminator
+    recs = emd.joint_records(bytes(d))
+    assert recs is not None, "word 35's list must end at its -1 record"
+    assert [r[0] for r in recs] == [4, 255, 143, -1]
+    counts = emd.check_emd(bytes(d))
+    assert counts["E11 emd sever records"] == 1
+    assert counts["E11 emd sever joint 143"] == 1
+    assert counts["E11 emd files with the (255, 0, 0, -1) marker"] == 1
+    assert "E11 emd sever a is not 0" not in counts
+
+
+def test_emd_counts_a_word_35_list_that_runs_off_the_end_instead_of_crashing():
+    d = bytearray(0xC8)
+    d[:4] = b"emd\0"
+    struct.pack_into("<I", d, 4 * 35, 0xC0)                                # 24 bytes don't fit after 0xC0
+    assert emd.joint_records(bytes(d)) is None
+    assert emd.check_emd(bytes(d))["E1 emd word 35 list doesn't end"] == 1
+
+
 def test_mhxx_attack_volume_whose_first_word_is_ffff_is_kept():
     """MHXX's HTS counts hold no closing record (only MH3U's do): a real record starting 0xFFFF stays"""
     record = b"\xff\xff" + bytes(46)

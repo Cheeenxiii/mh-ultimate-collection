@@ -1,7 +1,8 @@
 """Check E1 of specs/emd.md: MH4U `.emd` (rEnemyData) and `.etd` (rEnemyTuneData) against the layout taken from
 MHGU Definitive Edition's readers. Every function returns counts (a Counter), never bytes from the files.
 
-  check_emd(data)       header offsets, body records (shape, part, hitzone row), visibility rows
+  check_emd(data)       header offsets, body records (shape, part, hitzone row), visibility rows, and (check
+                        E11) the word 35 joint records' kinds and its kind-0 sever records
   check_etd(data)       header offsets, attack volumes, attack records
   check_pair(emd, etd)  body records' hitzone rows and parts against the .etd's tables; the hitzone row size
 """
@@ -13,7 +14,7 @@ from collections import Counter
 EMD_WORDS = {8: "body", 9: "camera body", 13: "w13", 16: "arena points", 20: "map-hit sphere", 21: "w21",
              22: "w22", 33: "breaks", 34: "visibility", 35: "severs", 38: "w38", 40: "slope fit", 43: "joints"}
 ETD_PTRS = range(5, 35)
-BODY, VIS, HIT, ATTACK = 44, 16, 40, 40
+BODY, VIS, JOINT, HIT, ATTACK = 44, 16, 24, 40, 40
 HITZONE_ROWS, HITZONE_ROW = 8, 10
 
 
@@ -48,6 +49,22 @@ def vis_rows(d: bytes) -> list[tuple[int, int, int, int, int]] | None:
     return None
 
 
+def joint_records(d: bytes) -> list[tuple[int, int, int, int, int, int]] | None:
+    """Word 35's records: (joint, kind, index, limit, a, b) each, the joint -1 terminator last; [] when word 35 is 0;
+    None if the list doesn't end in the file. A kind of 0 marks a sever/detach record (check E11); the records whose
+    kind isn't 0 are MHXX's `dtbparts` joint records, and a (255, 0, 0, -1) record may separate the two."""
+    p, out = _w(d, 35), []
+    if not p:
+        return []
+    while p + JOINT <= len(d):
+        rec = struct.unpack_from("<iIIIII", d, p)
+        out.append(rec)
+        p += JOINT
+        if rec[0] == -1:
+            return out
+    return None
+
+
 def check_emd(d: bytes) -> Counter:
     c = Counter()
     c["E1 emd magic emd\\0" if d[:4] == b"emd\0" else f"E1 emd magic other {d[:4]!r}"] += 1
@@ -71,7 +88,32 @@ def check_emd(d: bytes) -> Counter:
         for _, cond, mode, _, _ in rows:
             c[f"E1 emd visibility condition {cond}"] += 1
             c[f"E1 emd visibility mode {mode}" if mode <= 1 else "E1 emd visibility mode OTHER"] += 1
+    joint_counts(c, d)
     return c
+
+
+def joint_counts(c: Counter, d: bytes) -> None:
+    """Check E11: word 35's kinds and sever/detach records, into `c`."""
+    recs = joint_records(d)
+    if recs is None:
+        c["E1 emd word 35 list doesn't end"] += 1
+        return
+    if not recs:
+        return
+    c["E11 emd files with joint or sever records"] += 1
+    sever = [r for r in recs if r[1] == 0 and r[0] not in (255, -1)]
+    if any(r[0] == 255 and r[1] == 0 and r[3] == 0xFFFFFFFF for r in recs):
+        c["E11 emd files with the (255, 0, 0, -1) marker"] += 1
+    if not sever:
+        return
+    c["E11 emd files with sever records"] += 1
+    c["E11 emd sever records"] += len(sever)
+    for r in sever:
+        c[f"E11 emd sever joint {r[0]}"] += 1
+        c[f"E11 emd sever index {r[2]}"] += 1
+        c["E11 emd sever limit is the joint" if r[3] == r[0] else "E11 emd sever limit is not the joint"] += 1
+        c["E11 emd sever a is 0" if r[4] == 0 else "E11 emd sever a is not 0"] += 1
+        c["E11 emd sever b is 0" if r[5] == 0 else "E11 emd sever b is not 0"] += 1
 
 
 def _block_end(d: bytes, start: int, words: range) -> int:
