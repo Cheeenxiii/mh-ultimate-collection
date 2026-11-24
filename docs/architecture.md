@@ -68,7 +68,7 @@ Before porting a monster, MH4U's id-indexed tables have to grow. Two ways are op
 Every 3U and GU quest is the source game's own quest, rewritten as an MH4U `.mib`.
 
 - **Readers:** `mhuc quest dump` reads MH4U `.mib`, MHXX quest archives and MH3U `QTDS` into JSON.
-- **Writer:** the `.mib` builder lays a quest out with every offset recomputed. It reproduces all 120 MH4U DLC quests byte for byte.
+- **Writer:** the `.mib` builder lays a quest out with every offset recomputed. Rebuilding any of the 120 MH4U DLC quests gives back every field it had.
 - **Converter:** `mhuc convert quest --from mhxx` maps ids through `data/idmap/`, which ships empty. It refuses any quest with an unmapped id. Fields it can't convert come from an MH4U template quest and are listed as placeholders.
 - **MH3U quests** wait for stage data, because `QTDS` doesn't hold monster positions.
 
