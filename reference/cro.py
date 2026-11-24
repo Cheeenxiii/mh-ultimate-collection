@@ -13,10 +13,14 @@ Format: "CRO0" header at 0x80, then (offset, count) pairs for the tables below
 
     info     <file>                      header, segments and table sizes
     imports  <module.cro> --crs <crs>    the static addresses a module imports
+    calls    <module.cro> [--game mhxx]  every call into the static code, with the nearest
+                                         constant in r0..r3 (`--target`, `--arg r3=143` filter)
 
 `load()` places a module at a chosen base, applies its own relocations and its imports
 from the static executable, and returns the image, ready for the recompiler's Analyzer.
-Addresses only: nothing here copies a module's bytes anywhere but memory.
+`calls` loads the module at recompile_module.py's base and reads the import stubs, so the
+addresses it prints are the ones the game's loader would branch to. Addresses only:
+nothing here copies a module's bytes anywhere but memory.
 """
 from __future__ import annotations
 
@@ -209,6 +213,77 @@ def static_imports_of(crs: Cro, module: str) -> list[tuple[int, list[int]]]:
     return out
 
 
+STUB = 0xE51FF004          # ldr pc, [pc, #-4]: a module's import stub, its slot in the next word
+MODULE_BASE = 0x02000000   # where recompile_module.py places the modules
+_CS = None
+
+
+def _insn(word: int, addr: int):
+    """One ARM instruction decoded on its own (positions are 4-aligned; no stream to drift)."""
+    import capstone
+    global _CS
+    if _CS is None:
+        _CS = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_ARM)
+    out = list(_CS.disasm(word.to_bytes(4, "little"), addr))
+    return out[0] if out else None
+
+
+def calls_of(loaded: Loaded) -> list[tuple[int, int, dict[str, int]]]:
+    """Every call from a loaded module into the static executable: (call site, static target,
+    the nearest constant in r0..r3 before it). An import is called through a stub, so a `bl`
+    to a stub resolves to the address in the stub's slot."""
+    lo, hi = loaded.text
+    img, base = loaded.image, loaded.base
+    stubs = {}
+    for off in range(lo - base, hi - base - 8, 4):
+        if struct.unpack_from("<I", img, off)[0] == STUB:
+            stubs[base + off] = struct.unpack_from("<I", img, off + 4)[0]
+    out = []
+    for addr in range(lo, hi - 3, 4):
+        ins = _insn(struct.unpack_from("<I", img, addr - base)[0], addr)
+        if ins is None or ins.mnemonic not in ("bl", "blx") or not ins.op_str.startswith("#"):
+            continue
+        target = int(ins.op_str[1:], 0)
+        if target in stubs:
+            target = stubs[target]
+        elif lo <= target < hi:
+            continue                                    # a call inside the module
+        out.append((addr, target, _args_before(img, base, addr)))
+    return out
+
+
+def _args_before(img: bytes, base: int, addr: int) -> dict[str, int]:
+    """The nearest constant per register in the 20 words before a call: a `mov`/`movw`
+    immediate, or a `ldr` from the literal pool. The previous call, a branch or a `push` ends
+    the run: those words set up something else, not this call's arguments."""
+    regs: dict[str, int] = {}
+    for k in range(1, 21):
+        word = struct.unpack_from("<I", img, addr - base - 4 * k)[0]
+        at = addr - 4 * k
+        ins = _insn(word, at)
+        if ins is None:
+            continue
+        m, ops = ins.mnemonic, ins.op_str
+        if m in ("push", "b", "bx", "bl", "blx") or (m == "pop" and "pc" in ops):
+            break
+        if m in ("mov", "movs", "mvn", "movw") and ", #" in ops and ops.startswith("r"):
+            reg, imm = ops.split(", #")
+            if reg not in regs:
+                try:
+                    regs[reg] = int(imm.split(",")[0], 0)
+                except ValueError:
+                    pass
+        elif m == "ldr" and "[pc" in ops and "#" in ops:
+            reg = ops.split(",")[0]
+            if reg not in regs:
+                try:
+                    delta = int(ops.split("#")[-1].rstrip("]"), 0)
+                    regs[reg] = struct.unpack_from("<I", img, at - base + 8 + delta)[0]
+                except (ValueError, struct.error):
+                    pass
+    return regs
+
+
 def entry_points(loaded: Loaded, crs: Cro | None = None) -> dict[int, str]:
     """Function entries a recompile can start from: code pointers in the module's .rodata
     and .data after relocation, and the module addresses the static executable imports."""
@@ -236,9 +311,36 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("imports")
     p.add_argument("module")
     p.add_argument("--crs", required=True)
+    p = sub.add_parser("calls")
+    p.add_argument("module")
+    p.add_argument("--game", default="mhxx", help="a reference game whose game.json gives the static segments")
+    p.add_argument("--base", default=hex(MODULE_BASE), help="where the module is loaded (recompile_module.py's base)")
+    p.add_argument("--target", help="only calls into this static address")
+    p.add_argument("--arg", action="append", default=[], metavar="r3=143",
+                   help="only calls whose nearest constant in that register is this value (repeatable)")
     args = ap.parse_args(argv)
     with open(getattr(args, "file", None) or args.module, "rb") as f:
         cro = Cro(f.read())
+    if args.cmd == "calls":
+        import json
+        import os
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "games", args.game, "game.json")) as f:
+            game = json.load(f)
+        segments = [int(game["segments"][k][0], 16) for k in ("text", "ro", "data", "bss")]
+        loaded = load(cro.data, int(args.base, 16), segments)
+        want = {}
+        for a in args.arg:
+            reg, _, value = a.partition("=")
+            want[reg] = int(value, 0)
+        target = int(args.target, 16) if args.target else None
+        for site, callee, regs in calls_of(loaded):
+            if target is not None and callee != target:
+                continue
+            if any(regs.get(r) != v for r, v in want.items()):
+                continue
+            shown = " ".join(f"{r}={v:#x}" for r, v in sorted(regs.items()))
+            print(f"0x{site:08x} -> 0x{callee:08x}  {shown}")
+        return 0
     if args.cmd == "info":
         print(f"name: {cro.name}  file size: 0x{cro.file_size:x}  bss: 0x{cro.bss_size:x}")
         for i, s in enumerate(cro.segments):
