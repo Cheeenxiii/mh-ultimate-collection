@@ -80,10 +80,48 @@ Both files start with a header of u32 words, most of them offsets of blocks insi
 | words 17..21, 23, 24, 26 | offset | ailment buildups (12 or 16 bytes each where present) | unverified | MHGU-DE `dt_convert.py` |
 | word 25 | offset | a block of at least 14 bytes | unknown | MHGU-DE `dt_convert.py` |
 | word 27 (0x6C) | offset | attack volumes ("hitsize"): one offset per group up to word 28; a group is 40-byte records (capsules: off2 at +28) closed by a record whose first u16 is 0xFFFF; 2,184 groups, 5,463 volumes, every group ends | verified | MHGU-DE `emdata4u.hitsize`; check E1 |
-| word 28 (0x70) | offset | attack records, 40 bytes each, up to word 29 (whole records in all 86 files where word 29 is set). Where word 29 is 0 (24 files) no header word marks the end and the block runs into an unpointed tail of 4 to 16 bytes over whole records (the stride is what E1 verifies); byte 18 holds knockback bits | verified | MHGU-DE `emdata4u.attackdata`; check E1 |
+| word 28 (0x70) | offset | attack records, 40 bytes each (table "Attack record"): an all-zero record (attack id 0), the attacks, then one whose first u16 is 0xFFFF and whose other 38 bytes are 0, ending the list. Word 29, when set (81 of the 110), is one record past that terminator; when it is 0 (29) the terminator still ends the list and the data after it belongs to no header word. E1 counts the stride to word 29 or the next referenced offset; E10 counts the records to the terminator | verified | ours, 0xb700a8 and 0xb6d09c; MHGU-DE `emdata4u.attackdata`; checks E1, E10 |
 | word 29 (0x74) | offset | a 24-byte part table (`dttune` +0xC8) | unverified | MHGU-DE `dt_convert.py` |
 | word 30 | offset | a block read with the ailments (`dttune` +0xCC) | unknown | MHGU-DE `dt_convert.py` |
 | 0x8C, 0x90, 0x94, 0x9C | u32 or f32 | scalars (`dttune` +0xE0, +0xE4, +0xE8, +0xF0) | unverified | MHGU-DE `dt_convert.py` |
+
+### Attack record (40 bytes)
+
+MH4U's own setup reads the table at word 28 in two functions. 0xb6d09c takes the monster, the attack state, word 28 as the record base, an index, the word-27 group table and a flags word; it makes the record `base + index × 40`, reads the group index at +0x19, resolves it in the word-27 table and calls 0xb700a8 with the resolved pointer. 0xb700a8 copies the record into the attack state and converts as the table says. The list starts with an all-zero record (attack id 0) and ends with the 0xFFFF terminator; neither is an attack.
+
+**What the source games carry.** MH3U's `em_hitdata00` (specs/hitdata.md, HTD) has the same values in bytes 0x00-0x11, the group (+0x15), the count (+0x16) and the signed byte (+0x18); check E8 counts them. MHXX's `attackdata` (HDE) has MH4U's bytes 0x00-0x1B with byte 0x12 split into its +0x12 (bits 0-1) and +0x1F (bits 2-7), and byte 0x1D; check E5 counts them. A field is `verified` when MH4U's reader places it and a source game carries its value, `unverified` when only MH4U's reader places it, and `unknown` when no reader reads it.
+
+The eight bytes at +0x10 are moved together by one f32 load/store pair (`vldmia`/`vstmia` to the attack state's +0x40): the compiler copies them as two 32-bit words, not as two float fields. In all 4,806 records they are a u16 and two bytes, then a byte and three zero bytes (E10), so the table splits them.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| +0x00 | s16 | time A: the attack's start; converted to a float at the attack state's +0x54 | verified | ours, 0xb700a8; MH3U 0x844a40 (the name); checks E5, E8 |
+| +0x02 | s16 | time B: the window's length; converted to a float at the state's +0x58 | verified | ours, 0xb700a8; MH3U 0x844a40 (the name); checks E5, E8 |
+| +0x04 | u16 | to the state's +0x38; MH3U reads a signed 16 here and converts it to a float at its state's +0x44 | verified | ours, 0xb700a8; checks E5, E8 |
+| +0x06 | u8 | attack kind (MH3U's name), to the state's +0x3a | verified | ours, 0xb700a8; MH3U 0x987d50 (the name); checks E5, E8 |
+| +0x08 | u16 | flags (MH3U's name), to the state's +0x36 | verified | ours, 0xb700a8; MH3U 0x987d50 (the name); checks E5, E8 |
+| +0x0a | u8 | to the state's +0x3b | verified | ours, 0xb700a8; checks E5, E8 |
+| +0x0b | u8 | to the state's +0x64 | verified | ours, 0xb700a8; checks E5, E8 |
+| +0x0c | u32 | to the state's +0x3c; MH3U's +0x0c is a u16 and its high u16 is 0 | verified | ours, 0xb700a8; checks E5, E8 |
+| +0x10 | u16 | the first two bytes of the four copied to the state's +0x40; 0, 1, 2, 4, 0x0400, 0x0800 or 0x8000 in every record | verified | ours, 0xb700a8; MHXX carries bytes 0x10-0x11 (E5); check E10 |
+| +0x12 | u8 | the first four-byte group's third byte; MHXX splits it: bits 0-1 at its +0x12 and bits 2-7 at its +0x1F (MHGU-DE calls the high six the knockback bits; not checked in game) | verified | MHGU-DE `emdata4u.attackdata`; ours, 0xb700a8; checks E5, E10 |
+| +0x13 | u8 | the first four-byte group's high byte: 0, 0x08 or 0x40 in every record | verified | ours, 0xb700a8; MHXX carries it (E5); check E10 |
+| +0x14 | u8 | the low byte of the four copied to the state's +0x44: 0, 2 or 4 in every record | verified | ours, 0xb700a8; MHXX carries it (E5); check E10 |
+| +0x15..+0x17 | u8 ×3 | the upper three bytes of the second four; 0 in every record; no reader reads them | unknown | ours, 0xb700a8 (copied); check E10 |
+| +0x18 | u8 | to the state's +0x48, widened to a u16 | verified | ours, 0xb700a8; MHXX carries it (E5) |
+| +0x19 | u8 | attack-volume group: an index into word 27's group table, whose pointer the caller gives the state at +0x80 | verified | ours, 0xb6d09c; MH3U +0x15 (E8); check E10 |
+| +0x1a | u16 | to the state's +0x4a; MH3U's +0x16 plus one | verified | ours, 0xb700a8; checks E5, E8 |
+| +0x1c | u8 | to the state's +0x4d; 0 in 4,668 of 4,806 records; MHXX uses this byte (28) as its own kind, so it carries nothing of MH4U's | unverified | ours, 0xb700a8; MHGU-DE `emdata4u.attackdata`; check E10 |
+| +0x1d | s8 | to the state's +0x4e, clamped at 0; MH3U's +0x18 | verified | ours, 0xb700a8; checks E5, E8 |
+| +0x1e | u8 | 0xff means the default, else a float at the state's +0x5c; 0 in every record | unverified | ours, 0xb700a8; check E10 |
+| +0x1f | u8 | 0xff means the default, else a float at the state's +0x60; 0 in all but 2 of 4,806 records (10 there) | unverified | ours, 0xb700a8; check E10 |
+| +0x20 | u8 | to the state's +0x65, with 1 stored as 0; 0, 1, 5 or 6 in every record | unverified | ours, 0xb700a8; check E10 |
+| +0x21 | u8 | to the state's +0x4f; 0 in every record | unverified | ours, 0xb700a8; check E10 |
+| +0x22 | u8 | to the state's +0x50; 0 in 4,776 of 4,806 records (60 in the other 30) | unverified | ours, 0xb700a8; check E10 |
+| +0x23 | u8 | to the state's +0x51; 0 in every record | unverified | ours, 0xb700a8; check E10 |
+| +0x24..+0x27 | 4 bytes | 0 in every record; no reader reads them | unknown | ours, 0xb700a8 (the record is 40 bytes); check E10 |
+
+Byte 18 (the spec's earlier name for +0x12) is not a separate field: it is the third byte of the u32 at +0x10, and MHXX is the only source game that keeps it as a byte of its own.
 
 ### Hitzone row (10 bytes, 8 rows)
 
@@ -105,4 +143,6 @@ Rathian's row 7 is 100 in all ten bytes and no body record uses it.
 
 ## Checks
 
-- **E1 (done, MH4U USA v1.3.0 RomFS):** `mhuc survey` (or `mhuc emd check <data/em_data.arc>`). Results, all 110 pairs: both magics; every `.emd` word listed and every `.etd` word 5 to 34 is 0 or inside its file; every body-record list (2,917 body, 1,604 camera records) ends at a 0xFFFF bone, with shapes 0, 1, 2 only and parts below 8; every visibility list (1,568 rows) ends at −1, modes 0 and 1 only; base HP 1..100,000; 2,184 attack-volume groups, all ending; attack records whole wherever word 29 marks their end. The hitzone table is 80 bytes in every `.etd` and the body records' rows stay below 8: the first run's histogram of "table bytes / rows used" (10, 16, 20, 40, 80, and 31 not whole) only meant that most monsters leave rows unused; 10 bytes is the only row size that fits all 110. Comparing em001's rows with Kiranico's Rathian damage chart then fixed the columns (table "Hitzone row") and showed em001 is Rathian. Still open: the `.etd` part table, sensors, ailments, and the `.emd` scalars, which no count reaches.
+- **E1 (done, MH4U USA v1.3.0 RomFS):** `mhuc survey` (or `mhuc emd check <data/em_data.arc>`). Results, all 110 pairs: both magics; every `.emd` word listed and every `.etd` word 5 to 34 is 0 or inside its file; every body-record list (2,917 body, 1,604 camera records) ends at a 0xFFFF bone, with shapes 0, 1, 2 only and parts below 8; every visibility list (1,568 rows) ends at −1, modes 0 and 1 only; base HP 1..100,000; 2,184 attack-volume groups, all ending; the attack-record stride is whole from word 28 to word 29 in 86 files and stops on 4 to 16 extra bytes in the other 24 (E10 bounds the records themselves). The hitzone table is 80 bytes in every `.etd` and the body records' rows stay below 8: the first run's histogram of "table bytes / rows used" (10, 16, 20, 40, 80, and 31 not whole) only meant that most monsters leave rows unused; 10 bytes is the only row size that fits all 110. Comparing em001's rows with Kiranico's Rathian damage chart then fixed the columns (table "Hitzone row") and showed em001 is Rathian. Still open: the `.etd` part table, sensors, ailments, and the `.emd` scalars, which no count reaches.
+
+- **E10 (done, MH4U USA v1.3.0 RomFS):** `mhuc emd check data/em_data.arc` bounds every `.etd`'s attack records at their 0xFFFF terminator and counts them. Results: 110 lists, 4,806 records before the terminator; the all-zero record 0 in 110 lists and the terminator in 110; +0x15..+0x17, +0x1e, +0x21, +0x23 and +0x24..+0x27 are zero in all 4,806; +0x13 is 0, 0x08 or 0x40, +0x14 is 0, 2 or 4, +0x1f is 0 or 10, and +0x20 is 0, 1, 5 or 6 in every record; the +0x19 group is below the word-27 group count in 4,793 of 4,806 (the 13 outside are em026's records 56 to 68, indices 25 to 30 against its 25 groups). E1's stride count is 5,204: for the 29 files whose word 29 is 0 it walks from word 28 to the next referenced offset, which includes the data after the terminator.
