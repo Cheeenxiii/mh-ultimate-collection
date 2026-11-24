@@ -31,3 +31,4 @@ Most checks run as `mhuc survey <romfs.bin>`, which reads a whole RomFS in place
 | MH3U `QTDS` on the game's own 365 quests (Q13) | specs/quest.md | MH3U RomFS | done 2026-11-23 |
 | Native plugin in the game | docs/design/plugin-api.md | MH4U dump, the port | open |
 | Class registries of MH3U and MHXX | docs/design/reference-recompiles.md | MH3U, MHXX code.bin | done 2026-11-23 |
+| An action id is the same move in MH4U and MHXX (R1) | docs/design/monster-port.md | the port with an action-forcing plugin, MHXX in Azahar | open |
