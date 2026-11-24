@@ -96,7 +96,7 @@ Rathian's row 7 is 100 in all ten bytes and no body record uses it.
 ## What this means for the mod
 
 - **A monster's hitzones, parts and breaks travel with its own `.emd`/`.etd`.** A new monster brings its pair, loaded by id through `enemyDataPathIndex` (id-tables.md), with no shared table to grow. MHGU's equivalents (`dtbase`, `dttune`, `dtbparts`, `bodydata`, `hitsize`, `attackdata`) map onto MH4U's per word, and MHGU-DE converts them in the GU direction. The GU-to-4U direction this mod needs is the same mapping run backwards: the reverse of `emdata4u.py` and `dt_convert.py`.
-- **MH3U's monster data is another layout**, unknown here. Cha-Cha (docs/sources.md) is the lead on that side.
+- **The source games split the same data over several files.** MHXX's `dttune` holds the `.etd`'s HP, part table, hitzones, ranges, rage and ailments in a stream (specs/dttune.md); MH3U's `em_status00` holds HP, part HP and hitzones in an aligned walk (specs/emstatus.md); both keep hurt volumes, attack volumes and attack records in files of their own (specs/hitdata.md). `mhuc monsterdata` rebuilds MH4U's values from them and compares.
 - **Bone ids are the model's.** MHGU-DE keeps 4U's bone ids and remap table when converting models, so the data needs no remap, except where a bone is missing from the target skeleton.
 
 ## Checks

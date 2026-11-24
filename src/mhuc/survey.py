@@ -3,8 +3,8 @@
 It reads the image in place (mhuc.romfs) and every ARC inside it, and reports only counts,
 versions and pass/fail tallies: nothing from the files themselves, so its output can go into
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
-G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), L1 (lmt), A1 (rEnemyCmd),
-S1 (rCollision).
+G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
+em_status), E4 (body, attack volume and attack record files), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -15,7 +15,7 @@ import struct
 from collections import Counter
 from multiprocessing import Pool
 
-from .formats import arc, classid, emd, gmd, lmt, pica, romfs, tex
+from .formats import arc, classid, dttune, emd, emstatus, gmd, hitdata, lmt, pica, romfs, tex
 from .formats import mod as modfile
 from .quests import quest as questfile
 
@@ -139,6 +139,29 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
             return
         c[f"S1 inner class 0x{struct.unpack_from('<I', data, 4)[0]:08x}"] += 1
         c[f"S1 parts {'1' if struct.unpack_from('<H', data, 0x10)[0] == 1 else 'several'}"] += 1
+    elif data[:4] == dttune.MAGIC:
+        c = st.setdefault("monster data", Counter())
+        try:
+            dttune.blocks(data)
+            c["E2 dttune layout ends at the file's end"] += 1
+        except dttune.DttuneError as e:
+            c[f"E2 dttune {str(e).split(',')[0]}"] += 1
+    elif data[:4] == emstatus.MAGIC:
+        c = st.setdefault("monster data", Counter())
+        try:
+            emstatus.blocks(data)
+            c["E3 em_status walk ends at the file's end"] += 1
+        except emstatus.EmStatusError as e:
+            c[f"E3 em_status {str(e).split(':')[0]}"] += 1
+    elif data[:4] in (hitdata.BDD[0], hitdata.HTS[0], hitdata.HDE[0], hitdata.HTD[0]):
+        c = st.setdefault("monster data", Counter())
+        kind = {hitdata.BDD[0]: "bdd", hitdata.HTS[0]: "hts", hitdata.HDE[0]: "hde", hitdata.HTD[0]: "htd"}[data[:4]]
+        try:
+            n = len(hitdata.groups(data)[1]) if kind == "hts" else len(hitdata.records(data, kind))
+            c[f"E4 {kind} v{struct.unpack_from('<I', data, 4)[0]:#x} tiles the file"] += 1
+            c[f"E4 {kind} {'groups' if kind == 'hts' else 'records'}"] += n
+        except hitdata.HitDataError:
+            c[f"E4 {kind} does NOT tile the file"] += 1
     elif type_name == "rEnemyData":
         st.setdefault("emd", Counter()).update(emd.check_emd(data))
     elif type_name == "rEnemyTuneData":
@@ -223,7 +246,7 @@ def report(total: dict) -> str:
     lines = [f"files in image: {total['files']}"]
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
-    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "lmt", "emc", "sbc"):
+    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "emc", "sbc"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]

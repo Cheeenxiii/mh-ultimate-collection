@@ -16,6 +16,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `fnmap.py` | maps functions between two games |
 | `monster_actions.py` | lists a monster's actions from its dispatcher, and pairs handlers across games by action id |
 | `extract_nsp.py` | extracts a Switch NSP's program code with your own keys |
+| `loader_trace.py` | runs MHXX's `dttune` loader or MH3U's `em_status` walk on every such file and checks `mhuc`'s readers against it ([specs/dttune.md](../specs/dttune.md), [specs/emstatus.md](../specs/emstatus.md)) |
 | `trace_calls.py` | logs who calls chosen functions while the game runs in Azahar, through its GDB stub (standard library only; procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:

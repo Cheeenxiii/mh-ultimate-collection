@@ -32,12 +32,13 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 
 | Module | Does |
 |---|---|
-| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), models (MOD), monster data (EMD), serialised objects (XFS), RomFS images, class ids |
+| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), models (MOD), monster data (MH4U EMD, MHXX `dttune`, MH3U `em_status`, hurt and attack volumes), serialised objects (XFS), RomFS images, class ids |
 | `crypto/` | Blowfish and the save, Extra Data and DLC ciphers of the three games |
 | `quests/` | quest readers for the three games, the MH4U `.mib` writer, conversion from MHXX, monster ids by name |
 | `extdata.py` | MH4U Extra Data records: guild quest cards, DLC Palicos, the in-game test kit |
 | `survey.py` | runs the specs' checks over a whole RomFS and prints counts only |
 | `catalog.py` | what MH4U already has of 3U's and GU's monsters and maps, from `data/catalog/` |
+| `monsterdata.py` | rebuilds an MH4U monster's `.etd`/`.emd` values from MHXX's or MH3U's files and compares, counts only |
 
 Each format follows its spec in [specs/](../specs/README.md). A field is marked verified only once it has been checked against real files, with the procedure written down.
 
@@ -49,7 +50,7 @@ A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source g
 |---|---|---|
 | 1. Study the source | class, vtable, action dispatcher, engine calls | done for Rathian in all three games |
 | 2. Assets | models, textures, motions, AI scripts, collision, sounds | MOD is the same version in all three games; MHXX's LMT and EMC match MH4U's, MH3U's are older |
-| 3. Monster data | hitzones, parts, attacks, stats | MH4U's layout is known ([specs/emd.md](../specs/emd.md)); the source sides are not |
+| 3. Monster data | hitzones, parts, attacks, stats | known in all three games ([emd](../specs/emd.md), [dttune](../specs/dttune.md), [emstatus](../specs/emstatus.md), [hitdata](../specs/hitdata.md)); `mhuc monsterdata` rebuilds MH4U Rathian's HP, parts and hitzones from MHXX, and her HP and most hitzone rows from MH3U |
 | 4. Register | a new monster id and the tables it indexes | MH4U's tables are found ([reference/](../reference/README.md#mh4u-monster-tables)) |
 | 5. Behaviour | each action handler, translated onto `uEnemy` | not started |
 | 6. Quests, arena | the monster's quests and map | quest conversion exists for MHXX |
