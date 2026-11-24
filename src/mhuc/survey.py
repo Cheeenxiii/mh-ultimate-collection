@@ -5,7 +5,7 @@ versions and pass/fail tallies: nothing from the files themselves, so its output
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
-records against their hit volumes), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
+records against their hit volumes), E9 (MH3U em_status break blocks), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -164,8 +164,20 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
     elif data[:4] == emstatus.MAGIC:
         c = st.setdefault("monster data", Counter())
         try:
-            emstatus.blocks(data)
+            walk = emstatus.blocks(data)
             c["E3 em_status walk ends at the file's end"] += 1
+            names = {n for n, _, _ in walk}
+            if "block 0x74" in names:
+                records = emstatus.part_break_records(data) or []
+                c["E9 em_status break block 8 x 6 bytes"] += 1
+                c["E9 em_status break block with its 3-byte companion (0x70)"
+                  if "block 0x70" in names else "E9 em_status break block WITHOUT its companion"] += 1
+                c["E9 em_status parts with a non-default break record"] += sum(
+                    1 for r in records if r[:4] != bytes(4))
+            if "block 0x6c" in names:
+                hp = emstatus.second_part_hp(data) or []
+                c["E9 em_status second part HP block 8 x s16"] += 1
+                c["E9 em_status parts with a non-zero second HP"] += sum(1 for v in hp if v)
         except emstatus.EmStatusError as e:
             c[f"E3 em_status {str(e).split(':')[0]}"] += 1
     elif data[:4] in (hitdata.BDD[0], hitdata.HTS[0], hitdata.HDE[0], hitdata.HTD[0]):
