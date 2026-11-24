@@ -181,9 +181,21 @@ another function table.
 4. Start the quest. The log shows `plugin Force a monster action: ... ready: forcing action
    3/17 on monster 1 via the action setter`, then one `first force: monster 1 3/17 over ...`
    line, then a line only when the AI's action changes. If it says the action setter isn't a
-   hook point, the code library needs rebuilding.
-5. Watch the Rathian: note the move and whether it plays to the end. Once 3/17 plays, repeat
-   with 3/0 and 7/5, and with `hold = 0`, to cover the ids and modes R1 compares.
+   hook point, the code library needs rebuilding. A headless boot with the same library
+   (`mh4u_runner` with `--code`, the update installed) already logs that `ready` line at
+   start-up, which shows the hook is in the library; with no monster loaded there is no
+   `first force` line.
+5. Watch the Rathian: note the move and whether it plays to the end. The first session covers
+   only the first row below; the others are not done, and are not recorded as passed.
+
+| Row | What to watch | Status |
+|---|---|---|
+| 3/17, `hold = 1` | the move plays, not a frozen pose | planned for the maintainer's first session |
+| 3/0, `hold = 1` | the move plays | not done |
+| 7/5, `hold = 1` | the move plays | not done |
+| 3/17, `hold = 0` | forced once, then the AI resumes | not done |
+| 3/0, `hold = 0` | forced once | not done |
+| 7/5, `hold = 0` | forced once | not done |
 
 Result: not yet run; the maintainer reports it here. The source games can still be forced
 with [reference/force_action.py](../reference/force_action.py) through Azahar's GDB stub; it
