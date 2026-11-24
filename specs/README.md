@@ -8,7 +8,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 - **Status** is one of:
   - `verified`: checked against real files with a written procedure (in the spec's *Checks* section). The check's result is described in words, never pasted as bytes.
   - `unverified`: taken from a public source and not checked yet.
-  - `unknown`: a placeholder; nothing is known beyond the class.
+  - `unknown`: nothing is known yet.
 - **Source** names where the field comes from: a community tool or template (credited below), the engine's class registry (MH4UltimateDC `config/mt_classes.tsv`), or `ours` (our own reading of the engine's code, with the function named).
 - Every spec has a front-matter block with `class`, `extension`, `games` and `status` (the lowest status of its fields).
 - No bytes from game files, ever (LEGAL.md). Example values are synthetic.
@@ -30,7 +30,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2) (`plugin_mt_framework`) | GPL-3.0 | ARC header variants, GMD v1/v2 |
 | [3dbrew: GPU/Textures](https://www.3dbrew.org/wiki/GPU/Textures) | wiki | PICA200 texture formats and tiling |
 | MH4UltimateDC `config/mt_classes.tsv`, `docs/research/mt-classes.md` | GPL-3.0 | class names, ids, sizes |
-| MH4UltimateDC-fork `config/games/` (MH3U, MHXX registries) | GPL-3.0 | class names, ids, sizes of the source games |
+| `reference/` (MH3U, MHXX registries) | GPL-3.0 | class names, ids, sizes of the source games |
 
 ## Index
 
@@ -44,5 +44,6 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [lmt](lmt.md) | rMotionList | animations: MHGU Definitive Edition's version-67 layout, read on every MH4U and MHXX file (L1); MH3U is version 66 |
 | [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, structure checked on all 110 pairs and hitzone columns laid out (E1) |
 | [sound](sound.md) | rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rMHSoundEmitter, … | MH4U layouts from MHGU Definitive Edition, unverified; class ids from the registries |
+| [emc](emc.md) | rEnemyCmd | header verified in all three games (A1); bytecode from MHGU Definitive Edition |
+| [sbc](sbc.md) | rCollision | magic and inner class verified (S1); layout from MHGU Definitive Edition |
 | [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, … | from Cha-Cha (Wii U); 3DS magic verified, the rest open (X1) |
-| [placeholders/](placeholders/) | enemy, stage and quest classes | unknown |

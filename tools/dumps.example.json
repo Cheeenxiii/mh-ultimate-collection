@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy to <workspace>/dumps.json and list your own dumps: the work folder name, the file under game_files/, and what it is for. File names only, never the files.",
+  "dumps": {
+    "mh4u_usa_upd": {"file": "your MH4U v1.3.0 update (USA), decrypted.cia", "role": "MH4U v1.3.0 code, the port's target"},
+    "mh3u_usa": {"file": "your MH3U (USA) dump, decrypted.3ds", "role": "MH3U reference"},
+    "mhxx_upd": {"file": "your MHXX v1.4 update (JPN), decrypted.cxi", "role": "MHXX reference"},
+    "mhgu_switch": {"file": "your MHGU v1.4.0 update.nsp", "kind": "switch", "role": "MHGU code and format reference"}
+  }
+}

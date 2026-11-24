@@ -7,9 +7,9 @@ status: unknown
 
 # LMT: motion list (animations)
 
-A list of animations for one skeleton: per animation, tracks (one per bone and channel) pointing at keyframe buffers, optional bounds, and an event block. MH3U's underwater motions and every converted monster's moves are LMT files, so this format sits under both the underwater work (docs/design/underwater.md) and monster conversion.
+A list of animations for one skeleton: per animation, tracks (one per bone and channel) pointing at keyframe buffers, optional bounds, and an event block. MH3U's underwater motions and every converted monster's moves are LMT files, so this format sits under both the underwater work (docs/architecture.md#underwater) and monster conversion.
 
-**Source.** Scrimas's MHGU Definitive Edition (GPL-3.0-or-later), `tools/lmt.py`, which copies animations between MH4U and MHGU LMT files and states the layout as read off MH4U's em022 and em092 and MHGU's em067_00 (version 67 in both). Offsets are relative to the file (the game relocates them at load). Check L1 read every MH4U and MHXX motion list with this layout; the rows it reaches are marked verified. MH3U's are version 66 and don't follow it. The keyframe buffer encodings (by buffer type) aren't described there; PredatorCZ's RevilLib is the usual reference for them. Reader: `tools/mhuc/lmt.py`.
+**Source.** Scrimas's MHGU Definitive Edition (GPL-3.0-or-later), `tools/lmt.py`, which copies animations between MH4U and MHGU LMT files and states the layout as read off MH4U's em022 and em092 and MHGU's em067_00 (version 67 in both). Offsets are relative to the file (the game relocates them at load). Check L1 read every MH4U and MHXX motion list with this layout; the rows it reaches are marked verified. MH3U's are version 66 and don't follow it. The keyframe buffer encodings (by buffer type) aren't described there; PredatorCZ's RevilLib is the usual reference for them. Reader: `src/mhuc/lmt.py`.
 
 ## Header
 
@@ -53,9 +53,8 @@ A list of animations for one skeleton: per animation, tracks (one per bone and c
 
 ## Checks
 
-- **L1 (done, 2026-11-23):** `mhuc survey` on each RomFS (section `lmt`).
+- **L1 (done):** `mhuc survey` on each RomFS (section `lmt`).
   - MH4U: 1,466 motion lists, all version 67, all readable (every animation, track table, keyframe buffer, bounds block and event block inside its file): 23,412 animations, 25,633 empty slots, 732,404 tracks, buffer types 1–7 and 11–13. Every animation has an event block.
   - MHXX JPN: 988, all version 67, all readable: 21,154 animations, 57,010 empty slots, 677,909 tracks, the same buffer types (type 3 three times). So MHXX motions are MH4U's format: a GU monster's LMT can be read, and probably loaded, as it is.
-  - MH3U USA: 387, all **version 66**; `mhuc.lmt` lays out only 67, so none were read. MH3U's motions, the underwater ones among them, need their own layout (Cha-Cha's Wii U reading is the lead, docs/sources/cha-cha.md) or a conversion to 67.
+  - MH3U USA: 387, all **version 66**; `mhuc.lmt` lays out only 67, so none were read. MH3U's motions, the underwater ones among them, need their own layout (Cha-Cha's Wii U reading is the lead, docs/sources.md) or a conversion to 67.
   - Not reached: the meaning of the fields marked unverified (frame counts, weights, reference frames) and the keyframe encodings.
-- *As first written:* `mhuc survey` counts every `rMotionList`: its version, whether `mhuc.lmt.read` reads it (every offset inside the file), and its animations, tracks, buffer types and event blocks. Pass for MH4U: version 67 throughout and every file readable. For MH3U and MHXX, the versions they use say whether this layout applies (MH3U is older and may differ: underwater motions come from it).

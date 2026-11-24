@@ -4,9 +4,9 @@ Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Mo
 
 ## Start and end of a session
 
-- **Start:** read [STATUS.md](STATUS.md): where the project stands, the branches in flight and the next tasks. In the maintainer's workspace a SessionStart hook prints it with `tools/doctor.py`'s report, and `/next` orients a session explicitly.
-- **End:** rewrite STATUS.md (don't append), write a report in `docs/reports/`, run the checks, commit. In the workspace, `/handoff` does all of it.
-- The workspace's own `CLAUDE.md`, hook and skills are versioned in `tools/workspace/`; `tools/doctor.py --install` installs them one folder up.
+- **Start:** read [README.md](README.md) and [docs/architecture.md](docs/architecture.md). They describe the project as it is today; `git log` tells what changed and why. `/next` picks the task.
+- **Tasks** are GitHub issues in this repository, grouped by milestone, each with a "Done when". One session works on one issue; `/plan` adds issues and milestones.
+- **End:** `/done` runs the checks, commits, and opens a pull request that closes the issue. Write no session report, status file or task list anywhere in either repository.
 
 ## Ground rules (every session starts from these)
 
@@ -17,16 +17,48 @@ Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Mo
    - MHXX 3DS: GU-era models, textures, code and data.
    - MHGU Switch v1.4.0: English text only.
 
-   Author something only where no source exists, and record it in `docs/sources/authored-register.md`.
-3. **Stay mergeable with upstream MH4UltimateDC, but never wait on it.** Small focused commits with one-sentence subjects. Update docs in the same commit as the code. Add pytest tests. In the fork, add new files rather than rewriting upstream's, and keep the plugin layer additive.
+   Author something only where no source exists, and record it in the [authored register](docs/sources.md#authored-register).
+3. **Never wait on upstream MH4UltimateDC**, and keep the fork rebasable on it (see "The fork" below).
 4. **Licence.** GPL-3.0-or-later. Check a tool's licence before reusing its code, and credit whatever informs a format spec (mhff, Silvris's templates, Kuriimu2).
 5. **Web sessions have no game files.** Don't try to get them from anywhere.
-6. **Don't settle the open decisions** listed in [docs/design/open-decisions.md](docs/design/open-decisions.md) (combat base, monster versions, runtime, progression, versions of shared systems, map versions and lighting, music and sound versions, GU Switch assets). Write up the options there and stop. The base game (MH4U) is settled.
+6. **Don't settle open decisions.** They are listed in [docs/decisions.md](docs/decisions.md). Add facts and options there, then stop. Only the maintainer settles one.
 
 ## Conventions
 
-- Python 3.10+, standard library only for `tools/mhuc`. Every tool change needs a test in `tests/` built on synthetic data.
-- Run `python3 -m pytest` and `ruff check .` before committing.
+- Python 3.10+, standard library only for `src/mhuc`. `reference/` may use the fork's requirements.
 - Specs (`specs/`) mark every field `verified` or `unverified`, with its source. A field becomes verified only after a check against a real file, recorded as a procedure, never as the file's bytes.
 - Catalog rows (`data/catalog/`) carry a source URL each. Facts only.
-- Anything that can only be checked in the game gets a written test procedure in `docs/checks/`.
+- Anything that can only be checked in the game gets a procedure in [docs/checks.md](docs/checks.md).
+- Commits do one thing. The subject says what, in the imperative; the body says why.
+
+## Where information goes
+
+| Information | Goes in |
+|---|---|
+| what the project is and does now | README.md, docs/, specs/, reference/README.md, updated in the same commit as the change |
+| why a change was made | the commit message |
+| a structural decision, settled or open | docs/decisions.md |
+| a task, its progress, next steps | a GitHub issue |
+| results of a session, dated "results (YYYY-MM-DD)" sections | nowhere in the repository |
+| a command's options | its `--help`, not the docs |
+
+The 2026-11-24 cleanup removed 14 session reports, a STATUS.md rewritten by every session, and design docs whose dated results had grown to 170 lines. Don't recreate them under another name.
+
+## Tests
+
+- One command: `python3 -m pytest` here, `tests/uc/run` in the fork. Lint with `ruff check .` before committing.
+- Write a test only for a real risk or a bug that was fixed. Its name says the behaviour it protects.
+- Prove it: break that behaviour in the code, see the test fail with a readable message, revert. A test that stays green is rewritten or deleted.
+- A round trip through our own reader and writer proves nothing about the format. Compare against something independent: published test vectors, values computed by hand, or the player's own files (tests marked `game_files`, run with `MHUC_DUMPS`).
+- Mock only what is out of reach (the game, the hardware), never the code under test.
+- Test code in its own language with its own tooling: the fork's C++ plugin host is tested with CTest (`port/tests/plugins`), never through Python.
+
+## The fork
+
+- Its diff with upstream stays minimal: `git diff --stat upstream/main` lists only additions and the few hooks into upstream's files they need. Don't edit, reformat or "fix" upstream's code, docs or tests.
+- The fork's own docs are `.github/README.md` and `docs/PLUGINS.md`; its own tests are `tests/uc/` and `port/tests/plugins/`.
+- Logic specific to this mod doesn't go in the fork. The reference recompile tools once added 80,000 lines there; they live in `reference/` now.
+
+## Before adding something
+
+Check that it serves the pitch in README.md and that it belongs in this repository (content, formats, research) or the fork (an engine capability upstream could take). If it doesn't, say so instead of implementing it.

@@ -1,13 +1,13 @@
 # Id tables
 
-One folder per conversion (`mhxx-mh4u/`: MHXX to MH4U), one CSV per kind of id, read by `mhuc convert` (tools/mhuc/convert.py, docs/design/quest-conversion.md). They ship **empty**: their rows come from the maintainer's dumps and from decisions, and are added as they are settled. A converter refuses a quest whose ids aren't all here.
+One folder per conversion (`mhxx-mh4u/`: MHXX to MH4U), one CSV per kind of id, read by `mhuc convert` (src/mhuc/quests/convert.py, docs/architecture.md#quests). They ship **empty**: their rows come from the maintainer's dumps and from decisions, and are added as they are settled. A converter refuses a quest whose ids aren't all here.
 
 | Column | Meaning |
 |---|---|
 | `source` | the id in the source game, as text (see each table) |
 | `target` | the MH4U id, an integer (decimal or `0x` hex) |
 | `source_name`, `target_name` | names, for review (from the games' text or the catalog) |
-| `how` | how the row was established (`mhuc idnames`, check Q22 in specs/quest.md, gives candidate names for ids from your own quests): a catalog match, a check in docs/checks/, or a decision; a new MH4U id says where it was allocated (docs/design/id-tables.md) |
+| `how` | how the row was established (`mhuc idnames`, check Q22 in specs/quest.md, gives candidate names for ids from your own quests): a catalog match, an in-game check (docs/checks.md), or a decision; a new MH4U id says where it was allocated (reference/README.md#mh4u-monster-tables) |
 
 | Table | `source` key | `target` |
 |---|---|---|
