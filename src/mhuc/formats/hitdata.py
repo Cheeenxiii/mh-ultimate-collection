@@ -11,6 +11,7 @@ magic and the version only; the record sizes are the ones that tile every file (
 from __future__ import annotations
 
 import struct
+from collections import Counter
 
 BDD = (b"BDD\0", {0x20110219: 44})                       # same version in both games
 HTS = (b"HTS\0", {0x20110212: 40, 0x20131015: 48})       # MH3U, MHXX
@@ -47,6 +48,19 @@ def records(d: bytes, kind: str) -> list[bytes]:
             raise HitDataError("bdd: the last record isn't the 0xFFFF end")
         recs.pop()
     return recs
+
+
+def check_htd(attack: bytes, volumes: bytes) -> Counter:
+    """E6 of specs/hitdata.md: every HTD record's attack-volume group (+0x15) is a group of the monster's HTS."""
+    c: Counter = Counter()
+    recs = records(attack, "htd")
+    groups_n = len(groups(volumes)[1])
+    inside = sum(1 for r in recs if r[0x15] < groups_n)
+    c["E6 htd volume group below the HTS group count"] += inside
+    c["E6 htd volume group OUTSIDE"] += len(recs) - inside
+    c["E6 htd records"] += len(recs)
+    c["E6 htd/hts pairs"] += 1
+    return c
 
 
 def groups(d: bytes) -> tuple[int, list[list[bytes]]]:

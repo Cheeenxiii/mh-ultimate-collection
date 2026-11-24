@@ -225,6 +225,14 @@ def survey_arc(data: bytes, st: dict) -> None:
         if len(pair) == 2:
             st.setdefault("emd", Counter()).update(emd.check_pair(pair["rEnemyData"], pair["rEnemyTuneData"]))
             st["emd"]["E1 pairs"] += 1
+    hit_pairs: dict = {}
+    for e in a.entries:
+        if e.data[:4] in (hitdata.HTD[0], hitdata.HTS[0]):
+            hit_pairs.setdefault(e.path.rsplit("\\", 1)[0], {})[e.data[:4]] = e.data
+    for pair in hit_pairs.values():
+        if hitdata.HTD[0] in pair and hitdata.HTS[0] in pair:
+            st.setdefault("monster data", Counter()).update(
+                hitdata.check_htd(pair[hitdata.HTD[0]], pair[hitdata.HTS[0]]))
     q = [t for t in types if t in QUEST_TYPES]
     if q:
         qc = st.setdefault("quest", Counter())

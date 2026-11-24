@@ -106,6 +106,27 @@ def _entry(entries, type_id: int, *words: str) -> bytes:
     return hits[0]
 
 
+def test_rathian_attack_records_rebuild_from_mh3u(dump):
+    """specs/hitdata.md HTD: MH3U's 32-byte records carry MH4U's bytes 0x00-0x11, the volume group, the +0x16 count
+    and the signed byte (check E6); the other MH4U bytes don't come back"""
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    em_data = next(arc.read(image.read(f)).entries for f in image.files() if f.path.endswith("em_data.arc"))
+    mh4u = monsterdata.from_mh4u(_entry(em_data, 0x0A0E48D4, "em001"), _entry(em_data, 0x3D8BBBAC, "em001"))
+    u3 = dict(monster_entries(dump("mh3u", "romfs.bin")))["/arc/enemy/em001.arc"]
+    rebuilt = monsterdata.from_mh3u(_entry(u3, 0x4DEE8265, "em_status"), _entry(u3, 0x1AC7B52D, "em_body"),
+                                    _entry(u3, 0x1AC7B52D, "em_cambody"), _entry(u3, 0x5653C1B0, "em_hitsize"),
+                                    _entry(u3, 0x0C6016B9, "em_hitdata"))
+    got, want = rebuilt["attack records"], mh4u["attack records"]
+    assert len(got) == 45, len(got)
+
+    def shared(r: bytes) -> bytes:
+        return r[:0x12] + r[0x19:0x1B] + r[0x1D:0x1E]
+
+    assert sum(shared(a) == shared(b) for a, b in zip(got, want, strict=False)) == 19
+    assert sum(a[0x19] == b[0x19] for a, b in zip(got, want, strict=False)) == 38
+    assert sum(a[0x1D] == b[0x1D] for a, b in zip(got, want, strict=False)) == 37
+
+
 def test_rathian_hp_parts_and_hitzones_rebuild_from_mhxx_and_mh3u(dump):
     """The values the issue asks for: MH4U Rathian's base HP, part table and hitzone rows from MHXX's dttune; base HP
     and the hitzone rows MH4U didn't retune from MH3U's em_status (specs/dttune.md, specs/emstatus.md)"""

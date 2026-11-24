@@ -6,6 +6,7 @@ import zlib
 
 import pytest
 
+from mhuc import monsterdata
 from mhuc.formats import classid, emd, hitdata, lmt, pica
 
 
@@ -65,3 +66,35 @@ def test_mhxx_attack_volume_whose_first_word_is_ffff_is_kept():
     record = b"\xff\xff" + bytes(46)
     d = struct.pack("<4sIII", b"HTS\0", 0x20131015, 1, 0) + struct.pack("<II", 1, 24) + record
     assert hitdata.groups(d) == (48, [[record]])
+
+
+def test_mh3u_attack_record_maps_onto_the_mh4u_bytes_it_shares():
+    """specs/hitdata.md HTD: bytes 0x00-0x11 stay, the volume group goes to 0x19, the count one more to 0x1a, the
+    signed byte to 0x1d; the bytes with no MH4U counterpart stay zero"""
+    record = bytearray(32)
+    record[:0x12] = bytes(range(0x12))
+    record[0x15] = 7
+    record[0x16] = 3
+    record[0x17] = 9
+    record[0x18] = 0xFE
+    out = monsterdata._htd_to_4u(bytes(record))
+    assert out[:0x12] == bytes(range(0x12))
+    assert (out[0x19], out[0x1A], out[0x1D]) == (7, 4, 0xFE)
+    assert out[0x12:0x19] == bytes(7) and out[0x1B:0x1D] == bytes(2) and out[0x1E:] == bytes(40 - 0x1E)
+
+
+def test_mh3u_empty_attack_record_stays_empty():
+    assert monsterdata._htd_to_4u(bytes(32)) == bytes(40)
+
+
+def test_htd_volume_group_must_be_below_the_hts_group_count():
+    """check E6: an HTD record whose +0x15 indexes past the monster's HTS groups is counted, not accepted"""
+    close = b"\xff\xff" + bytes(38)
+    hts = struct.pack("<4sIII", b"HTS\0", 0x20110212, 2, 0)
+    hts += struct.pack("<II", 2, 32) + struct.pack("<II", 1, 112) + bytes(40) + close + close
+    inside, outside = bytearray(32), bytearray(32)
+    inside[0x15], outside[0x15] = 1, 2
+    htd = struct.pack("<4sIII", b"HTD\0", 0x20110209, 2, 0) + bytes(inside) + bytes(outside)
+    counts = hitdata.check_htd(htd, hts)
+    assert counts["E6 htd volume group below the HTS group count"] == 1
+    assert counts["E6 htd volume group OUTSIDE"] == 1
