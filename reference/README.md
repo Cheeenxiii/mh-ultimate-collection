@@ -237,7 +237,7 @@ Three ways found the matches. Translating field offsets: MHXX's work block at +0
 
 ### What a 3U Rathian needs from MH3U's engine
 
-Her own code is the block at 0x00686000 to 0x0069b000, which holds `uEm002`'s action dispatcher (vtable slot 47, 0x00687d30), its 66 handlers and the class's other methods. The 66 handlers call **101 engine functions 1,207 times**; the calls counted here are the ones that leave that block. (Her class's non-action methods, update and setup, call further engine functions, not counted here.)
+Her own code is the block at 0x00686000 to 0x0069b000, which holds `uEm002`'s action dispatcher (vtable slot 50, 0x00687d30), its 66 handlers and the class's other methods. The 66 handlers call **101 engine functions 1,207 times**; the calls counted here are the ones that leave that block. (Her class's non-action methods, update and setup, call further engine functions, not counted here.)
 
 Every engine function falls into one of these:
 
