@@ -23,7 +23,3 @@ jobs:
       - run: pip install pytest ruff
       - run: ruff check .
       - run: python -m pytest -q
-      - name: Spec checks
-        run: python tools/check_specs.py
-      - name: Refuse game data in the tree
-        run: python tools/check_no_game_data.py

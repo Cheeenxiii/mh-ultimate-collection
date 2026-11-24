@@ -36,7 +36,7 @@ python3 -m pip install -e .
 mhuc --help
 ```
 
-Run the tests with `python3 -m pytest`.
+Run the tests with `python3 -m pytest`. The tests against real game files run only when `MHUC_DUMPS` points at your dumps (layout in [tests/conftest.py](tests/conftest.py)).
 
 ## Licence
 
