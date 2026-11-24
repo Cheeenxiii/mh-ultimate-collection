@@ -16,6 +16,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `fnmap.py` | maps functions between two games |
 | `monster_actions.py` | lists a monster's actions from its dispatcher, and pairs handlers across games by action id |
 | `extract_nsp.py` | extracts a Switch NSP's program code with your own keys |
+| `trace_calls.py` | logs who calls chosen functions while the game runs in Azahar, through its GDB stub (standard library only; procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:
 
@@ -186,9 +187,9 @@ Each of the 62 called imports with no counterpart in the map, read in MHXX's cod
 | 0x008cc434 | | among the loaded monsters, claims the first active one of a given species outside the given area and flags it | 0x009179f4, the same steps, plus a branch for one MH4U state |
 | 0x008d0ec8 | | among the loaded monsters, sends a message to each active one of a species in an area, optionally within a radius | 0x0093c160, the same loop over MH4U's 32 monster slots |
 | 0x008e3628 | | checks a linked monster in the same area and its distance (500 units); under action 13/1 only | MH4U lacks it: the paired MH4U handler (0x006db540) has no call at that point |
-| 0x008ae1c8 | | plays a sound at a joint (or the monster's root) for the local player | not found yet |
+| 0x008ae1c8 | | plays a sound at a joint (or the monster's root) for the local player; at run time, called in fights from code under `uEnemy`'s vtable slot 10 | not found yet |
 | 0x008a1fc8 | `uEnemy` | forwards a request with a position to a manager's method 0x002cf3b0 | 0x002b9c38, the manager method, which MH4U calls directly (as with the confirmed pair 0x008a200c and 0x002b9cb4) |
-| 0x008a1ed8 | `uEmXXX` | calls a manager with no arguments (44 actions) | not found yet |
+| 0x008a1ed8 | `uEmXXX` | calls a manager with no arguments; Rathian tests its result (at least 9) only in one state of hers | not found yet; never called while tracing a low-rank and a Hyper Rathian fight |
 | 0x008a1934 | `sHitPush` | asks the hit-push manager about a player (GU's label: player absent) | 0x006832a0, called at the same place in Rathian's paired vtable slot (MHXX 0x0201ccd4, MH4U 0x006ebfd8) |
 | 0x008a7844 | `uEnemyBase` | applies a model part group: sets each part's visibility bit in the monster's mask | 0x009428a8, the same bit updates; MH4U takes its one part list from the monster's data instead of a group argument |
 | 0x008d8768 | `uEnemy` | saves or clears the monster's status flag sets, by mode | MH4U lacks it: the paired MH4U handler (0x006d5e98) has no call at that point |
@@ -197,16 +198,16 @@ Each of the 62 called imports with no counterpart in the map, read in MHXX's cod
 | 0x0089e698 | `uFestaEnemy` | vtable slot 76: builds a capability mask in a `uFestaEnemy` field from two of the monster's states | MH4U lacks it: the field belongs to the `uFestaEnemy` layer, and no MH4U function builds that mask |
 | 0x0089eb70 | | a rate for a part condition, from two part entries or a default, all `uFestaEnemy` fields (+0xb730 to +0xb76c) | MH4U lacks it: those fields are the `uFestaEnemy` layer's, which MH4U doesn't have |
 | 0x008bb4c0 | `uEnemy` | raises a request flag with an id in the work block | 0x00922104, the same two stores (0x00933fe4 clears them) |
-| 0x008c86d4 | `uEnemy` | clears one flag when called with 0 | not found yet |
+| 0x008c86d4 | `uEnemy` | clears one flag when called with 0; at run time, called in fights from code under `uEnemy`'s vtable slot 9 | not found yet |
 | 0x00adb338 | `uEnemy` | one of two entries of the monster's data table, chosen by the work block's state 0x67 | 0x0091dee8 (the monster's data entry), called at the same place in action 3/78's paired handler |
 | 0x00adcd4c | `uEnemy` | a mask from the work block's state flags and kind | 0x00911cfc, the same masks |
 | 0x00adcf38 | `uEnemy` | a second mask of the same kind | 0x0091df88, the same masks |
-| 0x008eb1c0 | | updates one part's damage state (states 1 to 3) and raises flags in the work block | not found yet |
-| 0x00a56ee0 | `MtObject` | calls a virtual method with the 16-bit id at +0x24c | not found yet |
-| 0x008ad638 | `uPlayerQuest` | a player's 16-bit field at +0x24c | not found yet |
-| 0x001e3950 | `uPlayerLobby` | sets a player speed and recomputes two ratios from it | not found yet |
+| 0x008eb1c0 | | updates one part's damage state (states 1 to 3) and raises flags in the work block | not found yet; never called while tracing a low-rank and a Hyper Rathian fight, head wounded included |
+| 0x00a56ee0 | `MtObject` | calls a virtual method with the 16-bit id at +0x24c; at run time, called every frame by the player's and its weapon's code (`uPlayerBase`, `uPlWeapon`) | not found yet |
+| 0x008ad638 | `uPlayerQuest` | a player's 16-bit field at +0x24c; at run time, read in quests by Rathian's module and by `uEnemyActCustom` code | not found yet |
+| 0x001e3950 | `uPlayerLobby` | sets a speed and recomputes two ratios from it; at run time, called in menus by `uPlayerPreview`, the hunter preview, so likely a model's motion-speed setter rather than player code | not found yet |
 
-Of the 62: 19 have an MH4U function, 36 are things MH4U lacks (26 of them the shell framework), 7 are not found yet. Those 7 go through MHXX managers or fields with no structural twin in MH4U: a quest-level getter, sound requests at a joint, a part damage state, a player's speed, a 16-bit player field and a virtual call made with it, and one flag.
+Of the 62: 19 have an MH4U function, 36 are things MH4U lacks (26 of them the shell framework), 7 are not found yet. Those 7 go through MHXX managers or fields with no structural twin in MH4U: a quest-level getter, sound requests at a joint, a part damage state, a player's speed, a 16-bit player field and a virtual call made with it, and one flag. Tracing MHXX's calls at run time (the procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) showed which code calls 5 of them; finding their MH4U twins that way needs the same trace on MH4U's side. The other 2 never ran in the fights traced.
 
 Two ways found the matches. Translating field offsets: MHXX's work block at +0x10a8 is MH4U's at +0xe28; within it MHXX's +0x40 (position) and +0x54 (heading) are MH4U's +0x198 and +0x1ac, +0x1d0 (target points) is +0x218, +0x1a8 and +0x1ba are +0x1b4 and +0x1c8, and the +0x5900 area is about 0x2160 further on in MH4U. Aligning call sequences: the handlers of a shared action call the same engine functions in the same order, so an import sits where its MH4U counterpart, or nothing, does. The alignment also confirms two of the call-site matches above (0x008a200c with 0x002b9cb4, 0x008a2298 with 0x002bab8c).
 
