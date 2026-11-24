@@ -18,7 +18,7 @@ The mod reaches the engine only through the fork's plugin API. Its reference is 
 
 The first plugin is `mods/force_action`. Its `mod.json` names `uEnemy`'s action dispatcher
 (USA v1.3.0 address `0x006e9cac`); the C library wraps that function and writes the monster's
-action category and index before the game reads them, so a chosen move plays (check R1). The
+action category and index before the game reads them, so a chosen move plays (the plugin's check, R1p). The
 library is built into the code library by the fork's `tools/build_game.py`, like any other
 plugin.
 

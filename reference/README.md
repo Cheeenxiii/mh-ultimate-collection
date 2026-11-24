@@ -18,6 +18,8 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `extract_nsp.py` | extracts a Switch NSP's program code with your own keys |
 | `loader_trace.py` | runs MHXX's `dttune`, `dtbase` or `dtbparts` loader, or MH3U's `em_status` walk, on every such file and checks `mhuc`'s readers against it ([specs/dttune.md](../specs/dttune.md), [specs/dtbase.md](../specs/dtbase.md), [specs/dtbparts.md](../specs/dtbparts.md), [specs/emstatus.md](../specs/emstatus.md)) |
 | `trace_calls.py` | logs who calls chosen functions while the game runs in Azahar, through its GDB stub (standard library only; procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) |
+| `force_action.py` | forces the next action of the monster at the dispatcher in MHXX or MH3U through the same GDB stub; a debugging tool for a move, not check R1 |
+| `monster_motions.py` | lists the motion each of a monster's action handlers starts, and compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:
 
@@ -95,7 +97,7 @@ Rathian's unmatched engine calls, seen through its pairs, are in the "Through MH
 | | MH4U | MH3U | MHXX |
 |---|---|---|---|
 | class | `uEm001` | `uEm002` (Rathalos's class) | `uEm001_00`, in `roEm001.cro` |
-| action dispatcher | vtable slot 44, 0x006e9cac | slot 47, 0x00687d30 | 0x02009704 (module at 0x02000000) |
+| action dispatcher | vtable slot 44, 0x006e9cac | slot 50, 0x00687d30 | slot 122, 0x02009704 (module at 0x02000000) |
 | actions | 342 | 191 | 301 |
 | distinct handlers | 97 | 66 | 83 |
 

@@ -1,5 +1,5 @@
 /*
- * force_action.c: makes a monster perform a chosen action, for check R1
+ * force_action.c: makes a monster perform a chosen action, for the plugin's check R1p
  * (docs/checks.md). It is the mod's first native plugin.
  *
  * The game runs a monster's current action from two bytes of its work block: the action's
@@ -31,7 +31,7 @@
  * symbols, so the mod gives it one. */
 #define HOOK_NAME "uEnemy::dispatchAction"
 
-/* Offsets in uEnemy, and in the work block its +0xe28 points to (docs/checks.md, R1). */
+/* Offsets in uEnemy, and in the work block its +0xe28 points to (docs/checks.md, R1p). */
 #define ENEMY_WORK 0xe28u
 #define WORK_ID    0x1c0u
 #define WORK_CATEGORY 0x1cau

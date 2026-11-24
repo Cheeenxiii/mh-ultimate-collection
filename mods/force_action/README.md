@@ -1,7 +1,7 @@
 # Force a monster action
 
 The mod's first native plugin. It makes a chosen action play on a monster, so a ported move
-can be watched without waiting for the AI to pick it: check R1 in
+can be watched without waiting for the AI to pick it: the plugin's check R1p in
 [checks.md](../../docs/checks.md).
 
 ## What it does
@@ -57,6 +57,7 @@ index separated by `/` (or `:`) makes the plugin refuse to start, and the port l
 runs without it. The same goes for a `monster` that isn't an id or `any`, and for a `hold`
 that isn't `0` or `1`.
 
-The check that uses the plugin, with its sample ids and the matching procedure for MHXX and
-MH3U, is R1 in [checks.md](../../docs/checks.md#monster-actions). Building the code library
+The in-game check that uses the plugin is R1p in
+[checks.md](../../docs/checks.md#the-plugins-check-r1p); R1 is the code check that compares
+the motion each action starts. Building the code library
 with the mod enabled is a separate step: a recompile.

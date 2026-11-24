@@ -51,9 +51,115 @@ Status: open. goshawk documents the protocol but is AGPL-3.0, so a server here w
 
 | Check | What | Pass |
 |---|---|---|
-| R1 | force the same action id on a Rathian in MH4U and in MHXX, for a sample of ids in categories 3 and 7 | each forced id plays the same move in both games |
+| R1 | for every action id Rathian has in two or more of MH4U, MHXX and MH3U, compare the motion (animation) index each game's handler starts | the counts per pair and the ids that differ are recorded below |
 
-Needs a plugin that writes the two action bytes (MH4U: bytes 0x1ca and 0x1cb of the block at `this+0xe28`; MHXX: `this+0x6bf0` and `+0x6bf1`). Status: open, the plugin doesn't exist yet.
+The action dispatchers are the ones the inventory walks: MH4U `uEm001` vtable slot 44,
+`0x006e9cac`; MHXX `roEm001` module offset `0x9704`; MH3U `uEm002` vtable slot 50,
+`0x00687d30`. A handler starts an animation by calling its game's motion-start wrapper with
+the motion index in r1: MH4U `0x0094e318` (`mov r2,#0; b 0x0091908c`), MHXX `0x008eb108`
+(the same into `0x008b393c`), MH3U `0x00828828` (it tail-calls `0x0083771c`, which sets the
+model's motion). The wrappers are engine functions of the base enemy class, so one address
+serves every monster of a game.
+
+How it was found: each wrapper is the routine the handler calls or tail-calls with a small
+constant, and MH4U's and MHXX's are the same two instructions into their setters. For the
+actions checked by hand (3/0, 3/17 and 7/5) the MH4U and MHXX handlers reach the same call in
+the same place and pass the same index, while MH3U's handlers pass a different one;
+`reference/monster_motions.py` then runs it over every action.
+
+[reference/monster_motions.py](../reference/monster_motions.py) reuses
+[monster_actions.py](../reference/monster_actions.py)'s inventory. For each action it scans
+the handler, stepping over the inline jump tables and literal pools that stop a linear
+disassembly, and takes the **first constant in r1** passed to the wrapper: the action's entry
+motion. A handler that calls the wrapper only with a computed value is `computed`; one that
+never calls it is `none`; an action whose work is inline is `no-handler`. Those three are not
+compared. The run covers MH4U USA v1.3.0, MHXX v1.4 `roEm001` and MH3U USA.
+
+| Game | Actions | Constant | Computed | None | No handler |
+|---|---|---|---|---|---|
+| MH4U | 342 | 240 | 0 | 67 | 35 |
+| MHXX | 301 | 178 | 0 | 96 | 27 |
+| MH3U | 191 | 132 | 0 | 50 | 9 |
+
+| Pair | Common ids | Compared | Same motion | Different motion | Not compared |
+|---|---|---|---|---|---|
+| MH4U / MHXX | 273 | 167 | 167 | 0 | 106 |
+| MH4U / MH3U | 174 | 117 | 2 | 115 | 57 |
+| MHXX / MH3U | 145 | 84 | 0 | 84 | 61 |
+
+Last result (2026-11-24): MH4U and MHXX start the same motion for every one of their 167
+comparable ids; the two ids that agree between MH4U and MH3U are 1/11 and 1/12, and every
+other compared id differs. The not-compared ids are those where one side (or both) is
+`computed`, `none` or `no-handler`; the run prints the reason counts.
+
+Ids that differ, MH4U / MH3U (115):
+
+```
+1/4 1/5 1/6 1/7 1/8 1/13 1/14 2/4 2/5 2/6
+3/0 3/1 3/2 3/4 3/6 3/7 3/8 3/12 3/13 3/16
+3/17 3/18 3/19 3/20 3/21 3/24 3/25 3/27 3/28 3/29
+7/0 7/1 7/3 7/4 7/5 7/6 7/7 7/8 7/9 7/12
+7/14 7/16 7/17 7/18 7/19 7/20 7/21 7/22 7/23 7/24
+7/25 7/26 7/27 7/28 7/29 7/30 7/31 7/32 7/33 7/34
+7/36 7/38 7/39 7/40 7/41 7/42 7/43 7/44 7/45 7/49
+7/50 7/51 7/52 7/53 7/54 7/55 7/56 7/57 7/59 7/60
+7/61 7/62 7/66 7/67 7/68 7/69 7/70 7/71 7/72 7/73
+7/74 7/75 7/76 7/77 7/78 7/80 7/83 7/85 7/88 7/89
+7/90 7/91 7/94 7/95 8 9/1 9/2 12 13/0 13/1
+13/2 13/4 13/5 13/6 13/8
+```
+
+Ids that differ, MHXX / MH3U (84):
+
+```
+1/4 1/5 1/6 1/7 1/8 2/4 2/5 2/6 3/0 3/2
+3/4 3/6 3/7 3/8 3/12 3/13 3/16 3/17 3/18 3/19
+3/20 3/21 3/24 3/25 3/27 3/28 3/29 7/0 7/1 7/4
+7/5 7/6 7/7 7/8 7/9 7/12 7/14 7/16 7/17 7/18
+7/19 7/20 7/21 7/22 7/23 7/24 7/25 7/26 7/27 7/28
+7/29 7/30 7/31 7/32 7/33 7/34 7/36 7/38 7/39 7/40
+7/42 7/45 7/49 7/50 7/51 7/52 7/57 7/59 7/60 7/61
+7/62 7/66 7/67 7/68 9/1 9/2 9/3 9/4 13/0 13/1
+13/2 13/5 13/6 13/8
+```
+
+The lists are action ids only; a bare number is a category with one action. The two motion
+indices are printed by `compare --values` and stay outside the repository.
+
+To rerun, write the TSVs outside the repository (for example under `build/`):
+
+```bash
+python3 reference/monster_motions.py list --game mh4u --exheader <v1.3.0 exheader> \
+    --code <v1.3.0 code.bin> --range 0x6d4f80 0x6ec8e0 --dispatcher 0x006e9cac -o build/mh4u.tsv
+python3 reference/monster_motions.py list --game mhxx --module roEm001.cro --crs static.crs \
+    --dispatcher 0x02009704 -o build/mhxx.tsv
+python3 reference/monster_motions.py list --game mh3u --exheader <MH3U exheader> \
+    --code <MH3U code.bin> --range 0x686000 0x69b000 --dispatcher 0x00687d30 -o build/mh3u.tsv
+python3 reference/monster_motions.py compare build/mh4u.tsv build/mhxx.tsv
+```
+
+For another monster, change `--range` to its code (or `--module`/`--crs` to its MHXX
+module); `--motion` overrides the wrapper if its class uses another one, and `--functions`
+another function table.
+
+### The plugin's check (R1p)
+
+| Check | What | Pass |
+|---|---|---|
+| R1p | force action 3/17 on the arena Rathian with `mods/force_action` | the log shows the plugin loaded and `forcing action 3/17 on monster 1`, and the forced move plays |
+
+1. Build the code library with the mod enabled and add the mod to the port's library; the
+   commands are in [the mod's README](../mods/force_action/README.md#install).
+2. In the installed mod's folder, set `action = 3/17`, `monster = 1` and `hold = 1` in
+   `config.ini` (monster 1 is Rathian; the plugin reads the id at `work+0x1c0`).
+3. Load the arena's Rathian quest (one Rathian, a fixed area) and stand in the arena.
+4. Start the quest. The log shows `plugin Force a monster action: ... ready: forcing action
+   3/17 on monster 1`, then a `monster 1: forced 3/17 over ...` line when it forces.
+5. Watch the Rathian: note the move and whether it plays to the end.
+
+Result: not yet run; the maintainer reports it here. The source games can still be forced
+with [reference/force_action.py](../reference/force_action.py) through Azahar's GDB stub; it
+is a debugging tool for later move investigations, not part of this check.
 
 ## Tracing engine calls in MHXX
 
