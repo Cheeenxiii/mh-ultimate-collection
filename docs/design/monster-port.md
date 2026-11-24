@@ -154,9 +154,41 @@ Step 1 had 68 with a counterpart; merging the module gives 91, the seeds 98, and
 **Check R1: an action id is the same move in both games.** Needs the port with a plugin that writes the two action bytes on a Rathian (MH4U: bytes 0x1ca, 0x1cb of the struct at `this+0xe28`), and MHXX in Azahar with a memory write to `this+0x6bf0` and `+0x6bf1`. For a sample of shared ids in categories 3 and 7, force the same id in both games and record whether the move matches (the same attack, roar, flinch or turn). Done when the sample's results are recorded here. Status: open, needs the action-forcing test aid of step 5.
 
 **Next, towards step 5** (preparing Rathian's port as the first one):
-1. The 61 called functions with no MH4U counterpart: for each, what it does (from its recompiled C and its callers) and the MH4U function or code that does the same, or "MH4U lacks it". Start with the 9 under paired actions and the 11 `uEnemy` ones. Confirm or drop the 33 call-site matches. Done when every one of the 61 has an entry.
+1. The 61 called functions with no MH4U counterpart (2 resolved and 28 placed in GU, see "MHGU Switch as a bridge"): for each, what it does (from its recompiled C and its callers) and the MH4U function or code that does the same, or "MH4U lacks it". Start with the 9 under paired actions and the 11 `uEnemy` ones. Confirm or drop the 33 call-site matches. Done when every one of the 61 has an entry.
 2. The source's monster data (step 3) for Rathian, MHXX's and MH3U's.
 3. The action-forcing test aid (a plugin that writes the two action bytes), then check R1.
+
+## MHGU Switch as a bridge (2026-11-24)
+
+The maintainer's MHGU Switch v1.4.0 is now extracted (fork `tools/extract_nsp.py`, with the maintainer's own keys, used for these two files only). Code and format reference only: the fidelity rule is unchanged, and shipped content from it stays English text.
+
+**Architecture: 32-bit ARM.** The NPDM says AArch32 and `main` is ARM-mode ARMv7 code (`movw`/`movt`), built by clang, position-independent. MHXX and MH4U are armcc builds, so instruction-level tokens (`fnmap.py`) don't carry over: a different compiler picks different instructions, registers and inlining. The matcher below uses no encoding.
+
+**GU links its monsters statically.** `uEm001_00` and the other monster classes are in `main` (the `roEm*.cro` names survive only as strings). `main` has 64,601 functions (recursive descent from relocated pointers, the init array, exports and `bl` targets); MHXX's static `code.bin` has 63,087.
+
+**Classes.** GU's `MtDTI` constructor is found by the init functions' calls; emulating the 2,334 init functions recovers 3,205 classes. A class's vtable is the one whose slot 5 (`getDTI`) returns its DTI: 3,193 classes, 3,181 of them with exactly one vtable. 2,949 class names are shared with MHXX's 3,109 static classes; slot counts are close (`uEnemy` 286 vs 283, `uEm001_00` 296 vs 293).
+
+**The matcher** (scratch, `game_files/work/gusw/xmap.py`; not yet a fork tool). Features per function: strings by content, MT classes referenced (DTI or vtable), constants rare on both sides, ordered callees, global variables, vtable slots. Stages, iterated: functions sharing a key found once on each side; slots of same-named classes (by position when the counts agree, else aligned on mapped slots); callees at aligned places in mapped pairs; globals at aligned places, which then become keys; mutual best by similarity, with a source-order locality term and a minimum of shared evidence. Clang folds identical tiny functions (MHXX has 38,950 vtable slot functions, GU 25,286), so several small MHXX functions may map to one GU function.
+
+| Map | Pairs | Check |
+|---|---|---|
+| MHXX static to GU | 26,406 of 63,087 (slot 14,411, similarity 6,072, key 3,023, call 2,900) | held out: 165 functions sharing 2+ unique strings, their strings and constants hidden: 161 right, 0 wrong, 4 unmapped |
+| MHXX static + `roEm001` to GU | 26,508; 97 of the module's 265 functions | |
+| MH4U v1.3.0 to GU | 4,057 of 40,577 (4,268 seeded with DE's pairs) | against DE's pairs it covers: 12 agree, 1 differs |
+| triangle with the MH4U↔MHXX map | 2,443 functions placed by all three maps | 2,328 agree (95.3%) |
+
+How near MHXX and GU are: most of what stays unmapped is code without strings, calls or callers (17,000 tiny MHXX functions) and the platform layers (3DS SDK vs NVN and the Switch SDK). Where a function has evidence, the two builds agree closely: the held-out test lost none to a wrong match.
+
+**MHGU Definitive Edition chained in.** Its dumps are byte-identical to ours (its GU `main` hash and its decompressed MH4U EUR v1.1 `code.bin` hash equal ours), so its addresses apply as they are. Its tracked notes and module C (`notes/api-map.md` tables, `[0x..]` brackets in `module/*.c`) give 85 MH4U EUR v1.1 ↔ GU pairs (59 C, 24 S, 2 W) and names for 269 GU functions. All 85 carry to USA v1.3.0 function starts through the fork's `config/shifts/eur_v110.txt`. Its `tools/match4u.py` (the full 4U↔GU pairing) was not run: it needs numpy and its own Ghidra-seeded names; our matcher follows the same evidence kinds.
+
+**The worklist through GU** (scratch `game_files/work/mport/actions/roEm001_imports_gu.tsv`):
+
+| Set | Through GU to MH4U | GU counterpart only | No GU counterpart |
+|---|---|---|---|
+| 62 called imports with no MH4U counterpart (the "61" plus one with use `unknown`) | 2 (DE C pairs: a `uFestaChar` material-dirty flag, a `uEnemy` rank-table getter) | 28 | 32 |
+| 33 call-site matches | confirmed 7 (5 by DE pairs, 2 by our MH4U↔GU map), 1 differs, 25 unchecked | | |
+
+The 28 placed in GU and not in MH4U are mostly projectile code (`uShell`, `uShellEnemy`, `uShellEmBase*`, 17) and GU-era framework slots: candidates for "MH4U lacks it". The 32 with no GU counterpart are mostly `uEnemy` and `uEnemyActCustom` functions without strings, where the next lever is Rathian's own code: pairing `roEm001` with GU's `uEm001_00` by the shared action ids, then reading the imports off aligned call sites.
 
 ## Lessons worth carrying over (from MHGU-DE's notes, 2026-11)
 
