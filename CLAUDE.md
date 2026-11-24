@@ -35,7 +35,7 @@ Project: a content mod for MH4UltimateDC (the static-recompilation PC port of Mo
 
 | Information | Goes in |
 |---|---|
-| what the project is and does now | README.md, docs/architecture.md, specs/, reference/README.md, updated in the same commit as the change |
+| what the project is and does now | README.md, docs/, specs/, reference/README.md, updated in the same commit as the change |
 | why a change was made | the commit message |
 | a structural decision, settled or open | docs/decisions.md |
 | a task, its progress, next steps | a GitHub issue |

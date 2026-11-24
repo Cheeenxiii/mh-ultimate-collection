@@ -43,9 +43,9 @@ They inform our specs and designs, credited where used. None is a source of game
 | [Yakumo](https://github.com/TeamGDB/Yakumo) | a static recompilation of Monster Hunter Portable 3rd | see repository | another MT-era recompilation to compare approaches with |
 | [umvc3-tools](https://github.com/tge-was-taken/umvc3-tools), [Gibbed.MT](https://github.com/gibbed/Gibbed.MT) | MT Framework tools for other Capcom games | see repositories | desktop MT Framework formats, close to but not the 3DS ones |
 
-## Leads from these projects
+## What these projects make possible
 
-Work these projects make possible, not yet done:
+Beyond the facts already in our specs:
 
 - **Names for the MH3U recompile.** Cha-Cha's `config/symbols.txt` and `virtuals.csv` name about 36,000 functions by class and virtual slot on the Wii U build. A class's slot *n* is the same method on 3DS, so names carry over through our own class and vtable recovery, checkable by counting how many slots line up.
 - **The `.quest_btl` format.** Cha-Cha names its loader (`rQuestBattleData::load`); its 3DS counterpart, found through the shared vtable slot, gives the layout.
