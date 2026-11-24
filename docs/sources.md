@@ -39,7 +39,7 @@ They inform our specs and designs, credited where used. None is a source of game
 | [MHTrIDA](https://github.com/sepalani/MHTrIDA) | reverse-engineering tools for Monster Hunter Tri | see repository | Tri is 3U's base: a second reference for underwater code |
 | [beeequeue/gmd](https://github.com/beeequeue/gmd) | a GMD reader and writer for MHGU (TypeScript) | MIT | a second implementation to test our GMD reader against |
 | [mhx_data_manager](https://github.com/svanheulen/mhx_data_manager), [mhxqe](https://svanheulen.github.io/mhxqe) | MHX's DLC and quest import into Extra Data; a quest-text editor | see repository | how MHX stores imported quests: a lead for MHXX's Extra Data |
-| [mhgu-decomp](https://github.com/mamotromico/mhgu-decomp) | an MHGU decompilation in progress | see repository | GU function names and structures |
+| [mhgu-decomp](https://github.com/mamotromico/mhgu-decomp) | an MHGU decompilation in its planning stage | GPL-3.0 | its function ledger uses the same addresses as our GU v1.4.0 code; it names only SDK functions so far, no game function |
 | [Yakumo](https://github.com/TeamGDB/Yakumo) | a static recompilation of Monster Hunter Portable 3rd | see repository | another MT-era recompilation to compare approaches with |
 | [umvc3-tools](https://github.com/tge-was-taken/umvc3-tools), [Gibbed.MT](https://github.com/gibbed/Gibbed.MT) | MT Framework tools for other Capcom games | see repositories | desktop MT Framework formats, close to but not the 3DS ones |
 
