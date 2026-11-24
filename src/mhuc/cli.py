@@ -388,6 +388,38 @@ def cmd_emd(args) -> int:
     return 0 if total else 1
 
 
+def cmd_monsterdata(args) -> int:
+    from . import monsterdata
+    from .formats import arc
+
+    def entries(path: str) -> list:
+        return arc.read(_read(path)).entries
+
+    def pick(ents: list, type_id: int, *words: str) -> bytes:
+        hits = [e.data for e in ents if e.type_id == type_id and all(w in e.path.replace("\\", "/") for w in words)]
+        if len(hits) != 1:
+            raise SystemExit(f"{len(hits)} entries of class {type_id:#010x} named with {words} (expected 1)")
+        return hits[0]
+
+    ents4 = entries(args.mh4u)
+    mh4u = monsterdata.from_mh4u(pick(ents4, 0x0A0E48D4, args.id + ""), pick(ents4, 0x3D8BBBAC, args.id))
+    for game, path in (("mhxx", args.mhxx), ("mh3u", args.mh3u)):
+        if not path:
+            continue
+        ents = entries(path)
+        if game == "mhxx":
+            src = monsterdata.from_mhxx(pick(ents, 0x48E8AC29, "dt_tune/"), pick(ents, 0x1AC7B52D, "/body_data/"),
+                                        pick(ents, 0x1AC7B52D, "cam_body_data/"),
+                                        pick(ents, 0x5653C1B0, "enemy/hit_data/"), pick(ents, 0x70BB64BA, "hit_data/"))
+        else:
+            src = monsterdata.from_mh3u(pick(ents, 0x4DEE8265, "em_status"), pick(ents, 0x1AC7B52D, "em_body"),
+                                        pick(ents, 0x1AC7B52D, "em_cambody"), pick(ents, 0x5653C1B0, "em_hitsize"),
+                                        pick(ents, 0x0C6016B9, "em_hitdata"))
+        print(f"{game} -> MH4U {args.id}:")
+        for name, verdict in monsterdata.compare(src, mh4u):
+            print(f"  {name}: {verdict}")
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
@@ -508,6 +540,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["check"])
     p.add_argument("paths", nargs="+")
     p.set_defaults(func=cmd_emd)
+
+    p = sub.add_parser("monsterdata", help="rebuild an MH4U monster's .etd/.emd values from MHXX's or MH3U's own "
+                                           "files and compare (counts only; specs/dttune.md, specs/emstatus.md)")
+    p.add_argument("--mh4u", required=True, help="MH4U data/em_data.arc")
+    p.add_argument("--id", required=True, help="the monster's MH4U name in em_data.arc, e.g. em001")
+    p.add_argument("--mhxx", help="the monster's MHXX archive, e.g. arc/enemy/em001_00.arc")
+    p.add_argument("--mh3u", help="the monster's MH3U archive, e.g. arc/enemy/em001.arc")
+    p.set_defaults(func=cmd_monsterdata)
 
     p = sub.add_parser("idnames", help="monster ids to names from quests and the wiki's quest pages (table "
                                        "written outside the repository)")

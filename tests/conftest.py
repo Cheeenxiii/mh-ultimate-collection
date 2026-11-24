@@ -4,6 +4,9 @@
                         RomFS holds only the 20 archives it patches, and no quest
     mh4u/extdata/       its Extra Data files, encrypted (quest1, card1, otomo1, ...)
     mh4u/save.key       the save cipher's key
+    mhxx/romfs.bin      MHXX's RomFS from the game itself (JPN v1.0): the v4.8.0 update doesn't patch the
+                        monster archives
+    mh3u/romfs.bin      MH3U USA's RomFS
 
 They are skipped when MHUC_DUMPS isn't set, so they never run in CI. They print nothing from the files.
 """

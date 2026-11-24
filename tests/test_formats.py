@@ -6,7 +6,7 @@ import zlib
 
 import pytest
 
-from mhuc.formats import classid, emd, lmt, pica
+from mhuc.formats import classid, emd, hitdata, lmt, pica
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -58,3 +58,10 @@ def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():
     struct.pack_into("<I", d, 4 * 8, 0x1F0)                  # body list, no 0xFFFF before the end
     counts = emd.check_emd(bytes(d))
     assert counts["E1 emd word 8 list doesn't end"] == 1
+
+
+def test_mhxx_attack_volume_whose_first_word_is_ffff_is_kept():
+    """MHXX's HTS counts hold no closing record (only MH3U's do): a real record starting 0xFFFF stays"""
+    record = b"\xff\xff" + bytes(46)
+    d = struct.pack("<4sIII", b"HTS\0", 0x20131015, 1, 0) + struct.pack("<II", 1, 24) + record
+    assert hitdata.groups(d) == (48, [[record]])
