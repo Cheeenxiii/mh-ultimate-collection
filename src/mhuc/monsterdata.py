@@ -1,6 +1,7 @@
 """Rebuild the parts of an MH4U monster's `.etd`/`.emd` (specs/emd.md) that a source game's own files also hold, and
 compare them with MH4U's. MHXX: specs/dttune.md, specs/dtbase.md, specs/dtbparts.md and specs/hitdata.md; MH3U:
-specs/emstatus.md and specs/hitdata.md.
+specs/emstatus.md, whose "Part record mapping" turns its part HP, second-level HP and break record into MH4U's
+10-byte part record, and specs/hitdata.md.
 
 `from_mhxx` / `from_mh3u` return {field: value in MH4U's layout}; `from_mh4u` reads the same fields from MH4U's pair;
 `compare` gives, per field, whether it is equal, and for record lists how many records are. Nothing returned or printed
@@ -207,15 +208,34 @@ def from_mhxx(tune: bytes, base: bytes, parts: bytes, body: bytes, cambody: byte
     return out
 
 
+MH4U_PART_RECORD = struct.Struct("<HBBBBHH")   # part HP, break levels, three bytes, second-level HP, kind
+# The shared break record 0x84c56c returns for every part when block 0x74 is absent (specs/emstatus.md): counter,
+# kind and second break id 0, no second-level HP.
+MH3U_DEFAULT_BREAK = bytes(4) + b"\xff\xff"
+
+
 def from_mh3u(status: bytes, body: bytes, cambody: bytes, hitsize: bytes, attack: bytes) -> dict[str, object]:
     blk = {n: status[o:o + s] for n, o, s in emstatus.blocks(status)}
     out: dict[str, object] = {"base HP": struct.unpack_from("<I", blk["header"])[0],
                               "hitzone table": blk["hitzone table"]}
-    if "part table" in blk:
-        out["part HP"] = list(struct.unpack("<8H", blk["part table"]))
+    hp = blk.get("part table")
+    if hp is not None:
+        out["part HP"] = list(struct.unpack("<8H", hp))
     records = emstatus.part_break_records(status)
-    out["break parts"] = None if records is None else [i for i, r in enumerate(records) if r[:4] != bytes(4)]
-    out["second part HP"] = emstatus.second_part_hp(status)
+    second = emstatus.second_part_hp(status)
+    parts = []
+    for i in range(8):
+        part_hp = struct.unpack_from("<H", hp, 2 * i)[0] if hp is not None else 0
+        record = MH3U_DEFAULT_BREAK if records is None else records[i]
+        # The record's bytes 0..3 are MH4U's bytes 2..5 as they are; its +4 field is MH4U's second-level HP
+        # where MH3U's own second-level HP block has no positive value (specs/emstatus.md, "Part record mapping").
+        second_hp = struct.unpack_from("<H", record, 4)[0]
+        if second is not None and second[i] > 0:
+            second_hp = second[i] & 0xFFFF
+        parts.append(MH4U_PART_RECORD.pack(part_hp, record[0], record[1], record[2], record[3], second_hp, 0))
+    out["part table"] = b"".join(parts)
+    out["_part table kind source"] = False
+    out["second part HP"] = second
     out["distance ranges"] = [blk["block 0x100"]]
     for name, word, n in (("ailment 0xa4", 17, 16), ("ailment 0xa8", 18, 12), ("ailment 0xac", 19, 12),
                           ("ailment 0xb0", 20, 12), ("ailment 0xb4", 21, 12), ("ailment 0xb8", 24, 8)):
@@ -260,6 +280,18 @@ def compare(src: dict[str, object], mh4u: dict[str, object]) -> list[tuple[str, 
                 out.append((name, "absent in the source" if value is None else "absent in MH4U"))
             else:
                 out.append((name, "same parts" if value == ref else f"source parts {value}, MH4U's {ref}"))
+        elif name == "part table" and isinstance(value, (bytes, bytearray)) and isinstance(ref, (bytes, bytearray)) \
+                and len(value) == len(ref) == 80:
+            got = [MH4U_PART_RECORD.unpack_from(value, 10 * i) for i in range(8)]
+            want = [MH4U_PART_RECORD.unpack_from(ref, 10 * i) for i in range(8)]
+            labels = ("part HP", "break levels", "+3", "+4", "+5", "second HP")
+            verdict = ", ".join(f"{sum(a[j] == b[j] for a, b in zip(got, want, strict=True))} of 8 {label}"
+                               for j, label in enumerate(labels))
+            if src.get("_part table kind source", True):
+                verdict += f", {sum(a[6] == b[6] for a, b in zip(got, want, strict=True))} of 8 kind"
+            else:
+                verdict += ", kind no 3U field"
+            out.append((name, verdict))
         elif isinstance(value, list) and (not value or isinstance(value[0], tuple)):
             ref = ref or []
             equal = sum(a == b for a, b in zip(value, ref, strict=False))

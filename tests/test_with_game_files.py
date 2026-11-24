@@ -156,3 +156,25 @@ def test_rathian_hp_parts_and_hitzones_rebuild_from_mhxx_and_mh3u(dump):
     assert struct.unpack_from("<I", emstatus.block(status, "header"))[0] == mh4u["base HP"]
     same = [i for i in range(8) if rows[10 * i:10 * i + 10] == mh4u["hitzone table"][10 * i:10 * i + 10]]
     assert same == [0, 1, 3, 4, 6, 7], same
+
+
+def test_rathian_part_record_rebuilds_from_mh3u(dump):
+    """specs/emstatus.md, "Part record mapping": MH3U's part HP and 6-byte break record rebuild MH4U's 10-byte part
+    record. On Rathian the part HPs agree on 5 parts (MH4U retuned 3), the break record's four bytes on all 8, and the
+    second-level HP on 7 (MH4U retuned the tail's); 3U has no kind field for MH4U's last u16."""
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    em_data = next(arc.read(image.read(f)).entries for f in image.files() if f.path.endswith("em_data.arc"))
+    mh4u = monsterdata.from_mh4u(_entry(em_data, 0x0A0E48D4, "em001"), _entry(em_data, 0x3D8BBBAC, "em001"))
+    u3 = dict(monster_entries(dump("mh3u", "romfs.bin")))["/arc/enemy/em001.arc"]
+    rebuilt = monsterdata.from_mh3u(_entry(u3, 0x4DEE8265, "em_status"), _entry(u3, 0x1AC7B52D, "em_body"),
+                                    _entry(u3, 0x1AC7B52D, "em_cambody"), _entry(u3, 0x5653C1B0, "em_hitsize"),
+                                    _entry(u3, 0x0C6016B9, "em_hitdata"))
+    got = [struct.unpack_from("<HBBBBHH", rebuilt["part table"], 10 * i) for i in range(8)]
+    want = [struct.unpack_from("<HBBBBHH", mh4u["part table"], 10 * i) for i in range(8)]
+    hp = sum(a[0] == b[0] for a, b in zip(got, want, strict=True))
+    assert hp == 5, f"MH3U's part HP agrees with MH4U's on {hp} of 8 parts, expected 5 (MH4U retuned 3)"
+    assert all(a[1:5] == b[1:5] for a, b in zip(got, want, strict=True)), \
+        "MH3U's break record bytes aren't MH4U's part bytes 2 to 5"
+    second = sum(a[5] == b[5] for a, b in zip(got, want, strict=True))
+    assert second == 7, f"MH3U's second-level HP agrees with MH4U's on {second} of 8 parts, expected 7"
+    assert all(a[6] == 0 for a in got), "MH3U has no kind field, so the rebuilt kind must stay 0"
