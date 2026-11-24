@@ -4,8 +4,8 @@ It reads the image in place (mhuc.romfs) and every ARC inside it, and reports on
 versions and pass/fail tallies: nothing from the files themselves, so its output can go into
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
-em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), L1 (lmt), A1
-(rEnemyCmd), S1 (rCollision).
+em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
+records against their hit volumes), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -225,6 +225,14 @@ def survey_arc(data: bytes, st: dict) -> None:
         if len(pair) == 2:
             st.setdefault("emd", Counter()).update(emd.check_pair(pair["rEnemyData"], pair["rEnemyTuneData"]))
             st["emd"]["E1 pairs"] += 1
+    hit_pairs: dict = {}
+    for e in a.entries:
+        if e.data[:4] in (hitdata.HTD[0], hitdata.HTS[0]):
+            hit_pairs.setdefault(e.path.rsplit("\\", 1)[0], {})[e.data[:4]] = e.data
+    for pair in hit_pairs.values():
+        if hitdata.HTD[0] in pair and hitdata.HTS[0] in pair:
+            st.setdefault("monster data", Counter()).update(
+                hitdata.check_htd(pair[hitdata.HTD[0]], pair[hitdata.HTS[0]]))
     q = [t for t in types if t in QUEST_TYPES]
     if q:
         qc = st.setdefault("quest", Counter())

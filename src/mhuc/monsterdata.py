@@ -140,6 +140,23 @@ def _hde_to_4u(r: bytes) -> bytes:
     return bytes(out)
 
 
+def _htd_to_4u(r: bytes) -> bytes:
+    """MH3U's 32-byte attack record in MH4U's 40-byte layout, for the fields the two share (specs/hitdata.md, HTD):
+    bytes 0x00-0x11, the attack-volume group (0x15 -> 0x19), the count at 0x16 (one more -> 0x1a), and the signed byte
+    (0x18 -> 0x1d). MH3U's other tail bytes have no MH4U counterpart and stay zero."""
+    out = bytearray(40)
+    out[:0x12] = r[:0x12]
+    out[0x19] = r[0x15]
+    out[0x1A] = r[0x16] + 1 if r[0x16] else 0
+    out[0x1D] = r[0x18]
+    return bytes(out)
+
+
+HTD_CARRIED = {"label": "bytes 0x00-0x11, 0x19-0x1a and 0x1d",
+               "ranges": ((0x00, 0x12), (0x19, 0x1B), (0x1D, 0x1E))}
+HDE_CARRIED = {"label": "bytes 0-27 and 29", "ranges": ((0, 28), (29, 30))}
+
+
 def from_mhxx(tune: bytes, base: bytes, parts: bytes, body: bytes, cambody: bytes, hitsize: bytes,
               attack: bytes) -> dict[str, object]:
     blk = {n: tune[o:o + s] for n, o, s in dttune.blocks(tune)}
@@ -183,6 +200,7 @@ def from_mhxx(tune: bytes, base: bytes, parts: bytes, body: bytes, cambody: byte
     out["break parts"] = sorted({r[0] for r in dtbparts.records(parts, "break records", 4)
                                  if r[1] != 0xFF and r[0] != 0xFF})
     out["break groups"] = None
+    out["_attack record carried"] = HDE_CARRIED
     return out
 
 
@@ -200,6 +218,8 @@ def from_mh3u(status: bytes, body: bytes, cambody: bytes, hitsize: bytes, attack
     out["body records"] = hitdata.records(body, "bdd")
     out["camera body records"] = hitdata.records(cambody, "bdd")
     out["attack volumes"] = [[r[:8] + bytes(4) + r[12:] for r in g] for g in hitdata.groups(hitsize)[1]]
+    out["attack records"] = [_htd_to_4u(r) for r in hitdata.records(attack, "htd")]
+    out["_attack record carried"] = HTD_CARRIED
     return out
 
 
@@ -212,6 +232,8 @@ def compare(src: dict[str, object], mh4u: dict[str, object]) -> list[tuple[str, 
     """(field, verdict) for every field the source rebuilt. Verdicts count records, never show them."""
     out = []
     for name, value in src.items():
+        if name.startswith("_"):
+            continue
         ref = mh4u.get(name)
         if name in ("etd word 24",) and value is not None and ref is not None:
             ref = ref[:len(value)]                  # MH3U's last ailment block is MH4U's first 8 bytes
@@ -241,9 +263,12 @@ def compare(src: dict[str, object], mh4u: dict[str, object]) -> list[tuple[str, 
         elif isinstance(value, list) and value and isinstance(value[0], (bytes, bytearray)):
             eq = sum(a == b for a, b in zip(value, ref or [], strict=False))
             verdict = f"{eq} of {len(ref or [])} records equal"
-            if name == "attack records":            # MHXX's record carries MH4U's bytes 0-27 and 29 only
-                carried = sum(a[:28] + a[29:30] == b[:28] + b[29:30] for a, b in zip(value, ref or [], strict=False))
-                verdict += f", {carried} on bytes 0-27 and 29"
+            carried = src.get("_attack record carried") if name == "attack records" else None
+            if carried:                              # the source's record carries a part of MH4U's 40 bytes
+                same = sum(b"".join(a[x:y] for x, y in carried["ranges"])
+                           == b"".join(b[x:y] for x, y in carried["ranges"])
+                           for a, b in zip(value, ref or [], strict=False))
+                verdict += f", {same} on {carried['label']}"
             out.append((name, verdict + ("" if len(value) == len(ref or []) else f" (source has {len(value)})")))
         elif isinstance(value, list):
             eq = sum(a == b for a, b in zip(value, ref or [], strict=False))
