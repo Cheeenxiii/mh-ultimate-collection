@@ -163,7 +163,7 @@ Each of the 62 called imports with no counterpart in the map, read in MHXX's cod
 | 0x005a6920 | | operator delete of `uShellEm001_sp_00`, one of Rathian's three projectile classes | MH4U lacks it: Rathian's projectiles are factory shell types |
 | 0x005a6950 | | operator delete of `uShellEm001_sp_01` | MH4U lacks it, as above |
 | 0x005a6980 | | operator delete of `uShellEm001_sp_11` | MH4U lacks it, as above |
-| 0x008cdfbc | | wrapper: calls the large `uEnemy` function 0x008a736c (a per-mode speed or distance computation) with a flag set | not found yet |
+| 0x008cdfbc | | wrapper: calls the large `uEnemy` function 0x008a736c (a per-mode speed or distance computation) with its flag set | 0x00939034, the same wrapper around MH4U's 0x00b06b4c (the flag-clear wrappers 0x008a7360 and 0x0091aae4 are aligned in paired handlers) |
 | 0x00265a9c | `uShellEnemy` | plays a sound at the shell when its owner is the local player | MH4U lacks it: each `uShellNNN` plays its own sounds |
 | 0x00265bf8 | `uShellEnemy` | sets the shell's scale and scales its two hit spheres by it and an `rShell` factor | MH4U lacks it |
 | 0x009285b0 | `uFestaChar` | registers a shell with its owner (up to 144) and checks its type against the shell-type table (58 actions) | MH4U lacks it: no shell registry or `rShell` |
@@ -187,13 +187,13 @@ Each of the 62 called imports with no counterpart in the map, read in MHXX's cod
 | 0x008d0ec8 | | among the loaded monsters, sends a message to each active one of a species in an area, optionally within a radius | 0x0093c160, the same loop over MH4U's 32 monster slots |
 | 0x008e3628 | | checks a linked monster in the same area and its distance (500 units); under action 13/1 only | MH4U lacks it: the paired MH4U handler (0x006db540) has no call at that point |
 | 0x008ae1c8 | | plays a sound at a joint (or the monster's root) for the local player | not found yet |
-| 0x008a1fc8 | `uEnemy` | forwards a request with a position to a manager | not found yet |
+| 0x008a1fc8 | `uEnemy` | forwards a request with a position to a manager's method 0x002cf3b0 | 0x002b9c38, the manager method, which MH4U calls directly (as with the confirmed pair 0x008a200c and 0x002b9cb4) |
 | 0x008a1ed8 | `uEmXXX` | calls a manager with no arguments (44 actions) | not found yet |
 | 0x008a1934 | `sHitPush` | asks the hit-push manager about a player (GU's label: player absent) | 0x006832a0, called at the same place in Rathian's paired vtable slot (MHXX 0x0201ccd4, MH4U 0x006ebfd8) |
 | 0x008a7844 | `uEnemyBase` | applies a model part group: sets each part's visibility bit in the monster's mask | 0x009428a8, the same bit updates; MH4U takes its one part list from the monster's data instead of a group argument |
 | 0x008d8768 | `uEnemy` | saves or clears the monster's status flag sets, by mode | MH4U lacks it: the paired MH4U handler (0x006d5e98) has no call at that point |
 | 0x008ddad8 | | selects an entry by index from a table of 36-byte entries in the monster's data (one of two tables, by the quest's state) and keeps its last field | 0x00947400, the same table at +0x74 of the same data block; MH4U copies the whole entry |
-| 0x008f1c1c | | reacts to a hit from one shell type by its owner, with one of three reactions | not found yet |
+| 0x008f1c1c | | reacts to a hit from one shell type: by the shell's kind, one of three reactions with strength 200 | 0x0086ff20 does the reaction part, with the same three reactions (0x00923ba4, 0x00917b60, 0x0091dc8c) in the same order; in MH4U the shell code calls it, not the monster |
 | 0x0089e698 | `uFestaEnemy` | vtable slot 76: builds a capability mask in a `uFestaEnemy` field from two of the monster's states | MH4U lacks it: the field belongs to the `uFestaEnemy` layer, and no MH4U function builds that mask |
 | 0x0089eb70 | | a rate for a part condition, from two part entries or a default, all `uFestaEnemy` fields (+0xb730 to +0xb76c) | MH4U lacks it: those fields are the `uFestaEnemy` layer's, which MH4U doesn't have |
 | 0x008bb4c0 | `uEnemy` | raises a request flag with an id in the work block | 0x00922104, the same two stores (0x00933fe4 clears them) |
@@ -206,7 +206,7 @@ Each of the 62 called imports with no counterpart in the map, read in MHXX's cod
 | 0x008ad638 | `uPlayerQuest` | a player's 16-bit field at +0x24c | not found yet |
 | 0x001e3950 | `uPlayerLobby` | sets a player speed and recomputes two ratios from it | not found yet |
 
-Of the 62: 16 have an MH4U function, 36 are things MH4U lacks (26 of them the shell framework), 10 are not found yet.
+Of the 62: 19 have an MH4U function, 36 are things MH4U lacks (26 of them the shell framework), 7 are not found yet. Those 7 go through MHXX managers or fields with no structural twin in MH4U: a quest-level getter, sound requests at a joint, a part damage state, a player's speed and a 16-bit player field, and one flag.
 
 Two ways found the matches. Translating field offsets: MHXX's work block at +0x10a8 is MH4U's at +0xe28; within it MHXX's +0x40 (position) and +0x54 (heading) are MH4U's +0x198 and +0x1ac, +0x1d0 (target points) is +0x218, +0x1a8 and +0x1ba are +0x1b4 and +0x1c8, and the +0x5900 area is about 0x2160 further on in MH4U. Aligning call sequences: the handlers of a shared action call the same engine functions in the same order, so an import sits where its MH4U counterpart, or nothing, does. The alignment also confirms two of the call-site matches above (0x008a200c with 0x002b9cb4, 0x008a2298 with 0x002bab8c).
 
