@@ -10,7 +10,8 @@ Nothing is playable yet. The repository has:
 
 - `mhuc`, a toolkit that reads, writes and converts the three games' files: archives, textures, text, quests and save data;
 - specs of those file formats;
-- the reference recompiles of MH3U and MHXX, used to study the code that monsters are ported from.
+- the reference recompiles of MH3U and MHXX, used to study the code that monsters are ported from;
+- the mod's first native plugin, `mods/force_action`, which makes a monster perform a chosen action so a ported move can be watched (check R1).
 
 How it all fits together: [docs/architecture.md](docs/architecture.md).
 

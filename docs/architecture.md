@@ -6,7 +6,7 @@ How the mod is built, what exists today, and where each part of the work stands.
 
 | Repository | Holds |
 |---|---|
-| this one | content: the `mhuc` toolkit, format specs, the reference recompiles, and later the mod's own files |
+| this one | content: the `mhuc` toolkit, format specs, the reference recompiles, and the mod's own files |
 | [MH4UltimateDC-fork](https://github.com/Cheeenxiii/MH4UltimateDC-fork), branch `uc/main` | the engine: upstream's port, plus native plugins and hooks by name |
 
 The mod reaches the engine only through the fork's plugin API. Its reference is the fork's [docs/PLUGINS.md](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/docs/PLUGINS.md). In short:
@@ -16,7 +16,11 @@ The mod reaches the engine only through the fork's plugin API. Its reference is 
 - the fork's `tools/build_game.py` builds those hooks into the recompiled game;
 - at start-up the port loads the library, which can read and write game memory and allocate from the game's heap.
 
-The mod has no `mod.json` and no plugin yet.
+The first plugin is `mods/force_action`. Its `mod.json` names `uEnemy`'s action dispatcher
+(USA v1.3.0 address `0x006e9cac`); the C library wraps that function and writes the monster's
+action category and index before the game reads them, so a chosen move plays (check R1). The
+library is built into the code library by the fork's `tools/build_game.py`, like any other
+plugin.
 
 ## From dumps to a mod
 
