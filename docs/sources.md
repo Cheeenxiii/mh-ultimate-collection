@@ -37,5 +37,22 @@ They inform our specs and designs, credited where used. None is a source of game
 | [MHGU-Modding wiki](https://github.com/RTHKKona/MHGU-Modding) | community wiki | MIT | GU id lists by name |
 | [Forge](https://github.com/Fexty12573/forge) | runtime hooking for MHGU | MIT | how a hooking layer for an MT game is shaped |
 | [MHTrIDA](https://github.com/sepalani/MHTrIDA) | reverse-engineering tools for Monster Hunter Tri | see repository | Tri is 3U's base: a second reference for underwater code |
+| [beeequeue/gmd](https://github.com/beeequeue/gmd) | a GMD reader and writer for MHGU (TypeScript) | MIT | a second implementation to test our GMD reader against |
+| [mhx_data_manager](https://github.com/svanheulen/mhx_data_manager), [mhxqe](https://svanheulen.github.io/mhxqe) | MHX's DLC and quest import into Extra Data; a quest-text editor | see repository | how MHX stores imported quests: a lead for MHXX's Extra Data |
+| [mhgu-decomp](https://github.com/mamotromico/mhgu-decomp) | an MHGU decompilation in progress | see repository | GU function names and structures |
+| [Yakumo](https://github.com/TeamGDB/Yakumo) | a static recompilation of Monster Hunter Portable 3rd | see repository | another MT-era recompilation to compare approaches with |
+| [umvc3-tools](https://github.com/tge-was-taken/umvc3-tools), [Gibbed.MT](https://github.com/gibbed/Gibbed.MT) | MT Framework tools for other Capcom games | see repositories | desktop MT Framework formats, close to but not the 3DS ones |
+
+## Leads from these projects
+
+Work these projects make possible, not yet done:
+
+- **Names for the MH3U recompile.** Cha-Cha's `config/symbols.txt` and `virtuals.csv` name about 36,000 functions by class and virtual slot on the Wii U build. A class's slot *n* is the same method on 3DS, so names carry over through our own class and vtable recovery, checkable by counting how many slots line up.
+- **The `.quest_btl` format.** Cha-Cha names its loader (`rQuestBattleData::load`); its 3DS counterpart, found through the shared vtable slot, gives the layout.
+- **Definitive Edition's readers as a second implementation.** Its MH4U readers for models, motions, collision and AI scripts can run beside `mhuc` on the same files before those specs are written. Its licence allows reuse with credit; whether to vendor its code is the maintainer's call.
+- **Definitive Edition's id allocation and mod save** (`allocations.toml`, `notes/registry.md`, `notes/mod-save-format.md`): read them before the first plugin that grows a table.
+- **MHGURecomp's runtime notes** (`docs/STATUS.md`, `docs/SWITCH_COMPARE.md`): read them before any work on a native runtime.
+- **GU behaviour, observed.** Watching a GU monster run natively in MHGURecomp can complement the MHXX reference recompile. Switch code is a reference for behaviour only, never a source of assets.
+- **Talking to Definitive Edition's maintainers:** specs of the formats both projects read would help both. The maintainer's call.
 
 Format credits are in [specs/README.md](../specs/README.md).
