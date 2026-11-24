@@ -6,8 +6,12 @@ import json
 import struct
 
 import pytest
-from mhuc import arc, cli, dlccrypt, quest
-from mhuc.blowfish import Blowfish, pi_words
+
+from mhuc import cli
+from mhuc.crypto import dlccrypt
+from mhuc.crypto.blowfish import Blowfish, pi_words
+from mhuc.formats import arc
+from mhuc.quests import quest
 
 KEY = b"synthetic test key"
 
@@ -184,7 +188,7 @@ def test_mib4_patch_and_copy_slot(tmp_path, capsys):
 
 
 def test_mib4_model_build_round_trip():
-    from mhuc import mibwrite
+    from mhuc.quests import mibwrite
     mib = build_mib4(60002)
     model = mibwrite.mib4_model(mib)
     out = mibwrite.mib4_build(model)
@@ -200,7 +204,7 @@ def test_mib4_model_build_round_trip():
 
 
 def test_mib_json_round_trip_and_edit(tmp_path, capsys):
-    from mhuc import mibwrite
+    from mhuc.quests import mibwrite
     mib = build_mib4(60003)
     obj = json.loads(json.dumps(mibwrite.model_to_json(mibwrite.mib4_model(mib))))
     assert mibwrite.model_from_json(obj) == mibwrite.mib4_model(mib)

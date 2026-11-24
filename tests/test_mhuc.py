@@ -7,7 +7,9 @@ import struct
 import zlib
 
 import pytest
-from mhuc import arc, classid, cli, gmd, pica, tex
+
+from mhuc import cli
+from mhuc.formats import arc, classid, gmd, pica, tex
 
 # ── class ids ──────────────────────────────────────────────────────────────
 

@@ -4,7 +4,8 @@ from __future__ import annotations
 import json
 import struct
 
-from mhuc import cli, mod, survey
+from mhuc import cli, survey
+from mhuc.formats import mod
 
 
 def make_mod(vertices=(3, 3), stride=12) -> bytes:

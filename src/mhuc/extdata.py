@@ -227,7 +227,8 @@ TESTKIT_PALICO = "UC Test"
 def testkit(files: dict[str, bytes], key: bytes) -> tuple[dict[str, bytes], list[str]]:
     """From an MH4U Extra Data folder's encrypted files (name -> bytes), the files for checks Q17, Q19 and E4,
     encrypted again, and the notes saying what each changed. Every other file is left out: copy only these."""
-    from . import dlccrypt, mibwrite, quest
+    from .crypto import dlccrypt
+    from .quests import mibwrite, quest
 
     out, notes = {}, []
     source = target = None

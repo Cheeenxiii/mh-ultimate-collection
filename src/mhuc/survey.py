@@ -15,9 +15,9 @@ import struct
 from collections import Counter
 from multiprocessing import Pool
 
-from . import arc, classid, emd, gmd, lmt, pica, romfs, tex
-from . import mod as modfile
-from . import quest as questfile
+from .formats import arc, classid, emd, gmd, lmt, pica, romfs, tex
+from .formats import mod as modfile
+from .quests import quest as questfile
 
 QUEST_TYPES = ("rQuestData", "rSetEmMain", "rEmSetList", "rRem")
 _IMG: romfs.Romfs | None = None
@@ -109,7 +109,7 @@ def survey_entry(type_name: str | None, data: bytes, st: dict) -> None:
         c[f"Q6 carve table {q['carve_table']}"] += 1
         c["Q6 stars 1..10" if 1 <= q["stars"] <= 10 else "Q6 stars outside 1..10"] += 1
         c["Q6 time 1..50" if 1 <= q["time_min"] <= 50 else "Q6 time outside 1..50"] += 1
-        from . import mibwrite
+        from .quests import mibwrite
         try:
             model = mibwrite.mib4_model(data)
             rebuilt = mibwrite.mib4_build(model)

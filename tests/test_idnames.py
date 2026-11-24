@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import os
 
-from mhuc import cli, idnames
+from mhuc import cli
+from mhuc.quests import idnames
 
 
 def test_infer_intersects_and_eliminates():

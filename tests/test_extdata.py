@@ -5,6 +5,7 @@ import json
 import struct
 
 import pytest
+
 from mhuc import cli, extdata
 
 
@@ -137,7 +138,7 @@ def test_put_otomo_slot_writes_hash_byte_and_tail():
 
 
 def test_cli_encrypt_round_trips(tmp_path, capsys):
-    from mhuc import dlccrypt
+    from mhuc.crypto import dlccrypt
     key, plain = tmp_path / "k", tmp_path / "p"
     key.write_bytes(b"synthetic test key")
     plain.write_bytes(bytes(range(256)) * 4)
@@ -149,8 +150,10 @@ def test_cli_encrypt_round_trips(tmp_path, capsys):
 
 
 def test_testkit_builds_q17_q19_e4(tmp_path, capsys):
-    from mhuc import dlccrypt, quest
     from test_quest_tools import build_mib4
+
+    from mhuc.crypto import dlccrypt
+    from mhuc.quests import quest
     key = b"synthetic test key"
     q = quest.mh4u_put_slot(bytes(40 * quest.SLOT + 120), 0, quest.mh4u_pack_slot(build_mib4(60001), "m60001.mib"))
     otomo = extdata.put_otomo_slot(bytes(0x21F8), 0, make_otb(), "ot001_xxx.otb")

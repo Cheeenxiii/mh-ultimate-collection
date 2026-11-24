@@ -4,7 +4,9 @@ from __future__ import annotations
 import struct
 
 import pytest
-from mhuc import lmt, survey
+
+from mhuc import survey
+from mhuc.formats import lmt
 
 
 def make_lmt() -> bytes:

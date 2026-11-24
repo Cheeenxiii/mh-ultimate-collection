@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 
 import pytest
-from mhuc import cli, convert, mibwrite, quest
 from test_quest_tools import build_mib4
+
+from mhuc import cli
+from mhuc.quests import convert, mibwrite, quest
 
 PARTS = {
     "mib": {"map": 3, "stars": 4, "time_min": 50, "fee": 300, "reward": 2700, "sub_reward": 0},

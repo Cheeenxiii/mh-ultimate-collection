@@ -4,7 +4,9 @@ from __future__ import annotations
 import struct
 
 import pytest
-from mhuc import arc, classid, cli, gmd, romfs, survey, tex
+
+from mhuc import cli, survey
+from mhuc.formats import arc, classid, gmd, romfs, tex
 
 NONE = 0xFFFFFFFF
 

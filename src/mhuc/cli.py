@@ -7,7 +7,10 @@ import os
 import struct
 import sys
 
-from . import __version__, arc, classid, dlccrypt, entropy, gmd, quest, romfs, survey, tex, xfs
+from . import __version__, entropy, survey
+from .crypto import dlccrypt
+from .formats import arc, classid, gmd, romfs, tex, xfs
+from .quests import quest
 
 
 def _read(path: str) -> bytes:
@@ -169,7 +172,7 @@ def cmd_quest(args) -> int:
 
 
 def cmd_mib(args) -> int:
-    from . import mibwrite
+    from .quests import mibwrite
     if args.action == "export":
         obj = mibwrite.model_to_json(mibwrite.mib4_model(_read(args.src)))
         with open(args.dst, "w", encoding="utf-8") as f:
@@ -230,7 +233,7 @@ def cmd_questslot(args) -> int:
         try:
             mib = quest.mib4_patch(mib, args.id, args.title)
         except quest.QuestError:  # a longer title: lay the quest out again (check Q18)
-            from . import mibwrite
+            from .quests import mibwrite
             mib = mibwrite.mib4_build(mibwrite.mib4_set_texts(mibwrite.mib4_model(mib), 0, args.title))
             mib = quest.mib4_patch(mib, args.id)
             print("the title didn't fit in place: the quest was laid out again", file=sys.stderr)
@@ -306,7 +309,7 @@ def cmd_convert(args) -> int:
         print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
               "[--tables DIR] --out OUT.json  (docs/design/quest-conversion.md)", file=sys.stderr)
         return 2
-    from . import convert
+    from .quests import convert
 
     def load(path):
         with open(path, encoding="utf-8") as f:
@@ -331,7 +334,8 @@ def cmd_convert(args) -> int:
 def cmd_idnames(args) -> int:
     import csv as _csv
 
-    from . import catalog, idnames
+    from . import catalog
+    from .quests import idnames
     out_real = os.path.realpath(args.out)
     repo = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
     if out_real == repo or out_real.startswith(repo + os.sep):
@@ -363,7 +367,7 @@ def cmd_idnames(args) -> int:
 
 
 def cmd_mod(args) -> int:
-    from . import mod as modfile
+    from .formats import mod as modfile
     out = {os.path.basename(p): modfile.info(_read(p)) for p in args.paths}
     json.dump(out, sys.stdout, indent=1)
     print()

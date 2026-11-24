@@ -5,7 +5,9 @@ import json
 import struct
 
 import pytest
-from mhuc import cli, xfs
+
+from mhuc import cli
+from mhuc.formats import xfs
 
 
 def build(e: str, classes, root) -> bytes:

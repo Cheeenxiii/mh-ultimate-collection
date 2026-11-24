@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import struct
 
-from mhuc import arc, classid, cli, emd
+from mhuc import cli
+from mhuc.formats import arc, classid, emd
 
 
 def make_emd(parts=(0, 3), rows=(0, 1)) -> bytes:
