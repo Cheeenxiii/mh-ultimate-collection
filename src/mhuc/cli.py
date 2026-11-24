@@ -307,7 +307,7 @@ def cmd_convert(args) -> int:
     need = (args.what, args.src, args.template, args.texts, args.id, args.out)
     if args.what != "quest" or None in need:
         print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
-              "[--tables DIR] --out OUT.json  (docs/design/quest-conversion.md)", file=sys.stderr)
+              "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)", file=sys.stderr)
         return 2
     from .quests import convert
 
@@ -326,7 +326,7 @@ def cmd_convert(args) -> int:
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
         f.write("\n")
-    print(f"{args.out}: {len(out['placeholders'])} placeholders to record (docs/sources/authored-register.md); "
+    print(f"{args.out}: {len(out['placeholders'])} placeholders to record (docs/sources.md#authored-register); "
           "build it with mhuc mib import")
     return 0
 
@@ -390,7 +390,7 @@ def cmd_emd(args) -> int:
 
 def cmd_pipeline(args) -> int:
     print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
-          "docs/design/ (the first session with game files fills it in).", file=sys.stderr)
+          "docs/architecture.md.", file=sys.stderr)
     return 2
 
 

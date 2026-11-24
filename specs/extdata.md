@@ -11,7 +11,7 @@ Downloaded quests (`quest1`..`quest5`) are in specs/quest.md. This page covers t
 
 The Blowfish key `SavedataCipher` uses is a NUL-terminated string in the game's own code: MHGU Definitive Edition reads it from the European v1.1 code at 0xE05E04 (`tools/extdata4u.py`), so a player can take it from their own dump rather than from mhef. Its address in USA v1.3.0 isn't known yet.
 
-Sources: the mhff wiki (svanheulen/mhff, GPL-3.0) pages "MH4U card1 Format", "MH4U Guild Quest Structure", "MH4U Equipment Structure" and "MH4U DLC Palico Format", credited in specs/README.md. Reader: `mhuc extdata dump|check card|otomo FILE` (`tools/mhuc/extdata.py`).
+Sources: the mhff wiki (svanheulen/mhff, GPL-3.0) pages "MH4U card1 Format", "MH4U Guild Quest Structure", "MH4U Equipment Structure" and "MH4U DLC Palico Format", credited in specs/README.md. Reader: `mhuc extdata dump|check card|otomo FILE` (`src/mhuc/extdata.py`).
 
 Why it matters to the mod: `otomo1` is a second place, after the quest slots, where the game takes whole DLC records from Extra Data. A mod Palico (a GU-era Palico, say) could go in this way without touching the RomFS. A guild quest is a 304-byte record that names its monsters and maps by id, so it may be a cheap way to put a new monster on a known map once ids grow.
 
@@ -60,7 +60,7 @@ No guild quest was in the maintainer's data, so every row is unverified.
 | 0x128 | u8 ×3 | initial level, current level, treasure area | unverified | mhff wiki |
 | 0x12B | u8 ×5 | per monster: frenzy bits (bit 0 normal start, bit 1 frenzy, bit 4 apex) | unverified | mhff wiki |
 
-The monster id is one byte here, so a guild quest can name ids up to 255 (docs/design/id-tables.md).
+The monster id is one byte here, so a guild quest can name ids up to 255 (reference/README.md#mh4u-monster-tables).
 
 ## otomo1 (decrypted)
 

@@ -78,4 +78,4 @@ Run on 2026-11-23 with `mhuc survey` on the maintainer's dumps (see [arc](arc.md
   - MHXX JPN: 3,251 tables, all version 0x00010302, all language 0; 3,105 in layout v2 and 146 in layout v2-32 (82 in archives, 64 loose). All decode as UTF-8. No obfuscation in any game.
   - The fan-translated MHXX keeps language 0 in its English tables, and a few of its rebuilt tables fit neither layout: the translation's tools, not the game.
 - **G2 (done): round trip.** `gmd.write(gmd.read(data)) == data` for all 3,115 MH3U tables. All 3,251 MHXX tables too, both layouts, with their label index kept.
-- **G3 (done, 2026-11-23):** `mhuc survey` on the MHXX JPN RomFS compares each v2 label entry's two stored hashes with `gmd.label_hashes` of its label. Result: 27,138 labels match, 0 differ, over all 3,251 tables (both layouts). The hash functions are verified for MHXX.
+- **G3 (done):** `mhuc survey` on the MHXX JPN RomFS compares each v2 label entry's two stored hashes with `gmd.label_hashes` of its label. Result: 27,138 labels match, 0 differ, over all 3,251 tables (both layouts). The hash functions are verified for MHXX.

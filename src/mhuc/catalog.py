@@ -2,7 +2,7 @@
 
 Two rows are the same monster or locale when they cite the same wiki page (`page_source`), which also catches
 renames (the wiki's MHGU "Dunes" is MH4U's "Old Desert"). This says which converted quests would need no
-new monster or map (docs/design/quest-conversion.md); it is not a statement that the two games' versions are
+new monster or map (docs/architecture.md#quests); it is not a statement that the two games' versions are
 the same (that is the open "monster versions" decision).
 """
 from __future__ import annotations

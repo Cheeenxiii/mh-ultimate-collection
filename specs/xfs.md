@@ -9,7 +9,7 @@ status: unknown
 
 XFS writes an object the way the class's `createProperty()` describes it, schema first: one definition per class (its DTI id and property list), then the root object. A reader needs no per-class code. In MH3U, `.supp` (`rSuppItem`, quest supply boxes), `.pop`, `.list` (`rQuestList`) and several ARC classes use it.
 
-Source: BoyClinton's Cha-Cha (`docs/formats/xfs.md`, GPL-3.0), written for MH3U on Wii U and checked there on 848 of 848 files. That build is big-endian. The 3DS RomFS's `.supp` files start with the bytes `XFS\0` (quest.md check Q1): the same magic value read as a little-endian u32, so the 3DS files are presumably the same format in little-endian. Reader: `mhuc xfs dump FILE` (`tools/mhuc/xfs.py`); it takes the byte order from the magic.
+Source: BoyClinton's Cha-Cha (`docs/formats/xfs.md`, GPL-3.0), written for MH3U on Wii U and checked there on 848 of 848 files. That build is big-endian. The 3DS RomFS's `.supp` files start with the bytes `XFS\0` (quest.md check Q1): the same magic value read as a little-endian u32, so the 3DS files are presumably the same format in little-endian. Reader: `mhuc xfs dump FILE` (`src/mhuc/xfs.py`); it takes the byte order from the magic.
 
 ## Header (0x18 bytes)
 

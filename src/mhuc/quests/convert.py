@@ -1,11 +1,11 @@
-"""Convert an MHXX (GU-era) quest into an MH4U `.mib` model (docs/design/quest-conversion.md).
+"""Convert an MHXX (GU-era) quest into an MH4U `.mib` model (docs/architecture.md#quests).
 
 Input: one quest as `mhuc quest dump mhxx` prints it (the `.mib` and its `.sem`, `.esl`, `.rem` and supply
-parts). Output: the JSON model `mhuc mib import` builds (tools/mhuc/mibwrite.py).
+parts). Output: the JSON model `mhuc mib import` builds (src/mhuc/mibwrite.py).
 
 What isn't converted comes from an MH4U template quest given by the user, and is listed in the result's
 `placeholders`, never silently: rule 2 allows authoring only where no source exists, and every placeholder is
-to be recorded in docs/sources/authored-register.md before anything ships. Every id goes through an id table
+to be recorded in docs/sources.md#authored-register before anything ships. Every id goes through an id table
 (data/idmap/mhxx-mh4u/*.csv); a quest with an id the tables don't map is refused, with every missing id listed,
 rather than guessed.
 """

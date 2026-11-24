@@ -16,9 +16,9 @@ Facts from the public [Monster Hunter Wiki](https://monsterhunterwiki.org) (mons
 | Column | Why not | Where it will come from |
 |---|---|---|
 | habitats per monster per game | the wiki has them only in prose and per-game quest pages, not as structured fields | the games' stage and quest files (rEmSetList, rSetEmMain, .mib), once read |
-| likely skeleton family | not a wiki fact; it's our inference | the reference recompiles and model comparisons (docs/design/reference-recompiles.md) |
+| likely skeleton family | not a wiki fact; it's our inference | the reference recompiles and model comparisons (reference/README.md) |
 | tier (rank, star level) | not a structured fact per monster | the games' quest data |
 | underwater areas per map | the wiki has no structured field; a text match was too unreliable to keep | the stage files (rStageAreaInfo), once read |
-| underwater movesets per weapon | the wiki has no page on underwater combat | MH3U's player command data (docs/design/underwater.md) |
+| underwater movesets per weapon | the wiki has no page on underwater combat | MH3U's player command data (docs/architecture.md#underwater) |
 
 The tables were made by a one-off script over the wiki's API (wikitext of the list pages, then each monster's and locale's infobox `Class`, `Original Game`, `Areas`, `Habitat`). `tests/test_catalog.py` checks their shape and sources.
