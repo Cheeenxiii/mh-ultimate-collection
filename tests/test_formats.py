@@ -61,6 +61,21 @@ def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():
     assert counts["E1 emd word 8 list doesn't end"] == 1
 
 
+def test_emd_attack_records_end_at_the_terminator_not_at_an_unpointed_block():
+    """specs/emd.md word 28, check E10: with word 29 clear, the list's 0xFFFF record ends it; the data after it
+    belongs to no header word and must not be read as records"""
+    d = bytearray(0x200)
+    d[:4] = b"etd\0"
+    struct.pack_into("<I", d, 4 * 28, 0x80)                   # attack records at 0x80, word 29 = 0
+    struct.pack_into("<H", d, 0x80 + 40 * 2, 0xFFFF)          # the third record is the terminator
+    struct.pack_into("<I", d, 0x80 + 40 * 3, 0x12345678)      # unpointed block after it
+    counts = emd.check_etd(bytes(d))
+    assert counts["E10 etd attack lists"] == 1
+    assert counts["E10 etd attack records"] == 2
+    assert counts["E10 etd attack record 0 all zero"] == 1
+    assert "E10 etd attack lists with no terminator" not in counts
+
+
 def test_mhxx_attack_volume_whose_first_word_is_ffff_is_kept():
     """MHXX's HTS counts hold no closing record (only MH3U's do): a real record starting 0xFFFF stays"""
     record = b"\xff\xff" + bytes(46)

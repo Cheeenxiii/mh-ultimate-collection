@@ -80,6 +80,54 @@ def _block_end(d: bytes, start: int, words: range) -> int:
     return min(nxt) if nxt else len(d)
 
 
+def attack_records(d: bytes) -> list[bytes] | None:
+    """Word 28's 40-byte records, ending at the record whose first u16 is 0xFFFF (and whose other 38 bytes are 0,
+    check E10); the terminator isn't returned. Word 29, when set, points one record past the terminator; when it is 0
+    the records are still bounded by it, so the unpointed data after it isn't read as records. None if no terminator
+    is found (inside word 29 or the next referenced offset)."""
+    p = _w(d, 28)
+    if not p:
+        return []
+    end = min(_w(d, 29) or _block_end(d, p, range(29, 35)), len(d))
+    out = []
+    while p + ATTACK <= end:
+        r = d[p:p + ATTACK]
+        if struct.unpack_from("<H", r, 0)[0] == 0xFFFF and not any(r[2:]):
+            return out
+        out.append(r)
+        p += ATTACK
+    return None
+
+
+ATTACK_ZERO = ((0x15, 0x18), (0x1E, 0x1F), (0x21, 0x22), (0x23, 0x24), (0x24, 0x28))
+ATTACK_VALUES = {0x13: (0, 0x08, 0x40), 0x14: (0, 2, 4), 0x1F: (0, 10), 0x20: (0, 1, 5, 6)}
+
+
+def check_attack_records(d: bytes) -> Counter:
+    """E10 of specs/emd.md: the attack record list's terminator and the bytes MH4U's own reader never reads."""
+    c = Counter()
+    recs = attack_records(d)
+    if recs is None:
+        c["E10 etd attack lists with no terminator"] += 1
+        return c
+    c["E10 etd attack lists"] += 1
+    c["E10 etd attack records"] += len(recs)
+    if recs and not any(recs[0]):
+        c["E10 etd attack record 0 all zero"] += 1
+    groups = (_w(d, 28) - _w(d, 27)) // 4 if _w(d, 27) < _w(d, 28) else 0
+    for r in recs:
+        for lo, hi in ATTACK_ZERO:
+            name = f"+{lo:#04x}..+{hi - 1:#04x}" if hi - lo > 1 else f"+{lo:#04x}"
+            c[f"E10 etd attack {name} zero" if not any(r[lo:hi]) else
+              f"E10 etd attack {name} NOT zero"] += 1
+        for off, values in ATTACK_VALUES.items():
+            c[f"E10 etd attack +{off:#04x} in {values}" if r[off] in values else
+              f"E10 etd attack +{off:#04x} OTHER {r[off]:#04x}"] += 1
+        c["E10 etd attack volume group below the word-27 group count" if r[0x19] < groups else
+          "E10 etd attack volume group OUTSIDE"] += 1
+    return c
+
+
 def check_etd(d: bytes) -> Counter:
     c = Counter()
     c["E1 etd magic etd\\0" if d[:4] == b"etd\0" else f"E1 etd magic other {d[:4]!r}"] += 1
@@ -114,6 +162,7 @@ def check_etd(d: bytes) -> Counter:
         else:
             c["E1 etd attack records NOT whole"] += 1
         c["E1 etd attack records"] += (end - b) // ATTACK
+    c.update(check_attack_records(d))
     return c
 
 

@@ -57,7 +57,7 @@ After the header, `count` pairs (u32 records, u32 offset), then the groups' reco
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
 | +0x00 | 28 bytes | MH4U's attack record bytes 0..27 (specs/emd.md, `.etd` word 28), except byte 18 | verified | MHGU-DE `emdata4u.attackdata`; check E5 |
-| +0x12 | u8 | bits 0-1 of MH4U's byte 18 (its higher bits, the knockback bits, are at +0x1F) | verified | MHGU-DE `emdata4u.attackdata`; check E5 |
+| +0x12 | u8 | bits 0-1 of MH4U's byte 18, its third byte at +0x12 (the higher bits, the knockback bits, are at +0x1F; specs/emd.md, "Attack record") | verified | MHGU-DE `emdata4u.attackdata`; check E5 |
 | +0x1C | u8 | a kind: 6 to 10, or 0xFE on an empty record (0xFF in 39 records); MH4U's byte 28 is mostly 0 | unknown | MHGU-DE `emdata4u.attackdata`; check E4 (histogram) |
 | +0x1D | u8 | MH4U's byte 29 | verified | check E5 |
 | +0x1E | u8 | not in MH4U's record (non-zero in 654 of 4,805) | unknown | check E4 |
@@ -106,7 +106,7 @@ Rebuilt into MH4U's layout (`mhuc monsterdata`), MHXX's records equal MH4U's on 
 | +0x16 u8 | +0x1a u16, one more | 42 | Diablos 46/46, Deviljho 66/67, Great Jaggi 8/8, Lagombi 30/30 |
 | +0x18 s8 | +0x1d s8 | 37 | Diablos 46/46, Deviljho 67/67, Great Jaggi 8/8, Lagombi 30/30 |
 
-The rest of MH3U's tail (+0x10's high u16, +0x14, +0x17, +0x19..+0x1e) has no MH4U counterpart at those offsets, and MH4U's +0x10 f32, +0x14 f32, +0x18 u8, +0x1c u8 and +0x20..+0x27 are not in MH3U's record: MH4U retuned or remade that part. The pairs are the same monster by name, not the same id: MH3U em001/MH4U em001 (Rathian), em012/em015 (Great Jaggi), em006/em100 (Diablos), em007/em042 (Deviljho) and em043/em047 (Lagombi). The games' monster-name tables give the ids, and the files' hitzones agree for all five.
+The rest of MH3U's tail (+0x10's high u16, +0x14, +0x17, +0x19..+0x1e) has no MH4U counterpart at those offsets, and MH4U's bytes +0x10..+0x17 (a u16, two bytes and a byte; specs/emd.md, "Attack record"), +0x18, +0x1c and +0x20..+0x27 are not in MH3U's record: MH4U retuned or remade that part. The pairs are the same monster by name, not the same id: MH3U em001/MH4U em001 (Rathian), em012/em015 (Great Jaggi), em006/em100 (Diablos), em007/em042 (Deviljho) and em043/em047 (Lagombi). The games' monster-name tables give the ids, and the files' hitzones agree for all five.
 
 `mhuc monsterdata` rebuilds MH4U's record from MH3U's where the table says it can: bytes 0x00-0x11 as they are, the group at +0x19, the +0x16 value one more at +0x1a, and the signed byte at +0x1d; the bytes with no counterpart stay 0. On Rathian 12 of the 55 MH4U records come back whole, and 19 on the shared bytes.
 
