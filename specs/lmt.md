@@ -36,7 +36,10 @@ A list of animations for one skeleton: per animation, tracks (one per bone and c
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u8 ×4 | buffer type, usage, joint type, bone id | unverified | MHGU-DE `lmt.py` |
+| +0x00 | u8 | buffer type | unverified | MHGU-DE `lmt.py` |
+| +0x01 | u8 | usage: 0 on a bone's rotation track, 1 on its translation track; 3 and 4 only on the 255 track, in every list read | unverified | MHGU-DE `lmt.py`; check L2 |
+| +0x02 | u8 | joint type: 0 in every track read | unverified | MHGU-DE `lmt.py`; check L2 |
+| +0x03 | u8 | bone id: the id in the model's bone table, not its index | verified | MHGU-DE `lmt.py`; check L2 |
 | +0x04 | f32 | weight | unverified | MHGU-DE `lmt.py` |
 | +0x08 | u32 | buffer size | verified | MHGU-DE `lmt.py`; check L1 |
 | +0x0C | u32 | buffer offset | verified | MHGU-DE `lmt.py`; check L1 |
@@ -58,3 +61,4 @@ A list of animations for one skeleton: per animation, tracks (one per bone and c
   - MHXX JPN: 988, all version 67, all readable: 21,154 animations, 57,010 empty slots, 677,909 tracks, the same buffer types (type 3 three times). So MHXX motions are MH4U's format: a GU monster's LMT can be read, and probably loaded, as it is.
   - MH3U USA: 387, all **version 66**; `mhuc.lmt` lays out only 67, so none were read. MH3U's motions, the underwater ones among them, need their own layout (Cha-Cha's Wii U reading is the lead, docs/sources.md) or a conversion to 67.
   - Not reached: the meaning of the fields marked unverified (frame counts, weights, reference frames) and the keyframe encodings.
+- **L2 (done, version 67):** a track's bone field is a bone id, not an index. MH4U's em001 model has 43 bones whose ids run to 202 with gaps, and its five motion lists carry ids from 60 to 145, which no 43-entry list could index. The player lists say the same: the common and per-weapon lists carry exactly the hunter body's ids (0 to 12 and 14 to 19) and never 13. MH3U's 50 player lists, read with version 67's track-table layout, carry rotation tracks on ids 1 to 21 (one list also gives id 0 a rotation track with no keyframes) and a translation track on 0, with 20 and 21 never keyframed; that part reads the tracks only, because MH3U's keyframe buffers are version 66 and aren't decoded. Procedure: `MHUC_DUMPS=… python -m pytest tests/test_with_game_files.py -k address_bones_by_id` for MH4U; the MH3U counts are a one-off read of the 50 player motion lists with the same track table.

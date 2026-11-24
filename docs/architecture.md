@@ -82,6 +82,7 @@ Underwater play comes from MH3U, which has it in full: the swim state, oxygen, t
 Known so far:
 
 - MH3U's 387 motion lists are LMT version 66. The layout we have reads version 67, so underwater motions need a version-66 layout or a converter.
+- MH3U's and MH4U's hunter skeletons are the same rig with MH3U's empty root dropped and the pelvis renumbered 13 to 0, so 3U underwater motions need their bone ids rewritten, not a positional retarget ([underwater.md](underwater.md#hunter-skeletons)).
 - MH3U's stage collision uses MH4U's format ([specs/sbc.md](../specs/sbc.md)).
 - Cha-Cha (MH3U on Wii U) marks the swim state, the underwater camera and underwater carving. Its offsets must be re-found on 3DS.
 - MH4U kept the water-surface class `uOcean` whole (same class id, parent, size and vtable, its functions paired in the MH4U↔MH3U map) and none of the underwater systems: MH3U's oxygen-gauge class and in-game camera classes are gone, and its player class survives only as a name on a rewritten layer ([underwater.md](underwater.md#what-mh4u-kept)).
