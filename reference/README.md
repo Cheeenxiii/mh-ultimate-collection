@@ -244,21 +244,21 @@ Every engine function falls into one of these:
 | How the counterpart was established | Functions | What it means |
 |---|---|---|
 | In the function map, same body | 18 | the map pairs the two functions; their instruction tokens match |
-| Found by reading, same steps | 10 | the same computation at shifted field offsets or with translated constants |
+| Found by reading, same steps | 12 | the same computation at shifted field offsets or with translated constants |
 | The same effect or shell class, from a factory | 4 | MH4U's factory builds the same class, or the paired handler calls it at the same place |
-| The same call in a paired handler (role, not body) | 36 | the two handlers of a shared action call at the same point; these are candidates to confirm one by one, as in GU's table |
-| **With a counterpart** | **68** | |
-| MH4U lacks it | 1 | the class or helper has no MH4U equivalent |
-| Not found yet | 32 | no MH4U function with these steps was found; listed for the next pass |
-| **Without** | **33** | |
+| The same call in a paired handler (role, not body) | 37 | the two handlers of a shared action call at the same point; these are candidates to confirm one by one, as in GU's table |
+| **With a counterpart** | **71** | |
+| MH4U lacks it | 9 | the class or helper has no MH4U equivalent |
+| Not found yet | 21 | no MH4U function with these steps was found; listed for the next pass |
+| **Without** | **30** | |
 
 **By MH3U class.** Each callee is labelled with the class whose vtable first introduces it, or its callers' nearest common ancestor (a heuristic, as in the table above):
 
 | MH3U class | Engine functions | Calls | With an MH4U counterpart | Without |
 |---|---|---|---|---|
-| `uEnemy` | 62 | 990 | 40 | 22 |
-| `uEm004` | 14 | 82 | 13 | 1 |
-| `cUnit` | 8 | 39 | 6 | 2 |
+| `uEnemy` | 62 | 990 | 41 | 21 |
+| `uEm004` | 14 | 82 | 14 | 0 |
+| `cUnit` | 8 | 39 | 7 | 1 |
 | `(no class)` | 2 | 2 | 1 | 1 |
 | `uCharacter` | 2 | 8 | 1 | 1 |
 | `uEm024` | 2 | 26 | 0 | 2 |
@@ -272,9 +272,9 @@ Every engine function falls into one of these:
 | `uEm040` | 1 | 15 | 1 | 0 |
 | `uEm056` | 1 | 4 | 0 | 1 |
 | `uShell` | 1 | 2 | 0 | 1 |
-| **All** | **101** | **1,207** | **68** | **33** |
+| **All** | **101** | **1,207** | **71** | **30** |
 
-### The 68 with an MH4U counterpart
+### The 71 with an MH4U counterpart
 
 Addresses are MH3U's `code.bin` and MH4U v1.3.0's. "Map" means `fnmap.py` pairs the two bodies; "call site" means the same call in the paired handler of a shared action, which is a role match and a candidate to confirm.
 
@@ -326,6 +326,7 @@ Addresses are MH3U's `code.bin` and MH4U v1.3.0's. "Map" means `fnmap.py` pairs 
 | 0x0083c6e0 | 0x00922250 | map, same body |
 | 0x0083c79c | 0x0093ba88 | call site of a paired handler |
 | 0x0083cbf4 | 0x00b05da4 | call site of a paired handler |
+| 0x0083cbfc | 0x00922c40 | call site of a paired handler |
 | 0x0083d18c | 0x00922ca0 | call site of a paired handler |
 | 0x0083d1a4 | 0x0092e4f8 | map, same body |
 | 0x0083db3c | 0x00923f90 | map, same body |
@@ -334,6 +335,7 @@ Addresses are MH3U's `code.bin` and MH4U v1.3.0's. "Map" means `fnmap.py` pairs 
 | 0x008438e8 | 0x0092dccc | call site of a paired handler |
 | 0x00844004 | 0x0092e408 | map, same body |
 | 0x008440a4 | 0x0093c938 | same steps (0.71) |
+| 0x00844100 | 0x0092e960 | same steps (0.88), offset translated |
 | 0x00844124 | 0x0092e99c | map, same body |
 | 0x00844a38 | 0x00914dc4 | call site of a paired handler |
 | 0x00844a40 | 0x0093310c | call site of a paired handler |
@@ -342,6 +344,7 @@ Addresses are MH3U's `code.bin` and MH4U v1.3.0's. "Map" means `fnmap.py` pairs 
 | 0x0084c1ac | 0x00939988 | identical |
 | 0x0084d790 | 0x0096e164 | same steps (0.91) |
 | 0x0084d7e4 | 0x00938f6c | map, same body |
+| 0x0084dc84 | 0x00935a90 | same steps (0.70) |
 | 0x0084e74c | 0x00935fb8 | call site of a paired handler |
 | 0x00850860 | 0x00917570 | map, same body |
 | 0x008509a0 | 0x0093cd70 | call site of a paired handler |
@@ -349,7 +352,7 @@ Addresses are MH3U's `code.bin` and MH4U v1.3.0's. "Map" means `fnmap.py` pairs 
 | 0x00852324 | 0x0093d870 | map, same body |
 | 0x008565d8 | 0x00947d0c | same loop |
 
-### The 33 with no MH4U counterpart
+### The 30 with no MH4U counterpart
 
 Read in MH3U's code; the last column says what MH4U does instead, or that nothing was found yet.
 
@@ -359,14 +362,14 @@ Read in MH3U's code; the last column says what MH4U does instead, or that nothin
 | 0x00161798 | `uEnemy` | forwards the object at +0x3f0 to 0x25e264 when it is set | Not found yet: no MH4U function with these steps was found. |
 | 0x00257628 | `uEnemy` | sets a byte at +0x1c8 of the object at +0x14, from r1 (-1, 0 or 1) | Not found yet: no MH4U function with these steps was found. |
 | 0x005aef18 | `uShell` | forwards a 2-float point and an index to 0x5864c4 | Not found yet: no MH4U function with these steps was found. |
-| 0x005bf66c | `uEnemy` | sets the byte at +0xd61 of the block passed in r1 | Not found yet: no MH4U function with these steps was found. |
-| 0x005bf77c | `uEnemy` | stores a 3-float point at (r1+0xc00)+0x198 and copies a point from +0xd60+0x38 to +0xda8 | Not found yet: no MH4U function with these steps was found. |
-| 0x005bf7bc | `uEnemy` | turns three floats into values through 0x5c4080 and stores them at +0xde0, +0xde4 and +0xde8 | Not found yet: no MH4U function with these steps was found. |
-| 0x005c0614 | `uEnemy` | clears +0xd61, then copies a 2-float point into +0xd60+0x38 and a scale into +0xd64+0xc | Not found yet: no MH4U function with these steps was found. |
-| 0x005c34c0 | `uEnemy` | calls 0x886ef8 with the global at 0x? and returns its result (a random number source) | Not found yet: no MH4U function with these steps was found. |
-| 0x005c3f88 | `uEm024` | builds a point from a speed, a table entry and two positions, then stores it at +0xc00+0x198 | Not found yet: no MH4U function with these steps was found. |
-| 0x005c6938 | `uEnemy` | compares a random number from 0x886ef8 with r1 scaled by a constant | Not found yet: no MH4U function with these steps was found. |
-| 0x005c7270 | `uEm024` | a projectile or trajectory setup: switches on a type (1 to 7) and builds points through 0x584e18 | Not found yet: no MH4U function with these steps was found. |
+| 0x005bf66c | `uEnemy` | sets the byte at +0xd61 of the block passed in r1 | MH4U lacks it: the paired handlers (0x006dbffc for action 13/8, 0x006dc274) call none of these aim helpers; MH4U's same actions spawn a factory shell (0x00661bc4), which takes the point in its setup block |
+| 0x005bf77c | `uEnemy` | stores a 3-float point at (r1+0xc00)+0x198 and copies a point from +0xd60+0x38 to +0xda8 | MH4U lacks it: the paired handler (0x006dc274) calls none of these aim helpers; MH4U's same action spawns a factory shell (0x00661bc4) |
+| 0x005bf7bc | `uEnemy` | turns three floats into values through 0x5c4080 and stores them at +0xde0, +0xde4 and +0xde8 | MH4U lacks it: as above, no such call in the paired handler |
+| 0x005c0614 | `uEnemy` | clears +0xd61, then copies a 2-float point into +0xd60+0x38 and a scale into +0xd64+0xc | MH4U lacks it: as above, no such call in the paired handler |
+| 0x005c34c0 | `uEnemy` | calls 0x886ef8 with a global: copies the point at global+0x18 to r0 | MH4U lacks it: no such call in the paired handler (0x006dc274) |
+| 0x005c3f88 | `uEm024` | builds a point from a speed, a table entry and two positions, then stores it at +0xc00+0x198 | MH4U lacks it: no such call in the paired handlers (0x006dbffc, 0x006dc274) |
+| 0x005c6938 | `uEnemy` | compares a point's coordinate (copied by 0x886ef8) with r1 scaled by a constant | MH4U lacks it: no such call in the paired handler (0x006dc274) |
+| 0x005c7270 | `uEm024` | a trajectory setup: switches on a type (1 to 7) and builds points through 0x584e18 | MH4U lacks it: no such call in the paired handler (0x006dc274) |
 | 0x0064325c | `uEnemy` | maps the byte at +0xed through a 0xff table and returns an address in the block | Not found yet: no MH4U function with these steps was found. |
 | 0x00829620 | `uEnemy` | a per-frame helper: reads a signed byte at +0x940 and walks the action table | Not found yet: no MH4U function with these steps was found. |
 | 0x00833234 | `uEnemy` | walks the monster list at the global manager and resets an entry per index | Not found yet: no MH4U function with these steps was found. |
@@ -374,16 +377,13 @@ Read in MH3U's code; the last column says what MH4U does instead, or that nothin
 | 0x0083771c | `uEnemy` | tests bit 2 of +0x8c and sets up a position and a timer | Not found yet: no MH4U function with these steps was found. |
 | 0x00839598 | `uEnemy` | returns the signed byte at +0xef of the monster's data block | Not found yet: no MH4U function with these steps was found. |
 | 0x0083c6cc | `uEm066` | returns the float at this+0x284 times a constant | Not found yet: no MH4U function with these steps was found. |
-| 0x0083cbfc | `uEnemy` | stores a scale at +0x824 and multiplies it by the value at +0x814 before calling 0x199480 | Not found yet: no MH4U function with these steps was found. |
 | 0x0083db24 | `uEnemy` | sets the byte at +0x259 to 1 | Not found yet: no MH4U function with these steps was found. |
 | 0x0083dc14 |  | walks the monster list and tests entries by their state at +0xd5c | Not found yet: no MH4U function with these steps was found. |
 | 0x0084161c | `uEm056` | calls 0xa07d48 and copies a point from +0x30, then stores it | Not found yet: no MH4U function with these steps was found. |
 | 0x00842a7c | `uEnemy` | a large function (710 tokens): a hit reaction or attack resolution, not read to the end | Not found yet: no MH4U function with these steps was found. |
 | 0x00843c20 | `uEnemy` | sets a scale at +0x894 and the byte at +0x923 to 1 | Not found yet: no MH4U function with these steps was found. |
-| 0x00844100 | `cUnit` | tells whether the byte at +0x941 is 2 or 3 | Not found yet: no MH4U function with these steps was found. |
 | 0x0084512c | `uEnemy` | walks the monster list, reads +0xd5c and picks an entry by a state byte | Not found yet: no MH4U function with these steps was found. |
 | 0x00847798 | `uEnemy` | forwards to 0x59070c when r2 is 0, with a global | Not found yet: no MH4U function with these steps was found. |
-| 0x0084dc84 | `uEm004` | calls 0x8412cc, then tail-calls 0x827d54 with r3 = 2 | Not found yet: no MH4U function with these steps was found. |
 | 0x0085162c | `uEnemy` | sets the float at +0x97c to 1.0 | Not found yet: no MH4U function with these steps was found. |
 | 0x00853c70 | `uEnemy` | sets the halfword at +0x89c to 2 | Not found yet: no MH4U function with these steps was found. |
 | 0x00a347bc | `uCharacter` | maps r1 (0 to 0x1c) through a 0xff table and returns the entry | Not found yet: no MH4U function with these steps was found. |
