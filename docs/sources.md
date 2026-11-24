@@ -28,7 +28,7 @@ They inform our specs and designs, credited where used. None is a source of game
 
 | Project | What it is | Licence | What it gives us |
 |---|---|---|---|
-| [MHGU Definitive Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) | MH4U monsters ported into MHGU on Switch | GPL-3.0-or-later | readers for MH4U's monster data, AI, collision, motions and sound; its id allocation and mod save are models for ours. Its dumps are byte-identical to ours, so its addresses apply |
+| [MHGU Definitive Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) | MH4U monsters ported into MHGU on Switch | GPL-3.0-or-later | readers for MH4U's monster data, AI, collision, motions and sound; its id allocation and mod save are models for ours. Its tools read MH4U **EUR v1.1**; ours read **USA v1.3.0**, the same code with small layout shifts and some functions changed between versions, so its addresses translate, they do not carry over ([the pairs](reference/README.md#mhgu-definitive-editions-pairs)) |
 | [MHGURecomp](https://github.com/morerokk/MHGURecomp) | MHGU Switch recompiled for PC | MIT | a native system layer for MT Framework, and mod layering with per-entry archive merging |
 | [Cha-Cha](https://github.com/BoyClinton/Cha-Cha) | MH3U Wii U recompiled for PC | GPL-3.0 | MH3U's DLC format, XFS, class names, underwater leads |
 | [mhff](https://github.com/svanheulen/mhff), [mhef](https://gitlab.com/svanheulen/mhef) | format notes and ciphers for the PSP and 3DS games | GPL-3.0 | quest, card, Palico and equipment layouts; save and DLC ciphers |
