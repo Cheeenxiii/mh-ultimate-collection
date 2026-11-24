@@ -28,6 +28,16 @@ Last result: pass on 2026-11-23, Linux, headless runner. The port's own pad feat
 
 Full steps: [specs/quest.md](../specs/quest.md) (Q17, Q19) and [specs/extdata.md](../specs/extdata.md) (E4). Status: open.
 
+## Extra Data in the port
+
+The checks above can run in the port instead of on a console, once this one passes.
+
+1. Run the fork's `tools/extdata_path.py` on the USA v1.3.0 exheader. It prints the game's Extra Data id and where Azahar keeps the folder.
+2. Start the game once with a fresh user folder and open the DLC menu. Pass: the folder exists and holds `quest1` to `quest5`, `otomo1`, `card1` to `card3` and `cardbox`.
+3. Copy a console's Extra Data files there and restart. Pass: the downloaded quests are listed, as on the console.
+
+Status: open.
+
 ## Local DLC server
 
 | Check | What | Pass |
