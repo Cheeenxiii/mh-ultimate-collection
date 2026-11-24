@@ -23,8 +23,13 @@ def archives(path: str):
 
 
 def test_every_mh4u_archive_repacks_byte_for_byte(dump):
-    failed = [name for name, data in archives(dump("mh4u", "romfs.bin")) if arc.write(arc.read(data)) != data]
-    assert not failed, f"{len(failed)} archives differ, first: {failed[:3]}"
+    checked, failed = 0, []
+    for name, data in archives(dump("mh4u", "romfs.bin")):
+        checked += 1
+        if arc.write(arc.read(data)) != data:
+            failed.append(name)
+    assert checked, "no .arc found"
+    assert not failed, f"{len(failed)} of {checked} archives differ, first: {failed[:3]}"
 
 
 def test_every_mh4u_quest_rebuilds_with_the_same_fields(dump):
