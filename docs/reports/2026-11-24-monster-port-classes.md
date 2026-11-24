@@ -15,7 +15,7 @@ An unattended workspace session, the first under the one-area rule (PR #8). It t
 
 ## What it changes for the plan
 
-- **A GU monster brings MHXX's enemy layer with it, or gets rewritten on MH4U's.** `roEm001` depends on about 260 static functions with no MH4U counterpart, most in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, the GU projectile classes). Step 5 either recompiles those with each module or reimplements every handler on MH4U's `uEnemy`. That choice is open (open-decisions.md, "Monster versions"). The counts are in monster-port.md to inform it.
+- **A GU monster brings MHXX's enemy layer with it, or gets rewritten on MH4U's.** `roEm001` depends on about 260 static functions with no MH4U counterpart, most in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, the GU projectile classes). Step 5 either recompiles those with each module or reimplements every handler on MH4U's `uEnemy`. The maintainer settled it the same day: monsters are ported onto MH4U's `uEnemy` (open-decisions.md, "Monster ports").
 - **The three Rathians are three codebases.** Slot alignment maps 3 of MH4U Rathian's own functions to MH3U's `uEm002` and 13 to MHXX's `uEm001_00`. A port translates the source's handlers. It can't diff against MH4U's.
 - **The function maps are now good enough to lean on** for the engine's virtual layer (the enemy classes' slots line up one for one). The rewritten non-virtual helpers are what stays unmapped.
 

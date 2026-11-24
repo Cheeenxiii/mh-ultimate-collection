@@ -17,6 +17,19 @@ The mod brings content into MH4U, on the MH4UltimateDC engine. Two other recompi
 
 What this leaves out: GU-only systems (Hunter Styles, Hunter Arts, GU's Kinsect system) are not part of the base. Whether they come in is the "Combat base" decision below.
 
+### Monster ports: onto MH4U's engine
+
+Settled by the maintainer on 2026-11-24: 3U and GU monsters are properly ported to MH4U, not run on their own game's engine.
+
+Step 1 of [monster-port.md](monster-port.md) showed that a GU monster's module depends on MHXX's enemy layer: Rathian's module imports 330 engine functions, 262 with no MH4U counterpart, mostly in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, GU's projectile classes). Two ways were weighed:
+
+| Way | What it would have given | Why not |
+|---|---|---|
+| The module recompiled and linked with that part of MHXX's engine, beside MH4U's | GU behaviour exactly, with little translation | two enemy engines in one game; MH4U's own systems (status, parts, AI sensors, multiplayer sync) wouldn't see the monster as one of theirs |
+| **Each handler reimplemented on MH4U's `uEnemy`** (chosen) | the monster is an MH4U monster, with MH4U's systems | each handler is translated by hand, from the source's recompiled C, with its frame values and call order (MHGU-DE's way, turned around) |
+
+What this means for the work: the source game's code is the reference to translate and to test against, never code that runs in the mod. MHXX module recompiles exist to give that reference as checked C.
+
 ## Open
 
 ### Combat base
@@ -32,9 +45,7 @@ These are code, not data, so they are the costliest content of the mod. Underwat
 
 A monster that appears in more than one game is listed once per game in [data/catalog/monsters.md](../../data/catalog/monsters.md). Which version the mod uses (data, moves, AI, model) is open.
 
-Facts for GU monsters (2026-11-24, [monster-port.md](monster-port.md), "Step 1 continued"): a GU monster's code lives in its CRO module and depends on MHXX's enemy layer. Rathian's module imports 330 engine functions, 262 of them with no MH4U counterpart, mostly in classes MH4U lacks (`uFestaEnemy`, `uFestaChar`, `uEnemyBase`, GU's projectile classes). How a GU monster runs is open:
-- its module recompiled together with that part of MHXX's engine, beside MH4U's;
-- its handlers reimplemented on MH4U's `uEnemy` (MHGU-DE's way, turned around).
+How a 3U or GU monster runs is settled (above, "Monster ports"); which version of a shared monster the mod uses stays open.
 
 ### Runtime
 

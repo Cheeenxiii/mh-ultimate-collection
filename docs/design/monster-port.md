@@ -11,11 +11,11 @@ MHGU-DE converts 3DS assets to Switch ones: models from MOD 0xE6 to 0xD4, textur
 | Step | What | MHGU-DE's way (4U to GU) | Ours (3U/XX to 4U) | Status here |
 |---|---|---|---|---|
 | 0. Identify | the source monster's number and files; a close MH4U "donor" (skeleton, behaviour) for templates and fallbacks; its arena | reads the 4U quests' boss ids; donor Kushala for Gogmazios | source ids from the source quests (`mhuc idnames`, Q22); donor among MH4U's monsters (catalog overlap.md) | tools ready; choices open |
-| 1. Study the source class | DTI, vtable, action dispatch, AI tables, engine calls | 4U class read statically; engine calls mapped 4U to GU through a monster both games have | the MH3U and MHXX reference recompiles (every function, docs/design/reference-recompiles.md); Cha-Cha's names for MH3U; engine calls mapped to MH4U's through a shared monster (Rathalos/Rathian are in all three); MHXX's monster code is in CRO modules, outside the recompile | Rathian's engine calls grouped by class (step 1 results below): 130 of its 197 MH4U callees are `uEnemy`'s; 63 placed in MHXX (51 confirmed by its import table), 39 in MH3U; `roEm001`'s 330 imports grouped by MHXX class, 262 with no MH4U counterpart; MH3U runs Rathian on `uEm002`; MHXX modules load (`tools/cro.py`) but aren't recompiled |
+| 1. Study the source class | DTI, vtable, action dispatch, AI tables, engine calls | 4U class read statically; engine calls mapped 4U to GU through a monster both games have | the MH3U and MHXX reference recompiles (every function, docs/design/reference-recompiles.md); Cha-Cha's names for MH3U; engine calls mapped to MH4U's through a shared monster (Rathalos/Rathian are in all three); MHXX's monster code is in CRO modules, outside the recompile | Rathian's engine calls grouped by class (step 1 results below): 130 of its 197 MH4U callees are `uEnemy`'s; 63 placed in MHXX (51 confirmed by its import table), 39 in MH3U; `roEm001`'s 330 imports grouped by MHXX class, 262 with no MH4U counterpart; MH3U runs Rathian on `uEm002`; all 109 MHXX modules recompiled and tested against the original (fork `tools/recompile_module.py`, `recomp.modtest`); Rathian's actions listed in all three games, with shared ids (fork `tools/monster_actions.py`); `roEm001`'s 330 imports classified, 61 called with no MH4U counterpart |
 | 2. Assets | models, textures, materials, animations, effects, sounds, cameras | ~10 converters (`mod4u2gu`, `tex`, `mrl_build`, `efl4u2gu`, `snd4u2gu`, `lcm4u2gu`); LMT and EMC copied as they are | MOD and TEX likely as they are (M1; T1 to T3 on MH4U, to repeat on the others); LMT and EMC: MHXX's are MH4U's versions (LMT 67, EMC 0x20120804; L1, A1), MH3U's older (LMT 66, EMC 0x20110601); collision: MH3U shares MH4U's SBC class, MHXX has another (S1); MRL, effects, sounds and cameras unexamined | specs: arc, tex, mod (partial), lmt, emd; MRL/EFL/sound none |
 | 3. Monster data | hurt and attack volumes, hitzones, parts, breaks, stats, AI sensors | 4U `.emd`/`.etd` to GU `bodydata`/`hitsize`/`attackdata`/`dtbase`/`dttune` per header word (`emdata4u.py`, `dt_convert.py`), checked by rebuilding GU's own files | the reverse mapping: MHXX's GU-style files (if MHXX 3DS uses them; to check) or MH3U's own format to MH4U `.emd`/`.etd`; check by rebuilding a shared monster's MH4U pair from its source files | MH4U side: specs/emd.md (E1 open); source sides unknown |
 | 4. Register | a new monster id, its tables, its file ids | an id allocation file and a C module that grows GU's registry tables and patches their bounds | id-tables.md's "Bounds to move" (the factory, the path index, crowns, drops, list order, icons, names) grown by a plugin; the save's 82-entry monster log is fixed-size (id-tables.md) | bounds listed; the first table-growing plugin is STATUS task 5 |
-| 5. Behaviour | one handler per source action, translated in the source's call order, with its frame values | C reimplementation of each 4U handler on GU's framework, with a test aid that forces the AI's next action | C handlers in the fork's plugin layer on MH4U's `uEnemy`, from the source recompile's functions (which the recompile already provides as C) | plugin layer exists (plugin-api.md); no monster yet |
+| 5. Behaviour | one handler per source action, translated in the source's call order, with its frame values | C reimplementation of each 4U handler on GU's framework, with a test aid that forces the AI's next action | C handlers in the fork's plugin layer on MH4U's `uEnemy` (settled 2026-11-24: ported, not run on the source engine), translated from the source recompile's functions; for GU, the module recompile gives them as C checked against the original | plugin layer exists (plugin-api.md); no monster yet |
 | 6. Quests, arena, UI | the monster's quests, its arena, its name and icon | quest builder from 4U quests; arenas as stage aliases | `mhuc convert quest` (MHXX); Extra Data or quest archives as routes (extra-data.md); a 3U arena is a stage port | quest pipeline built; stages not started |
 | 7. Content | materials, carves, rewards, gear, skills, Hunter's Notes | a data file per monster that the module patches into the loaded tables; added ids only; its own save file for added data | the same pattern fits: added records, never replaced; a separate mod save beside MH4U's (MHGU-DE keeps `mhgu_de_<slot>.bin`) | design only |
 | 8. Test loop | build, play, read the log | rebuild from the dumps, the maintainer plays, a log reader reports | the port's headless runner and Azahar; docs/checks/ procedures per step | runner exists (plugin-api.md, in-game check) |
@@ -57,11 +57,11 @@ Anchors and propagation cover core and library code well, and the enemy layer ba
 
 The 48 are the strongest result: MHXX's import table comes from the loader, so it confirms those matches without relying on similarity. The 276 imported functions with no MH4U counterpart are the MHXX engine behaviour a GU Rathian depends on and MH4U may lack. They're the list to study for step 5: shim, port, or find by other means.
 
-**Next for step 1** (items 1 to 3 done on 2026-11-24, below):
+**Next for step 1** (all done on 2026-11-24, below):
 1. ~~Vtables of the classes both games name, slot by slot, as anchors.~~
 2. ~~Group the 276 unplaced MHXX imports by class and vtable slot.~~
 3. ~~MH3U: find em001's class through the enemy factory, then isolate its code.~~
-4. Module recompiles for MHXX: load each module at a fixed base, recompile it with the static library's addresses resolved, and link at run time (fork work, needed before step 5 for any GU monster).
+4. ~~Module recompiles for MHXX.~~ Done: see "Module recompiles" below.
 
 ## Step 1 continued: classes and vtables (2026-11-24)
 
@@ -116,9 +116,47 @@ The vtables added three callees for MHXX (60 → 63) and two for MH3U (37 → 39
 | no class (library and free functions) | 62 | 17 | 45 | |
 | **All** | **330** | **68** | **262** | |
 
-So a GU monster ported as its own code needs, besides MH4U's `uEnemy`, most of MHXX's enemy layer: `uFestaEnemy`, `uFestaChar` and `uEnemyBase` are classes MH4U doesn't have, and GU's projectiles are a class family of their own. That decides step 5's shape. Either the port brings MHXX's enemy layer with each module (recompiled with it, about 260 functions for Rathian alone), or each GU handler is rewritten on MH4U's `uEnemy`, as MHGU-DE does the other way. Which one is open (open-decisions.md, "Monster versions"); the counts are here to inform it.
+So a GU monster ported as its own code needs, besides MH4U's `uEnemy`, most of MHXX's enemy layer: `uFestaEnemy`, `uFestaChar` and `uEnemyBase` are classes MH4U doesn't have, and GU's projectiles are a class family of their own. That decides step 5's shape. The maintainer settled it on 2026-11-24 (open-decisions.md, "Monster ports"): each GU handler is reimplemented on MH4U's `uEnemy`, as MHGU-DE does the other way. MHXX's enemy layer doesn't come along. The 262 imports are the GU engine calls each translated handler must express with MH4U's engine.
 
 **MH3U's Rathian is `uEm002`.** MH3U's enemy factory (`0x005bbc5c`, 86 ids; id-tables.md has the whole id-to-class table) builds ids 1, 2 and 62-65 (Rathian, Rathalos and the colour variants) with `uEm002`. `uEm002`'s slot 14 names their files by id. MH4U does the reverse, with all six on `uEm001`. `uEm002`'s own code is small: it overrides 26 slots and owns 35 functions (5,545 instructions), against MH4U `uEm001`'s 24 slots and 137 functions (22,729 instructions). Its engine calls go to 71 functions (312 calls), 50 of them `uEnemy`'s (253 calls). Only 13 of the 71 have an MH4U counterpart, and 11 of those are functions MH4U's Rathian calls too. Aligning `uEm001`'s slots with `uEm002`'s maps 3 of Rathian's own functions; aligning them with MHXX's `uEm001_00` in `roEm001` maps 13. The three Rathians are three codebases, as the token comparison already said.
+
+## Module recompiles (2026-11-24)
+
+Monsters are ported onto MH4U's engine (open-decisions.md, "Monster ports"), so a GU monster's module is the reference a port translates, handler by handler. The fork now recompiles all 109 MHXX modules at fixed bases into one library with the static code (`tools/recompile_module.py`) and tests every module function against the original in Unicorn (`recomp.modtest`). All 109 modules gametest with no differences in state, memory or exit. In the full rerun after the first run's fixes (36,669 functions, 4 random cases each), 20,718 pass, 15,770 fault the same way in both and 178 are inconclusive. The first run's 40 leftovers are down to 3, none of them a recompiler fault. One is a garbage pointer from a random state (the function passes in 64 more cases). Two are data words in `roTitle` that point into veneers, not code; the fork now drops such entries (4 in all 109 modules). `roPlayerQuest05` is an empty stub with no functions. Rathian's module alone: 454 functions (veneers counted), 289 pass and 160 fault the same way in both, with no differences.
+
+Two things came out of it for the static side. 956 static functions are called only from modules, so a recompile of `code.bin` alone never had them; they're now extra entry points. And the analyser gave different C from run to run (a set iterated in hash order); it now queues functions in address order.
+
+## Rathian's actions (2026-11-24)
+
+**One action scheme in all three games.** A monster's current action is two bytes, a category and an index. One dispatcher, a vtable slot, jumps through a table on the category. Each category switches on the index (a jump table or a compare chain) to a case block. Most case blocks tail-call the action's handler, some with constants in r1-r3. Fork `tools/monster_actions.py` walks a dispatcher down to every action (fork `config/games/README.md`, "Monster actions", has the dispatchers and struct offsets).
+
+| | MH4U `uEm001` | MH3U `uEm002` | MHXX `uEm001_00` (`roEm001`) |
+|---|---|---|---|
+| dispatcher | slot 44, 0x006e9cac | slot 47, 0x00687d30 | 0x02009704 (module at 0x02000000) |
+| categories | 14 | 14 | 18 |
+| actions | 342 | 191 | 301 |
+| distinct handlers | 97 | 66 | 83 |
+| largest categories | 7: 116, 3: 87, 10: 33, 2: 30 | 7: 95, 3: 30, 1: 15 | 3: 88, 7: 68, 10: 39, 4: 33 |
+
+**The action ids are shared.** 273 of MHXX's 301 ids exist in MH4U. Of the 197 shared actions that pass constants, 194 pass the same ones in both games. Each of the 80 MH4U handlers that a shared action reaches meets exactly one MHXX handler, including the 57 handlers that serve several actions. With MH3U, 174 ids are shared and 63 handlers pair (one meets two). That's consistency. The independent check is a function map built without the action pairs: it holds 42 of the 80 handler pairs, and all 42 agree. One pair conflicts: an MHXX static engine function that MH4U reaches through Rathian's own code. So equal ids mean the same action slot. Whether each slot is the same move in game is check R1 below.
+
+**What the handlers need from MHXX's engine.** The 80 handler pairs seed `fnmap.py` (new `--seed`), with `roEm001` merged into MHXX's static side (new `--module-side`), so propagation reaches the functions the module imports. `roEm001`'s 330 imported functions, with how Rathian's code uses them:
+
+| MH4U counterpart | Called by `roEm001`'s code | Not called (vtable slots, other data) |
+|---|---|---|
+| by code (map) | 86 | 12 |
+| at the same call site of a mapped pair (role, not body) | 33 | 2 |
+| none | **61** | 136 |
+| **All** | 180 | 150 |
+
+Step 1 had 68 with a counterpart; merging the module gives 91, the seeds 98, and call sites add 35. The 136 that are neither matched nor called are mostly `uEm001_00`'s inherited vtable slots (96), and pointers in the module's other data (39, the projectile classes' vtables among them). A port onto MH4U's `uEnemy` doesn't translate them: MH4U's base class provides its own. **The translation worklist is the 61 called functions with no counterpart:** 11 `uEnemy`, 17 projectile classes (`uShell` 9, `uShellEnemy` 3, `uShellEmBase*` 3, `uShellPlayer` 2), 19 with no class, 5 `uFestaEnemy`/`uFestaChar`, and 9 others (`uEnemyActCustom` 2, `uPlayerQuest` 2, `uEnemyBase`, `uEmXXX`, `sHitcheck`, `sHitPush`, `uPlayerLobby`). 9 of the 61 sit under an action that has an MH4U pair, so the MH4U handler shows how MH4U does the same. The other 52 are called outside the action handlers (update, setup and per-frame code). The 33 call-site matches are candidates to confirm one by one.
+
+**Check R1: an action id is the same move in both games.** Needs the port with a plugin that writes the two action bytes on a Rathian (MH4U: bytes 0x1ca, 0x1cb of the struct at `this+0xe28`), and MHXX in Azahar with a memory write to `this+0x6bf0` and `+0x6bf1`. For a sample of shared ids in categories 3 and 7, force the same id in both games and record whether the move matches (the same attack, roar, flinch or turn). Done when the sample's results are recorded here. Status: open, needs the action-forcing test aid of step 5.
+
+**Next, towards step 5** (preparing Rathian's port as the first one):
+1. The 61 called functions with no MH4U counterpart: for each, what it does (from its recompiled C and its callers) and the MH4U function or code that does the same, or "MH4U lacks it". Start with the 9 under paired actions and the 11 `uEnemy` ones. Confirm or drop the 33 call-site matches. Done when every one of the 61 has an entry.
+2. The source's monster data (step 3) for Rathian, MHXX's and MH3U's.
+3. The action-forcing test aid (a plugin that writes the two action bytes), then check R1.
 
 ## Lessons worth carrying over (from MHGU-DE's notes, 2026-11)
 
