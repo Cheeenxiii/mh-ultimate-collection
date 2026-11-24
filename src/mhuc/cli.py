@@ -388,11 +388,6 @@ def cmd_emd(args) -> int:
     return 0 if total else 1
 
 
-def cmd_pipeline(args) -> int:
-    print(f"mhuc {args.command}: not implemented yet. It needs the game files and is planned in "
-          "docs/architecture.md.", file=sys.stderr)
-    return 2
-
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
@@ -534,11 +529,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out")
     p.set_defaults(func=cmd_convert)
 
-    for name, text in (("ingest", "read a dump into a work folder (needs game files)"),
-                       ("build", "build the mod's romfs and plugins (needs game files)")):
-        p = sub.add_parser(name, help=text)
-        p.add_argument("rest", nargs=argparse.REMAINDER)
-        p.set_defaults(func=cmd_pipeline)
     return ap
 
 

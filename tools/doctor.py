@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Where the workspace stands: dumps, extractions, the venv, both repositories, Claude's files.
+"""Where the workspace stands: dumps, extractions, the venv and both repositories.
 
 The workspace is the folder holding this repository, the engine fork and game_files/:
 
@@ -8,16 +8,15 @@ The workspace is the folder holding this repository, the engine fork and game_fi
       MH4UltimateDC-fork/       the engine fork
       game_files/               the maintainer's dumps (never in git)
         work/                   extractions, the venv, scratch output
-      CLAUDE.md, .claude/       installed from tools/workspace/ (doctor --install)
+      dumps.json                which dump goes in which work folder (see tools/dumps.example.json)
 
-usage: doctor.py [--workspace DIR] [--fix] [--install] [--fetch] [--tests] [--session-start]
+usage: doctor.py [--workspace DIR] [--fix] [--fetch] [--tests] [--session-start]
 
   --fix            extract missing dumps (the fork's extract_ncch.py), create the venv, and set
                    both repos' git identity to the project's
-  --install        copy tools/workspace/ files into the workspace (CLAUDE.md, .claude/)
   --fetch          git fetch both repositories first (network)
   --tests          run both test suites (the fork's takes about a minute)
-  --session-start  short report followed by STATUS.md, for the SessionStart hook; never fails
+  --session-start  short report for a session-start hook; never fails
 
 It prints one line per check, "ok", "warn" or "FAIL". Exit status 1 if anything FAILs
 (except with --session-start). Standard library only; nothing it prints comes from the dumps.
@@ -25,10 +24,8 @@ It prints one line per check, "ok", "warn" or "FAIL". Exit status 1 if anything 
 from __future__ import annotations
 
 import argparse
-import filecmp
 import json
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -36,14 +33,6 @@ from dataclasses import dataclass
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTENT = os.path.basename(REPO)
 FORK = "MH4UltimateDC-fork"
-WORKSPACE_FILES = os.path.join(REPO, "tools", "workspace")
-# installed path in the workspace -> source under tools/workspace/
-INSTALL = {
-    "CLAUDE.md": "CLAUDE.md",
-    ".claude/settings.json": "settings.json",
-    ".claude/skills/next/SKILL.md": "skills/next/SKILL.md",
-    ".claude/skills/handoff/SKILL.md": "skills/handoff/SKILL.md",
-}
 VENV_MODULES = ("pytest", "ruff", "unicorn", "capstone", "elftools", "numpy")
 # the project's git identity: both repos set it locally so the machine's global identity never leaks
 GIT_NAME = "Cheeenxiii"
@@ -70,7 +59,7 @@ def _run(cmd: list[str], cwd: str | None = None, timeout: int = 60) -> tuple[int
 
 # ── dumps and extractions ──────────────────────────────────────────────────
 
-def load_dumps(path: str = os.path.join(WORKSPACE_FILES, "dumps.json")) -> dict:
+def load_dumps(path: str) -> dict:
     with open(path) as f:
         return json.load(f)["dumps"]
 
@@ -98,8 +87,11 @@ def check_dumps(ws: str, fix: bool) -> list[Result]:
     games = os.path.join(ws, "game_files")
     if not os.path.isdir(games):
         return [Result("warn", "dumps", "no game_files/ here: a web session, or dumps kept elsewhere")]
+    listing = os.path.join(ws, "dumps.json")
+    if not os.path.isfile(listing):
+        return [Result("warn", "dumps", "no dumps.json in the workspace (format: tools/dumps.example.json)")]
     extractor = os.path.join(ws, FORK, "tools", "extract_ncch.py")
-    for name, d in load_dumps().items():
+    for name, d in load_dumps(listing).items():
         src = os.path.join(games, d["file"])
         work = os.path.join(games, "work", name)
         kind = d.get("kind", "3ds")
@@ -107,7 +99,7 @@ def check_dumps(ws: str, fix: bool) -> list[Result]:
         if kind == "switch" and state != "ok":
             # Needs the maintainer's keys: never extracted automatically.
             out.append(Result("warn", "dumps", f"{name}: not extracted ({state}); needs the maintainer's keys, "
-                              f"see extract_nsp.py in the fork"))
+                              f"see reference/extract_nsp.py"))
             continue
         if state != "ok" and fix and os.path.isfile(src) and os.path.isfile(extractor):
             code, msg = _run([sys.executable, extractor, src, "-o", work, "--romfs"], timeout=1800)
@@ -188,26 +180,6 @@ def repo_state(path: str, fetch: bool = False) -> list[Result]:
     return out
 
 
-# ── Claude's workspace files ───────────────────────────────────────────────
-
-def check_install(ws: str, install: bool, source: str = WORKSPACE_FILES) -> list[Result]:
-    out = []
-    for dest_rel, src_rel in INSTALL.items():
-        src, dest = os.path.join(source, src_rel), os.path.join(ws, dest_rel)
-        same = os.path.isfile(dest) and filecmp.cmp(src, dest, shallow=False)
-        if not same and install:
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            shutil.copyfile(src, dest)
-            same = True
-            out.append(Result("ok", "workspace", f"installed {dest_rel}"))
-        elif not same:
-            what = "differs from" if os.path.isfile(dest) else "missing; from"
-            out.append(Result("warn", "workspace", f"{dest_rel} {what} tools/workspace/ (doctor --install)"))
-    if not out:
-        out.append(Result("ok", "workspace", "CLAUDE.md, hook and skills match tools/workspace/"))
-    return out
-
-
 def run_tests(ws: str) -> list[Result]:
     py = os.path.join(ws, "game_files", "work", "venv", "bin", "python")
     py = py if os.path.isfile(py) else sys.executable
@@ -219,8 +191,8 @@ def run_tests(ws: str) -> list[Result]:
     return out
 
 
-def doctor(ws: str, fix=False, install=False, fetch=False, tests=False) -> list[Result]:
-    results = check_install(ws, install)
+def doctor(ws: str, fix=False, fetch=False, tests=False) -> list[Result]:
+    results = []
     for repo in (CONTENT, FORK):
         results += repo_state(os.path.join(ws, repo), fetch)
         if os.path.isdir(os.path.join(ws, repo, ".git")):
@@ -236,13 +208,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--workspace", default=os.path.dirname(REPO))
     ap.add_argument("--fix", action="store_true")
-    ap.add_argument("--install", action="store_true")
     ap.add_argument("--fetch", action="store_true")
     ap.add_argument("--tests", action="store_true")
     ap.add_argument("--session-start", action="store_true")
     a = ap.parse_args(argv)
     try:
-        results = doctor(a.workspace, a.fix, a.install, a.fetch, a.tests)
+        results = doctor(a.workspace, a.fix, a.fetch, a.tests)
     except Exception as e:  # the hook must never break a session
         if not a.session_start:
             raise
@@ -252,11 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         n_ok = sum(r.level == "ok" for r in results)
         print("# Workspace doctor (tools/doctor.py)")
         print("\n".join(r.line() for r in shown))
-        print(f"({n_ok} checks ok; run `python3 {CONTENT}/tools/doctor.py` for all of them)\n")
-        status = os.path.join(REPO, "STATUS.md")
-        if os.path.isfile(status):
-            with open(status) as f:
-                print(f.read())
+        print(f"({n_ok} checks ok; run `python3 {CONTENT}/tools/doctor.py` for all of them)")
         return 0
     print("\n".join(r.line() for r in results))
     return 1 if any(r.level == "FAIL" for r in results) else 0
