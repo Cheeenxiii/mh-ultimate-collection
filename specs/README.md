@@ -48,7 +48,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [dtbase](dtbase.md) | rEnemyDtBase | MHXX map-hit spheres, joint points, part groups and the `.emd` scalars: layout from MHXX's loader, checked on all 138 files (E7); matched to MH4U's `.emd` on three monsters (E5) |
 | [dtbparts](dtbparts.md) | rEnemyDtBaseParts | MHXX break and joint records: layout from MHXX's loader, checked on all 138 files (E7); break parts and joint records matched to MH4U's `.emd` on three monsters (E5); MH4U's sever records absent |
 | [emstatus](emstatus.md) | rEnemyStatus | MH3U HP, parts, hitzones, tuning: layout from MH3U's walk, checked on all 91 files (E3); HP and hitzones matched on Rathian (E5) |
-| [hitdata](hitdata.md) | rBodyData, rHitSize, rHitDataEnemy, rHitData | MH3U and MHXX hurt volumes, attack volumes, attack records: record sizes tile every file (E4); MHXX's match MH4U's (E5) and MH3U's attack records are placed and match on the fields MH4U kept (E6) |
+| [hitdata](hitdata.md) | rBodyData, rHitSize, rHitDataEnemy, rHitData | MH3U and MHXX hurt volumes, attack volumes, attack records: record sizes tile every file (E4); MHXX's match MH4U's (E5) and MH3U's attack records are placed and match on the fields MH4U kept (E8) |
 | [emc](emc.md) | rEnemyCmd | header verified in all three games (A1); bytecode from MHGU Definitive Edition |
 | [sbc](sbc.md) | rCollision | magic and inner class verified (S1); layout from MHGU Definitive Edition |
 | [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, … | from Cha-Cha (Wii U); 3DS magic verified, the rest open (X1) |

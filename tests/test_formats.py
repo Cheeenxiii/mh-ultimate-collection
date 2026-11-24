@@ -88,7 +88,7 @@ def test_mh3u_empty_attack_record_stays_empty():
 
 
 def test_htd_volume_group_must_be_below_the_hts_group_count():
-    """check E6: an HTD record whose +0x15 indexes past the monster's HTS groups is counted, not accepted"""
+    """check E8: an HTD record whose +0x15 indexes past the monster's HTS groups is counted, not accepted"""
     close = b"\xff\xff" + bytes(38)
     hts = struct.pack("<4sIII", b"HTS\0", 0x20110212, 2, 0)
     hts += struct.pack("<II", 2, 32) + struct.pack("<II", 1, 112) + bytes(40) + close + close
@@ -96,5 +96,5 @@ def test_htd_volume_group_must_be_below_the_hts_group_count():
     inside[0x15], outside[0x15] = 1, 2
     htd = struct.pack("<4sIII", b"HTD\0", 0x20110209, 2, 0) + bytes(inside) + bytes(outside)
     counts = hitdata.check_htd(htd, hts)
-    assert counts["E6 htd volume group below the HTS group count"] == 1
-    assert counts["E6 htd volume group OUTSIDE"] == 1
+    assert counts["E8 htd volume group below the HTS group count"] == 1
+    assert counts["E8 htd volume group OUTSIDE"] == 1

@@ -4,8 +4,8 @@ It reads the image in place (mhuc.romfs) and every ARC inside it, and reports on
 versions and pass/fail tallies: nothing from the files themselves, so its output can go into
 a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (tex),
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
-em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), L1 (lmt), A1
-(rEnemyCmd), S1 (rCollision).
+em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
+records against their hit volumes), L1 (lmt), A1 (rEnemyCmd), S1 (rCollision).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).

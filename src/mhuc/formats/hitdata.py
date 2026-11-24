@@ -51,15 +51,15 @@ def records(d: bytes, kind: str) -> list[bytes]:
 
 
 def check_htd(attack: bytes, volumes: bytes) -> Counter:
-    """E6 of specs/hitdata.md: every HTD record's attack-volume group (+0x15) is a group of the monster's HTS."""
+    """E8 of specs/hitdata.md: every HTD record's attack-volume group (+0x15) is a group of the monster's HTS."""
     c: Counter = Counter()
     recs = records(attack, "htd")
     groups_n = len(groups(volumes)[1])
     inside = sum(1 for r in recs if r[0x15] < groups_n)
-    c["E6 htd volume group below the HTS group count"] += inside
-    c["E6 htd volume group OUTSIDE"] += len(recs) - inside
-    c["E6 htd records"] += len(recs)
-    c["E6 htd/hts pairs"] += 1
+    c["E8 htd volume group below the HTS group count"] += inside
+    c["E8 htd volume group OUTSIDE"] += len(recs) - inside
+    c["E8 htd records"] += len(recs)
+    c["E8 htd/hts pairs"] += 1
     return c
 
 
