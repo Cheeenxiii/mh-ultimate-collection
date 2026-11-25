@@ -29,22 +29,26 @@
 #define MHUC_FILES_CMD 0x0040u
 #define MHUC_FILES_EFL 0x0080u
 
+#define MHUC_MOTION_SLOTS 6u
+#define MHUC_MOTION_SLOT(slot) (1u << (slot))
+
 /* One ported monster: the id it takes, the MH4U monster id whose rows the reader
- * hooks answer with until the port ships this monster's own rows, the number of
- * motion-list slots it ships from slot 0, and the kinds of file it ships
- * (MHUC_FILES_* bits). */
+ * hooks answer with until the port ships this monster's own rows, the motion-list slots
+ * it ships (MHUC_MOTION_SLOT bits), and the kinds of file it ships (MHUC_FILES_* bits).
+ * A slot or kind it does not ship keeps the stand-in's path. */
 typedef struct MhucMonsterId {
     uint32_t id;
     unsigned char stand_in;
-    unsigned char motions;
+    unsigned char motion_mask;
     unsigned short files;
 } MhucMonsterId;
 
 /* The permanent ids, consecutive from 124. */
-#define MHUC_MONSTER_COUNT 2
+#define MHUC_MONSTER_COUNT 3
 static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {
-    {124, 1, 5, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
-    {125, 1, 3, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_SOUND | MHUC_FILES_CMD},
+    {124, 1, 0x1fu, /* slots 0, 1, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
+    {125, 1, 0x07u, /* slots 0, 1, 2 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_SOUND | MHUC_FILES_CMD},
+    {126, 15, 0x1du, /* slots 0, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS},
 };
 
 /* The pooled ids: each is lent one byte of 224 to 255 for a quest that names it. */
@@ -56,5 +60,7 @@ static const MhucMonsterId mhuc_pooled_monster_ids[1] = {{0, 0, 0, 0}};
 #define MHUC_MONSTER_ID_RATHIAN_GU 124
 /* Rathian, mh3u em001 */
 #define MHUC_MONSTER_ID_RATHIAN_3U 125
+/* Giadrome, mhxx em034 */
+#define MHUC_MONSTER_ID_GIADROME_GU 126
 
 #endif
