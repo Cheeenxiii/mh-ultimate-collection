@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import struct
 from collections import Counter
 
@@ -17,10 +18,12 @@ from mhuc.formats import (
     dtbase,
     dtbparts,
     dttune,
+    efl,
     emd,
     emstatus,
     hitdata,
     lmt,
+    mef,
     mod,
     romfs,
     sound,
@@ -720,3 +723,106 @@ def test_mh4u_ships_no_texlayout_and_its_xfs_files_read(dump):
             failures.append(f"{label}: {x.endian}-endian")
     assert not failures, f"{len(failures)} XFS files not read, first: {failures[:3]}"
     assert counts == Counter({classid.class_id("rSoundAttributeSe"): 8}), counts
+
+
+# The monster archives of each game. A port's effects live in its monster's archive, so these,
+# not the whole RomFS, are where the effect specs are checked.
+MONSTER_ARCHIVES = {
+    "mh4u": re.compile(r"/data/em\d{3}\.arc$"),
+    "mh3u": re.compile(r"/arc/enemy/em\d{3}\.arc$"),
+    "mhxx": re.compile(r"/arc/enemy/ems?\d{3}_\d{2}\.arc$"),
+}
+
+
+def _effect_entries(dump, game: str, classes: tuple[str, ...]):
+    """Every entry of the named resource classes in `game`'s monster archives."""
+    ids = {classid.class_id(name): name for name in classes}
+    image = romfs.open_image(dump(game, "romfs.bin"))
+    wanted = MONSTER_ARCHIVES[game]
+    for f in image.files():
+        if not wanted.search(f.path):
+            continue
+        for e in arc.read(image.read(f)).entries:
+            if e.type_id in ids:
+                yield ids[e.type_id], f"{f.path}:{e.path}", e.data
+
+
+def test_every_mh4u_motion_effect_record_is_laid_out(dump):
+    """check FX1: MH4U's MEF header and 0x48-byte records tile every file, and the fields the spec
+    calls fixed are fixed."""
+    entries, records, paths, failures = 0, 0, set(), []
+    for _name, label, data in _effect_entries(dump, "mh4u", ("rMhMotionEffect",)):
+        entries += 1
+        paths.add(label.split(":", 1)[1])
+        try:
+            parsed = mef.read_mef(data)
+        except mef.MefError as e:
+            failures.append(f"{label}: {e}")
+            continue
+        records += len(parsed)
+        for i, record in enumerate(parsed.records):
+            zero = (record.u8(0x07), record.u8(0x09), record.u8(0x0F),
+                    record.u32(0x24), record.u32(0x34), record.u32(0x44))
+            if any(zero):
+                failures.append(f"{label} record {i}: {zero} aren't the zeros the spec has")
+            if not all(math.isfinite(record.f32(o)) for o in (0x38, 0x3C, 0x40)):
+                failures.append(f"{label} record {i}: the three +0x38 floats aren't finite")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (entries, records, len(paths)) == (150, 6216, 96)
+
+
+def test_every_mh3u_effect_sequence_header_is_laid_out(dump):
+    """check FX2: MH3U's ESQ header holds six non-decreasing section offsets inside every file."""
+    entries, failures = 0, []
+    for _name, label, data in _effect_entries(dump, "mh3u", ("rEffectSequence",)):
+        entries += 1
+        try:
+            mef.read_esq(data)
+        except mef.MefError as e:
+            failures.append(f"{label}: {e}")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert entries == 44
+
+
+def test_every_mhxx_motion_effect_and_proof_effect_list_is_laid_out(dump):
+    """check FX2 and EF2: MHXX's PSL slot tables and descriptors, and its PEL magic and version."""
+    motion, slots, proofs, failures = 0, 0, 0, []
+    for name, label, data in _effect_entries(dump, "mhxx", ("rProofEffectMotSequenceList", "rProofEffectList")):
+        if name == "rProofEffectList":
+            proofs += 1
+            try:
+                efl.read_pel(data)
+            except efl.EflError as e:
+                failures.append(f"{label}: {e}")
+            continue
+        motion += 1
+        try:
+            slots += len(mef.read_psl(data).slots)
+        except mef.MefError as e:
+            failures.append(f"{label}: {e}")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (motion, slots, proofs) == (507, 18831, 280)
+
+
+def test_every_effect_list_header_is_laid_out(dump):
+    """check EF1: every EFL in the three games' monster archives fills its block-size field and
+    carries its game's version; the 60.0 at +0x0C is in all but one MH3U file."""
+    expected = {"mh4u": (1937, 1937, 1937), "mh3u": (1496, 1495, 1478), "mhxx": (4042, 4042, 4042)}
+    for game, (files, sixty, tail_zero) in expected.items():
+        entries, sixties, tails, failures = 0, 0, 0, []
+        for _name, label, data in _effect_entries(dump, game, ("rEffectList",)):
+            entries += 1
+            try:
+                parsed = efl.read_efl(data)
+            except efl.EflError as e:
+                failures.append(f"{label}: {e}")
+                continue
+            if parsed.block_size % 16:
+                failures.append(f"{label}: block size {parsed.block_size:#x} isn't a multiple of 16")
+            if data[0x18:0x1C] != bytes(4) or data[0x1C:0x20] != bytes(4):
+                failures.append(f"{label}: +0x18 or +0x1C isn't 0")
+            tails += data[0x20:0x2C] == bytes(0xC)
+            sixties += parsed.field_0c == 60.0
+        assert not failures, f"{game}: {len(failures)} problems, first: {failures[:3]}"
+        assert (entries, sixties, tails) == (files, sixty, tail_zero), \
+            f"{game}: {entries} files, {sixties} with 60.0, {tails} with a zero 0x20 to 0x2C"

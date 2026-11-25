@@ -18,7 +18,8 @@ def class_id(name: str) -> int:
 # convention (mhff's table), not something the archive stores; the archive stores the id.
 EXTENSIONS: dict[str, str] = {
     "rArchive": "arc", "rCameraList": "lcm", "rChainCol": "ccl", "rCnsTinyChain": "ctc",
-    "rCollision": "sbc", "rEffectAnim": "ean", "rEffectList": "efl", "rEnemyCmd": "emc",
+    "rCollision": "sbc", "rEffectAnim": "ean", "rEffectList": "efl", "rEffectSequence": "esq",
+    "rEnemyCmd": "emc",
     "rEnemyData": "emd", "rEnemyDtBase": "dtbase", "rEnemyDtBaseParts": "dtbparts", "rEnemyTuneData": "etd",
     "rEventActorTbl": "evt", "rGrass2": "gr2",
     "rGrass2Setting": "gr2s", "rGrassWind": "grw", "rItemPopList": "ipl", "rItemPopSet": "ips",
@@ -27,6 +28,7 @@ EXTENSIONS: dict[str, str] = {
     "rLtSoundCategoryFilter": "cfl", "rLtSoundRequest": "srq", "rLtSoundReverb": "rev_ctr",
     "rLtSoundSourceADPCM": "mca", "rLtSoundStreamRequest": "stq", "rMHSoundEmitter": "ses",
     "rMHSoundSequence": "mss", "rMaterial": "mrl", "rMhMotionEffect": "mef", "rModel": "mod",
+    "rProofEffectList": "pel", "rProofEffectMotSequenceList": "psl",
     "rMotionList": "lmt", "rMovieOnDisk": "moflex", "rQuestData": "mib", "rScheduler": "sdl",
     "rSoundAttributeSe": "ase", "rSoundCurveSet": "scs", "rSoundDirectionalSet": "sds",
     "rStageAreaInfo": "sai", "rStageCameraData": "scd", "rStageInfoSet": "sis",
