@@ -63,6 +63,20 @@ Size = bone count × 0x98 + 0x100 + (u32 at 0x24) × 0x1C in every skinned model
 | then | s32 × 8 | bone, group, material-name, mesh, vertex, vertex2, face, unknown offsets | unverified | Silvris MH3U MOD.bt |
 | then | floats | bounding sphere and box (versions under 190) | unverified | Silvris MH3U MOD.bt |
 
+## Material table
+
+At 0x30, `material count` (header 0x0A) entries of 0x80 bytes each: a NUL-terminated material
+name, zero-padded to the entry. The names are the binding to the model's material file: the engine
+copies the table into the `rModel` (0x00680d14) and, for each name, asks the `rMaterial` at the
+model's own path for the material whose record is keyed by the name's CRC-32 with no final
+inversion ([mrl.md](mrl.md); `rModel::createMaterials` 0x00681650, `rMaterial::findMaterial`
+0x00be6e88). A name the material file has no record for gets the engine's default material, so a
+converted model must keep the names and records that came from the same source (check M6).
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[0x80] | material name, NUL-terminated and zero-padded | verified | ours (0x00681650 and 0x00be6e88); check M6 |
+
 ## Mesh entry (MH4U, MH3U and MHXX, 48 bytes)
 
 Field names from mhff and MHGU Definitive Edition's `mod.py` (after RevilLib). "M3" fields held on every `rModel` of the three games (34,370 models; procedure under Checks). The vertex stream relation is an upper bound (the stream fits the buffer), not an exact layout.
@@ -96,3 +110,10 @@ Field names from mhff and MHGU Definitive Edition's `mod.py` (after RevilLib). "
 - **M3 (done):** `mhuc survey` on each RomFS. Every `rModel` is readable and passes every relation: MH4U 10,472, MH3U 6,237, MHXX JPN 17,661. The first run counted a "group index over the count" in 4,267, 1,846 and 4,577 models; in every one of them, and in every other model, each mesh's group value is one of the ids at the start of the group entries, so the field is an id and the check now tests that. Strides seen: 24, 28, 32, 36, 40, 44 (28 and 36 the most common in MH4U and MH3U, 24 and 28 in MHXX). Procedure: `mhuc survey <romfs.bin>`; section `mod`, every count equal to the model count.
 - **M4 (done, static):** the hunter skeletons. Reads the body, arm, leg, waist and helm models of both genders at armour ids 1, 2, 3, 10, 20, 50, 100, 150, 200 and 212. Every MH4U bone has the parent of an MH3U bone in every set checked, and the bind pose (parent distance and local position) at armour id 1: MH4U id 0 is MH3U id 13, the pelvis, and every other id is itself; MH3U id 0 is an empty root that MH4U dropped, so the torso and the two leg chains hang off the pelvis. The arm, helm, face and hair ids are the same in both games; leg and waist renumber the root 13 → 0; some helmets add ids 20 and 21 in both games. The mirror field is an index that pairs both ways (714 values), the pad byte is 0 (1,399 bones), and the block-size formula holds. No bone names are stored: the block is exactly the formula and the file ends at the index buffer. Some MH4U armour sets were remodelled, so their rest positions differ; the ids and parents don't. Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k "hunter_skeleton or address_bones_by_id"` (the bones come from `mod.bones()`).
 - **M5 (done, static):** the Sword and Shield weapon rigs. Reads every `rModel` of MH3U's `/arc/weapon/mod/w01/w01_*.arc` (54 arcs, 54 swords and 54 shields) and MH4U's `/data/pl_one*.arc` (128 arcs, 256 models). A sword is id 0 root with child 1 (39 MH3U, 99 MH4U) or id 0 alone (15, 29); a shield is id 0 alone (33, 100), id 0 with child 1 (20, 22), or two id-0/child-1 skeletons in one bone block (1, 6). No model in either game has a bone id above 1, and every rig exists in both games with the same ids and parents. MH4U's own weapon motion list `weapon/one/mot/wg01.lmt` (in `/data/pl_w01.arc`, version 67) has 19 animations in 25 slots and addresses ids 0, 1, 2 and 255; id 2 is not an SnS model bone in either game, and what it drives is unverified. MH3U ships no weapon-rig motion list: the 15 arcs under `/arc/player/mot/` hold its 50 player motion lists, its 574 `/arc/weapon/` arcs hold none, and its code has no weapon-motion path. A converted 3U SnS model therefore plays MH4U's weapon motion unchanged, and 3U has no weapon motion of its own to rewrite ([underwater.md](../docs/underwater.md#weapon-rigs)). Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k sns_weapon_rig`.
+- **M6 (done, static):** the model-to-material binding. Every `rModel` in a monster archive has an
+  `rMaterial` at its own path. A model's material table holds 0x80-byte names, and the material's
+  0x3c-byte records are keyed by each name's CRC-32 with no final inversion; the engine's lookup
+  hashes the model's name and scans the records by that key ([mrl.md](mrl.md), checks MR2 and
+  MR4). Checked on every model/material pair of every monster archive of MH4U and MH3U (270 and
+  409 pairs in 123 and 85 archives), with no unbound name (counts under check MR4). Procedure:
+  `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k every_material_a_monster`.

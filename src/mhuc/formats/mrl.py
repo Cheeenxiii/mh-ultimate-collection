@@ -28,6 +28,7 @@ header and the name hash are needed to make a source material load and bind in M
 from __future__ import annotations
 
 import struct
+import zlib
 from collections import Counter
 
 MAGIC = b"MRL\0"
@@ -72,11 +73,32 @@ def read(data: bytes) -> dict:
             "signature": signature, "references_at": references_at, "records_at": records_at}
 
 
+def material_key(name: bytes | str) -> int:
+    """The key a material record is filed under: the CRC-32 of its name with no final inversion,
+    which is `crc32_string(~0, name)` in the engine (specs/mrl.md, MR2)."""
+    if isinstance(name, str):
+        name = name.encode("ascii")
+    return (~zlib.crc32(name)) & 0xFFFFFFFF
+
+
 def material_hashes(data: bytes) -> list[int]:
     """The name hashes of the material records, in the file's order."""
     h = read(data)
     return [struct.unpack_from("<I", data, h["records_at"] + 4 + MATERIAL_RECORD * i)[0]
             for i in range(h["materials"])]
+
+
+def find_material(data: bytes, name: bytes | str) -> int | None:
+    """The index of the record whose key is `name`'s, or None when the file has no such record."""
+    key = material_key(name)
+    hashes = material_hashes(data)
+    return hashes.index(key) if key in hashes else None
+
+
+def unbound(data: bytes, names: list[bytes]) -> list[bytes]:
+    """The names `data` has no material record for."""
+    hashes = set(material_hashes(data))
+    return [name for name in names if material_key(name) not in hashes]
 
 
 def for_mh4u(data: bytes) -> bytes:

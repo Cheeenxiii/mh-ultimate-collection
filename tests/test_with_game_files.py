@@ -12,7 +12,7 @@ from collections import Counter
 import check_ids
 import pytest
 
-from mhuc import cli, monsterdata, monstersound, monstertext
+from mhuc import cli, monsterassets, monsterdata, monstersound, monstertext
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
 from mhuc.formats import (
@@ -1413,6 +1413,29 @@ def test_the_three_games_material_signature_is_their_own_and_names_hash_to_their
                     assert (~zlib.crc32(name)) & 0xFFFFFFFF in hashes, (game, model_path, name)
             pairs += 1
     assert pairs >= 3
+def test_every_material_a_monster_model_names_is_keyed_in_its_material_file(dump):
+    """specs/mrl.md check MR4: a model's material table holds 0x80-byte names (mod.md, check M6) and the
+    material at the same path holds one 0x3c-byte record per name, keyed by the name's CRC-32 with no final
+    inversion. Every model/material pair sharing a path in every monster archive of MH4U and MH3U is checked."""
+    checked = 0
+    for game, pattern in (("mh4u", r"/data/em\d+\.arc"), ("mh3u", r"/arc/enemy/em\d+\.arc")):
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        for entry in image.files():
+            if not re.fullmatch(pattern, entry.path):
+                continue
+            entries = arc.read(image.read(entry)).entries
+            models = {e.path: e for e in entries if e.type_name == "rModel"}
+            materials = {e.path: e for e in entries if e.type_name == "rMaterial"}
+            for name, model in models.items():
+                material = materials.get(name)
+                if material is None:
+                    continue
+                keys = set(mrl.material_hashes(material.data))
+                for material_name in monsterassets.material_names(model.data):
+                    assert mrl.material_key(material_name) in keys, (entry.path, name, material_name)
+                checked += 1
+    assert checked > 100, f"only {checked} model/material pairs found"
+
 
 def test_every_mh3u_motion_list_converts_to_version_67(dump):
     """specs/lmt.md check L6: `mhuc.formats.lmt.convert` rebuilds every MH3U motion list as version 67, keeping
