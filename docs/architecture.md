@@ -62,7 +62,7 @@ What makes this tractable:
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.
 
-Before porting a monster, MH4U's id-indexed tables have to grow. Two ways are open: relocate a table into plugin memory and patch its readers, or hook the readers and answer new ids. Ids only ever grow, because saves and quests keep them. How ids are handed out, and where the mod keeps what MH4U's save doesn't hold, is open ([decisions.md](decisions.md#id-allocation-and-mod-saves)).
+Before porting a monster, MH4U's id-indexed tables have to grow. They grow by hooks on their readers, which answer the new ids; a table is relocated only where a case needs it. Ids come from one registry file, start at 124 and only ever grow, because saves and quests keep them; the mod's data may go in MH4U's save, which a converter will clean back to MH4U's own ([decisions.md](decisions.md#0003-id-allocation-and-mod-saves)).
 
 ## Quests
 

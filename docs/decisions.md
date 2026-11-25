@@ -23,47 +23,28 @@ Settled by the maintainer on 2026-11-24.
 
 A GU monster's code depends on MHXX's enemy layer, most of which MH4U lacks. Linking that layer beside MH4U's would put two enemy engines in one game, and MH4U's status, parts, AI sensors and multiplayer sync would not see the monster. So each handler is reimplemented on MH4U's `uEnemy`, from the source's recompiled code, keeping its frame values and call order. MHGU Definitive Edition does the same in the other direction.
 
-## Open
+### 0003. Id allocation and mod saves
 
-| Decision | The question | Options |
-|---|---|---|
-| Combat base | which GU combat systems come in | MH4U's only; some as switches; GU's on GU content only |
-| Monster versions | which version of a monster that several games have | MH4U's where it exists; the newest; a pick per monster |
-| Id allocation and mod saves | which ids ported content takes, and where the mod keeps what MH4U's save can't | Definitive Edition's registry and own save file; a range per mod; a name hash; a stand-in; a store in MH4U's save; an Extra Data record; no mod save |
-| Runtime | stay on Azahar's core or go native | Azahar core; the fork's `native` branch; wait for upstream |
-| Progression | how players reach 3U and GU content | hubs per game; one shared hub; quest categories per game; merged key quests; hubs later |
-| Shared systems | skills, meals, Kinsect, Palicos, points, rank unlocks | 4U's everywhere; each content's own; a pick per system |
-| Map versions | 3U's or GU's version of a shared locale, and whose lighting | 3U's (keeps water); GU's; both as separate maps |
-| Music versions | which game's arrangement of a shared theme | first game's; the content's own game's; MH4U's |
-| GU Switch assets | whether HD Switch assets may come in | no; an optional pack from the player's Switch dump; change the source rule |
+Settled by the maintainer on 2026-11-25.
 
-Each one in detail below. Facts and options only: none of them is chosen.
+- **Ids: one registry file.** Every id a ported content takes is recorded in one file in this repository, checked by a tool, and the run time gets its ids from it (a generated header or table). Monsters first; the format leaves room for the other game-wide ids. New monster ids start at 124, after MH4U's 0 to 123, and a shipped id never moves.
+- **Tables grow by hooks on their readers** (the overlay below): a hook answers the new ids and falls through to the game's function for the old ones. A table is relocated only where a case needs it. Besides the costs below, the game is statically recompiled, so a table's address may be folded into the native code, and relocating would then take a patch at recompile time (unverified).
+- **MH4U's save may hold the mod's data.** The base save need not stay vanilla, on one condition: a converter, still to be written, removes everything that isn't MH4U's (other games' weapons, armour, monsters and records) and gives back a clean MH4U save. A player runs it before removing the mod, because an unmodded game that meets a ported id may crash.
 
-### Combat base
+Still open: where in MH4U's save the mod's data goes and in what format (MH4U's save layout is unmapped, see the open questions below); when the registry takes ids other than monsters; the rule for a shipped id that has to move, and who applies the migration.
 
-GU's combat systems are code, not data, so they are the costliest content in the mod: Hunter Styles, Hunter Arts, GU's Kinsect (nectar stats, evolution forms, elements), the Sword and Shield oils, Palico customisation.
+| Alternative | Why not |
+|---|---|
+| An id range per mod | ownership still has to be recorded, so a registry comes back; two relocations of one table cannot both win |
+| An id from a hash of the name | collisions, and sparse ids in tables indexed by id |
+| The first free id at boot | ids change with the mods installed and their order, which breaks saves |
+| Stand-ins only | the base game records the stand-in, and the ported monster still needs its tables |
+| Relocating every table | one patch per reference, possibly impossible at run time on a recompiled game |
+| A save file of the mod's own, MH4U's save kept vanilla (Definitive Edition) | hooks on the save's write, read and parse and a format to maintain; the converter gives the same way back to a clean save |
 
-| Option | Gives | Costs |
-|---|---|---|
-| MH4U's combat only | one consistent combat system, the least work | GU players lose Styles and Arts |
-| Some GU systems as switches, per player or per quest | choice | each system ported as code and tested against the others |
-| GU's combat on GU content only | GU content plays as in GU | two combat systems side by side |
+The facts and options it was chosen from, as the open entry held them:
 
-Underwater, Styles and Arts would also need movesets no game ever had (see [underwater.md](underwater.md)).
-
-### Monster versions
-
-Some monsters appear in more than one game ([data/catalog/monsters.md](../data/catalog/monsters.md) lists each once per game). The versions differ in data, moves, AI and model. How a 3U or GU monster runs is settled (0002); which version of a shared monster the mod uses is not.
-
-| Option | Gives | Costs |
-|---|---|---|
-| MH4U's version wherever MH4U has the monster | no porting for those | 3U and GU versions are lost |
-| The newest game's version | the latest design | ports replace MH4U monsters |
-| A pick per monster | the best of each | a choice to justify per monster |
-
-### Id allocation and mod saves
-
-A ported monster or item is a row MH4U never shipped with: an id, a row in every table indexed by that id, and a place in the save for what the base game's structures don't hold. The two halves are one question, because the id is what a save and a quest both record. This entry complements [Monster versions](#monster-versions), which chooses which version of a monster runs; this one chooses what number it takes and where the mod's own data lives. [Progression](#progression) names a side file as likely for per-game progress, which is this entry's save half.
+A ported monster or item is a row MH4U never shipped with: an id, a row in every table indexed by that id, and a place in the save for what the base game's structures don't hold. The two halves are one question, because the id is what a save and a quest both record. The entry complemented [Monster versions](#monster-versions), which chooses which version of a monster runs; this one chooses what number it takes and where the mod's own data lives. [Progression](#progression) names a side file as likely for per-game progress, which is this entry's save half.
 
 **What is known**
 
@@ -152,7 +133,7 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 - **Maintenance.** One ledger and one save format have one place to be right; per-mod ranges and per-mod files scatter that. Definitive Edition maintains its save format in three implementations and compares them on the same saves.
 - **The content routes.** [quests.md](quests.md#routes-into-the-game) delivers quests three ways (the game's archives, an Extra Data slot, a local DLC server). None stores player progress, so none answers the save half, and each still puts a quest into the game's form, which names its monsters by id.
 
-**What the maintainer still has to decide**
+**The questions as they stood** (0003 answers 1, 2 and 4; 3 in part, since the mod's data goes in MH4U's save; 5 stays open)
 
 1. Which id rule: one registry file as Definitive Edition has, a range per mod, a hash, or stand-ins only. If a registry: which file (the allocation record #47 then holds the ids), whether it covers monsters only or every game-wide id (maps, quests, items, gear, Palicos, icons, BGM), and how the run time gets the ids (a header generated from it, as Definitive Edition does, or a table the content ships).
 2. How tables grow: relocate, hook, or a mix per table, and whether a plugin may write the code and data that hold the references. This fixes the shape of [#47](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/47).
@@ -171,6 +152,43 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 - How a second mod's table growth composes with the first's: two plugins hooking the same reader chain ([PLUGINS.md](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/docs/PLUGINS.md) allows 256 chained functions), but two relocations of one table cannot both win.
 
 **Sources for Definitive Edition's side:** its `allocations.toml`, `migrations.toml`, `tools/alloc.py`, `notes/registry.md`, `notes/save-store.md`, `notes/mod-save-format.md` and `notes/items-append.md`, read at commit dd5c666 (2026-11-24, core 3.1.0). The project is credited in [sources.md](sources.md); no code is copied.
+
+## Open
+
+| Decision | The question | Options |
+|---|---|---|
+| Combat base | which GU combat systems come in | MH4U's only; some as switches; GU's on GU content only |
+| Monster versions | which version of a monster that several games have | MH4U's where it exists; the newest; a pick per monster |
+| Runtime | stay on Azahar's core or go native | Azahar core; the fork's `native` branch; wait for upstream |
+| Progression | how players reach 3U and GU content | hubs per game; one shared hub; quest categories per game; merged key quests; hubs later |
+| Shared systems | skills, meals, Kinsect, Palicos, points, rank unlocks | 4U's everywhere; each content's own; a pick per system |
+| Map versions | 3U's or GU's version of a shared locale, and whose lighting | 3U's (keeps water); GU's; both as separate maps |
+| Music versions | which game's arrangement of a shared theme | first game's; the content's own game's; MH4U's |
+| GU Switch assets | whether HD Switch assets may come in | no; an optional pack from the player's Switch dump; change the source rule |
+
+Each one in detail below. Facts and options only: none of them is chosen.
+
+### Combat base
+
+GU's combat systems are code, not data, so they are the costliest content in the mod: Hunter Styles, Hunter Arts, GU's Kinsect (nectar stats, evolution forms, elements), the Sword and Shield oils, Palico customisation.
+
+| Option | Gives | Costs |
+|---|---|---|
+| MH4U's combat only | one consistent combat system, the least work | GU players lose Styles and Arts |
+| Some GU systems as switches, per player or per quest | choice | each system ported as code and tested against the others |
+| GU's combat on GU content only | GU content plays as in GU | two combat systems side by side |
+
+Underwater, Styles and Arts would also need movesets no game ever had (see [underwater.md](underwater.md)).
+
+### Monster versions
+
+Some monsters appear in more than one game ([data/catalog/monsters.md](../data/catalog/monsters.md) lists each once per game). The versions differ in data, moves, AI and model. How a 3U or GU monster runs is settled (0002); which version of a shared monster the mod uses is not.
+
+| Option | Gives | Costs |
+|---|---|---|
+| MH4U's version wherever MH4U has the monster | no porting for those | 3U and GU versions are lost |
+| The newest game's version | the latest design | ports replace MH4U monsters |
+| A pick per monster | the best of each | a choice to justify per monster |
 
 ### Runtime
 
@@ -201,7 +219,7 @@ Constraints whatever the option:
 - **Length.** A full story per game makes the whole very long; GU alone has more quests than MH4U. C and E keep the total down, A and D add it up.
 - **Difficulty curves.** 4U's and GU's ranks roughly line up. 3U's don't: one 3U rank spans a wide range, and its gear expects the rank's early monsters to be farmed first. Re-ranking 3U quests is authored balance work, recorded in the authored register.
 - **Unlocks tied to Hunter Rank.** The Wyporium and the Wyceum unlock at given ranks. If one rank-up counts for every game, they fire at the same point; if each game has its own ranks, they must stay reachable.
-- **Saves.** B and C fit MH4U's save if quest-clear flags can be extended. A needs per-game progress, likely a side file kept by a plugin (MHGU Definitive Edition keeps such a mod save; the save half is [Id allocation and mod saves](#id-allocation-and-mod-saves)).
+- **Saves.** B and C fit MH4U's save if quest-clear flags can be extended. A needs per-game progress, likely a side file kept by a plugin (MHGU Definitive Edition keeps such a mod save; the save half is [Id allocation and mod saves](#0003-id-allocation-and-mod-saves)).
 - **Online.** Quests must be identical for every player in a room: the same mod version on both sides.
 
 Inputs before deciding: how MH4U stores quest lists and clear flags, whether quest categories are a fixed set, how hub stages load NPCs and shops.
