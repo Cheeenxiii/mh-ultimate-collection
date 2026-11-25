@@ -237,6 +237,19 @@ the move. R2's map says what to expect: a shared id starts MHXX's motion at the 
 the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
 what differs: no motion, another motion, a different timing, a missing effect or projectile.
 
+Category 17 has no motion to watch. MHXX's case jumps to the gate `0x008d5bd4`, which returns
+for indexes 0 to 2 and otherwise tail-calls the base update `0x008ae50c`; the port maps that
+routine to MH4U's `0x00911b48` (the step mapping is in the plugin's
+[README](../mods/rathian_actions/README.md#category-17-the-gate-and-the-base-update)). Force
+each row:
+
+| Forced | What MHXX does | What to watch |
+|---|---|---|
+| 17/0, 17/1, 17/2 | the gate returns | no move and no action change; the log has `17/N: nothing (the gate returns for 0 to 2)` |
+| 17/3 and up | the base update returns the monster to an idle action | the log has `17/N: running MH4U's base action update 0x00911b48`, and the action pair goes back to category 0 |
+
+Status: not done. The category-17 rows wait with the rest of R2p for #48 and #105.
+
 The 3U port (id 125) has the rows below (#116's). They are the 16 ids MH4U's `uEm001` lacks that
 reach a handler a shared action also reaches, so `mods/monster_actions` sends each to the MH4U
 action the map names and MH4U's own handler runs
@@ -273,8 +286,8 @@ Status: not done. The GU rows wait for #48 (the ported files) and #105 (the port
 resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
 
 The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
-handlers for 3/98 and 12/1-3 and leaves shared ids and 12/0 alone (T1). It logs one line the
-first time each translated action runs.
+handlers for 3/98, 12/1-3 and category 17, and leaves shared ids and 12/0 alone (T1). It logs
+one line the first time each translated action runs, and one line per category-17 index.
 
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
@@ -456,16 +469,20 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <st
 ```
 
 Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (category 17 has
-none), first motions 9/13; translated 4, MH4U's own 1 (12/0), pending 8. Changing a ledger
+none), first motions 9/13; translated 5, MH4U's own 1 (12/0), pending 7. Changing a ledger
 motion makes it exit 1 and name the id.
 
-T1b, last result (2026-11-25): pass, 13 engine calls checked across 3/98's three frames and
-the 12/1-3 blocks. Changing 3/98's `6.0` to `5.0` fails it with the motion line.
+T1b, last result (2026-11-25): pass, 15 engine calls checked across 3/98's three frames, the
+12/1-3 blocks and category 17's no-op and base-update paths. Changing 3/98's `6.0` to `5.0`
+fails it with the motion line; making 17/3 a no-op (`index > 3`) fails it with 17/3's line.
 
-T1c, last result (2026-11-25, MH4U USA v1.3.0, a code library built with the mod's
+T1c, last result (2026-11-25, MH4U USA v1.3.0, the #139 code library built with the mod's
 `uEnemy::dispatchAction` hook, headless runner): pass. The log had the plugin's ready line,
-`selftest: 4 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...`,
-the line naming 12/0 as MH4U's own `0x006d524c` and the pending slices, and
+`ready: translating 5 of GU Rathian's 13 MHXX-only actions on monster 124`, then
+`selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...,
+17 <- the gate 0x008d5bd4 + MH4U's base update 0x00911b48 (slot 89, MHXX's slot 244)`, the
+line saying category 17 does nothing for indexes 0 to 2 and naming 12/0 as MH4U's own
+`0x006d524c` and the pending slices, and
 `selftest: float stubs at 0x08e44670 (256 bytes, the game's heap)`; the runner exited 0. No
 monster spawned, so no translated action ran: the in-game side is R2p.
 
