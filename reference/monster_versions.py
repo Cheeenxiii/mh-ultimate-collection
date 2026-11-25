@@ -253,6 +253,9 @@ def inventory(files, game, em):
         if not best:
             raise
         actions = inventory_with_calls(code, max(best)[1], True)
+    if entries is not None:
+        entries |= {a.handler for a in actions if a.handler}
+        entries |= {a.fn for a in actions if a.fn}
     rows = {}
     for a in actions:
         handler = a.handler if a.kind == "tail" else None
