@@ -215,3 +215,32 @@ def model_from_json(obj: dict) -> dict:
         "small_areas": [[_def_bytes(d, DEF) for d in area] for area in obj["small_areas"]],
         "intruders": [_def_bytes(d, INTRUDER, 4) for d in obj["intruders"]],
     }
+
+
+def mib4_set_wave_monster(m: bytes, monster_id: int, wave: int = 0, index: int = 0) -> bytes:
+    """The original `.mib` with one large-monster definition's id changed in place.
+
+    A port's quest starts from MH4U's own quest and changes only the monster it fields; this
+    keeps every other byte (the texts, the pointer table, the blocks and their packing) and
+    the game's layout. `mib4_build` can't be used for that: it lays the blocks out again and
+    shifts every offset, which the game's own readers don't all follow (checks Q18, Q19). An
+    unchanged `monster_id` gives back `m` exactly.
+    """
+    if len(m) < HEADER or _u32(m, 0) != 0xA0 or m[4:8] != b"v005":
+        raise QuestError("not an MH4U .mib (0xA0, v005)")
+    list_at = _u32(m, POINTERS["waves"])
+    if not list_at or list_at + 4 * (wave + 1) > len(m):
+        raise QuestError(f"wave {wave} is outside the waves list")
+    defs = _u32(m, list_at + 4 * wave)
+    if not defs:
+        raise QuestError(f"wave {wave} is empty")
+    at = defs + DEF * index
+    if at + DEF > len(m):
+        raise QuestError(f"definition {index} is outside wave {wave}")
+    if _u32(m, at) == 0xFFFFFFFF:
+        raise QuestError(f"definition {index} is past the end of wave {wave}")
+    if index and _u32(m, defs + DEF * (index - 1)) == 0xFFFFFFFF:
+        raise QuestError(f"definition {index} is past the end of wave {wave}")
+    out = bytearray(m)
+    struct.pack_into("<I", out, at, monster_id)
+    return bytes(out)

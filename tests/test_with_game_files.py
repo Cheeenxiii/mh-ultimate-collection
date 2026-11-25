@@ -71,6 +71,54 @@ def test_every_mh4u_quest_rebuilds_with_the_same_fields(dump):
     assert not failed, f"{len(failed)} of {checked} quests change, first: {failed[:3]}"
 
 
+def test_every_mh4u_quest_patches_in_place_byte_for_byte(dump):
+    """An unchanged in-place patch gives back the original .mib exactly, and a changed monster
+    id changes only its four bytes; the builder is a converter, not the quest writer."""
+    checked = 0
+    for name, data in archives(dump("mh4u", "romfs.bin")):
+        for e in arc.read(data).entries:
+            if e.type_name != "rQuestData" or e.data[4:8] != b"v005":
+                continue
+            model = mibwrite.mib4_model(e.data)
+            if not model["waves"] or not model["waves"][0]:
+                continue
+            checked += 1
+            id0 = struct.unpack_from("<I", model["waves"][0][0])[0]
+            assert mibwrite.mib4_set_wave_monster(e.data, id0) == e.data, f"{name}:{e.file_name}"
+            changed = mibwrite.mib4_set_wave_monster(e.data, 125)
+            assert changed != e.data
+            first = next(i for i in range(len(e.data)) if e.data[i] != changed[i])
+            at = first & ~3
+            assert struct.unpack_from("<I", changed, at)[0] == 125
+            assert changed[:at] == e.data[:at] and changed[at + 4:] == e.data[at + 4:]
+    assert checked, "no .mib found"
+
+
+def test_mh4u_arc_patch_keeps_the_other_entries(dump):
+    """Replacing one quest inside a real archive keeps every other entry's stream; a full repack
+    compresses them all again. The unchanged replacement returns the archive byte for byte."""
+    for _name, data in archives(dump("mh4u", "romfs.bin")):
+        a = arc.read(data)
+        target = next((e for e in a.entries if e.file_name == "loc/quest/m10212.mib"), None)
+        if target is None or target.data[4:8] != b"v005":
+            continue
+        assert arc.replace_entry(data, target.file_name, target.data) == data
+        model = mibwrite.mib4_model(target.data)
+        id0 = struct.unpack_from("<I", model["waves"][0][0])[0]
+        patched = arc.replace_entry(data, target.file_name,
+                                    mibwrite.mib4_set_wave_monster(target.data, id0 + 1))
+        b = arc.read(patched)
+        by_name = {e.file_name: e for e in b.entries}
+        for e in a.entries:
+            if e.file_name == target.file_name:
+                continue
+            assert by_name[e.file_name].compressed == e.compressed, e.file_name
+            assert by_name[e.file_name].data == e.data
+        assert by_name[target.file_name].data != target.data
+        return
+    pytest.skip("no quest archive with m10212")
+
+
 # names match by prefix, so cardbox comes before card
 MODES = {"quest": "quest", "cardbox": "normal", "card": "card", "otomo": "normal"}
 
