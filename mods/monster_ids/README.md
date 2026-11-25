@@ -96,8 +96,16 @@ the effect lists at +0x24 and +0x28).
 | `+0x18` | unused (null in MH4U's own records) | 1 |
 | `+0x1c` | sound | 1 |
 | `+0x20` | four extra paths; slot 3 is the command (EMC) | 4 |
-| `+0x24` | effect lists | 1 |
-| `+0x28` | a second effect list | 1 |
+| `+0x24` | effect lists | the count in 0x00fb7a70 + id*4 (low u16; 26 for the stand-in em001) |
+| `+0x28` | a second effect list | the high u16 of the same word (0 for em001) |
+
+The two effect-list fields are arrays without a null terminator. `enemyResource::effectLists`
+(0x00c0b830) takes their lengths from the per-id table of two u16 at 0x00fb7a70 (the low half
+for +0x24, the high half for +0x28) and reads exactly that many slots. The builder gives each
+field the stand-in's count, since the reader runs as the stand-in and a port ships no effect
+lists yet. A field built with fewer slots makes the reader walk past the array; in the
+plugin-built block the words after it are the record's path strings, so their first bytes
+(`enem`, `y\em`, `125\`, `mod\`) are passed as path pointers and the load faults (#182).
 
 The stand-in's record names paths under the stand-in's own id (`enemy\em001\...` for 124
 and 125, `enemy\em015\...` for 126 and 127). On its first frame the plugin builds,
