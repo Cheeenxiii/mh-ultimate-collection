@@ -107,7 +107,7 @@ So a monster theme is **not** in the quest, in the stage's data or in a per-mons
 
 ### What a new monster must add
 
-1. **Its id, in the usual places.** The quest's monster list and the id-indexed tables ([reference/README.md](../reference/README.md#mh4u-monster-tables), [decisions.md](decisions.md#id-allocation-and-mod-saves)). The theme follows the id; no sound data goes in the quest.
+1. **Its id, in the usual places.** The quest's monster list and the id-indexed tables ([reference/README.md](../reference/README.md#mh4u-monster-tables), [decisions.md](decisions.md#0003-id-allocation-and-mod-saves)). The theme follows the id; no sound data goes in the quest.
 2. **A selector answer for the id.** The switch has no row for a new id, so it returns kind 1, theme 11. A plugin hooks `0x30e148` and answers for the new id instead. Kind 2 for a theme of its own; kind 1 if it should share its stage's battle theme; 255 for none. A phase, like Gogmazios's, is a second answer for the same id, keyed on `sound+0x1838` or on the monster's own state.
 3. **A stream and a sequence in the stream request the kind selects.** For kind 2, add the theme to `bgm_bat.stq`: a stream record for the `.mca` and a sequence record with an unused id (12, 24 and 25 carry no stream, or append an id past 39 and raise the count), its volume and its stream index. For kind 1, add it to that stage's `bgm_st_NN.stq` at id 11 or 12, as the boss stages do. Nothing else in the game names the theme.
 4. **The wave.** The `MADP` `.mca` in `sound/bgm/battle/wav/` (kind 2) or `sound/bgm/stage/wav/` (kind 1), at the path the stream record gives, with the size, samples, channels, rate and loop the record repeats.
