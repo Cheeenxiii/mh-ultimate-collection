@@ -300,8 +300,8 @@ def placement(s: dict, game_a: str, game_b: str):
         for item in items:
             key, ma, mb = item[:3]
             placed[decode_motion(game_a, ma)].append((key, decode_motion(game_b, mb), how))
-    for key, ma, _mb, _sig, found in s["elsewhere"]:
-        placed[decode_motion(game_a, ma)].append((key, found, "elsewhere"))
+    for key, ma, mb, _sig, _found in s["elsewhere"]:
+        placed[decode_motion(game_a, ma)].append((key, decode_motion(game_b, mb), "elsewhere"))
     for key, motion in s["same_index"]:
         placed[decode_motion(game_a, motion)].append(
             (key, decode_motion(game_b, motion), "same-index"))

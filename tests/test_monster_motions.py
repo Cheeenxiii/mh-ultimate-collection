@@ -159,3 +159,18 @@ def test_placement_refuses_a_target_slot_two_animations_want():
     assert all(r["how"] == "conflict" and r["target"] == (0, 2) for r in rows)
     assert [r["actions"] for r in rows] == [[(13, 5)], [(13, 6)]]
     assert [r["source"] for r in rows] == [(0, 19), (0, 26)]
+
+
+def test_placement_takes_an_elsewhere_animation_from_the_source_game():
+    """`elsewhere` is a fact about the target's own lists; the port still copies the source's
+    animation from the source game's slot."""
+    a = {(7, 1): dict(motion=0x41A, how="constant")}          # file 4, slot 26: empty
+    b = {(7, 1): dict(motion=209, how="constant")}            # file 2, slot 9
+    lmts_a = [[None] * 100 for _ in range(5)]
+    lmts_a[0][3] = (175, -1, 42)                              # the same animation, another slot
+    lmts_b = [[None] * 30 for _ in range(3)]
+    lmts_b[2][9] = (175, -1, 42)
+    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
+    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
+    assert unresolved == []
+    assert rows == [dict(target=(4, 26), source=(2, 9), how="elsewhere", actions=[(7, 1)])]

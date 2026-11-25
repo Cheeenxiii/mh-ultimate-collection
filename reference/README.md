@@ -408,7 +408,7 @@ animation in both games, and 115 of those start a different index.
 | The 117 compared ids | ids |
 |---|---|
 | the same index in both games | 2 (1/11 and 1/12) |
-| the same animation at another index | 93 (86 identical, 2 with the skeleton's extra MH4U track, 5 whose animation is found at another index in MH3U's lists) |
+| the same animation at another index | 93 (86 identical, 2 with the skeleton's extra MH4U track, 5 whose target slot is empty in MH4U's own lists but whose animation is found at another index there) |
 | a different animation | 3 (13/5, 13/6 and 13/8) |
 | not resolved | 19 (all category 7, whose shared code can start more than one motion, so the first constant is not enough) |
 
@@ -425,8 +425,8 @@ handlers have one, 8 have none.
 **Where the port's animations go.** `monster_motions.py place` writes the plan for a port:
 one row per target (file, slot), with the source slot and the action ids that ask for it, and
 a row for each id it cannot place. On Rathian's data it places 96 ids at 27 target slots
-(5 of them by the animation's signature found at another index), and has two kinds of row
-left over:
+(5 of them whose target slot MH4U's own lists leave empty), and has two kinds of row left
+over:
 
 - 19 ids whose animation has no unique match, which stay wherever the source's file keeps
   them; the handler's computed index decides whether that is where it is asked for.
