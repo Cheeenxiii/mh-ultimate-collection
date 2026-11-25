@@ -8,7 +8,7 @@ rule: one registry, ids only ever grow, and the run time reads them from here.
 | Column | Meaning |
 |---|---|
 | `kind` | what kind of id: `monster` today; another kind needs its range and rules in `tools/check_ids.py` first |
-| `id` | the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123) and stop at 255, the most a guild quest card's one-byte field holds |
+| `id` | the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123); 124 to 223 are permanent and 224 to 255 are the pool lent per quest ([0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)), so a permanent monster row stops at 223; `tools/check_ids.py` still allows 255 until [#101](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/101) |
 | `key` | the content's name in the registry, lowercase words joined by hyphens, unique |
 | `source_game` | which game the content comes from: `mh4u`, `mh3u`, `mhxx` or `mhgu` |
 | `source_key` | the content's name in that game: a monster's `emNNN` |
@@ -43,7 +43,11 @@ free id, and a mistake is corrected by a migration, not by renumbering
 ## Why these bounds
 
 - **124** is MH4U's first id after its own 0 to 123 ([reference](../reference/README.md#mh4u-monster-tables)).
-- **255** is the guild quest card's one-byte monster id ([specs/extdata.md](../specs/extdata.md));
+- **255** is the most one byte holds: the engine keeps a monster's id in one byte (`+0x1c0` of its data
+  block, read with `ldrb`), and so does a guild quest card ([specs/extdata.md](../specs/extdata.md)).
+  0003's amendment keeps 124 to 223 permanent and lends 224 to 255 per quest to monsters registered
+  from 256 up; the tool and the plugin implement the pool in
+  [#101](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/101);
   the character save's monster log has 82 fixed entries and whether it is indexed by id is
   unverified, so an id above 81 is already beyond what that structure can hold if it is.
 - The name and notes texts are messages named by the id (`emName`, `emExp`): a ported id needs
