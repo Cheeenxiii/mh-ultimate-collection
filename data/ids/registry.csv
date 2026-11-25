@@ -1,3 +1,3 @@
 kind,id,key,source_game,source_key,name,stand_in,files,notes
 monster,124,rathian-gu,mhxx,em001,Rathian,1,"model,motions=5,tail,cmd","GU Rathian: MHXX em001 (roEm001); ported onto uEnemy"
-monster,125,rathian-3u,mh3u,em001,Rathian,1,"model,motions=3,tail,cmd","3U Rathian: MH3U em001 runs on uEm002; ported onto uEnemy"
+monster,125,rathian-3u,mh3u,em001,Rathian,1,"model,motions=3,tail,cmd,sound","3U Rathian: MH3U em001 runs on uEm002; ported onto uEnemy"

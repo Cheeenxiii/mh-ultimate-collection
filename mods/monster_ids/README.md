@@ -111,9 +111,10 @@ not an id and stays). The motion lists take a count, `motions=N`: the port's fir
 from slot 0 are rewritten and the slots above keep the stand-in's paths, because the port's
 motion-number translation only targets the source slots it ships (125 keeps MH4U's
 `enemy\em001\mot\em001_3` and `_4`). For a kind it does not ship, the stand-in's path is
-copied unchanged, so the monster loads MH4U's own camera, motion effects, sound and effect
-lists until its game's are converted. The record, its slots and its strings are one block
-from the game's own heap (`alloc`, ABI 2), and it is kept for the run.
+copied unchanged, so the monster loads MH4U's own camera, motion effects and effect lists
+until its game's are converted; 125 ships her own sound (`mhuc convert monster`, issue
+#158). The record, its slots and its strings are one block from the game's own heap (`alloc`,
+ABI 2), and it is kept for the run.
 
 | Kind in `files` | The record's paths |
 |---|---|
@@ -152,9 +153,10 @@ MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
   a pooled monster is check P2 and is not done, and whether the post-quest screens still read
   the tables after the end sequence is unverified. A quest that never reaches its end sequence
   keeps its bytes until the next quest starts.
-- **The port's camera, motion effects, sound and effect lists.** A port ships only its model,
-  motions, tail and command so far, so the record keeps the stand-in's paths for those kinds
-  and their files are MH4U's until the port's game has them converted.
+- **The port's camera, motion effects and effect lists.** A port ships its model, motions,
+  tail and command, and 125 her sound; the record keeps the stand-in's paths for the camera,
+  motion effects and effect lists, and their files are MH4U's until the port's game has them
+  converted.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
   stand-in, and the monster's data block still holds the stand-in's own id byte, so a spawned
   monster is MH4U's monster. The port's own rows replace the stand-in when

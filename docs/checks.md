@@ -455,13 +455,17 @@ P1, headless:
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
    record built in guest memory; one `self-test: id 124 ships model, motions 0-4, tail, cmd;
    keeps stand-in 1's paths for motions above 4, camera, mef, sound, efl` line and one for 125
-   (`ships model, motions 0-2, tail, cmd; keeps stand-in 1's paths for motions above 2, camera,
-   mef, sound, efl`); and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass
+   (`ships model, motions 0-2, tail, sound, cmd; keeps stand-in 1's paths for motions above 2,
+   camera, mef, efl`); and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass
    through`. In the 124 record the model, motion, tail and command paths name `em124`, and the
    camera, motion-effect, sound and effect-list paths still name `em001`. The 125 record names
-   `em125` for the model, motion slots 0 to 2, the tail and the command, and keeps the
-   stand-in's `em001` for motion slots 3 and 4, the camera, motion effects, sound and effect
+   `em125` for the model, motion slots 0 to 2, the tail, the sound and the command, and keeps
+   the stand-in's `em001` for motion slots 3 and 4, the camera, motion effects and effect
    lists; no path may name a file the port's arc does not ship ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
+   The 125 sound path is the converted call `mhuc convert monster` writes (#158), and the 125
+   command path is the port's converted EMC, which #49 ships; a P1 run before that file exists
+   still builds the record (the self-test does not load files), but a quest with 125 would hang
+   as in #143.
    The factory's and data path's lines name the path the stand-in's files are read from
    (`enemy\em001\data\em001`), which the record does not change. With the fixture the ready
    line is `1 permanent and 1 pooled`, its record is `enemy\em256\...` for the one kind the
@@ -498,6 +502,13 @@ points (the two quest hooks among them), headless runner. Both passes:
 No `isn't a hook point` line appeared in either run. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.
 
+After that run, 125's registry row gained `cmd`
+([#159](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/159)) and `sound`
+([#158](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/158)), so the next P1
+run's 125 record also names `enemy\em125\data\em125_cmd`, the converted EMC #49 ships, and
+`sound\call\em\em125`, the converted sound call #158's `mhuc convert monster` writes; that
+run is not done yet.
+
 ## A ported camera's cut-in (C2)
 
 MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an action posts by
@@ -520,6 +531,35 @@ plugin's record built with it (P1), and a quest that spawns the id (#144).
    stops at the camera path.
 
 Status: open; waits for #48's port files and #144's quest-load proof.
+
+## A ported monster's own voice (A1)
+
+A ported monster's resource record names its sounds by one path, `sound\call\em\emNNN`: the
+sound call, which names the requests, banks and waves the monster's code and motions play
+([specs/sound.md](../specs/sound.md), check SN7). `mhuc convert monster` writes the set from the
+source game's archives into the port's own arc. This check hears it; it needs the port's other
+files so the monster spawns (#48, #49), the `sound` kind on the id, the plugin's record built
+with it (P1), and a quest that spawns the id (#144). It is the in-game half of SN9.
+
+1. Convert the sound set: `mhuc convert monster --id 125 --arc <MH3U
+   arc/enemy/em001.arc> --sound-arc <MH3U arc/sound/se/em/em001/snd_em001.arc> --out <mod
+   folder>` (MHXX: `--from mhxx --id 124 --arc <MHXX arc/enemy/em001_00.arc>`). The port's
+   `data/em125.arc` gains the sound call, 48 waves, the bank and the request, every path under
+   `sound\se\em\em125\...` or `sound\call\em\em125`. Check that 125's `files` in
+   `data/ids/registry.csv` lists `sound`, regenerate `mods/monster_ids/src/ids.h` and rebuild the
+   code library (P1 step 1).
+2. Spawn the ported monster in a quest (#144) and let it roar, bite, fly and take a hit; a roar
+   is an action, so `mods/force_action` (R1p) can play one without waiting for the AI.
+3. Pass: the sounds are the source game's — MH3U Rathian's roar, not MH4U Rathian's — at about
+   the volume MH4U's own monster sounds play at, and the footsteps and attack sounds match the
+   source game's on the same moves. The P1 log's line for 125 names `sound\call\em\em125`
+   among the record's own paths.
+   Fail: MH4U Rathian's voice (the record kept the stand-in's `sound\call\em\em001`), silence
+   (a path or an id the request doesn't answer), or a sound at the wrong pitch or volume, which
+   would point at the request words the converter keeps from MH3U
+   ([specs/sound.md](../specs/sound.md#the-request-records-words)).
+
+Status: not done; waits for #48, #49 and #144.
 
 ## Calling the engine from a plugin (P3)
 

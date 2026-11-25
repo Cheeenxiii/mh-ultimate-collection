@@ -64,14 +64,14 @@ group of paths in the record:
 | `camera` | the camera | no | no |
 | `tail` | the tail model | yes | yes |
 | `mef` | the motion effects | no | no |
-| `sound` | the sound | no | no |
+| `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes |
 | `cmd` | the command/EMC | yes | yes |
 | `efl` | the effect lists | no | no |
 
 124's `em124.arc` holds the model, five motion lists, the tail and the command; 125's holds
-the model, three motion lists, the tail and the command. Until a port's own camera, motion
-effects, sound and effect lists are converted, its monster loads MH4U's own from the stand-in's
-paths (`enemy\em001\...`); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
+the model, three motion lists, the tail, the command and its converted sound set. Until a port's
+own camera, motion effects and effect lists are converted, its monster loads MH4U's own from the
+stand-in's paths (`enemy\em001\...`); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
 0 to 2. The motion-effect and effect-list formats the `mef` and `efl` kinds carry are laid out
 and checked on the three games' monster archives ([mef](../../specs/mef.md),
@@ -81,6 +81,14 @@ understood yet, so a port still ships neither kind.
 A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map
 together; the generated header's `MHUC_FILES_*` bits and each row's `motions` count are what
 the plugin's record builder reads.
+
+The `sound` kind is one path, `sound\call\em\emNNN`, but the file it names (the sound call)
+names its requests, banks and waves by their own paths; those are looked up in the same loaded
+archive, so the port's `data/emNNN.arc` must carry all four kinds. `mhuc convert monster` writes
+them there from the source game's own archives and moves every path into the ported id's
+namespace (`sound\se\em\emNNN\...`), so a port never shadows MH4U's own monster or another
+port. [specs/sound.md](../../specs/sound.md) has the formats and the conversion, and check A1
+in [checks.md](../docs/checks.md#a-ported-monsters-own-voice-a1) the in-game listen.
 
 125's command is her own AI script: MH3U's EMC is an older format, so her port converts it at
 build time (version, 23 group rows and the 15 opcodes whose argument count differs) rather than
@@ -129,7 +137,7 @@ free id, and a mistake is corrected by a migration, not by renumbering
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|
 | 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=5, tail, cmd |
-| 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=3, tail, cmd |
+| 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=3, tail, cmd, sound |
 
 No pooled row ships yet; the first would be 256, with a `stand_in` like any other.
 
