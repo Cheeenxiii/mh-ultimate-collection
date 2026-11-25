@@ -69,11 +69,16 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 | `crypto/` | Blowfish and the save, Extra Data and DLC ciphers of the three games |
 | `quests/` | quest readers for the three games, the MH4U `.mib` writer, conversion from MHXX, monster ids by name |
 | `extdata.py` | MH4U Extra Data records: guild quest cards, DLC Palicos, the in-game test kit |
+| `save.py` | MH4U's character saves (`user1` to `user3`) and `system`: profile, item and equipment boxes, pouches, guild quests, Palicos, monster log and guild card ([save](save.md)) |
 | `survey.py` | runs the specs' checks over a whole RomFS and prints counts only |
 | `catalog.py` | what MH4U already has of 3U's and GU's monsters and maps, from `data/catalog/` |
 | `monsterdata.py` | rebuilds an MH4U monster's `.etd`/`.emd` values from MHXX's or MH3U's files and compares, counts only |
 
 Each format follows its spec in [specs/](../specs/README.md). A field is marked verified only once it has been checked against real files, with the procedure written down.
+
+## Saves
+
+MH4U's character saves are read by `mhuc save dump` (specs/save.md): the profile, item and equipment boxes, the seven worn pieces and their box indices, the item and gunner pouches, ten guild quests, 56 Palicos, the 82 fixed monster-log entries and the guild card's quest counts, weapon usage and brigade points. Checks S1 to S7 fix those offsets against the maintainer's saves. Two things a converter still needs are open: the character save's quest clear lists ([#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153)) and the `system` save's fields ([#154](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/154)). The monster log is not indexed by monster id: its order is the guild card's, so a ported id does not fit it, which decision [0003](decisions.md#0003-id-allocation-and-mod-saves) asked.
 
 ## Monsters
 
