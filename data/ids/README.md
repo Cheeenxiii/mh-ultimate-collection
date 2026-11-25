@@ -1,9 +1,11 @@
 # Ids
 
-The registry of every id a ported content takes in MH4U. One file, `registry.csv`, read by
-`tools/check_ids.py`; the plugin `mods/monster_ids` gets its ids from the header the tool
-generates. Decision [0003](../docs/decisions.md#0003-id-allocation-and-mod-saves) settles the
-rule: one registry, ids only ever grow, and the run time reads them from here.
+The registry of every id a ported content takes in MH4U. `registry.csv` is read by
+`tools/check_ids.py`, and the plugin `mods/monster_ids` gets its ids from the header the tool
+generates. Its companion `notes.csv` records where each ported id's Hunter's Notes text comes
+from; `tools/check_text.py` checks it and `mhuc text build` turns it and the registry into the
+mod's text table. Decision [0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)
+settles the rule: one registry, ids only ever grow, and the run time reads them from here.
 
 | Column | Meaning |
 |---|---|
@@ -127,6 +129,30 @@ check fails when it is stale. An id that has shipped never moves: a new content 
 free id, and a mistake is corrected by a migration, not by renumbering
 ([0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)).
 
+## The notes source
+
+The notes text is not in the registry: it is the source game's own, recorded per ported id in
+`notes.csv` (the name is the registry's `name`). Columns:
+
+| Column | Meaning |
+|---|---|
+| `id` | the ported monster's registry id |
+| `source_game` | the game the notes come from, which must be the registry row's `source_game` |
+| `source_file` | the table's path in that game's RomFS, without its leading `/` |
+| `source_entry` | the GMD's path inside that `source_file` when it is an ARC, empty when the file is the GMD |
+| `source_index` | the string's index in that GMD; MH3U's Hunter's Notes and MHXX's monster list are ordered tables, not id-indexed ones, so the index is the fact the port's session established |
+
+`tools/check_text.py` checks every ported id has exactly one row, the game is its registry's,
+the path is a RomFS path and the index is a non-negative number. `mhuc text build` reads the
+player's own dumps (MH3U's `arc/ID/ID_gallery_eng.arc`, MHXX's
+`table/HN_MonsterListMsg_jpn.gmd`), takes the name from `registry.csv` and writes
+`text/monster_text.bin` into the mod's folder; `tools/check_text.py --mod` checks that built
+file holds exactly the registered ids with the registry's names. The text's language is the
+source game's: MH3U USA is English, MHXX JPN is Japanese until MHGU's English text is read.
+No text is kept here, only the source's address and index; the plugin's README
+([the name and notes text](../mods/monster_ids/README.md#the-name-and-notes-text)) says how
+the game reads it.
+
 ## Why these bounds
 
 - **124** is MH4U's first id after its own 0 to 123 ([reference](../reference/README.md#mh4u-monster-tables)).
@@ -139,7 +165,10 @@ free id, and a mistake is corrected by a migration, not by renumbering
   and whether it is indexed by id is unverified, so an id above 81 is already beyond what that
   structure can hold if it is.
 - The name and notes texts are messages named by the id (`emName`, `emExp`): a ported id needs
-  a message of its own in the mod's text, which is content work, not an id range.
+  a message of its own in the mod's text. The plugin answers the three message getters with the
+  mod's table ([the notes source](#the-notes-source)); the Hunter's Notes list row is not
+  answered yet, so the text exists for an id the UI already shows but a ported monster is not
+  added to the list itself.
 
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|

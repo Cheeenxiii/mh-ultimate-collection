@@ -9,7 +9,7 @@ import zlib
 import pytest
 
 from mhuc import cli, monsterdata
-from mhuc.formats import camera, classid, emd, hitdata, lmt, lyt, pica, sound, stq, xfs
+from mhuc.formats import camera, classid, emd, hitdata, lmd, lmt, lyt, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -784,3 +784,63 @@ def test_lyt_dump_writes_the_tree_as_json(tmp_path, capsys):
     assert dumped["root_count"] == 1
     assert [n["name"] for n in dumped["nodes"]] == ["root", "pic", "msg", "hit"]
     assert dumped["nodes"][2]["text"] == "Hi"
+
+
+def lmd_bytes(messages):
+    """A hand-built id-indexed message table: one label and one record per message."""
+    n = len(messages)
+    label_off = 0x24
+    format_off = label_off + 8 * n
+    record_off = format_off + 16 * 2 * n
+    strings = record_off + 12 * n
+    out = bytearray(strings)
+    struct.pack_into("<4sI7I", out, 0, b"lmd\0", lmd.VERSION, n, 2 * n, n,
+                     label_off, format_off, record_off, 0)
+    for i in range(n):
+        struct.pack_into("<2I", out, label_off + 8 * i, 0xDEADBEEF, 0x400000 + 2 * i)
+        struct.pack_into("<4I", out, format_off + 32 * i, 1, i, 0, 0)
+        struct.pack_into("<4I", out, format_off + 32 * i + 16, 0x16, 0, 0, 0)
+    for i, text in enumerate(messages):
+        raw = text.encode("utf-16-le")
+        struct.pack_into("<3I", out, record_off + 12 * i, len(out), len(text), len(text))
+        out += raw + b"\0\0"
+    struct.pack_into("<I", out, 0x20, len(out))       # the string area ends here
+    return bytes(out) + b"lmd\0"                        # 5-byte trailer, not read
+
+
+def test_lmd_reads_messages_by_record_index_and_keeps_the_trailer_unread():
+    data = lmd_bytes(["No enemy", "Rathian"])
+    table = lmd.read(data)
+    assert table.version == lmd.VERSION
+    assert [m.text for m in table.messages] == ["No enemy", "Rathian"]
+    assert [m.chars for m in table.messages] == [8, 7]
+    assert table.message(1).text == "Rathian"
+    assert table.message(2) is None
+
+
+def test_lmd_reads_a_utf16_message_with_its_two_lengths():
+    table = lmd.read(lmd_bytes(["Méga potion"]))
+    assert table.messages[0].text == "Méga potion"
+    assert table.messages[0].chars == table.messages[0].width == 11
+
+
+def test_lmd_refuses_a_message_that_does_not_end_in_nul():
+    data = bytearray(lmd_bytes(["Rathian"]))
+    record = 0x4C                                               # one message: labels, then formatting, then this
+    struct.pack_into("<3I", data, record, 0x58, 2, 2)           # two units of the string, no NUL after them
+    with pytest.raises(lmd.LmdError, match="NUL"):
+        lmd.read(bytes(data))
+
+
+def test_lmd_refuses_offsets_not_in_file_order():
+    data = bytearray(lmd_bytes(["Rathian"]))
+    struct.pack_into("<I", data, 0x1C, 0x10)                        # record table before the labels
+    with pytest.raises(lmd.LmdError, match="file order"):
+        lmd.read(bytes(data))
+
+
+def test_lmd_refuses_a_version_it_does_not_lay_out():
+    data = bytearray(lmd_bytes(["Rathian"]))
+    struct.pack_into("<I", data, 4, 0x00010201)
+    with pytest.raises(lmd.LmdError, match="version"):
+        lmd.read(bytes(data))

@@ -31,6 +31,7 @@ from .formats import (
     emstatus,
     gmd,
     hitdata,
+    lmd,
     lmt,
     lyt,
     pica,
@@ -234,6 +235,8 @@ def survey_entry(type_name: str | None, data: bytes, st: dict, type_id: int | No
         if n:
             c["G3 label hashes match"] += ok
             c["G3 label hashes differ"] += n - ok
+    elif type_name == "rLayoutMessage" or data[:4] == b"lmd\0":
+        st.setdefault("lmd", Counter()).update(lmd.check(data))
     elif type_name == "rMotionList" or data[:4] == b"LMT\0":
         st.setdefault("lmt", Counter()).update(lmt.check(data))
     elif type_name == "rCameraList" or data[:4] == b"LCM\0":
@@ -439,7 +442,7 @@ def report(total: dict) -> str:
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
     for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "camera",
-                "emc", "sbc", "xfs", "lyt", "stage", "sound"):
+                "emc", "sbc", "xfs", "lyt", "lmd", "stage", "sound"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]
