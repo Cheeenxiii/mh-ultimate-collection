@@ -2,11 +2,17 @@
  * rathian_actions.c: GU Rathian's MHXX-only actions, run on MH4U's uEnemy.
  *
  * GU Rathian (MHXX v1.4, roEm001) has 13 action ids MH4U has no action for:
- * 3/98, 4/27 to 4/32, 8/0, 12/0 to 12/3 and category 17. This plugin carries the first
- * slice: 3/98 and the 12/1 to 12/3 chain around it. 12/0 needs nothing: MH4U's own
- * category-12 case checks index 0 and runs its own handler 0x006d524c, the handler its
- * shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0. The other slices are
- * 4/27-32, 8/0 and 17 (separate issues).
+ * 3/98, 4/27 to 4/32, 8/0, 12/0 to 12/3 and category 17. This plugin carries 3/98, the
+ * 12/1 to 12/3 chain around it and category 17. 12/0 needs nothing: MH4U's own category-12
+ * case checks index 0 and runs its own handler 0x006d524c, the handler its shared 3/2, 3/83
+ * etc. use and the role pair of MHXX's 12/0. The other slices are 4/27-32 and 8/0 (separate
+ * issues).
+ *
+ * Category 17 is a gate plus a base-class update, not a per-index handler. MHXX's case
+ * (0x020098b8) jumps to 0x008d5bd4, which reads the index byte at this+0x6bf1: 0 to 2
+ * return, any other index tail-calls uEnemy's vtable slot 0x3d0 (0x008ae50c). MH4U's uEnemy
+ * has 95 slots and no 244, but its slot 89 (0x00911b48) is the same routine on MH4U's
+ * layout: the port calls it, and for 0 to 2 does nothing.
  *
  * The dispatcher (vtable slot 44, 0x006e9cac) reads the action pair from the monster's
  * work block; for the ported monster and one of this slice's pairs the plugin runs the
@@ -60,6 +66,10 @@
 #define FN_MOTION      0x0094e318u  /* 0x008eb108: start a motion (index r1, s0/s1) */
 #define FN_HANDLER_3_9 0x006d5e98u  /* 0x02010aec, MH4U's shared 3/9 handler (also 3/5) */
 #define FN_HANDLER_3_12 0x006d791cu /* 0x0201041c, MH4U's shared 3/12 handler */
+/* MH4U's uEnemy vtable slot 89, the same routine as MHXX's slot 0x3d0 (0x008ae50c):
+ * 0x008b1700->0x009167b4, 0x00add004->0x0092e960, 0x008ac5a0 (the action setter)
+ * ->0x0090ef74, and the finish flag this+0x6b00->work+0x1dc (the plugin README). */
+#define FN_BASE_UPDATE 0x00911b48u
 
 /* The motions 3/98 starts. 0x101 runs with s0 = 6.0, s1 = 0.0; 0x104 with s0 = 2.0 (the
  * source leaves s1 from the previous state, which is 0.0 while the move is current). */
@@ -237,6 +247,25 @@ static void log_action_once(int category, int index) {
     host->log(host, MH4U_LOG_INFO, line);
 }
 
+/* Category 17: one line per index, whether the gate's 0-2 no-op or the base update. The
+ * plugin has no per-monster state to keep here, and the first line is the evidence that the
+ * forced index reached the translation. */
+static uint8_t cat17_logged[256];
+static void log_cat17_once(int index) {
+    if (cat17_logged[index]) {
+        return;
+    }
+    cat17_logged[index] = 1;
+    char line[160];
+    if (index <= 2) {
+        snprintf(line, sizeof line, "17/%d: nothing (the gate returns for 0 to 2)", index);
+    } else {
+        snprintf(line, sizeof line, "17/%d: running MH4U's base action update 0x%08x", index,
+                 (unsigned)FN_BASE_UPDATE);
+    }
+    host->log(host, MH4U_LOG_INFO, line);
+}
+
 /* MHXX 3/98, handler 0x020062d4: three states.
  *   0: remember the data float, advance the fall by it, start motion 0x101 at 6.0, snap
  *      the fall to the target height;
@@ -342,6 +371,18 @@ static void dispatch_action(MH4UCall *call, void *user) {
     }
     const int category = (int)host->read8(call, work + WORK_CATEGORY);
     const int index = (int)host->read8(call, work + WORK_INDEX);
+    /* Category 17 is the gate first: MHXX's dispatcher case (0x020098b8) jumps to
+     * 0x008d5bd4, which reads the index (this+0x6bf1 there, MH4U's work+0x1cb here), returns
+     * for 0 to 2 and otherwise tail-calls uEnemy's slot 0x3d0 (0x008ae50c). MH4U has no such
+     * slot; its slot 89 (0x00911b48) is the same routine and runs the ported action. */
+    if (category == 17) {
+        if (index > 2) {
+            host->call(call, FN_BASE_UPDATE, enemy, 0, 0);
+        }
+        log_cat17_once(index);
+        host->skip_original(call);
+        return;
+    }
     const int which = (category == 3 && index == 98) ? 98
                     : (category == 12 && index >= 1 && index <= 3) ? index
                     : -1;
@@ -364,14 +405,15 @@ static void dispatch_action(MH4UCall *call, void *user) {
 static void self_test(MH4UCall *call) {
     char line[512];
     snprintf(line, sizeof line,
-             "selftest: 4 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and "
+             "selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and "
              "0x104), 12/1 <- 0x0201c1d0 + 0x020062d4, 12/2 <- 0x0201c228 + 0x0201041c->0x%08x, "
-             "12/3 <- 0x0201c27c + 0x02010aec->0x%08x",
-             (unsigned)FN_HANDLER_3_12, (unsigned)FN_HANDLER_3_9);
+             "12/3 <- 0x0201c27c + 0x02010aec->0x%08x, 17 <- the gate 0x008d5bd4 + MH4U's base "
+             "update 0x%08x (slot 89, MHXX's slot 244)",
+             (unsigned)FN_HANDLER_3_12, (unsigned)FN_HANDLER_3_9, (unsigned)FN_BASE_UPDATE);
     host->log(host, MH4U_LOG_INFO, line);
     snprintf(line, sizeof line,
-             "selftest: 12/0 is MH4U's own category-12 handler 0x006d524c; pending: 4/27-32 "
-             "(0x0200e3b4), 8/0 (0x0201b460), category 17 (0x008d5bd4)");
+             "selftest: category 17 does nothing for indexes 0 to 2; 12/0 is MH4U's own "
+             "category-12 handler 0x006d524c; pending: 4/27-32 (0x0200e3b4), 8/0 (0x0201b460)");
     host->log(host, MH4U_LOG_INFO, line);
     if (stub_block) {
         snprintf(line, sizeof line, "selftest: float stubs at 0x%08x (%u bytes, the game's heap)",
@@ -428,10 +470,10 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
     char line[200];
     if (any_monster) {
         snprintf(line, sizeof line,
-                 "ready: translating 4 of GU Rathian's 13 MHXX-only actions on every monster");
+                 "ready: translating 5 of GU Rathian's 13 MHXX-only actions on every monster");
     } else {
         snprintf(line, sizeof line,
-                 "ready: translating 4 of GU Rathian's 13 MHXX-only actions on monster %d",
+                 "ready: translating 5 of GU Rathian's 13 MHXX-only actions on monster %d",
                  monster_id);
     }
     host->log(host, MH4U_LOG_INFO, line);

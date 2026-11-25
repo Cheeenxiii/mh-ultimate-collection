@@ -181,7 +181,7 @@ int main(void) {
     CHECK(hooked_frame != NULL, "no frame hook");
     hooked_frame(NULL, NULL);                 /* allocates the stubs and runs the self-test */
     int saw_selftest = 0;
-    for (int i = 0; i < nlogs; i++) if (strstr(logs[i], "selftest: 4 of the 13")) saw_selftest = 1;
+    for (int i = 0; i < nlogs; i++) if (strstr(logs[i], "selftest: 5 of the 13")) saw_selftest = 1;
     CHECK(saw_selftest, "the self-test didn't log the translated actions");
 
     /* ── 3/98, three frames ── */
@@ -260,6 +260,35 @@ int main(void) {
     CHECK(ffrom(h_read32(NULL, work + WORK_TARGET + 12u)) == 2.0f, "12/1 target +12 is the caller's s1");
     CHECK(ncalls >= 4 && calls[0].fn == FN_DATA_FLOAT, "12/1 doesn't run the 3/98 handler");
 
+    /* ── category 17: a gate plus MH4U's base action update ── */
+    for (int idx = 0; idx <= 2; idx++) {
+        reset_run();
+        frame_with(17, idx);
+        CHECK(ncalls == 0 && skipped_calls == 1 && original_calls == 0,
+              "17/%d isn't a no-op (%d calls, %d skipped, %d original)", idx, ncalls,
+              skipped_calls, original_calls);
+    }
+    reset_run();
+    frame_with(17, 3);
+    CHECK(ncalls == 1 && calls[0].fn == FN_BASE_UPDATE && calls[0].a0 == enemy,
+          "17/3 doesn't run MH4U's base action update with the monster in r0");
+    CHECK(skipped_calls == 1 && original_calls == 0, "17/3 doesn't skip the dispatcher");
+    reset_run();
+    frame_with(17, 9);
+    CHECK(ncalls == 1 && calls[0].fn == FN_BASE_UPDATE, "17/9 doesn't run the base update");
+
+    /* ── category 17 on MH4U's own Rathian is left to the game ── */
+    reset_run();
+    h_write8(NULL, work + WORK_ID, 1);
+    h_write8(NULL, work + WORK_CATEGORY, 17);
+    h_write8(NULL, work + WORK_INDEX, 3);
+    regs[0] = enemy;
+    h_write32(NULL, enemy + ENEMY_WORK, work);
+    hooked_dispatch(NULL, NULL);
+    CHECK(original_calls == 1 && ncalls == 0 && skipped_calls == 0,
+          "category 17 on monster 1 isn't left to the game");
+    h_write8(NULL, work + WORK_ID, 124);
+
     /* ── shared ids and other monsters fall through ── */
     reset_run();
     frame_with(3, 17);
@@ -279,6 +308,6 @@ int main(void) {
         fprintf(stderr, "%d check(s) failed\n", failures);
         return 1;
     }
-    printf("ok: %d engine calls checked across 3/98 and 12/1-3\n", 4 + 4 + 2 + 1 + 1 + 1);
+    printf("ok: %d engine calls checked across 3/98, 12/1-3 and category 17\n", 4 + 4 + 2 + 1 + 1 + 1 + 2);
     return 0;
 }
