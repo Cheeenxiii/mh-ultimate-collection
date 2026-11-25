@@ -22,6 +22,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `monster_motions.py` | lists the motion each of a monster's action handlers starts, compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)), and plans where a port writes the source's animations ([3U Rathian's moves](#a-3u-rathians-moves-on-mh4us-handlers)) |
 | `action_map.py` | joins two games' action and motion inventories: the MH4U handler each shared action id reaches, the ids only one game has, and the ids where the two sides' start motions differ (check R2 in [docs/checks.md](../docs/checks.md#the-shared-action-map-r2)) |
 | `monster_handlers.py` | the 3U Rathian's 17 ids MH4U has no action for: each handler's engine calls and MH4U counterpart (`worklist`), the shared action each missing id can run with the proof (`targets`), and the run time's generated action-id map (`table`; [The 17 ids MH4U has no action for](#the-17-ids-mh4u-has-no-action-for)) |
+| `monster_attack_records.py` | the in-image action-start record a 3U move passes (44 bytes) and the value curves, their MH4U counterparts rebuilt from MH3U's, and the comparison with MH4U's own records ([specs/actiondata.md](../specs/actiondata.md), checks N1 to N4) |
 | `monster_emc.py` | the native actions a monster's AI script starts (`00 cat num` in its rEnemyCmd), to tell an action the AI picks from one nothing reaches ([specs/emc.md](../specs/emc.md)) |
 | `monster_versions.py` | the player-visible comparison of every 3U and GU version MH4U shares, per axis, and the writer of [data/catalog/versions.csv](../data/catalog/versions.csv) ([how it is made](../data/catalog/versions.md)) |
 
@@ -484,9 +485,13 @@ calls 7 of the class's own sub-handlers (0x00691930, 0x00691b38, 0x00691c74, 0x0
   with `set_reg`, but the guest's VFP registers cannot, so a call that passes a float in s0 or
   s1 (0x00833b2c, 0x008437f4 and 0x00839514 here) cannot be made as MH3U makes it. That needs
   an ABI that also takes the float and r3 arguments, which is engine work (the fork).
-- **MH3U's data:** 0x0084704c and 0x00847134 take an address into MH3U's image (0x00b0b194);
-  MH4U's counterparts take MH4U's own tables, so the 3U attack/shell data has to be converted
-  first.
+- **MH3U's data:** 0x0084704c and 0x00847134 take 0x00b0b194, a 44-byte action-start record
+  in MH3U's image ([specs/actiondata.md](../specs/actiondata.md)). Its MH4U counterpart is
+  built from the dumps by `reference/monster_attack_records.py`, checked against the shared
+  3/5 record both games have (checks N1 and N2). Action 4's sub-handlers also pass three value
+  curves (0x00c4ed68, 0x00c4eef0 and 0x00c4ef28); MH4U's evaluator has the same body, so the
+  port carries them (N4). So the data half of this blocker is done; what remains for action 4
+  is the C and the calls above.
 - **One shared branch:** the handler falls back to 0x00858b6c, the shared 0/3 handler, so that
   branch can call MH4U's 0x0094dc84 by the same map as 13/9.
 
@@ -513,6 +518,23 @@ python3 reference/monster_handlers.py worklist --game mh3u --exheader <MH3U exhe
 
 The inventories and the motion list come from `monster_actions.py list` and
 `monster_motions.py list` (their commands are above and in R1).
+
+### The tables the missing ids pass
+
+The translated and mapped ids pass in-image tables to the engine; for each call, either
+MH4U's own data serves it or an MH4U counterpart is built. The three tables' formats are in
+[specs/actiondata.md](../specs/actiondata.md).
+
+| Ids | MH3U's call and table | MH4U's counterpart |
+|---|---|---|
+| 4 | 0x0084704c and 0x00847134 take 0x00b0b194, the second of the two 44-byte action-start records at 0x00b0b168 | built from MH3U's by `reference/monster_attack_records.py`; the shared 3/5 pair rebuilds on all 12 fields (N1/N2) |
+| 4's sub-handlers | 0x00691cd8, 0x00691e68, 0x00691e80, 0x00692318 and 0x00692330 pass the value curves 0x00c4ed68, 0x00c4eef0 and 0x00c4ef28 to 0x0083c6e0 | carried, not converted: MH3U's evaluator 0x0058493c and MH4U's 0x00aac8dc are a map pair ("same body"), so MH4U reads the same keys (N4) |
+| 10/0 to 10/6 | each case block passes a command list to the shared handler 0x008326e0: 0x00c4d520 (10/0), 0x00c4d5a0 (10/1, 10/2), 0x00c4d550 (10/3), 0x00c4d578 (10/4), 0x00c4d530 (10/5), 0x00c4d540 (10/6) | MH4U's 10/7 runs the same handler's MH4U counterpart 0x00919788 with MH4U's own lists at 0x00fd1db8, 0x00fd1dc8, 0x00fd1dd8, 0x00fd1e10, 0x00fd1e38, 0x00fd1f38, 0x00fd1f48, 0x00fd1f70 and 0x00fd1f80, chosen by 0x009385e8's result. No 3U list is converted (N3) |
+| 11/5 | its case block passes 0x00c4d818 to 0x008326dc, the shared handler's other entry | MH4U's 11/0 runs 0x00919788 with MH4U's own list 0x00fd2360. No conversion (N3) |
+| 11/15, 11/26, 11/28 | their case blocks pass 0x00c4d850, 0x00c4d868 and 0x00c4d880 through the wrapper 0x00687e88, ending on 0x0084d864 | as 11/5: MH4U's 11/0 and its own list 0x00fd2360 |
+
+The 3/5 record the check compares is not one of the missing ids: both games have 3/5, so its
+record is what proves the conversion before it is used for action 4's.
 
 **Where the port's animations go.** The converted animation file keeps the source game's
 grouping, and the port translates the motion number at run time: the ported monster's plugin
