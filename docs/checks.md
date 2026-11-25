@@ -134,9 +134,9 @@ Last result (2026-11-24): MH4U and MHXX start the same index for every one of th
 comparable ids. The two ids whose index also agrees with MH3U are 1/11 and 1/12; the content
 comparison above shows that the rest are mostly the same motion at another index, not different
 moves. The not-compared ids are those where one side (or both) is `computed`, `none` or
-`no-handler`; the run prints the reason counts. The port must map MH3U's motion indices (its
-packing and LMT grouping), not reuse them; 13/5, 13/6 and 13/8 are the entries whose motion
-itself differs.
+`no-handler`; the run prints the reason counts. The port translates MH3U's motion indices at
+run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125));
+13/5, 13/6 and 13/8 each keep their own animation.
 
 To rerun, write the TSVs outside the repository (for example under `build/`):
 
