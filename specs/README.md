@@ -62,4 +62,5 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [camera](camera.md) | rCameraList | MH4U and MHXX layouts, tracks and keyframe buffers verified (C1); MH3U ships no file of the class |
 | [sbc](sbc.md) | rCollision | magic and inner class verified (S1); layout from MHGU Definitive Edition |
 | [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, rTexLayout, rSoundAttributeSe, … | from Cha-Cha (Wii U); the little-endian layout read on all 853 XFS files of MH3U's and MH4U's RomFS (X1): 845 in MH3U, 8 in MH4U, which ships no rTexLayout |
+| [lyt](lyt.md) | rLayout | MH4U's HUD and menu layouts: header, texture slots, node chain and the common node header read on all 825 entries of the five languages (LY1); the per-type fields beyond position and the text string unverified |
 | [save](save.md) | none (save-side files) | character save (profile, item and equipment boxes, pouches, guild quests, Palicos, monster log, guild card) and the system save's cipher and checksum, checked on the maintainer's saves (S1-S7); the character save's quest lists and the system save's fields open |
