@@ -69,7 +69,7 @@ Each format follows its spec in [specs/](../specs/README.md). A field is marked 
 
 ## Monsters
 
-A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source game's code is the reference to translate, handler by handler, and never runs in the mod ([decision 0002](decisions.md#0002-monsters-are-ported-onto-mh4us-engine)). Before a version gets an id, [data/catalog/versions.csv](../data/catalog/versions.csv) records whether it differs from MH4U's version ([decision 0004](decisions.md#0004-monster-versions)'s amendment): every large monster MH4U shares with MH3U or MHXX has a verdict, per axis (monster data, moves, model), with the comparison's counts ([how it is made](../data/catalog/versions.md)).
+A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source game's code is the reference to translate, handler by handler, and never runs in the mod ([decision 0002](decisions.md#0002-monsters-are-ported-onto-mh4us-engine)). Before a version gets an id, [data/catalog/versions.csv](../data/catalog/versions.csv) records whether a player would notice it differ from MH4U's version ([decision 0004](decisions.md#0004-monster-versions)'s amendment): every large monster MH4U shares with MH3U or MHXX has a verdict, per axis (monster data, moves, model), with the evidence — the source's AI script and the wiki's attack lists for moves, the thresholds and counts for data ([how it is made](../data/catalog/versions.md)).
 
 | Step | What | State |
 |---|---|---|
