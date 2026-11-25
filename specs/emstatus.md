@@ -93,7 +93,7 @@ MH4U keeps a part's HP and breaks in one 10-byte record in its `.etd` part table
 | +0x05 | u8 | third of the three bytes | break record +0x03 (the second break id) | verified | E5: 8 of 8 equal |
 | +0x06 | u16 | second-level HP (0xFFFF none), from the break record | break record +0x04, when block 0x6C has no positive value for the part | verified | E5: 7 of 8 equal on Rathian, all seven 0xFFFF on both sides; the eighth retuned |
 | +0x06 | u16 | second-level HP, from block 0x6C | second-level HP block (+0x6C), when the part's value is above 0 | unverified | no MH4U pair: the four files with the block are em025, em046, em073 and em085, and MH4U has none of their monsters ([reference/README.md](../reference/README.md#mh3u-ids-to-mh4us)) |
-| +0x08 | u16 | kind | none | unverified | no MH3U field; E5: no source |
+| +0x08 | u16 | kind: the part's Insect Glaive extract kind, 0 none, 1 red, 2 orange, 3 white, 4 green | none: MH3U has no Insect Glaive and no field; a port takes MH4U's own em001 values by part index (all eight nonzero) | verified | ours, MH4U 0x936904; E13 (specs/emd.md) |
 
 The record's first four bytes go into MH4U's bytes +2 to +5 as they are, and its last two bytes (+4) into MH4U's second-level HP. On Rathian the eight records' bytes +0 to +3 equal MH4U's bytes +2 to +5 on all eight parts, and the record's +4 equals MH4U's second-level HP on the seven parts that have none in both games; on the eighth, the tail, both games have a value and MH4U's is the lower of the two. That the 0xFFFF of the record's +4 is the same 0xFFFF as MH4U's +6, and that the field takes the same place in the record, is the evidence for the mapping; what the 3U field itself means stays unverified, and the initializer 0x84cb10 scales it into the part's state record.
 
@@ -101,7 +101,7 @@ The record's first four bytes go into MH4U's bytes +2 to +5 as they are, and its
 
 **Where 3U has no value for an MH4U field:**
 
-- **MH4U's kind (+8)** has no 3U field at all. The converter writes 0 and the comparison prints `kind no 3U field`; the field stays unverified, and a port that needs it has to find where MH4U reads it, or author a value.
+- **MH4U's kind (+8)** has no 3U field at all: MH3U has no Insect Glaive, and the field is the part's extract kind. The converter writes 0 and the comparison prints `kind no 3U field`; MH4U's own 0x936904 reads it (check E13, specs/emd.md), and a port takes MH4U's own em001 values by part index, where all eight are nonzero.
 - **MH4U's second-level HP (+6)** is written as 0xFFFF (none) when neither block 0x6C nor the break record's +4 supplies a value; both games use 0xFFFF for "no second-level HP".
 - **MH4U's part HP (+0)** is written as 0 when a file lacks the part HP block (the walk makes it optional).
 - **Block 0x6C's place in MH4U** is unverified: it is 3U's own second-level HP and the converter prefers it over the record's +4 when it is above 0, but the only four files that have it are em025, em046, em073 and em085 — Jhen Mohran, Duramboros, Rust Duramboros and Hallowed Jhen Mohran — and MH4U has none of those monsters. MH4U's closest file to Jhen Mohran is Dah'ren Mohran, a different monster that agrees on 40 of 80 hitzone bytes, and the other three's closest agree on at most 34 ([reference/README.md](../reference/README.md#mh3u-ids-to-mh4us)); no MH4U part record can check the block, so the preference has no check behind it.
@@ -124,7 +124,7 @@ What calls slot 45, and at which break level, is unverified: no function calls 0
 | byte +4 | break record +2 | 8 of 8 |
 | byte +5 | break record +3 | 8 of 8 |
 | second-level HP (+6) | break record +4 (block 0x6C absent) | 7 of 8 |
-| kind (+8) | none | no 3U field |
+| kind (+8) | none: MH3U has no Insect Glaive | no 3U field; MH4U's own em001 has it on all eight parts (E13) |
 
 | | MH3U | MH4U |
 |---|---|---|
@@ -134,12 +134,12 @@ What calls slot 45, and at which break level, is unverified: no function calls 0
 
 - Both games single out exactly part 7, and it is the tail in both (the sever data above). MH4U's only non-zero break-level byte and only second-level HP are part 7's, and 3U's only non-default break record is part 7's.
 - The 3U record's first four bytes equal MH4U's part-record bytes +2 to +5 on all eight parts (the seven unused records are zero on both sides). The record's +4 equals MH4U's second-level HP on the seven parts that have none in both games; on part 7 both games have a value, MH4U's lower, so MH4U retuned it. 3U has no second-level HP block for Rathian, so the record's +4 is the only 3U field that can hold that value.
-- MH4U's kind has no 3U field: the comparison prints `kind no 3U field`, and the field stays unverified.
+- MH4U's kind has no 3U field: the comparison prints `kind no 3U field`. The field is the part's Insect Glaive extract kind, which MH4U's own em001 carries on all eight parts ([specs/emd.md](emd.md), check E13); 3U has no source for it.
 
 ## What this means for the mod
 
 - **A 3U monster's base HP and hitzones come from its `em_status00`**, in MH4U's hitzone layout. MH4U retuned some of the monsters it inherited from 3U; a 3U monster that MH4U lacks keeps 3U's values (fidelity rule).
-- **MH3U's break data is also in `em_status00`**: the part HP table, the second-level HP block and one 6-byte break record per part. A port takes all three; [Part record mapping](#part-record-mapping) says which 3U field feeds which MH4U field, checked against MH4U's own file on Rathian (check E5). MH4U's kind field has no 3U source, so a port has to find or author it. Severing is not a file record: it is the separate `emNNN_tail.mod` plus the class handler that swaps it in.
+- **MH3U's break data is also in `em_status00`**: the part HP table, the second-level HP block and one 6-byte break record per part. A port takes all three; [Part record mapping](#part-record-mapping) says which 3U field feeds which MH4U field, checked against MH4U's own file on Rathian (check E5). MH4U's kind field has no 3U source: it is the part's Insect Glaive extract kind (0x936904, check E13), so a port takes MH4U's own em001 values by part index. Severing is not a file record: it is the separate `emNNN_tail.mod` plus the class handler that swaps it in.
 - MH3U's hurt volumes, attack volumes and attack records are in specs/hitdata.md. They are on MH3U's own skeleton: none of Rathian's hurt volumes equals MH4U's.
 
 ## Checks
