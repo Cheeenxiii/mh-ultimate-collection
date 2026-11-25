@@ -24,7 +24,7 @@ package. The three games number their objects in different orders: MH4U keeps `B
 in the game whose package it was made against. That package's hash is the signature the material
 carries at 0x10, and MH4U's rMaterial load refuses any other ([mrl](mrl.md)). Past that check the
 slots are used as stored, so a material converted by rewriting the signature alone points at
-other objects (check X4 is the game check of the converted model).
+other objects. With the ids moved, MH3U Rathian's model draws in MH4U (check X4).
 
 Reading the package: the names and slots below are what the converter needs. The objects'
 bodies (shader code, state values, buffer layouts) are not decoded.
@@ -92,5 +92,6 @@ one (check X3).
   MHXX files. Only one aligned word in the MH3U files carries a known name hash with the wrong
   slot (a coincidence, left alone). Procedure:
   `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k shader_package`.
-- **X4 (game, open):** the converted model drawn in MH4U; procedure and status in
-  [checks.md](../docs/checks.md#the-materials-shader-ids-x4-game-open).
+- **X4 (done, 2026-11-26, game):** with its ids moved, 3U Rathian's converted model draws in
+  MH4U (area 3 of the 125 quest), where it drew nothing before. Procedure in
+  [checks.md](../docs/checks.md#the-materials-shader-ids-x4-game).

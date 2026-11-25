@@ -90,7 +90,7 @@ the material records' name hashes included, stays the source's.
   quest the archive resource's +0x50 reaches done (`0x00928a01`) and `HW.Memory UnmappedAccess`
   is 0 through the load, where the source signature stalled it. With only the signature
   rewritten its shader ids still named MH3U's slots, and the #182 runs drew no Rathian;
-  whether the moved ids make the model draw is [mfx](mfx.md) X4. Procedure in
+  with the ids moved, it draws ([mfx](mfx.md) X4). Procedure in
   [checks.md](../docs/checks.md#a-converted-material-loads-m3).
 - **MR4 (done, 2026-11-25, static):** every model/material pair of every monster archive of MH4U
   (`/data/emNNN.arc`, 123 archives) and MH3U (`/arc/enemy/emNNN.arc`, 85 archives). For every
