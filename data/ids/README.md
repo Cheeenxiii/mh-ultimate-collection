@@ -16,9 +16,23 @@ rule: one registry, ids only ever grow, and the run time reads them from here.
 | `stand_in` | the MH4U monster id whose table rows answer for this id until the port ships the content's own rows |
 | `notes` | where the content comes from, and anything the next reader needs |
 
-The table it stands in for is the game's own, read by the plugin's hooks: the ported monster's
-id is answered with that MH4U monster's rows, so the id loads the base game's files today and
-the port's own files when they are installed. Changing a `stand_in` is not moving an id.
+The rows a registered id answers with are the game's own, read by the plugin's hooks: the
+ported monster's id is answered with that MH4U monster's rows. One exception: MH4U loads a
+monster's own files from the paths in the record `enemyResourceIndex[id]` (0x00efbd08) points
+to, and the plugin builds a record for each registered id on its first frame, from the
+stand-in's, with every path rewritten to the ported id (`enemy\em001\...` -> `enemy\em124\...`).
+So the port's files are loaded from its own id's paths, not the stand-in's. The data path
+(`enemyDataPathIndex`) still answers with the stand-in's: the ports ship no MH4U-format
+`.emd`/`.etd` yet, and their monster data is the stand-in's. Changing a `stand_in` is not
+moving an id.
+
+The resource record is a `0x2c`-byte record of eleven pointers: the model, six motion lists,
+the camera, a second motion list, the tail model, the motion effects, an unused field, the
+sound, four extra paths (the command/EMC is the fourth), the effect lists and a second effect
+list. The plugin's [README](../mods/monster_ids/README.md#the-resource-record) has the
+offsets, and check P1 in [checks.md](../docs/checks.md#ported-monster-ids) shows the built
+record's paths. A port packages its files under those paths
+(`enemy\em124\mod\em124`, `enemy\em124\mot\em124_0`, ...).
 
 ## Rules the tool checks
 
