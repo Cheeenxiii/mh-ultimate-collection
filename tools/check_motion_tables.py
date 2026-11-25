@@ -50,7 +50,7 @@ R1_COUNTS = {
     "mhxx": dict(common=273, compared=167, same_index=167, not_compared=106, unresolved=0),
     "mh3u": dict(common=174, compared=117, same_index=2, not_compared=57, unresolved=19),
 }
-GENERATED = "Generated from R1's comparison by reference/monster_motions.py table."
+GENERATED = f"Generated from R1's comparison by {monster_motions.GENERATOR}."
 
 MOTIONS = re.compile(r"^static const MhucMotion mhuc_motions_(\d+)\[\] = \{$")
 NO_MOTIONS = re.compile(r"^static const MhucMotion \*const mhuc_motions_(\d+) = NULL;$")
