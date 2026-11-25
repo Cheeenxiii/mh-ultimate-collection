@@ -449,8 +449,12 @@ motion makes it exit 1 and name the id.
 T1b, last result (2026-11-25): pass, 13 engine calls checked across 3/98's three frames and
 the 12/1-3 blocks. Changing 3/98's `6.0` to `5.0` fails it with the motion line.
 
-T1c: waits on a code-library build with this mod's hook (a heavy job). Until then the plugin's
-first real run is R2p; the stubs it depends on are T0.
+T1c, last result (2026-11-25, MH4U USA v1.3.0, a code library built with the mod's
+`uEnemy::dispatchAction` hook, headless runner): pass. The log had the plugin's ready line,
+`selftest: 4 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...`,
+the line naming 12/0 as MH4U's own `0x006d524c` and the pending slices, and
+`selftest: float stubs at 0x08e44670 (256 bytes, the game's heap)`; the runner exited 0. No
+monster spawned, so no translated action ran: the in-game side is R2p.
 
 ## Floats through a guest stub (T0)
 
