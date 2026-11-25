@@ -43,6 +43,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 |---|---|---|
 | [arc](arc.md) | rArchive | verified (MH4U, MH3U, MHXX) |
 | [tex](tex.md) | rTexture | header and 11 formats verified; formats 6, 15, 16 open |
+| [lmd](lmd.md) | rLayoutMessage | MH4U's message tables read on all 1,455 of the base and update RomFS (LM1): the header, the id-indexed `emName`/`emExp` tables (123 messages, message N names id N), the formatting and string records; the label hash and the file's trailer are open |
 | [gmd](gmd.md) | rGUIMessage | layouts verified (MH3U v1-short, MHXX v2 and v2-32); v2 hashes open |
 | [mod](mod.md) | rModel | version and header shape verified, the same in all three games; fields partial |
 | [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem, rQuestBattleData, rSuppItem | MH4U, MHXX `.mib` and MH3U `QTDS` headers verified on DLC quests; DLC crypto of all three; `.quest_btl` unknown |

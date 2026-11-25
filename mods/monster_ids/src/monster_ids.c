@@ -70,11 +70,17 @@
  * ports ship no MH4U-format `.emd`/`.etd` yet (mods/monster_ids/README.md), so the stand-in's
  * data row is what loads their monster data.
  *
- * What is not answered yet (left undone): the name and notes text (`emName` and
- * `emExp` message N names id N; its reader is the message layer, not one per-monster getter)
- * and the Hunter's Notes list that walks all 124 rows (0x0061df4c). The stand-in also means
- * the spawned monster is MH4U's own (the data block keeps its own id byte) until #48/#49's
- * converted files and the port's own rows replace it.
+ * The name and notes text. MH4U's `emName` and `emExp` message tables (0x0109a080 slots 6
+ * and 7; message N names id N) are read through three per-id getters: 0x00cdfb30 (format
+ * entry), 0x00cdfa18 (string record) and 0x00cdfa30 (record by id). The plugin wraps all
+ * three and answers a registered id with its own record and a UTF-16 string in the game's
+ * heap, loaded on the first frame from text/monster_text.bin in the mod's folder (built by
+ * `mhuc text build` from the source game's notes table and the registry's name). Ids 0 to 123
+ * and every other message table go to the game's getters.
+ *
+ * What is not answered yet (left undone): the Hunter's Notes list that walks all 124 rows
+ * (0x0061df4c). The stand-in also means the spawned monster is MH4U's own (the data block
+ * keeps its own id byte) until #48/#49's converted files and the port's own rows replace it.
  *
  * Settings (mod.json "config", the player's config.ini over it):
  *   selftest  "1": on the first frame, log what the reader hooks answer for each registered
@@ -87,6 +93,7 @@
  */
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -910,6 +917,361 @@ static void file_kind_list(uint16_t files, unsigned motion_mask, int shipped, ch
     }
 }
 
+
+/* ── the name and notes text ─────────────────────────────────────────────────────
+ *
+ * MH4U answers a monster's name and Hunter's Notes text by the id: the message tables
+ * `emName` and `emExp` are loaded from `core_common.arc` and their message N names id N.
+ * The loader at 0x005aa2f0 fills 71 pointers at 0x0109a080; `emName` is slot 6 and `emExp`
+ * slot 7 (reference/README.md#mh4u-monster-tables). A ported id has no message there, so the
+ * game's per-id getters are answered from the mod's own table:
+ *
+ *   - `0x00cdfb30` (format entry by id) is given a copy of the stand-in id's 16-byte entry,
+ *     kept per registered id;
+ *   - `0x00cdfa18` (string record by format entry) is given a 12-byte record whose string
+ *     pointer is the ported id's own text in the game's heap;
+ *   - `0x00cdfa30` (string record by id) is answered the same record.
+ *
+ * The text is `text/monster_text.bin` in the mod's folder, built by `mhuc text build` from
+ * the source game's own notes table (data/ids/notes.csv) and the registry's name; the file
+ * holds no MH4U text. Ids 0 to 123, and every other message table, go to the game's own
+ * getters unchanged.
+ */
+#define MESSAGE_TABLE_ARRAY 0x0109a080u
+#define MESSAGE_SLOT_NAME 6u
+#define MESSAGE_SLOT_NOTES 7u
+#define MESSAGE_FORMAT 0x00cdfb30u
+#define MESSAGE_STRING_RECORD 0x00cdfa18u
+#define MESSAGE_STRING_RECORD_BY_ID 0x00cdfa30u
+#define TEXT_FILE "text/monster_text.bin"
+#define TEXT_MAGIC "MHUT"
+#define TEXT_VERSION 1u
+
+typedef struct PortedText {
+    uint8_t have;       /* the id has text for this kind: its string and record are built */
+    uint32_t string;    /* guest NUL-terminated UTF-16LE text */
+    uint32_t units;     /* UTF-16 code units, NUL not counted */
+    uint32_t record;    /* guest 12-byte string record: text, units, units */
+    uint32_t format;    /* guest 16-byte format entry, 0 until the first getter call */
+} PortedText;
+
+static PortedText names[MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT];
+static PortedText notes[MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT];
+static uint32_t name_table;      /* the loaded emName object, or 0 */
+static uint32_t notes_table;     /* the loaded emExp object, or 0 */
+static int text_loaded;
+static int text_failed;
+
+static HookInfo h_msg_format = {"message format", 1, 0, 0};   /* getter(table, id) */
+static HookInfo h_msg_record = {"message record", 1, 0, 0};   /* getter(table, format) */
+static HookInfo h_msg_by_id = {"message record", 1, 0, 0};    /* getter(table, id) */
+
+static uint32_t read16le(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8);
+}
+
+static uint32_t read32le(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+           ((uint32_t)p[3] << 24);
+}
+
+/* Copies one UTF-16LE string into the game's heap for a registered id, then builds its
+ * 12-byte string record. Returns 0 when the heap can't give the blocks. */
+static int keep_text(MH4UCall *call, PortedText *text, const uint8_t *units, uint32_t count) {
+    const uint32_t chars = host->alloc(call, (count + 1) * 2u, 2);
+    if (!chars) {
+        return 0;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+        host->write16(call, chars + i * 2u, read16le(units + i * 2u));
+    }
+    host->write16(call, chars + count * 2u, 0);
+    const uint32_t record = host->alloc(call, 12, 4);
+    if (!record) {
+        return 0;
+    }
+    host->write32(call, record, chars);
+    host->write32(call, record + 4u, count);
+    host->write32(call, record + 8u, count);
+    text->have = 1;
+    text->string = chars;
+    text->units = count;
+    text->record = record;
+    text->format = 0;
+    return 1;
+}
+
+/* The mod's text table, read once the heap and MH4U's message tables are up: one entry per
+ * registered id, in the registry's order, each with a name and a notes string. */
+static void load_text(MH4UCall *call) {
+    char path[512], line[220];
+    if (text_loaded || text_failed) {
+        return;
+    }
+    name_table = host->read32(call, MESSAGE_TABLE_ARRAY + MESSAGE_SLOT_NAME * 4u);
+    notes_table = host->read32(call, MESSAGE_TABLE_ARRAY + MESSAGE_SLOT_NOTES * 4u);
+    if (!name_table || !notes_table) {
+        return;      /* the loader hasn't run yet: try again next frame */
+    }
+    text_loaded = 1;
+    snprintf(path, sizeof path, "%s/%s", host->mod_dir ? host->mod_dir : ".", TEXT_FILE);
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        text_failed = 1;
+        snprintf(line, sizeof line, "text: no %s in the mod folder: run mhuc text build "
+                 "(data/ids/notes.csv) to give the ported ids their name and notes", TEXT_FILE);
+        say(MH4U_LOG_WARNING, line);
+        return;
+    }
+    uint8_t *data = NULL;
+    long size = 0;
+    if (fseek(f, 0, SEEK_END) == 0) {
+        size = ftell(f);
+    }
+    if (size > 0 && size < (1L << 20) && fseek(f, 0, SEEK_SET) == 0) {
+        data = (uint8_t *)malloc((size_t)size);
+        if (data && fread(data, 1, (size_t)size, f) != (size_t)size) {
+            free(data);
+            data = NULL;
+        }
+    }
+    fclose(f);
+    if (!data) {
+        text_failed = 1;
+        snprintf(line, sizeof line, "text: %s isn't a text table mhuc writes", TEXT_FILE);
+        say(MH4U_LOG_WARNING, line);
+        return;
+    }
+    if (size < 12 || memcmp(data, TEXT_MAGIC, 4) != 0 || read32le(data + 4) != TEXT_VERSION) {
+        text_failed = 1;
+        free(data);
+        snprintf(line, sizeof line, "text: %s isn't a version %u text table", TEXT_FILE,
+                 (unsigned)TEXT_VERSION);
+        say(MH4U_LOG_WARNING, line);
+        return;
+    }
+    const uint32_t count = read32le(data + 8);
+    size_t at = 12;
+    uint32_t kept = 0;
+    for (uint32_t e = 0; e < count; e++) {
+        if (at + 12 > (size_t)size) {
+            break;
+        }
+        const uint32_t id = read32le(data + at);
+        const uint32_t name_units = read32le(data + at + 4);
+        const uint32_t notes_units = read32le(data + at + 8);
+        at += 12;
+        const size_t need = (size_t)(name_units + notes_units) * 2u;
+        if (at + need > (size_t)size) {
+            break;
+        }
+        int which = -1;
+        if (lookup(id, &which)) {
+            if (!names[which].have) {
+                keep_text(call, &names[which], data + at, name_units);
+                keep_text(call, &notes[which], data + at + name_units * 2u, notes_units);
+                kept++;
+            }
+        } else {
+            snprintf(line, sizeof line, "text: id %u isn't a registered monster: ignored",
+                     (unsigned)id);
+            say(MH4U_LOG_WARNING, line);
+        }
+        at += need;
+    }
+    free(data);
+    int missing = 0;
+    for (int i = 0; i < MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT; i++) {
+        if (!names[i].have || !notes[i].have) {
+            missing++;
+        }
+    }
+    snprintf(line, sizeof line, "text: %u of %u entry(ies) from %s; %s", (unsigned)kept,
+             (unsigned)count, TEXT_FILE,
+             missing ? "some registered ids have no name or notes"
+                     : "every registered id has a name and notes");
+    say(missing ? MH4U_LOG_WARNING : MH4U_LOG_INFO, line);
+}
+
+static int text_table_kind(uint32_t table) {
+    if (table && table == name_table) {
+        return 0;
+    }
+    if (table && table == notes_table) {
+        return 1;
+    }
+    return -1;
+}
+
+static PortedText *text_answer(uint32_t table, uint32_t id) {
+    const int kind = text_table_kind(table);
+    if (kind < 0) {
+        return NULL;
+    }
+    int which = -1;
+    if (!lookup(id, &which)) {
+        return NULL;
+    }
+    PortedText *answer = kind == 0 ? &names[which] : &notes[which];
+    return answer->have ? answer : NULL;
+}
+
+static const MhucMonsterId *text_row(int i) {
+    return i < MHUC_MONSTER_COUNT ? &mhuc_monster_ids[i]
+                                  : &mhuc_pooled_monster_ids[i - MHUC_MONSTER_COUNT];
+}
+
+/* The game's format getter, answered with a copy of the stand-in id's own 16-byte entry so
+ * the message object keeps its layout, font and colour words. Built once per id. */
+static void message_format_reader(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    const uint32_t table = host->reg(call, 0);
+    const uint32_t id = host->reg(call, 1);
+    PortedText *answer = text_answer(table, id);
+    if (!answer) {
+        if (id <= MHUC_MONSTER_FIRST - 1 && text_table_kind(table) >= 0) {
+            note_old(info, id);
+        }
+        host->call_original(call);
+        return;
+    }
+    int which = -1;
+    const MhucMonsterId *row = lookup(id, &which);
+    if (!answer->format) {
+        const uint32_t fmt = host->call(call, MESSAGE_FORMAT, table, row->stand_in, 0);
+        if (!fmt) {
+            host->call_original(call);
+            return;
+        }
+        const uint32_t copy = host->alloc(call, 16, 4);
+        if (!copy) {
+            host->call_original(call);
+            return;
+        }
+        for (unsigned i = 0; i < 4; i++) {
+            host->write32(call, copy + i * 4u, host->read32(call, fmt + i * 4u));
+        }
+        answer->format = copy;
+    }
+    note_own(info, id);
+    host->set_reg(call, 0, answer->format);
+    host->skip_original(call);
+}
+
+/* The game's string-record getter by format entry: our format copies are recognised and
+ * answered with the ported id's own record. */
+static void message_record_reader(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    const uint32_t table = host->reg(call, 0);
+    const uint32_t fmt = host->reg(call, 1);
+    const int kind = text_table_kind(table);
+    if (kind >= 0 && fmt) {
+        for (int i = 0; i < MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT; i++) {
+            PortedText *answer = kind == 0 ? &names[i] : &notes[i];
+            if (answer->have && answer->format == fmt) {
+                note_own(info, text_row(i)->id);
+                host->set_reg(call, 0, answer->record);
+                host->skip_original(call);
+                return;
+            }
+        }
+    }
+    host->call_original(call);
+}
+
+/* The game's string-record getter by id: the same record. */
+static void message_record_by_id_reader(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    const uint32_t table = host->reg(call, 0);
+    const uint32_t id = host->reg(call, 1);
+    PortedText *answer = text_answer(table, id);
+    if (!answer) {
+        if (id <= MHUC_MONSTER_FIRST - 1 && text_table_kind(table) >= 0) {
+            note_old(info, id);
+        }
+        host->call_original(call);
+        return;
+    }
+    note_own(info, id);
+    host->set_reg(call, 0, answer->record);
+    host->skip_original(call);
+}
+
+/* A name as ASCII for the log (the registry's names are ASCII; anything else is '?'). */
+static void name_text(MH4UCall *call, PortedText *answer, char *out, size_t size) {
+    size_t n = 0;
+    for (uint32_t i = 0; i < answer->units && n + 1 < size; i++) {
+        const uint32_t c = host->read16(call, answer->string + i * 2u);
+        out[n++] = c < 0x80 ? (char)c : '?';
+    }
+    out[n] = '\0';
+}
+
+static void text_line(MH4UCall *call, const char *what, uint32_t id, PortedText *answer,
+                      int is_name) {
+    char line[220], name[80];
+    if (is_name) {
+        name_text(call, answer, name, sizeof name);
+        snprintf(line, sizeof line, "self-test: message %s id %u -> \"%s\", %u UTF-16 unit(s)",
+                 what, (unsigned)id, name, (unsigned)answer->units);
+    } else {
+        snprintf(line, sizeof line, "self-test: message %s id %u -> %u UTF-16 unit(s)", what,
+                 (unsigned)id, (unsigned)answer->units);
+    }
+    say(MH4U_LOG_INFO, line);
+}
+
+static void self_test_text(MH4UCall *call) {
+    char line[260];
+    if (!text_loaded) {
+        load_text(call);
+    }
+    if (text_failed) {
+        say(MH4U_LOG_WARNING, "self-test: no text table: ported ids have no name or notes");
+        return;
+    }
+    for (int i = 0; i < MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT; i++) {
+        const MhucMonsterId *row = text_row(i);
+        if (!names[i].have || !notes[i].have) {
+            snprintf(line, sizeof line, "self-test: id %u has no text", (unsigned)row->id);
+            say(MH4U_LOG_WARNING, line);
+            continue;
+        }
+        text_line(call, "name", row->id, &names[i], 1);
+        text_line(call, "notes", row->id, &notes[i], 0);
+        /* The getters are called through the game's own entry points, so this proves the
+         * hook chain answers a ported id as well as the stored text. */
+        const uint32_t fmt = host->call(call, MESSAGE_FORMAT, name_table, row->id, 0);
+        const uint32_t rec = host->call(call, MESSAGE_STRING_RECORD_BY_ID, name_table, row->id, 0);
+        const uint32_t fmt_notes = host->call(call, MESSAGE_FORMAT, notes_table, row->id, 0);
+        const uint32_t rec_notes = host->call(call, MESSAGE_STRING_RECORD_BY_ID, notes_table,
+                                              row->id, 0);
+        snprintf(line, sizeof line, "self-test: id %u's getters answer its own record%s%s%s; "
+                 "ids 0..%u pass through", (unsigned)row->id,
+                 fmt == names[i].format ? "" : " (no name format)",
+                 rec == names[i].record ? "" : " (no name record)",
+                 (fmt_notes == notes[i].format && rec_notes == notes[i].record) ? ""
+                 : " (no notes record)", (unsigned)(MHUC_MONSTER_FIRST - 1));
+        say(MH4U_LOG_INFO, line);
+    }
+    /* MH4U's own id 1 must still come from the game's tables. */
+    const uint32_t fmt = host->call(call, MESSAGE_FORMAT, name_table, 1, 0);
+    const uint32_t rec = host->call(call, MESSAGE_STRING_RECORD_BY_ID, name_table, 1, 0);
+    int ours = 0;
+    for (int i = 0; i < MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT; i++) {
+        if (fmt && (fmt == names[i].format || fmt == notes[i].format)) {
+            ours = 1;
+        }
+        if (rec && (rec == names[i].record || rec == notes[i].record)) {
+            ours = 1;
+        }
+    }
+    snprintf(line, sizeof line, "self-test: message tables: id 1 %s%s; ids 0..%u pass through",
+             fmt ? "answers the game's own format" : "has no format",
+             ours ? ", WRONG (a ported record)" : "", (unsigned)(MHUC_MONSTER_FIRST - 1));
+    say(ours ? MH4U_LOG_WARNING : MH4U_LOG_INFO, line);
+}
+
 /* Log what the readers answer, without a monster to load: the mapping itself, the paths the
  * built resource records name, the path the stand-in's data comes from, and the pool lent to
  * a synthetic quest. The hooks use the same records, so this shows what they will do for 124
@@ -977,6 +1339,7 @@ static void self_test(MH4UCall *call) {
         say(MH4U_LOG_INFO, line);
     }
     self_test_pool(call);
+    self_test_text(call);
 }
 
 static int first_frame = 1;
@@ -989,6 +1352,7 @@ static void frame(MH4UCall *call, void *user) {
     }
     first_frame = 0;
     build_records(call);
+    load_text(call);
     if (selftest && !logged) {
         logged = 1;
         self_test(call);
@@ -1016,6 +1380,9 @@ static const struct {
     {"monsterIcon::get", "0x00c0e800", argument_reader, &h_icon},
     {"monsterIcon::put", "0x00c0e164", argument_reader, &h_icon_ui},
     {"monsterListOrder::position", "0x0061dc58", argument_reader, &h_order},
+    {"message::getFormat", "0x00cdfb30", message_format_reader, &h_msg_format},
+    {"message::getRecord", "0x00cdfa18", message_record_reader, &h_msg_record},
+    {"message::getRecordById", "0x00cdfa30", message_record_by_id_reader, &h_msg_by_id},
     {"QuestFlow::startQuest", "0x00b7c010", quest_start_reader, NULL},
     {"aQuest::endSequence", "0x0065a378", quest_end_reader, NULL},
 };
@@ -1052,9 +1419,9 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
         say(MH4U_LOG_WARNING, "no frame call point: the self-test can't run");
     }
     char line[256];
-    snprintf(line, sizeof line, "ready: answering MH4U's monster tables for %d permanent and %d "
-             "pooled id(s), %u and up, lending %u..%u per quest, with the files each port ships "
-             "and the stand-in's for the rest",
+    snprintf(line, sizeof line, "ready: answering MH4U's monster tables and name/notes message "
+             "getters for %d permanent and %d pooled id(s), %u and up, lending %u..%u per quest, "
+             "with the files each port ships and the stand-in's for the rest",
              MHUC_MONSTER_COUNT, MHUC_POOLED_MONSTER_COUNT, (unsigned)MHUC_MONSTER_FIRST,
              (unsigned)MHUC_MONSTER_POOL_FIRST, (unsigned)MHUC_MONSTER_POOL_LAST);
     say(MH4U_LOG_INFO, line);

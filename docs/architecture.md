@@ -70,7 +70,7 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 
 | Module | Does |
 |---|---|
-| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), camera lists (LCM), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), motion effects and effect lists (MEF/ESQ/PSL, EFL/PEL), serialised objects (XFS), MH4U layouts (LYT), RomFS images, class ids |
+| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD) and MH4U's message tables (LMD), motions (LMT), camera lists (LCM), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), motion effects and effect lists (MEF/ESQ/PSL, EFL/PEL), serialised objects (XFS), MH4U layouts (LYT), RomFS images, class ids |
 | `crypto/` | Blowfish and the save, Extra Data and DLC ciphers of the three games |
 | `quests/` | quest readers for the three games, the MH4U `.mib` writer, conversion from MHXX, monster ids by name |
 | `extdata.py` | MH4U Extra Data records: guild quest cards, DLC Palicos, the in-game test kit |
@@ -79,6 +79,7 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 | `catalog.py` | what MH4U already has of 3U's and GU's monsters and maps, from `data/catalog/` |
 | `monsterdata.py` | rebuilds an MH4U monster's `.etd`/`.emd` values from MHXX's or MH3U's files and compares, counts only |
 | `monsters.py` | a ported monster's files: an MHXX monster archive sorted into the kinds the registry's `files` column ships, converted where needed and packed as a mod folder |
+| `monstertext.py` | a ported monster's name and Hunter's Notes text: the registry's name and the source game's notes table, built into the mod's `text/monster_text.bin` (`mhuc text build`) |
 | `monstersound.py` | a ported monster's own sounds: its source game's waves, bank, request and sound call converted to MH4U's and written into the port's arc ([specs/sound.md](../specs/sound.md#what-a-converter-must-produce)) |
 | `save.py` | MH4U's character and `system` saves: profile, boxes, equipment, guild quests, Palicos, the monster log, the guild card and the mapped `system` fields |
 

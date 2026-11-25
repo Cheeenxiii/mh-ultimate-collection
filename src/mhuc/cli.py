@@ -9,7 +9,7 @@ import sys
 
 from . import __version__, entropy, survey
 from .crypto import dlccrypt
-from .formats import arc, classid, gmd, lyt, romfs, sound, stq, tex, xfs
+from .formats import arc, classid, gmd, lmd, lyt, romfs, sound, stq, tex, xfs
 from .quests import quest
 
 
@@ -117,6 +117,12 @@ DECRYPT = {"mh4u-save": "mh4u_save_decrypt", "mh4u-dlc": "mh4u_dlc_decrypt",
 
 def cmd_lyt(args) -> int:
     json.dump(lyt.to_json(lyt.read(_read(args.file))), sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
+def cmd_lmd(args) -> int:
+    json.dump(lmd.to_json(lmd.read(_read(args.file))), sys.stdout, ensure_ascii=False, indent=1)
     print()
     return 0
 
@@ -565,6 +571,31 @@ def _convert_monster_sound(args) -> int:
     return 0
 
 
+def cmd_text(args) -> int:
+    from . import monstertext
+    if args.action == "build":
+        try:
+            entries = monstertext.build(args.dumps, args.registry, args.notes)
+            if not entries:
+                raise monstertext.TextError("the registry has no ported monster")
+            monstertext.write_file(args.out, entries)
+        except (monstertext.TextError, OSError) as e:
+            print(f"mhuc text: {e}", file=sys.stderr)
+            return 1
+        print(f"{args.out}: {len(entries)} ported monster(s), ids "
+              f"{min(e.id for e in entries)}..{max(e.id for e in entries)}")
+        return 0
+    try:
+        entries = monstertext.read_mod_text(_read(args.file))
+    except monstertext.TextError as e:
+        print(f"mhuc text: {e}", file=sys.stderr)
+        return 1
+    json.dump([{"id": e.id, "name": e.name, "notes": e.notes, "notes_chars": len(e.notes)}
+               for e in entries], sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
 def cmd_idnames(args) -> int:
     import csv as _csv
 
@@ -714,6 +745,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("file")
     p.set_defaults(func=cmd_lyt)
 
+    p = sub.add_parser("lmd", help="MH4U message tables (.lmd, rLayoutMessage) as JSON")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_lmd)
     p = sub.add_parser("decrypt", help="decrypt a DLC or Extra Data file (the key comes from a file you supply)")
     p.add_argument("kind", choices=sorted(DECRYPT))
     p.add_argument("file")
@@ -813,6 +847,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", required=True, help="the CSV to write, outside the repository")
     p.set_defaults(func=cmd_idnames)
 
+    p = sub.add_parser("text", help="a ported monster's name and notes text table for the mod")
+    t = p.add_subparsers(dest="action", required=True)
+    b = t.add_parser("build", help="read the dumps' source texts and write the mod's text table")
+    b.add_argument("--dumps", required=True, help="the folder holding mh3u/ and mhxx/ (MHUC_DUMPS)")
+    b.add_argument("--registry", default=None)
+    b.add_argument("--notes", default=None)
+    b.add_argument("--out", required=True, help="the mod's text file, outside the repository")
+    b.set_defaults(func=cmd_text)
+    d = t.add_parser("dump", help="print a mod text table as JSON")
+    d.add_argument("file")
+    d.set_defaults(func=cmd_text)
     p = sub.add_parser("convert", help="convert a source game's quest, camera list, or a ported "
                                        "monster's own files or sounds into MH4U's formats")
     p.add_argument("what", nargs="?", choices=["quest", "camera", "monster"])

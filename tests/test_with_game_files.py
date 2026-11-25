@@ -10,7 +10,7 @@ from collections import Counter
 
 import pytest
 
-from mhuc import cli, monsterdata, monstersound
+from mhuc import cli, monsterdata, monstersound, monstertext
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
 from mhuc.formats import (
@@ -24,6 +24,7 @@ from mhuc.formats import (
     emd,
     emstatus,
     hitdata,
+    lmd,
     lmt,
     lyt,
     mef,
@@ -1127,6 +1128,62 @@ def test_a_mhxx_monsters_own_sound_set_converts_to_what_mh4u_loads(dump):
     assert converted_call.version == 0x20120123
     assert [r.key for r in converted_call.records] == [r.key for r in source_call.records]
     assert all(a.body == b.body for a, b in zip(converted_call.records, source_call.records, strict=True))
+
+
+def test_the_ported_monsters_text_comes_from_their_source_games(dump):
+    dump("mhxx", "romfs.bin")
+    dump("mh3u", "romfs.bin")
+    entries = monstertext.build(os.environ["MHUC_DUMPS"])
+    by_id = {e.id: e for e in entries}
+    registry = {int(r["id"]): r for r in monstertext.registry_rows()}
+    assert sorted(by_id) == sorted(registry)
+    assert all(e.name == registry[e.id]["name"] for e in entries)   # the registry's names
+    # The GU rows (MHXX JPN) have Japanese notes; the 3U rows (MH3U USA) have English ones.
+    for ident in (124, 126):
+        assert not by_id[ident].notes.isascii(), ident
+        assert registry[ident]["source_game"] == "mhxx"
+    for ident in (125, 127):
+        assert by_id[ident].notes.isascii(), ident
+        assert registry[ident]["source_game"] == "mh3u"
+    assert all(len(e.notes) > 40 for e in entries)
+    assert "\r" not in "".join(e.notes for e in entries)
+    # the built table is what the plugin reads, and the checker accepts it
+    table = monstertext.write(entries)
+    assert monstertext.read_mod_text(table) == entries
+    assert monstertext.check(monstertext.registry_rows(), monstertext.read_notes()) == []
+
+
+def test_every_mh4u_message_table_reads(dump):
+    """check LM1: every rLayoutMessage entry of the five languages reads, in the base and update RomFS."""
+    wanted = 920
+    if True:
+        image = romfs.open_image(dump("mh4u", "romfs.bin"))
+        per_language: dict[str, int] = {}
+        name_counts = {}
+        failures = []
+        for f in image.files():
+            if not (f.path.endswith(".arc") and "/data/core_" in f.path):
+                continue
+            language = f.path.split("/")[1]
+            for e in arc.read(image.read(f)).entries:
+                if e.data[:4] != lmd.MAGIC:
+                    continue
+                per_language[language] = per_language.get(language, 0) + 1
+                try:
+                    table = lmd.read(e.data)
+                except (lmd.LmdError, struct.error, IndexError, UnicodeDecodeError) as exc:
+                    failures.append(f"{f.path}:{e.file_name}: {exc}")
+                    continue
+                if any(m.chars != m.width for m in table.messages):
+                    failures.append(f"{f.path}:{e.file_name}: two lengths differ")
+                if "/msg/emName_" in e.file_name or "/msg/emExp_" in e.file_name:
+                    name_counts[e.file_name] = len(table.messages)
+        assert not failures, f"{len(failures)} tables not read, first: {failures[:3]}"
+        assert set(per_language) == {"eng", "fre", "ger", "ita", "spa"}, sorted(per_language)
+        assert sum(per_language.values()) == wanted, per_language
+        assert set(per_language.values()) == {wanted // 5}, per_language
+        assert len(name_counts) == 10, name_counts          # emName and emExp in five languages
+        assert set(name_counts.values()) == {123}, name_counts
 
 
 def test_every_mh4u_layout_reads(dump):

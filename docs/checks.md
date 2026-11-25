@@ -461,16 +461,21 @@ registry has no row from 256 up and the pool is exercised through a registry fix
 
 | Check | What | Pass |
 |---|---|---|
-| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
+| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, its name and notes text from `text/monster_text.bin` and the three message getters answering it, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
 | P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
 
 P1, headless:
 
 1. Build the plugin (`make` in `mods/monster_ids`) and add it to a user folder's mod library
    (`tools/mods.py add mods/monster_ids`). Set `selftest = 1` in the installed mod's
-   `config.ini`. Build the code library with the mod on:
+   `config.ini`. Build the mod's text table from the player's own dumps into the installed
+   mod's folder, and check it:
+   `MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> --out "<user folder>/mh4u-mods/Ported
+   monster ids/text/monster_text.bin"` and `tools/check_text.py --mod "<that file>"`. Build the
+   code library with the mod on:
    `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`. The
-   build lists the mod's 16 hook points.
+   build reports 50 hook points: the base 32 and the mod's 19 names, `QuestFlow::startQuest`
+   being in both.
 2. For the pool's lines, use the registry fixture instead of the shipped registry: copy the
    mod, write the copy's header from `tests/fixtures/registry-pooled.csv`
    (`python3 tools/check_ids.py --registry tests/fixtures/registry-pooled.csv --header
@@ -478,9 +483,14 @@ P1, headless:
    fixture, not a shipped monster.
 3. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
-4. Pass: the log has `ready: answering MH4U's monster tables for 4 permanent and 0 pooled
-   id(s), 124 and up, lending 224..255 per quest, with the files each port ships and the
-   stand-in's for the rest`; one `self-test: id 124 resource record at <address>, built from
+4. Pass: the log has `ready: answering MH4U's monster tables and name/notes message getters
+   for 4 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files
+   each port ships and the stand-in's for the rest`; `text: 4 of 4 entry(ies) from
+   text/monster_text.bin; every registered id has a name and notes`; a `self-test: message name
+   id 124 -> "Rathian", N UTF-16 unit(s)` line and a notes line per registered id, one
+   `self-test: id 124's getters answer its own record; ids 0..123 pass through` per id (the
+   getters are called through the game's own entry points), one `self-test: message tables:
+   id 1 answers the game's own format; ids 0..123 pass through`; one `self-test: id 124 resource record at <address>, built from
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
    record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, tail,
    cmd; keeps stand-in 1's paths for motions 5, camera, mef, sound, efl` line; one for 125
@@ -536,6 +546,12 @@ points (the two quest hooks among them), headless runner. Both passes:
   pooled id 256 -> lent 224`; `self-test: quest 60001 names pooled id 256; lent 224; the
   readers answer 224 -> pooled id 256, stand-in 1, its own record`; `quest 60001 ends: freed
   the pool byte(s) 224`; and `self-test: the quest ended, so byte 224 is free again`.
+
+The name/notes message getters and the text table were added after the run above: the code
+library has not been rebuilt with the mod's 19 hook names (50 hook points), `text/monster_text.bin` has not
+been put in the mod's folder, and the text lines in step 4 are **not run yet**. The Python side
+is checked without the game: the message tables by LM1 (specs/lmd.md), and the text table by
+`tools/check_text.py --mod` on a table built from the dumps with `mhuc text build`.
 
 No `isn't a hook point` line appeared in either run. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.
