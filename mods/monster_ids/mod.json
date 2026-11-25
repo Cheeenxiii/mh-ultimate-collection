@@ -14,7 +14,9 @@
     {"name": "enemyResource::effectLists", "address": "0x00c0b830"},
     {"name": "monsterIcon::get", "address": "0x00c0e800"},
     {"name": "monsterIcon::put", "address": "0x00c0e164"},
-    {"name": "monsterListOrder::position", "address": "0x0061dc58"}
+    {"name": "monsterListOrder::position", "address": "0x0061dc58"},
+    {"name": "QuestFlow::startQuest", "address": "0x00b7c010"},
+    {"name": "aQuest::endSequence", "address": "0x0065a378"}
   ],
   "plugin": {"linux": "monster_ids.so", "windows": "monster_ids.dll", "macos": "monster_ids.dylib"},
   "config": {"selftest": "0"}

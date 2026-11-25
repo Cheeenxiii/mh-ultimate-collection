@@ -4,10 +4,13 @@ The plugin that gives a ported monster its own id. MH4U looks a monster up by id
 that have 124 rows (0 to 123, [reference/README.md](../../reference/README.md#mh4u-monster-tables)).
 A ported monster's id starts at 124 and comes from the mod's registry,
 [data/ids/registry.csv](../../data/ids/README.md), which `tools/check_ids.py` turns into
-`src/ids.h`. The plugin wraps the readers of those tables and answers a registered id with
-the MH4U monster's rows the registry names as its stand-in, except its resource record, which
-it builds for the ported id so the game loads the port's files from their own paths; ids 0 to
-123 go to the game's function unchanged, so MH4U's own monsters are untouched.
+`src/ids.h`. Ids 124 to 223 are permanent; a monster ported after that range is full takes a
+registry id from 256 up, and the plugin lends it a free byte of 224 to 255 for each quest that
+names it (the [id pool](#the-id-pool) below). The plugin wraps the readers of those tables and
+answers a registered id with the MH4U monster's rows the registry names as its stand-in, except
+its resource record, which it builds for the ported id so the game loads the port's files from
+their own paths; ids 0 to 123 go to the game's function unchanged, so MH4U's own monsters are
+untouched.
 
 ## What it hooks
 
@@ -32,6 +35,44 @@ because the block is the game's own and must not keep the stand-in.
 [`tools/build_game.py`](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/tools/build_game.py)
 adds them to the code library it builds. A library built without them logs which readers are
 missing and the rest still answer.
+
+## The id pool
+
+MH4U's one-byte id leaves 124 to 223 permanent and 224 to 255 free
+([0003](../../docs/decisions.md#0003-id-allocation-and-mod-saves)). A monster ported after the
+permanent range is full takes a registry id from 256 up, which a quest's u32 monster list
+records; 224 to 255 are the bytes the plugin lends it for each quest. No pooled monster ships
+yet, so the shipped header's pooled array is empty. The checker's rules for the two ranges are
+in [data/ids/README.md](../../data/ids/README.md#rules-the-tool-checks).
+
+| Hook | Address | When |
+|---|---|---|
+| `QuestFlow::startQuest` | `0x00b7c010` | a quest starts: find its loaded `.mib` and rewrite the pooled ids it names |
+| `aQuest::endSequence` | `0x0065a378` | the quest's return: free the bytes once the holder's status is 4 |
+
+At quest start the plugin reads the quest id and the loaded quest-file resources from the
+engine's quest holder (the same objects the port's quest-start workaround reads; the fork's
+`port/src/hooks.cpp`, `QuestFlow::startQuest`). It finds the resource whose `.mib` quest id
+matches, then walks the `.mib`'s large-monster waves ([specs/quest.md](../../specs/quest.md)):
+each pooled id (256 and up) is rewritten in place to a free byte of 224 to 255, in the quest's
+own wave order, so the same quest lends the same bytes on every player's console. The reader
+hooks answer that byte with the pooled monster's rows, and build its resource record from its
+stand-in exactly as for a permanent id. A retried quest start (the port rebuilds the list when
+a file is late) keeps the bytes it already lent. When `aQuest::endSequence` has set the
+holder's status to 4, the quest is over and the bytes are free; the next quest lends them
+again. A quest that never reaches its end sequence keeps them until the next start.
+
+The codes a lent byte needs are the same as a permanent id's: the stand-in's rows, the
+resource record built for the pooled id, and the mod's own text; the pool only changes which
+one-byte id those rows are addressed by. A pooled monster can't be on a guild quest card and
+its hunt records go through the mod's data in the save, not MH4U's byte-indexed structures
+([0003](../../docs/decisions.md#0003-id-allocation-and-mod-saves)).
+
+The self-test (settings below) builds a synthetic `.mib` in guest memory that names the first
+pooled id, lends it a byte, logs the answer, frees it again and logs that. With the shipped
+registry (no pooled row) it logs that the pool is unused instead; check P1 in
+[checks.md](../../docs/checks.md#ported-monster-ids) builds the plugin from
+`tests/fixtures/registry-pooled.csv` to see the pooled lines.
 
 ## The resource record
 
@@ -79,6 +120,10 @@ MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
 - **The Hunter's Notes list** that walks all 124 rows (`0x0061df4c`) and the notes list's sort.
   Only the position lookup (`0x0061dc58`) is answered.
 - **The data path** stays the stand-in's until the ports ship MH4U-format `.emd`/`.etd`.
+- **The pool's real path.** No pooled monster ships and no quest names one yet, so the quest
+  start and end hooks have only run against the synthetic `.mib` of check P1; a real quest with
+  a pooled monster is check P2 and is not done. A quest that never reaches its end sequence
+  keeps its bytes until the next quest starts.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
   stand-in, and the monster's data block still holds the stand-in's own id byte, so a spawned
   monster is MH4U's monster. The port's own rows replace the stand-in when
@@ -104,11 +149,13 @@ python3 <fork>/tools/mods.py enable "Ported monster ids"
 python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Azahar user directory>
 ```
 
-A run logs `ready: answering MH4U's monster tables for 2 ported id(s), 124 and up, ...`, then
-one line per reader the first time it answers a registered id and one the first time it passes
-an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource readers log
-`resource index: id 124 -> its own record`, `resource load: id 124 -> its own record` and
-`effect lists: id 124 -> its own record`.
+A run logs `ready: answering MH4U's monster tables for 2 permanent and 0 pooled id(s), 124 and
+up, lending 224..255 per quest`, then one line per reader the first time it answers a
+registered id and one the first time it passes an MH4U id through, for example `factory: id 124
+-> stand-in 1`; the resource readers log `resource index: id 124 -> its own record`, `resource
+load: id 124 -> its own record` and `effect lists: id 124 -> its own record`. A quest that names
+a pooled monster logs `quest 60012: pooled id 256 -> lent 224`, and its end logs `quest 60012
+ends: freed the pool byte(s) 224`.
 
 ## Settings
 
@@ -117,7 +164,7 @@ an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource re
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it, the path the stand-in's data comes from, and that ids 0 to 123 pass through. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it, the path the stand-in's data comes from, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
 
 ## The check
 
