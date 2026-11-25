@@ -164,6 +164,67 @@ For another monster, change `--range` to its code (or `--module`/`--crs` to its 
 module); `--motion` overrides the wrapper if its class uses another one, and `--functions`
 another function table.
 
+### The shared action map (R2)
+
+| Check | What | Pass |
+|---|---|---|
+| R2 | for every action id MHXX Rathian and MH4U's Rathian both have, record MH4U's handler, each side's start motion, and whether the constant indices agree; list the ids where only one side starts a constant motion or where the case blocks pass different arguments | the counts and ids are recorded below |
+
+`reference/action_map.py` joins the inventories and motion lists R1 already writes. It prints
+counts and ids only; the per-id map, which holds the motion indices, is written with `--out`
+and stays outside the repository:
+
+```bash
+python3 reference/action_map.py map build/mhxx-actions.tsv build/mh4u-actions.tsv \
+    build/mhxx-motions.tsv build/mh4u-motions.tsv --out build/action-map.tsv
+```
+
+Last result (2026-11-25, MHXX v1.4 `roEm001`, MH4U USA v1.3.0): of MHXX's 301 action ids, 273
+exist in MH4U. 167 start the same constant index and none starts a different one. The other 106
+are not compared by index: 50 start no motion on either side, 17 are inline on both sides, 16
+MH4U starts one and MHXX none, 12 MH4U is inline and MHXX starts none, 6 MH4U starts none and
+MHXX is inline, 3 MH4U starts one and MHXX is inline, 2 MH4U is inline and MHXX starts one.
+
+Only MH4U starts a constant motion (19):
+
+```
+1/11 2/14 2/15 2/16 2/17 2/20 2/21 2/22 3/1 7/3 7/41 7/43 7/44 7/53 7/54 7/55 7/56 7/58 13/4
+```
+
+Only MHXX starts one (2): `9/3 9/4`. One side is inline and the other starts none (18):
+
+```
+0/3 0/6 3/14 3/22 3/23 3/26 3/30 3/39 3/40 3/44 3/58 3/76 3/77 3/97 4/2 4/12 4/13 4/23
+```
+
+20 ids pass different case-block arguments. The 12 category-3 ones (3/14, 3/22, 3/23, 3/26,
+3/30, 3/39, 3/40, 3/44, 3/58, 3/76, 3/77, 3/97) take a mode in `r1` in MHXX and run inline in
+MH4U, so they are the first to watch in R2p.
+
+The 28 ids MH4U lacks reach 8 handler units: 15 are projectile spawns that tail-call MHXX's
+`0x008b4228` (category 10's 14 ids and 11/7), and the other 13 use six units, listed in
+[#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112).
+
+What this means for the port: a shared id runs MH4U's own handler, and because #48 ships
+MHXX's motion lists under the ported monster's name and the index is the same, that handler
+starts MHXX's animation. A GU shared id needs no index remap, unlike a 3U one. The ids above
+where only one side starts a motion are what R2p looks at first.
+
+### The ported moves' check (R2p)
+
+| Check | What | Pass |
+|---|---|---|
+| R2p | force each action id the port ships on the ported GU Rathian and compare the move with MHXX's | every shipped id is recorded below, and the ids that do not play like MHXX are named with what differs |
+
+For each id in R2's map, set it in `mods/force_action`'s `config.ini` (`action = <cat>/<idx>`,
+`monster = 124`, `hold = 1`), take a quest that names id 124, and watch the move. R2's map says
+what to expect: a shared id starts MHXX's motion at the same index, and the ids R2 lists as
+one-sided may start no motion or another one. Record pass or fail per id and what differs: no
+motion, another motion, a different timing, a missing effect or projectile.
+
+Status: not done. It waits for #48 (the ported files) and #105 (the ported monster's own
+resource paths); the ids themselves are in R2.
+
 ### The plugin's check (R1p)
 
 | Check | What | Pass |
