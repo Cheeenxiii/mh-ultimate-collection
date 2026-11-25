@@ -29,6 +29,10 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [Scrimas/MHGU-Definitive-Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) | GPL-3.0-or-later | MH4U `.emd`/`.etd` layouts (`tools/emdata4u.py`, `tools/dt_convert.py`, `notes/data.md`), read from its MH4U-to-MHGU monster ports; the 4U-to-GU mappings of hitsize, attackdata, sensor and rage blocks, of the `.emd` blocks `dtbase` holds, and the break records (`monsters/dalamadur/module/dala_break.c`); the three monster pairs used by specs/dttune.md; no code copied |
 | [PredatorCZ/RevilLib](https://github.com/PredatorCZ/RevilLib) | GPL-3.0 | MT Framework LMT layouts per version (`src/mtf_lmt/*.inl`): the version groups that put 66 and 67 in one layout, the animation's flags, scene position and rotation and float-track block, the track's reference data and bounds, the track type and buffer type enums, and the keyframe buffer codecs (`codecs.hpp`, `bone_track.cpp`) that [lmt.md](lmt.md#keyframe-buffers) lays out; no code copied |
 | [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2) (`plugin_mt_framework`) | GPL-3.0 | ARC header variants, GMD v1/v2 |
+| [Rokumaehn/mh4edit](https://github.com/Rokumaehn/mh4edit) | MIT | MH4U character save layout: profile, item and equipment boxes, equipped slots, guild quests and Palicos; no code copied |
+| the MH4G save-editor wiki ([saveeditor_mh4g](https://w.atwiki.jp/saveeditor_mh4g/)) | not stated | MH4U pouches, guild-card quest counts and weapon usage; facts only, no text copied |
+| [jvrs-0/mh4u-toolbox](https://github.com/jvrs-0/mh4u-toolbox) | MIT, from mh4edit | the Palico equipment box's offset; no code copied |
+| GameFAQs MH4U save-editing threads ([1](https://gamefaqs.gamespot.com/boards/762804-monster-hunter-4-ultimate/72464388), [2](https://gamefaqs.gamespot.com/boards/762804-monster-hunter-4-ultimate/77653912)) | forum posts | the monster log's offset and fields, the arena block; facts only |
 | [3dbrew: GPU/Textures](https://www.3dbrew.org/wiki/GPU/Textures) | wiki | PICA200 texture formats and tiling |
 | MH4UltimateDC `config/mt_classes.tsv`, `docs/research/mt-classes.md` | GPL-3.0 | class names, ids, sizes |
 | `reference/` (MH3U, MHXX registries) | GPL-3.0 | class names, ids, sizes of the source games |
@@ -53,3 +57,4 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [emc](emc.md) | rEnemyCmd | header verified in all three games (A1); bytecode from MHGU Definitive Edition |
 | [sbc](sbc.md) | rCollision | magic and inner class verified (S1); layout from MHGU Definitive Edition |
 | [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, rTexLayout, rSoundAttributeSe, … | from Cha-Cha (Wii U); the little-endian layout read on all 853 XFS files of MH3U's and MH4U's RomFS (X1): 845 in MH3U, 8 in MH4U, which ships no rTexLayout |
+| [save](save.md) | none (save-side files) | character save (profile, item and equipment boxes, pouches, guild quests, Palicos, monster log, guild card) and the system save's cipher and checksum, checked on the maintainer's saves (S1-S7); the character save's quest lists and the system save's fields open |

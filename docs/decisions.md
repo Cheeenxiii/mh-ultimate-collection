@@ -31,7 +31,7 @@ Settled by the maintainer on 2026-11-25.
 - **Tables grow by hooks on their readers** (the overlay below): a hook answers the new ids and falls through to the game's function for the old ones. A table is relocated only where a case needs it. Besides the costs below, the game is statically recompiled, so a table's address may be folded into the native code, and relocating would then take a patch at recompile time (unverified).
 - **MH4U's save may hold the mod's data.** The base save need not stay vanilla, on one condition: a converter, still to be written, removes everything that isn't MH4U's (other games' weapons, armour, monsters and records) and gives back a clean MH4U save. A player runs it before removing the mod, because an unmodded game that meets a ported id may crash.
 
-Still open: where in MH4U's save the mod's data goes and in what format (MH4U's save layout is unmapped, see the open questions below); when the registry takes ids other than monsters; the rule for a shipped id that has to move, and who applies the migration.
+Still open: where in MH4U's save the mod's data goes and in what format (the character save is mapped in [specs/save.md](../specs/save.md), but no region it copies and never reads is known; see the open questions below); when the registry takes ids other than monsters; the rule for a shipped id that has to move, and who applies the migration.
 
 | Alternative | Why not |
 |---|---|
@@ -89,7 +89,7 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 |---|---|---|
 | a quest's monster definition (`.mib`) | a u32 monster id ([specs/quest.md](../specs/quest.md)) | the file allows large ids; whether the game takes one it has no table row for is unverified |
 | a guild quest card | a u8 monster id ([specs/extdata.md](../specs/extdata.md), from mhff, unverified) | 255 at most |
-| the character save's monster log | 82 fixed entries of 10 bytes (mhff, [reference/README.md](../reference/README.md#mh4u-monster-tables)) | whether it is indexed by id, and what it does with a new one, is unverified |
+| the character save's monster log | 82 fixed entries of 10 bytes (mhff, [reference/README.md](../reference/README.md#mh4u-monster-tables)) | it is not indexed by monster id: entry 0 is Seltas, MH4U id 25, and its order is unknown, so a new id has no entry ([specs/save.md](../specs/save.md), check S6) |
 
 **Definitive Edition's ids: one registry file.** MHGU Definitive Edition ports MH4U monsters into MHGU the other way round, and keeps every game-wide id a port takes in one file, `allocations.toml` (GPL-3.0-or-later; commit dd5c666 of 2026-11-24, core 3.1.0): registry index, monster number, file ids, save slot, name, icon and Hunter's Notes entries, quest ids, items, decorations, BGM ids, stage folder, and the records a port appends to the game's tables.
 
@@ -124,7 +124,7 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 
 | Option | Gives | Costs |
 |---|---|---|
-| A store in an unused region of MH4U's save (Definitive Edition's first step) | no second file; the game saves it | MH4U's save layout is not mapped in this repository, so the region is unknown (open question); a fixed budget; a save editor that clears it loses the data; the base save is no longer vanilla |
+| A store in an unused region of MH4U's save (Definitive Edition's first step) | no second file; the game saves it | the character save is mapped ([specs/save.md](../specs/save.md)) but no region the game copies and never reads is known (open question); a fixed budget; a save editor that clears it loses the data; the base save is no longer vanilla |
 | Grow MH4U's save: new sections, or a larger file | all data in the game's own save, with no split and merge | needs the layout, the size rule and the checksum; whether the game takes a bigger file or an unknown section is unverified; an old save manager may drop it; the hardest to undo |
 | An Extra Data record | the game already reads whole records from Extra Data, the port's extdata folder is known (the fork's `tools/extdata_path.py`), and `mhuc` writes the game's form byte for byte (check E5) | capacity is per kind (40 × 5 quests, 9 Palicos, 50 × 3 guild quest files); whether the game takes a file or a spare slot it did not download is unverified; Extra Data lives on the SD card, so a save manager, a wipe or another card loses it; it is not per character |
 | No mod save: keep everything in MH4U's own fields | nothing new to write, nothing to keep compatible | the fixed structures (the 82-entry monster log, one-byte guild quest ids, the quest lists) cannot record a new id past their size, so the mod's monsters lose part of their record; exactly which parts is unverified |
@@ -149,7 +149,7 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 
 **Open questions**, where a fact is missing to cost an option honestly:
 
-- MH4U's save layout: whether the 82-entry monster log is indexed by id (then an id above 81 could not be recorded), whether the save has a region the game copies and never reads, and its fixed size and checksum. The repository has a spec for Extra Data ([specs/extdata.md](../specs/extdata.md)) but none for the save.
+- MH4U's save layout: the character save is mapped ([specs/save.md](../specs/save.md)): 81,400 bytes decrypted, one checksum (the cipher's), and the 82-entry monster log is not indexed by monster id (entry 0 is Seltas, id 25; its order is unknown). Still open: the character save's quest clear lists ([#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153)) and the `system` save's fields ([#154](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/154)); whether the save has a region the game copies and never reads stays open too.
 - Whether any loader validates a quest's or a guild card's monster ids, and what the game does with an id past 123 in a `.mib` and past 255 in a card.
 - What a guest without the mod sees for a new id in a quest or a room.
 - Whether the plugin host may write the code segment (the references and the bound instructions) or only hook: `PLUGINS.md` gives named hooks and read/write of guest memory, and says nothing about patching code.
