@@ -1,4 +1,5 @@
-"""Survey counts sound resources by kind, version and class id (specs/sound.md, check SN1)."""
+"""Survey counts sound resources by kind, version and class id (specs/sound.md, check SN1), and
+stage resources that reference the water-surface class uOcean (docs/underwater.md, check U1)."""
 from __future__ import annotations
 
 import struct
@@ -34,6 +35,28 @@ def test_survey_counts_the_same_sound_kind_in_both_games_class_namespaces():
     assert counts["area emitter SES v0x20160706"] == 1
     assert counts[f"area emitter SES type 0x{mhxx_emitter:08x} rFestaSoundEmitter"] == 1
     assert sum(n for k, n in counts.items() if k == "wave MADP v5") == 1
+
+
+def test_survey_check_u1_counts_only_stage_resources_that_reference_uOcean():
+    """check U1: a stage entry that names uOcean, carries its class id or is typed it is counted;
+    an entry outside a stage path is not, and a suimen surface is counted as the positive control"""
+    data = arc.write(arc.Archive(version=0x13, entries=[
+        arc.Entry(path="stage\\m01d\\m01a00d\\m01a00d-info", type_id=classid.class_id("rStageInfoSet"),
+                  data=b"SIS\x00uOcean"),
+        arc.Entry(path="stage\\m01d\\m01a00d\\m01a00d-id", type_id=classid.class_id("rStageInfoSet"),
+                  data=b"SIS\x00" + struct.pack("<I", survey.UOCEAN_ID)),
+        arc.Entry(path="stage\\m01d\\m01a00d\\m01a00d-ocean", type_id=survey.UOCEAN_ID, data=b""),
+        arc.Entry(path="stage\\m01d\\m01a00d\\m01a00d-suimen", type_id=0x1234, data=b"suimen"),
+        arc.Entry(path="em\\em001\\em001", type_id=0x1234, data=b"uOcean"),
+    ]))
+    st: dict = {}
+    survey.survey_arc(data, st)
+    counts = st["stage"]
+    assert counts["U1 stage-path entries"] == 4
+    assert counts["U1 stage entries naming uOcean"] == 1
+    assert counts["U1 stage entries carrying uOcean's class id"] == 1
+    assert counts["U1 entries typed uOcean"] == 1
+    assert counts["U1 stage entries naming a suimen surface"] == 1
 
 
 def test_survey_counts_a_loose_sound_file_that_has_no_class_id():

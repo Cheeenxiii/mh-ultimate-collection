@@ -7,7 +7,8 @@ G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dtt
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
 records against their hit volumes), E9 (MH3U em_status break blocks), E11 (MHXX dtbparts joint record kinds),
 L1 (lmt), A1 (rEnemyCmd), S1 (rCollision), SN1 (sound resources by kind, version and class id), SN6 (the
-MH3U wave, bank, request and stream request layouts), S4 (MH4U stream requests).
+MH3U wave, bank, request and stream request layouts), S4 (MH4U stream requests), U1 (whether a stage
+resource references the water-surface class uOcean).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -67,6 +68,13 @@ _SOUND_CLASS_NAMES = (
 )
 SOUND_CLASSES: dict[int, str] = {classid.class_id(name): kind for name, kind in _SOUND_CLASS_NAMES}
 SOUND_CLASS_NAMES: dict[int, str] = {classid.class_id(name): name for name, _ in _SOUND_CLASS_NAMES}
+
+# Check U1: the water-surface class uOcean is engine code, not a resource class, so an ARC entry's
+# type id would only be its class id if a stage data file stored the class itself. Stage resources
+# live under these two path prefixes in every MT Framework Mobile game.
+UOCEAN_ID = classid.class_id("uOcean")
+UOCEAN_ID_BYTES = struct.pack("<I", UOCEAN_ID)
+STAGE_PREFIXES = ("stage\\", "snake\\stage\\")
 
 _IMG: romfs.Romfs | None = None
 
@@ -131,6 +139,28 @@ def _sound(st: dict, data: bytes, kind: str, type_id: int | None) -> None:
     else:
         name = SOUND_CLASS_NAMES.get(type_id) or classid.name_of(type_id) or "?"
         c[f"{kind} {magic} type 0x{type_id:08x} {name}"] += 1
+
+
+def survey_stage(path: str, data: bytes, type_id: int | None, st: dict) -> None:
+    """Check U1: count stage resources and whether any references the water-surface class uOcean.
+
+    MH4U keeps uOcean's class and code; whether its stages ever create the object is a data
+    question, asked here over every entry whose stored path is a stage resource.
+    """
+    low = path.lower()
+    if not low.startswith(STAGE_PREFIXES):
+        return
+    c = st.setdefault("stage", Counter())
+    c["U1 stage-path entries"] += 1
+    if type_id == UOCEAN_ID:
+        c["U1 entries typed uOcean"] += 1
+    if b"uOcean" in data:
+        c["U1 stage entries naming uOcean"] += 1
+    if UOCEAN_ID_BYTES in data:
+        c["U1 stage entries carrying uOcean's class id"] += 1
+    # Positive control: a water-surface resource name 3U and MH4U both use for baked surfaces.
+    if b"suimen" in data or "suimen" in low:
+        c["U1 stage entries naming a suimen surface"] += 1
 
 
 def survey_entry(type_name: str | None, data: bytes, st: dict, type_id: int | None = None) -> None:
@@ -327,6 +357,7 @@ def survey_arc(data: bytes, st: dict) -> None:
             c["C3 entry over 0x00FFFFFF"] += 1
         name = classid.name_of(e.type_id)
         types.append(name)
+        survey_stage(e.path, e.data, e.type_id, st)
         survey_entry(name, e.data, st, e.type_id)
     pairs: dict = {}
     for e, name in zip(a.entries, types, strict=True):
@@ -380,7 +411,8 @@ def report(total: dict) -> str:
     lines = [f"files in image: {total['files']}"]
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
-    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "emc", "sbc", "sound"):
+    for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data",
+                "lmt", "emc", "sbc", "stage", "sound"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]
