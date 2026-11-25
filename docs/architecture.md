@@ -16,6 +16,8 @@ The mod reaches the engine only through the fork's plugin API. Its reference is 
 - the fork's `tools/build_game.py` builds those hooks into the recompiled game;
 - at start-up the port loads the library, which can read and write game memory and allocate from the game's heap.
 
+A hook can also run instead of the game's function, so the mod may replace any part of MH4U with its own C code, written from the decompiled original, while the fork stays a minimal diff on upstream ([decision 0012](decisions.md#0012-how-much-of-mh4u-the-mod-may-replace)).
+
 The first plugin is `mods/force_action`. Its `mod.json` names `uEnemy`'s action setter (USA
 v1.3.0 address `0x0090ef74`); the C library replaces the category and index the AI asks for
 with the forced pair, so the game's own setter initializes the chosen action and it plays (the

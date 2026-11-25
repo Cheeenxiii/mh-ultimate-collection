@@ -373,6 +373,19 @@ MHGU on Switch has HD textures and a single-screen interface. The source rule ta
 
 Changing the rule means changing CLAUDE.md's rule 2 and [sources.md](sources.md).
 
+### 0012. How much of MH4U the mod may replace
+
+Settled by the maintainer on 2026-11-25.
+
+**As much as it needs.** A plugin hook can run instead of a game function (`skip_original`, [PLUGINS.md](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/docs/PLUGINS.md)), so the mod may replace a single function, a whole system (AI, saves, id handling) or, over time, as much of MH4U as it wants, with its own C code written from the decompiled original. The working rule: when working around one of the game's limits would take more hooks than rewriting the functions behind it, rewrite them, and check the result in game.
+
+The engine side does not move with it: the fork keeps its diff with upstream MH4UltimateDC minimal (additions and the hooks they need, [CLAUDE.md](../CLAUDE.md#the-fork)), in the hope that upstream's maintainer returns, and the plugin ABI stays the contract between mod and engine ([0006](#0006-runtime)). Replacing MH4U's code happens in the mod, never in the fork. Whatever the mod replaces, it ships only its own code: it still needs the player's dumps, and no Capcom code or asset is distributed (CLAUDE.md rule 1).
+
+| Alternative | Why not |
+|---|---|
+| Hooks only around the game's code, never instead of it | every limit of MH4U's structures (one-byte ids, fixed tables, hard-coded motion indices) has to be worked around, monster by monster |
+| Replace MH4U's code in the fork | the fork would drift from upstream, which it must stay rebasable on |
+
 ## Open
 
 None. A new structural question goes here, with its facts and options, until the maintainer settles it.
