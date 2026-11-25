@@ -24,6 +24,9 @@ ids 0 to 123 go to the game's function unchanged, so MH4U's own monsters are unt
 | resource index (`enemyResourceIndex`) | `0x00efbd08` | `0x0068d8c8`, `0x00682ca0`, `0x00c0b830` | r1, r2, r2 |
 | drops (`dropRecordIndex`) | `0x01003bec` | `0x00684b40`, `0x0092600c` | r1; the monster's own id |
 | drops (`dropBaseA`, `dropBaseB`) | `0x01003ddc`, `0x01003ed4` | `0x00911f20`, `0x009357b4` | the monster's own id |
+| name/notes text (`emName`, `emExp`) | `0x0109a080` slots 6, 7 | `0x00cdfb30` (`message::getFormat`) | r0 the table, r1 the id |
+| name/notes text | — | `0x00cdfa18` (`message::getRecord`) | r0 the table, r1 the format entry |
+| name/notes text | — | `0x00cdfa30` (`message::getRecordById`) | r0 the table, r1 the id |
 
 Most readers take the id in a register; the plugin rewrites that register and calls the game's
 function. Four read the id from the monster's data block (`this+0xe28`, byte `+0x1c0`); the
@@ -144,13 +147,39 @@ record for the call, runs the reader as the stand-in, and puts the row back. The
 (`enemyDataPathIndex`, 0x00efc268) still answers with the stand-in's: the ports ship no
 MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
 
+## The name and notes text
+
+MH4U answers a monster's name and its Hunter's Notes text by the id: the message tables
+`emName` and `emExp` are loaded from `core_common.arc` and their message N names monster N
+(specs/lmd.md). The game loads 71 message tables into the pointer array at `0x0109a080`, with
+`emName` at slot 6 and `emExp` at slot 7, and the per-id getters are `0x00cdfb30` (the 16-byte
+format entry), `0x00cdfa18` (the 12-byte string record from a format entry) and `0x00cdfa30`
+(the record by id). The plugin wraps the three: a registered id is answered with its own
+format entry (a copy of the stand-in id's, so the message object's layout words stay), its own
+string record and a UTF-16 string in the game's heap. Every other id and every other message
+table goes to the game's getters unchanged.
+
+The text comes from the mod's `text/monster_text.bin`: one entry per registered id, its name
+from [the registry](../../data/ids/README.md) and its notes from the source game's own table,
+recorded per id in [data/ids/notes.csv](../../data/ids/README.md#the-notes-source). The file
+holds no MH4U text. Build it where the mod's folder can see it (outside the repository):
+
+```bash
+MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> \
+    --out <mod library>/<the mod's folder>/text/monster_text.bin
+tools/check_text.py --mod <that file>
+```
+
+Until the file exists, the plugin logs a warning and the ported ids keep no text (the game's
+getters return nothing for them). The notes' language is the source game's: MH3U USA gives
+English, MHXX JPN gives Japanese until the port reads MHGU's English text. A GU monster's
+English notes are therefore still content work, not this plugin's.
+
 ## What it does not do yet
 
-- **Name and notes text.** The monster's name and description are messages named by the id
-  (`emName`, `emExp`); a ported id needs a message of its own in the mod's text. Its reader is
-  the message layer, not one per-monster getter, so this plugin doesn't hook it.
 - **The Hunter's Notes list** that walks all 124 rows (`0x0061df4c`) and the notes list's sort.
-  Only the position lookup (`0x0061dc58`) is answered.
+  Only the position lookup (`0x0061dc58`) is answered, so the textual getters above answer an
+  id the UI already shows, but a ported monster is not added to the Notes list itself.
 - **The data path** stays the stand-in's until the ports ship MH4U-format `.emd`/`.etd`.
 - **The pool's real path.** No pooled monster ships and no quest names one yet, so the quest
   start and end hooks have only run against the synthetic `.mib` of check P1; a real quest with
@@ -184,12 +213,15 @@ another checkout. `src/ids.h` is generated, not edited: run `python3 tools/check
 ```bash
 python3 <fork>/tools/mods.py add mods/monster_ids
 python3 <fork>/tools/mods.py enable "Ported monster ids"
+MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> \
+    --out <user directory>/mods/<the mod's folder>/text/monster_text.bin
 python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Azahar user directory>
 ```
 
-A run logs `ready: answering MH4U's monster tables for 4 permanent and 0 pooled id(s), 124 and
-up, lending 224..255 per quest, with the files each port ships and the stand-in's for the
-rest`, then one line per reader the first time it answers a registered id and one the first
+A run logs `ready: answering MH4U's monster tables and name/notes message getters for 4
+permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files each port
+ships and the stand-in's for the rest`, then `text: 2 of 2 entry(ies) from
+text/monster_text.bin; every registered id has a name and notes`, then one line per reader the first time it answers a registered id and one the first
 time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource
 readers log `resource index: id 124 -> its own record`, `resource load: id 124 -> its own
 record` and `effect lists: id 124 -> its own record`. A quest that names a pooled monster logs
@@ -203,7 +235,7 @@ byte(s) 224`.
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
 
 ## The check
 
