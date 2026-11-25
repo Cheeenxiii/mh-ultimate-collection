@@ -21,7 +21,7 @@ def write_registry(path, rows):
         writer.writerows(rows)
 
 
-def row(ident, key="rathian-gu", stand_in="1", kind="monster", files="model,motions=5,tail,cmd"):
+def row(ident, key="rathian-gu", stand_in="1", kind="monster", files="model,motions=0-4,tail,cmd"):
     return [kind, str(ident), key, "mhxx", "em001", "Rathian", stand_in, files, ""]
 
 
@@ -100,35 +100,50 @@ def test_a_port_that_ships_no_files_is_refused():
     assert any("files is empty" in p for p in problems), problems
 
 
-def test_motions_must_say_how_many_slots_it_ships():
+def test_motions_must_say_which_slots_it_ships():
     problems = check_ids.check_rows([as_dict(row(124, files="model,motions"))])
-    assert any("motions needs the number of slots" in p for p in problems), problems
+    assert any("motions needs the slots" in p for p in problems), problems
 
 
-@pytest.mark.parametrize("count", ["0", "7", "three"])
-def test_a_motions_count_outside_the_six_slots_is_refused(count):
-    problems = check_ids.check_rows([as_dict(row(124, files=f"model,motions={count}"))])
-    assert any("isn't a slot count in 1..6" in p for p in problems), problems
+@pytest.mark.parametrize("value", ["7", "0,7", "three", "4-2"])
+def test_a_motions_slot_outside_the_six_slots_is_refused(value):
+    problems = check_ids.check_rows([as_dict(row(124, files=f"model,motions={value}"))])
+    assert any("not a slot or a range" in p or "isn't in 0..5" in p for p in problems), problems
 
 
-def test_only_motions_takes_a_count():
-    problems = check_ids.check_rows([as_dict(row(124, files="model=1,motions=5"))])
-    assert any("only motions takes a count" in p for p in problems), problems
+@pytest.mark.parametrize("value", ["0,0", "0-2,1"])
+def test_a_motions_slot_may_not_be_named_twice(value):
+    problems = check_ids.check_rows([as_dict(row(124, files=f"model,motions={value}"))])
+    assert any("names a slot twice" in p for p in problems), problems
+
+
+def test_motions_takes_the_slots_it_ships_sparse_and_as_ranges():
+    assert check_ids.motion_slots("model,motions=0-4") == [0, 1, 2, 3, 4]
+    assert check_ids.motion_slots("model,motions=0,2,3,4") == [0, 2, 3, 4]
+    assert check_ids.motion_slots("model") == []
+    assert check_ids.motion_mask({"files": "model,motions=0,2,3,4"}) == 0x1D
+
+
+def test_only_motions_takes_a_value():
+    problems = check_ids.check_rows([as_dict(row(124, files="model=1,motions=0-4"))])
+    assert any("only motions takes a value" in p for p in problems), problems
 
 
 def test_the_header_carries_the_kinds_each_port_ships(tmp_path):
     registry = tmp_path / "registry.csv"
     header = tmp_path / "ids.h"
-    write_registry(registry, [row(124), row(125, key="rathian-3u", files="model,motions=3,tail")])
+    write_registry(registry, [row(124), row(125, key="rathian-3u", files="model,motions=0-2,tail")])
     args = ["--registry", str(registry), "--header", str(header)]
     assert check_ids.main(args + ["--write"]) == 0
     text = header.read_text()
     assert "#define MHUC_FILES_MODEL 0x0001u" in text
     assert "#define MHUC_FILES_MOTIONS 0x0002u" in text
     assert "#define MHUC_FILES_CMD 0x0040u" in text
-    assert ("{124, 1, 5, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | "
-            "MHUC_FILES_CMD},") in text
-    assert "{125, 1, 3, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL}," in text
+    assert "#define MHUC_MOTION_SLOT(slot) (1u << (slot))" in text
+    assert ("{124, 1, 0x1fu, /* slots 0, 1, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | "
+            "MHUC_FILES_TAIL | MHUC_FILES_CMD},") in text
+    assert ("{125, 1, 0x07u, /* slots 0, 1, 2 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | "
+            "MHUC_FILES_TAIL},") in text
 
 
 def test_the_header_the_registry_generates_has_both_arrays(tmp_path, capsys):
@@ -143,13 +158,24 @@ def test_the_header_the_registry_generates_has_both_arrays(tmp_path, capsys):
     assert "MHUC_POOLED_MONSTER_COUNT 1" in text
     assert "static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT]" in text
     assert "static const MhucMonsterId mhuc_pooled_monster_ids[MHUC_POOLED_MONSTER_COUNT]" in text
-    assert "{256, 1, 5, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD}," in text
+    assert ("{256, 1, 0x1fu, /* slots 0, 1, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | "
+            "MHUC_FILES_TAIL | MHUC_FILES_CMD},") in text
     assert "MHUC_MONSTER_ID_POOLED 256" in text
     assert check_ids.main(args) == 0
     # A stale header is refused, so the plugin can never build from another id set.
     header.write_text(text.replace("124", "126"))
     assert check_ids.main(args) == 1
     assert "isn't what the registry generates" in capsys.readouterr().out
+
+
+def test_the_registry_gives_giadrome_the_slots_it_borrows():
+    with open(os.path.join(ROOT, "data", "ids", "registry.csv"), newline="", encoding="utf-8") as f:
+        rows = [as_dict(r) for r in list(csv.reader(f))[1:]]
+    giadrome = next(r for r in rows if r["id"] == "126")
+    assert giadrome["key"] == "giadrome-gu"
+    assert (giadrome["source_game"], giadrome["source_key"]) == ("mhxx", "em034")
+    assert giadrome["stand_in"] == "15"      # MH4U's Great Jaggi
+    assert check_ids.motion_slots(giadrome["files"]) == [0, 2, 3, 4]
 
 
 def test_the_pooled_fixture_is_a_registry_the_checker_accepts():
@@ -164,5 +190,5 @@ def test_the_repository_registry_and_its_header_agree():
     res = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_ids.py")], cwd=ROOT,
                          capture_output=True, text=True)
     assert res.returncode == 0, res.stdout + res.stderr
-    assert "2 permanent monsters" in res.stdout
+    assert "3 permanent monsters" in res.stdout
     assert "0 pooled" in res.stdout

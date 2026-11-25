@@ -14,7 +14,7 @@ rule: one registry, ids only ever grow, and the run time reads them from here.
 | `source_key` | the content's name in that game: a monster's `emNNN` |
 | `name` | the content's name, for review |
 | `stand_in` | the MH4U monster id whose table rows answer for this id until the port ships the content's own rows |
-| `files` | the kinds of file the port ships, comma-separated: `model`, `motions`, `camera`, `tail`, `mef`, `sound`, `cmd`, `efl` (the resource record's path kinds, below). `motions` takes the number of motion-list slots shipped from slot 0, as `motions=3`; the slots above keep the stand-in's paths |
+| `files` | the kinds of file the port ships, comma-separated: `model`, `motions`, `camera`, `tail`, `mef`, `sound`, `cmd`, `efl` (the resource record's path kinds, below). `motions` takes the motion-list slots shipped, as a range or a list: `motions=0-4` or `motions=0,2,3,4`; a slot it does not name keeps the stand-in's path |
 | `notes` | where the content comes from, and anything the next reader needs |
 
 The rows a registered id answers with are the game's own, read by the plugin's hooks: the
@@ -57,19 +57,22 @@ ships 6 ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)
 ships only some kinds and the record keeps the stand-in's path for the rest. A kind is one
 group of paths in the record:
 
-| Kind | The record's paths | 124 ships | 125 ships |
-|---|---|---|---|
-| `model` | the model | yes | yes |
-| `motions` | the six motion lists and the second motion list; `motions=N` is the first N slots from slot 0 | `motions=5` (0-4) | `motions=3` (0-2) |
-| `camera` | the camera | no | no |
-| `tail` | the tail model | yes | yes |
-| `mef` | the motion effects | no | no |
-| `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes |
-| `cmd` | the command/EMC | yes | yes |
-| `efl` | the effect lists | no | no |
+| Kind | The record's paths | 124 ships | 125 ships | 126 ships |
+|---|---|---|---|---|
+| `model` | the model | yes | yes | yes |
+| `motions` | the six motion lists and the second motion list; `motions` names the slots the port ships | `motions=0-4` | `motions=0-2` | `motions=0,2,3,4` |
+| `camera` | the camera | no | no | no |
+| `tail` | the tail model | yes | yes | no |
+| `mef` | the motion effects | no | no | no |
+| `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no |
+| `cmd` | the command/EMC | yes | yes | no |
+| `efl` | the effect lists | no | no | no |
 
 124's `em124.arc` holds the model, five motion lists, the tail and the command; 125's holds
-the model, three motion lists, the tail, the command and its converted sound set. Until a port's
+the model, three motion lists, the tail, the command and its converted sound set; 126's holds
+the model and four motion lists, borrowed from MHXX's em014 (Velocidrome) and shipped at the
+same slots 0, 2, 3 and 4 the source groups them in, so its record keeps the stand-in's paths
+for slots 1 and 5. Until a port's
 own camera, motion effects and effect lists are converted, its monster loads MH4U's own from the
 stand-in's paths (`enemy\em001\...`); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
@@ -79,7 +82,7 @@ and checked on the three games' monster archives ([mef](../../specs/mef.md),
 understood yet, so a port still ships neither kind.
 
 A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map
-together; the generated header's `MHUC_FILES_*` bits and each row's `motions` count are what
+together; the generated header's `MHUC_FILES_*` bits and each row's `motion_mask` are what
 the plugin's record builder reads.
 
 The `sound` kind is one path, `sound\call\em\emNNN`, but the file it names (the sound call)
@@ -104,9 +107,10 @@ ships it with the rest of her files.
 - a pooled id starts at 256 and needs no gap: the pool lends it a byte, so it is not a table
   index, and 224 to 255 are refused as registry ids;
 - a key, a source game and a source key are valid, and every row has a name and a stand-in;
-- `files` is not empty, every kind in it appears once, and `motions` gives a count in 1..6;
+- `files` is not empty, every kind in it appears once, and `motions` names slots in 0..5 once
+  each;
 - `mods/monster_ids/src/ids.h` is exactly what this file generates: the permanent ids in one
-  array, the pooled ids in another, and each row's `files` bits and `motions` count.
+  array, the pooled ids in another, and each row's `files` bits and `motion_mask`.
 
 After editing the registry, write the header and check both:
 
@@ -136,11 +140,15 @@ free id, and a mistake is corrected by a migration, not by renumbering
 
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|
-| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=5, tail, cmd |
-| 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=3, tail, cmd, sound |
+| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=0-4, tail, cmd |
+| 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=0-2, tail, cmd, sound |
+| 126 | `giadrome-gu` | Giadrome, ported from MHXX (GU) | MH4U Great Jaggi (15) | model, motions=0,2,3,4 |
 
 No pooled row ships yet; the first would be 256, with a `stand_in` like any other.
 
-The two ports are [#47](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/47)'s
-subject; their files come from [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48)
-and [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49).
+124 and 125 are [#47](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/47)'s subject;
+their files come from [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48) and
+[#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49). 126 is
+[#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161)'s, and its AI is the
+stand-in's until [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48) converts
+an MHXX EMC ([specs/emc.md](../specs/emc.md#what-a-converter-must-do)).

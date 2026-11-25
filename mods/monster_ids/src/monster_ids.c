@@ -49,13 +49,13 @@
  * A port ships only some of those path kinds (its arc holds the model, motions, tail and
  * command for 124, the model, the first three motion lists and the tail for 125); MH4U stops
  * the load on a path that is not there. The registry's `files` column, generated into
- * src/ids.h, names the kinds a port ships, and `motions=N` says how many motion-list slots
- * from slot 0 are the port's. For a kind it ships the path is copied and its monster-id token
+ * src/ids.h, names the kinds a port ships, and `motions=0,2,3,4` names the motion-list slots
+ * it ships. For a kind and slot it ships the path is copied and its monster-id token
  * rewritten to the ported id (`em001` -> `em124`, and the camera's `e001` -> `e124`); for a
- * kind it does not ship, and for a motion slot above its count, the stand-in's path is copied
- * unchanged, so MH4U's camera, motion effects, sound, effect lists and the rest of the motion
- * lists load until the port's game has them converted. The record, its slots and its strings
- * are guest memory from the game's own heap (alloc, ABI 2).
+ * kind it does not ship, and for a motion slot it does not name, the stand-in's path is
+ * copied unchanged, so MH4U's camera, motion effects, sound, effect lists and the rest of the
+ * motion lists load until the port's game has them converted. The record, its slots and its
+ * strings are guest memory from the game's own heap (alloc, ABI 2).
  *
  * The three readers of the record are answered with the built one:
  *   - `enemyResource::get` (0x0068d8c8) returns one field of the record; the hook returns the
@@ -162,14 +162,14 @@ static const uint16_t field_kinds[RECORD_FIELDS][RECORD_SLOTS_MAX] = {
 };
 
 /* Whether a slot's path is the port's (rewrite the id) or the stand-in's (copy it as it is):
- * its kind must be in the port's `files`, and a motion slot must be below its `motions`
- * count, because a port ships the motion lists from slot 0 and keeps MH4U's for the rest. */
+ * its kind must be in the port's `files`, and a motion slot must be one of the slots its
+ * `motions` names, because a port keeps MH4U's path for the slots it does not ship. */
 static int slot_is_ours(const MhucMonsterId *row, unsigned f, unsigned k) {
     const uint16_t kind = field_kinds[f][k];
     if (!(kind & row->files)) {
         return 0;
     }
-    if (kind == MHUC_FILES_MOTIONS && k >= row->motions) {
+    if (kind == MHUC_FILES_MOTIONS && !(row->motion_mask & MHUC_MOTION_SLOT(k))) {
         return 0;
     }
     return 1;
@@ -859,33 +859,44 @@ static void self_test_pool(MH4UCall *call) {
     host->free(call, data);
 }
 
+/* The motion slots a mask names (or, with shipped clear, the slots it leaves to the
+ * stand-in), joined for the self-test. 0 when the list is empty. */
+static int motion_slot_list(unsigned motion_mask, int shipped, char *out, size_t size) {
+    size_t used = 0;
+    int any = 0;
+    out[0] = '\0';
+    for (unsigned slot = 0; slot < MHUC_MOTION_SLOTS && slot < RECORD_SLOTS_MAX; slot++) {
+        int n;
+        if (((motion_mask >> slot) & 1u) != (unsigned)shipped) {
+            continue;
+        }
+        n = snprintf(out + used, size - used, "%s%u", used ? "," : "", slot);
+        if (n < 0 || (size_t)n >= size - used) {
+            return 0;
+        }
+        used += (size_t)n;
+        any = 1;
+    }
+    return any;
+}
+
 /* The kinds a port ships (shipped set) or keeps the stand-in's path for (shipped clear),
- * joined for the self-test. A motion kind is logged with its slot range, because the port
- * ships the first `motions` slots and keeps the stand-in's for the rest. */
-static void file_kind_list(uint16_t files, unsigned motions, int shipped, char *out, size_t size) {
+ * joined for the self-test. A motion kind is logged with the slots it names, because the
+ * port ships only those and keeps the stand-in's for the rest. */
+static void file_kind_list(uint16_t files, unsigned motion_mask, int shipped, char *out, size_t size) {
     size_t used = 0;
     out[0] = '\0';
     for (size_t i = 0; i < sizeof file_kind_names / sizeof file_kind_names[0]; i++) {
         int n;
         if (file_kind_names[i].bit == MHUC_FILES_MOTIONS) {
-            /* The motions are split by slot rather than by bit: the port's first `motions`
-             * slots, the stand-in's for the rest. */
+            char slots[24];
             if (!(files & MHUC_FILES_MOTIONS)) {
                 continue;
             }
-            if (shipped) {
-                if (motions == 0) {
-                    continue;
-                }
-                n = snprintf(out + used, size - used, "%smotions 0-%u", used ? ", " : "",
-                             motions - 1);
-            } else {
-                if (motions >= RECORD_SLOTS_MAX) {
-                    continue;
-                }
-                n = snprintf(out + used, size - used, "%smotions above %u", used ? ", " : "",
-                             motions - 1);
+            if (!motion_slot_list(motion_mask, shipped, slots, sizeof slots)) {
+                continue;
             }
+            n = snprintf(out + used, size - used, "%smotions %s", used ? ", " : "", slots);
         } else if (((files & file_kind_names[i].bit) != 0) != shipped) {
             continue;
         } else {
@@ -934,8 +945,8 @@ static void self_test(MH4UCall *call) {
                  "stand-in %u, names: %s", (unsigned)row->id, (unsigned)records[i].address,
                  (unsigned)row->stand_in, texts);
         say(MH4U_LOG_INFO, line);
-        file_kind_list(row->files, row->motions, 1, ships, sizeof ships);
-        file_kind_list(row->files, row->motions, 0, keeps, sizeof keeps);
+        file_kind_list(row->files, row->motion_mask, 1, ships, sizeof ships);
+        file_kind_list(row->files, row->motion_mask, 0, keeps, sizeof keeps);
         snprintf(line, sizeof line, "self-test: id %u ships %s; keeps stand-in %u's paths for %s",
                  (unsigned)row->id, ships[0] ? ships : "no files", (unsigned)row->stand_in,
                  keeps[0] ? keeps : "nothing");

@@ -50,10 +50,14 @@ static const MhucAction mhuc_actions_125[] = {
     {13, 9, 0, 3},
 };
 
-#define MHUC_PORTED_ACTIONS_COUNT 2
+/* Giadrome, ported from mhxx em034 (giadrome-gu, id 126): no entry: no action-id map is recorded for it yet. */
+static const MhucAction *const mhuc_actions_126 = NULL;
+
+#define MHUC_PORTED_ACTIONS_COUNT 3
 static const MhucPortedActions mhuc_ported_actions[MHUC_PORTED_ACTIONS_COUNT] = {
     {124, 0, mhuc_actions_124},
     {125, 16, mhuc_actions_125},
+    {126, 0, mhuc_actions_126},
 };
 
 #endif

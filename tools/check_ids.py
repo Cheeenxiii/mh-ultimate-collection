@@ -22,15 +22,15 @@ The registry is the one file that records every id a ported content takes
               tail, mef, sound, cmd, efl (the resource record's path kinds). The record the
               plugin builds rewrites the id token only in these kinds' paths; the rest keep
               the stand-in's path, because the game does not tolerate a missing file. A kind
-              covers every path in its group, except motions, which takes the number of
-              motion-list slots shipped from slot 0 (`motions=3`): the slots above keep the
-              stand-in's paths.
+              covers every path in its group, except motions, which takes the motion-list slots
+              shipped, as a slot or a range: `motions=0-4` or `motions=0,2,3,4`. A slot it does
+              not name keeps the stand-in's path.
 - `notes`     free text.
 
 Rules checked: each id is inside its kind's range and unique, permanent monster ids are
 consecutive from 124 (every permanent id up to the highest one used needs a row in each table;
 pooled ids may skip), each key, source game and source key is valid, `files` names known kinds
-once each and gives `motions` a count in 1..6, and every line of the plugin's header is the one
+once each and gives `motions` slots in 0..5, and every line of the plugin's header is the one
 this file generates.
 
 `--write` writes the header. The header is checked in, so a wrong or stale one fails the
@@ -57,7 +57,7 @@ SOURCE_GAMES = ("mh4u", "mh3u", "mhxx", "mhgu")
 # the stand-in's path, because a missing file stops the load (#143).
 FILE_KINDS = ("model", "motions", "camera", "tail", "mef", "sound", "cmd", "efl")
 # The motion-list fields hold this many slots (record +0x04, reference/README.md#mh4u-monster-tables);
-# `motions=N` says the first N are the port's, and the slots above keep the stand-in's path.
+# `motions` names the slots the port ships as a list, and the rest keep the stand-in's path.
 MOTION_SLOTS = 6
 # MH4U's own monster ids are 0 to 123 (reference/README.md#mh4u-monster-tables). 124 to 223
 # are the permanent ids; 224 to 255 are the bytes a quest lends from the pool, whose monsters
@@ -103,22 +103,70 @@ def read_registry(path: str) -> tuple[list[dict[str, str]], list[str]]:
     return out, problems
 
 
+SLOT = re.compile(r"\d+\Z")
+SLOT_RANGE = re.compile(r"(\d+)-(\d+)\Z")
+
+
 def files_tokens(text: str) -> list[tuple[str, str | None]]:
-    """One row's `files` as (kind, count or None) tokens."""
-    tokens = []
+    """One row's `files` as (kind, value or None) tokens.
+
+    `motions` is the one kind with a value, and that value is a comma-separated slot list:
+    `motions=0-4` or `motions=0,2,3,4`. The commas in the slot list are part of the motions
+    value, not another kind, so a bare number after a motions token extends it.
+    """
+    tokens: list[list[str | None]] = []
     for raw in text.split(","):
-        kind, sep, count = raw.strip().partition("=")
-        tokens.append((kind.strip(), count.strip() if sep else None))
-    return tokens
+        piece = raw.strip()
+        kind, sep, value = piece.partition("=")
+        kind = kind.strip()
+        if sep:
+            tokens.append([kind, value.strip()])
+        elif tokens and tokens[-1][0] == "motions" and SLOT.match(piece):
+            tokens[-1][1] = f"{tokens[-1][1]},{piece}"
+        elif SLOT_RANGE.match(piece) or SLOT.match(piece):
+            tokens.append([piece, None])
+        else:
+            tokens.append([kind, None])
+    return [(str(kind), value) for kind, value in tokens]
+
+
+def slots_of(value: str) -> tuple[list[int], str | None]:
+    """The slots a motions value names, and the first part that isn't a slot or a range."""
+    slots: list[int] = []
+    for part in value.split(","):
+        part = part.strip()
+        span = SLOT_RANGE.match(part)
+        if span:
+            first, last = int(span.group(1)), int(span.group(2))
+            if first > last:
+                return slots, part
+            slots.extend(range(first, last + 1))
+        elif SLOT.match(part):
+            slots.append(int(part))
+        else:
+            return slots, part
+    return slots, None
+
+
+def motion_slots(text: str) -> list[int] | None:
+    """The motion-list slots one row's `files` names, sorted, or None when it ships none."""
+    for kind, value in files_tokens(text):
+        if kind != "motions":
+            continue
+        if value is None:
+            return []
+        slots, _bad = slots_of(value)
+        return sorted(set(slots))
+    return []
 
 
 def check_files(where: str, text: str) -> list[str]:
-    """What is wrong with one row's `files`: empty, unknown, twice, or a bad motions count."""
+    """What is wrong with one row's `files`: empty, unknown, twice, or a bad motion slot."""
     if not text.strip():
         return [f"{where}: files is empty; name the kinds the port ships, or it has no files"]
     problems: list[str] = []
     seen: set[str] = set()
-    for kind, count in files_tokens(text):
+    for kind, value in files_tokens(text):
         if not kind:
             problems.append(f"{where}: files has an empty kind")
             continue
@@ -130,24 +178,28 @@ def check_files(where: str, text: str) -> list[str]:
             continue
         seen.add(kind)
         if kind == "motions":
-            if count is None:
-                problems.append(f"{where}: motions needs the number of slots the port ships, as motions=3")
+            if value is None:
+                problems.append(f"{where}: motions needs the slots the port ships, as "
+                                f"motions=0,2,3 or motions=0-4")
                 continue
-            slots = parse_int(count)
-            if slots is None or not 1 <= slots <= MOTION_SLOTS:
-                problems.append(f"{where}: motions={count!r} isn't a slot count in 1..{MOTION_SLOTS}")
-        elif count is not None:
-            problems.append(f"{where}: only motions takes a count, not {kind!r}")
+            slots, bad = slots_of(value)
+            if bad is not None:
+                problems.append(f"{where}: motions={value!r} has {bad!r}, not a slot or a range")
+                continue
+            out_of_range = [slot for slot in slots if not 0 <= slot < MOTION_SLOTS]
+            if out_of_range:
+                problems.append(f"{where}: motion slot {out_of_range[0]} isn't in "
+                                f"0..{MOTION_SLOTS - 1}")
+            if len(slots) != len(set(slots)):
+                problems.append(f"{where}: motions={value!r} names a slot twice")
+        elif value is not None:
+            problems.append(f"{where}: only motions takes a value, not {kind!r}")
     return problems
 
 
-def motions_count(row: dict[str, str]) -> int:
-    """The number of motion-list slots a row ships, 0 when it ships none."""
-    for kind, count in files_tokens(row["files"]):
-        if kind == "motions" and count is not None:
-            slots = parse_int(count)
-            return slots if slots is not None else 0
-    return 0
+def motion_mask(row: dict[str, str]) -> int:
+    """The motion-list slots a row ships, as one bit per slot."""
+    return sum(1 << slot for slot in (motion_slots(row["files"]) or []))
 
 
 def check_rows(rows: list[dict[str, str]]) -> list[str]:
@@ -250,14 +302,17 @@ def render_header(rows: list[dict[str, str]]) -> str:
         lines.append(f"#define MHUC_FILES_{kind.upper()} 0x{1 << n:04x}u")
     lines += [
         "",
+        f"#define MHUC_MOTION_SLOTS {MOTION_SLOTS}u",
+        "#define MHUC_MOTION_SLOT(slot) (1u << (slot))",
+        "",
         "/* One ported monster: the id it takes, the MH4U monster id whose rows the reader",
-        " * hooks answer with until the port ships this monster's own rows, the number of",
-        " * motion-list slots it ships from slot 0, and the kinds of file it ships",
-        " * (MHUC_FILES_* bits). */",
+        " * hooks answer with until the port ships this monster's own rows, the motion-list slots",
+        " * it ships (MHUC_MOTION_SLOT bits), and the kinds of file it ships (MHUC_FILES_* bits).",
+        " * A slot or kind it does not ship keeps the stand-in's path. */",
         "typedef struct MhucMonsterId {",
         "    uint32_t id;",
         "    unsigned char stand_in;",
-        "    unsigned char motions;",
+        "    unsigned char motion_mask;",
         "    unsigned short files;",
         "} MhucMonsterId;",
         "",
@@ -267,8 +322,10 @@ def render_header(rows: list[dict[str, str]]) -> str:
     if permanent:
         lines.append("static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {")
         for row in permanent:
+            slots = motion_slots(row["files"]) or []
             lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}, "
-                         f"{motions_count(row)}, {file_mask(row)}}},")
+                         f"0x{motion_mask(row):02x}u, /* slots {', '.join(map(str, slots)) or 'none'} */ "
+                         f"{file_mask(row)}}},")
         lines.append("};")
     else:
         lines.append("/* Empty: a dummy entry keeps the array valid C. */")
@@ -281,8 +338,10 @@ def render_header(rows: list[dict[str, str]]) -> str:
     if pooled:
         lines.append("static const MhucMonsterId mhuc_pooled_monster_ids[MHUC_POOLED_MONSTER_COUNT] = {")
         for row in pooled:
+            slots = motion_slots(row["files"]) or []
             lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}, "
-                         f"{motions_count(row)}, {file_mask(row)}}},")
+                         f"0x{motion_mask(row):02x}u, /* slots {', '.join(map(str, slots)) or 'none'} */ "
+                         f"{file_mask(row)}}},")
         lines.append("};")
     else:
         lines.append("/* Empty: a dummy entry keeps the array valid C. */")
