@@ -129,6 +129,23 @@ def write(arc: Archive, level: int = 9) -> bytes:
     return bytes(out)
 
 
+def replace_entry(data: bytes, file_name: str, body: bytes) -> bytes:
+    """The archive with one entry's contents replaced, in place where the format allows it.
+
+    Every other entry keeps its original compressed stream (write() reuses it), so only the
+    replaced entry's stream moves and the table's offsets after it change; a full repack, which
+    builds every entry from its file (`entry_from_file`), compresses all the streams again.
+    """
+    a = read(data)
+    for e in a.entries:
+        if e.file_name == file_name:
+            if body != e.data:   # unchanged: keep the original stream, so the archive is exact
+                e.data = body
+                e.compressed = None
+            return write(a)
+    raise ArcError(f"{file_name}: not in the archive")
+
+
 def entry_from_file(file_name: str, data: bytes) -> Entry:
     """An entry from a path with an extension (as Entry.file_name gives)."""
     stem, dot, ext = file_name.rpartition(".")

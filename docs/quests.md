@@ -8,6 +8,9 @@ Progression is one story whose key quests come from all three games ([decisions.
 
 - **Readers:** `mhuc quest dump` reads all three formats into JSON. Layouts: [specs/quest.md](../specs/quest.md).
 - **Writer:** `mibwrite.mib4_build` lays out an MH4U `.mib` from a model. It round-trips all 120 DLC quests (check Q18). Whether the game accepts its output is check Q19 ([checks.md](checks.md)).
+- **In place:** a port's quest starts from MH4U's own `.mib` and changes only the fields it needs
+  (`mibwrite.mib4_set_wave_monster` for the large monster); the builder above is for conversions
+  from another game, because its layout shifts the game's own offsets ([checks.md](checks.md), P2).
 - **Converter:** `mhuc convert quest --from mhxx` exists. MH3U waits for stage data, because `QTDS` doesn't hold monster positions.
 - **Id tables:** [data/idmap/](../data/idmap/README.md) ships empty, so nothing converts yet without the maintainer's tables.
 
