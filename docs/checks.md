@@ -168,7 +168,7 @@ another function table.
 
 | Check | What | Pass |
 |---|---|---|
-| R1p | force action 3/17 on the arena Rathian with `mods/force_action` | the log shows the plugin loaded and `forcing action 3/17 on monster 1`, and the forced move plays |
+| R1p | force action 3/17 on Rathian with `mods/force_action` | the log shows the plugin loaded and `forcing action 3/17 on monster 1`, and the forced move plays |
 
 1. Build the code library with the mod enabled and add the mod to the port's library; the
    commands are in [the mod's README](../mods/force_action/README.md#install). The current
@@ -177,7 +177,7 @@ another function table.
    cannot beat the AI's per-frame reset.
 2. In the installed mod's folder, set `action = 3/17`, `monster = 1` and `hold = 1` in
    `config.ini` (monster 1 is Rathian; the plugin reads the id at `work+0x1c0`).
-3. Load the arena's Rathian quest (one Rathian, a fixed area) and stand in the arena.
+3. Take quest 10212 from the Hall (Low Rank 2★) and go to area 3, where the Rathian is.
 4. Start the quest. The log shows `plugin Force a monster action: ... ready: forcing action
    3/17 on monster 1 via the action setter`, then one `first force: monster 1 3/17 over ...`
    line, then a line only when the AI's action changes. If it says the action setter isn't a
