@@ -8,7 +8,7 @@ Where a part is not marked as checked, "where it likely lives" is a hypothesis t
 
 | Part | What it does | Where it likely lives in MH3U | How it reaches MH4U |
 |---|---|---|---|
-| Swim state | 3D movement, surfacing, diving, entering and leaving water | a state of the player's action state machine, and the player command tables | hooks on MH4U's player update running a swim state machine translated from MH3U's |
+| Swim state | 3D movement, surfacing, diving, entering and leaving water | category 1 of the player's action state machine (indices 0x12 to 0x17), and the water byte +0x3d, both in the status block at `[uPlayer+0xd5c]` | hooks on MH4U's player update running the swim category's handlers translated from MH3U's |
 | Oxygen | the gauge, drain, refill on surfacing, damage at zero, items and skills | player status code, item and skill data | gauge logic in the plugin, values from MH3U's tables |
 | Camera | the free 3D camera underwater | MH3U's camera classes | a hook on MH4U's camera (`sMhCamera`, which the port already hooks) |
 | Water volumes | where the water is, its surface, which areas are underwater | stage collision and area info, per area | converted stage data; the area loader told which areas are water |
@@ -119,10 +119,88 @@ So the gauge is a display of the player's oxygen timer, not the oxygen system's 
 
 The texlayout is a little-endian XFS file; `mhuc`'s XFS reader reads it as the other 3DS XFS files (its object-header flag, property count and property sizes are laid out per byte order, [specs/xfs.md](../specs/xfs.md), check X1), so step 4 reads its objects rather than walking the bytes.
 
+## MH3U's player state machine
+
+**One action machine, not a class per state.** MH3U's class registry names 1,218 classes and none is a player state: the only state-machine classes are the framework's `cStateMachineBase::StateBase` and its network subclasses, and `uPlayer` (class id `0x72b401fd`, 0x26a8 bytes, 46 vtable slots, vtable `0xb68640`) sits under `uCharacter` with no state class between them. The player's state is a category and an index in its status block, `[uPlayer+0xd5c]`, written by one setter and dispatched by one function. So the swim state can be ported function by function, but the functions are the category's action handlers, not a class.
+
+| Part | Where | Role |
+|---|---|---|
+| status block | `[uPlayer+0xd5c]` | the player's state data; the air timer and the camera read it too |
+| water position | block +0x3d | 0 on land, 3 underwater; 1 and 2 also occur (below) |
+| action category | block +0x3e | 13 values, 0 to 0xc |
+| action index | block +0x40 (u16) | the action within the category |
+| previous pair | block +0x43, +0x44 | the category and index copied at each change |
+| state setter | `0x8e128c`, its twin `0x8a5a90` (reached through `0x8b0c40`) | writes the category and index, and clears +7, +8, +9 and the flag words +0x608 and +0x60c |
+| state query | `0xa3a9c0(player, category, index)` | returns whether the pair matches |
+| dispatcher | `0x8aaa48` | switches on the category; 13-entry jump table at `0x8aaa70` |
+
+A frame reaches it through `uPlayer`'s vtable slot 9 (`0x91f3e4`), which calls `0x932ed0`; that function branches on status+6, to `0x918a70` for 0 and through `0x933544` to `0x920fb4` for 1. `0x920fb4` calls the dispatcher `0x8aaa48` and the status and air update `0x8d60c0`. The dispatcher sends each category to its own function, and that function switches on the index:
+
+| Category | Handler | Actions |
+|---|---|---|
+| 0 | `0x8e73b4` | 210 (0 to 0xd1) |
+| 1 | `0x8b3710` | 40; the water actions (below) |
+| 2 | `0x8aaabc` | 8 |
+| 4 | `0x8aab7c` | first the weapon byte +2 picks a per-weapon function (`0x8d87a8`, `0x8d8ec8`, …); each switches on the index |
+| 5 | `0x8d20c8` | 20 |
+| 6 | `0x8e1890` | 76 |
+| 7 | `0x8cd780` | 13 |
+| 8 | `0x934950` | 4 |
+| 9 | `0x8b210c` | 11 |
+| 10 | `0x8f0328` | 16 |
+| 11 | `0x8b1af4` | 34 |
+| 3 | `0x8aab74` | returns without acting |
+
+### The water byte
+
+A second byte, block +0x3d, says where the character is. It is not the action category: the action machine reads it to choose behaviour, and so do the air timer and the camera.
+
+- `0x8e7248` tests the water with `0x9578a4(player, position, out)` at three points and writes +0x3d: 3 at `0x8e72e4` and 0 at `0x8e737c`. It also keeps the water surface's height at +0x120 and a flag at +0x134.
+- `0x8e6dc0`, the depth test, writes +0x3d: 2 at `0x8e6e94` and 0 at `0x8e6f24`.
+- The get-out action functions `0x8a73a0`, `0x8a8748`, `0x8a88fc`, `0x8a8bf4`, `0x8a8f50`, `0x8a9348` and `0x8a99b0` write +0x3d = 0. `0x8a73a0` also moves the action state to category 0xb, indices 0x0d, 0x0e, 0x12 and 0x13.
+- The air update `0x8d60c0` reads it at `0x8d6ac0`: with +0x3d = 3 it drains `0xa39c20(player, -1)` at `0x8d6fe4`; with +0x3d not 3 and the category not 8 it refills by 150 at `0x8d6ad8`; category 8 neither drains nor refills (`0x8d6f38`).
+
+What 1 and 2 mean is not read to the end; 2 is written by the depth test, so it is likely a shallow or in-water state.
+
+### The swim state
+
+The water actions are category 1: its handlers from index 0x12 to 0x17 test the water movement sub-state at +7 and the surface query `0xa39894(player)`, and the underwater camera checks (1, 0x14) and (1, 0x15) only in its underwater branch, which confirms those two as swim actions:
+
+| Index | Handler | Read so far |
+|---|---|---|
+| 0x12 | `0x8ae650` | with +7 = 1 and the surface query true, integrates the position at +0x90 by the frame delta |
+| 0x13 | `0x8ae72c` | with +7 = 1 and in water, calls `0x908178(player, 0, 0)` and follows its answer |
+| 0x14 | `0x8ad4dc` | with +7 = 1, calls `0xa3a7f4` and builds a position |
+| 0x15 | `0x8ae84c` | with +7 = 1, calls `0xa3a7f4` and builds a position |
+| 0x16 | `0x8aeb38` | with +7 = 1, builds a direction from the angle at +0x118 |
+
+The transitions into and out of these indices, and what each sets, are not all read: the get-out functions are verified (they leave for category 0xb), the entry side is not. The oxygen functions sit beside them: `0xa39c20` for the current air, `0xa3a478` for the capacity, and `0x8eccb8` resets both to 100 and is called when water is entered.
+
+### Cha-Cha's marks on 3DS
+
+The Wii U build marks three pieces of this; the 3DS offsets are re-found here.
+
+| Mark (Cha-Cha, Wii U) | 3DS counterpart | Status |
+|---|---|---|
+| swim state: `[player+0xE30]` +0x3D is 3 under water | the 3DS player reaches the block through the pointer at `[uPlayer+0xd5c]`, whose byte +0x3d is 3 under water. `0x8e7248` writes it at `0x8e72e4`, the get-out functions clear it, the air update reads it at `0x8d6ab8` and the gauge at `0x33f3fc` | verified |
+| camera: camera block +0x12D is 1 under water, the game handles pitch, and the turn ramp is 10 frames instead of 5 | the player camera block is the object at +0x8e8 of the camera system (`0x26766c`). Its +0x12d is set to 1 on the underwater path of `0x2699c0` (`0x269e0c`) and read by `0x26da08` (`0x26dc44`). `0x26766c` branches on +0x3d = 3 at `0x268018` to `0x2681f0`; there the ramp timer at camera +0x10e is 10 (`0x2682dc`) for action (1, 0x15), where the land branch sets 5 (`0x268294`) | verified |
+| carving: a carve spot is kind 6 under water, 4 on land | not found. The class registry and the strings have no carve-spot class or name; the functions that read +0x3d for `== 3` and the calls of the state setter with index 4 or 6 were read, and none chooses a 4/6 kind from the water byte. The lead is the monster's death or the area's water data rather than the player's state, or a player action index | unverified |
+
+### How the player state machine was read (check U2)
+
+Addresses, counts and names only.
+
+1. Decompress MH3U's `code.bin`; its SHA-1 matches `reference/games/mh3u/game.json`. Recover the class registry and instance vtables with `reference/mt_dti.py` and `reference/mt_vtables.py`: `uPlayer`'s DTI is `0xd57638`, its instance vtable `0xb68640`, 46 slots.
+2. Disassemble with capstone and follow `uPlayer`'s vtable slot 9 (`0x91f3e4`) to `0x932ed0`, then to `0x920fb4`, the dispatcher `0x8aaa48` and the status update `0x8d60c0`.
+3. Read `0x8aaa48`'s 13-entry jump table at `0x8aaa70`, and each category handler's own switch. Read the setter `0x8e128c` (`+0x3e`/`+0x40` and the previous pair) and the query `0xa3a9c0`.
+4. Scan for stores of a byte or halfword at +0x3d in functions that load `[x+0xd5c]`, and read `0x8e7248`, `0x8e6dc0`, the seven get-out functions and the air update's branch.
+5. For the camera, read `0x26766c`, `0x2699c0` and `0x26da08`, and check that the +0x3d = 3 branch, the +0x12d flag and the 5/10 ramp constants are the ones above.
+6. For the carve mark, search the class registry and strings for a carve spot, scan the functions that read +0x3d = 3 for a store of 4 or 6, and list the state-setter calls with index 4 or 6; none matched. This part is open.
+
 ## Unknowns
 
-1. Whether MH4U kept any of MH3U's water code: answered for the class level in [What MH4U kept](#what-mh4u-kept) — the water surface survives, the underwater systems do not. The function-level question stays with unknown 2.
-2. How MH3U's player state machine is organised (one class per state, or one big switch). This decides whether the swim state can be ported function by function.
+1. Whether MH4U kept any of MH3U's water code: answered for the class level in [What MH4U kept](#what-mh4u-kept) — the water surface survives, the underwater systems do not. The function-level question is answered for the player state machine above; MH4U's own player still has to be compared to it.
+2. Which category-1 index each water transition (enter, surface, dive) sets, and where the carve spot's kind is chosen. The state machine and the swim actions are found; these edges are not.
 
 ## Approach
 
