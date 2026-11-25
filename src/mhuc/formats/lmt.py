@@ -1,7 +1,8 @@
 """MT Framework motion lists (`.lmt`, rMotionList), as specs/lmt.md lays them out (from MHGU Definitive Edition's
 `tools/lmt.py`, read off MH4U files: version 67; and from RevilLib's version layouts, which put 66 and 67 in the
 same class layouts, so MH3U's files read with the same code). `read` returns the structure, `decode_keys` its
-keyframes and `bounds` a track's bounds block; `check` gives check L1's counts.
+keyframes, `bounds` a track's bounds block and `read_float_tracks` an animation's float-track block; `check` gives
+checks L1 and L5's counts.
 """
 from __future__ import annotations
 
@@ -10,7 +11,8 @@ import struct
 from collections import Counter
 from dataclasses import dataclass, field
 
-ANIM, TRACK, BOUNDS, GROUP, GROUPS = 0x40, 0x24, 0x20, 0x48, 4
+ANIM, TRACK, BOUNDS, GROUP, GROUPS = 0x3C, 0x24, 0x20, 0x48, 4
+FLOAT_TRACK, FLOAT_GROUPS, FLOAT_KEY = 0x0C, 4, 0x10
 VERSIONS = (66, 67)      # 66 is MH3U's, 67 MH4U's, MHXX's and MHGU's; the layout is the same, types 11-13 differ
 
 # Keyframe buffer types, from RevilLib's src/mtf_lmt/codecs.hpp and the per-version registry in bone_track.cpp
@@ -51,6 +53,26 @@ class Key:
     value: tuple[float, float, float, float]
 
 
+@dataclass(frozen=True)
+class FloatKey:
+    """One key of an animation's float-track block (RevilLib's `FloatFrame`): how many of the value's components
+    it sets, its frame, and the three floats. No file in the three games carries one (check L5), so the layout is
+    RevilLib's alone."""
+    components: int
+    frame: int
+    value: tuple[float, float, float]
+
+
+@dataclass
+class FloatTrack:
+    """One of an animation's four float-track groups (RevilLib's `FloatTrack`): the component each float is remapped
+    onto (RevilLib's `FloatTrackComponentRemap`: 0 none, 1 x, 2 y, 3 z, one byte per remap), its keys, and the
+    offset those keys were read from."""
+    remaps: tuple[int, int, int, int]
+    keys: list[FloatKey] = field(default_factory=list)
+    frames: int = 0
+
+
 @dataclass
 class Animation:
     offset: int
@@ -59,11 +81,33 @@ class Animation:
     tracks: list[Track] = field(default_factory=list)
     events: int = 0          # event block offset (0 none)
     flags: int = 0           # bit 0x800000 is set exactly when `events` is
+    floats: list[FloatTrack] | None = None   # float-track block (None when +0x38 is 0)
 
 
 def _in(d: bytes, at: int, size: int) -> None:
     if not 0 < at or at + size > len(d):
         raise LmtError(f"block {at:#x}+{size:#x} outside the file")
+
+
+def read_float_tracks(d: bytes, at: int) -> list[FloatTrack]:
+    """The float-track block at `at`: four `FloatTrack` records (RevilLib's `FloatTracks`), each followed by its
+    offset's keys. Offsets are relative to the file, as the block's own is (RevilLib `float_track.inl`)."""
+    _in(d, at, FLOAT_TRACK * FLOAT_GROUPS)
+    out: list[FloatTrack] = []
+    for g in range(FLOAT_GROUPS):
+        b = at + FLOAT_TRACK * g
+        remaps = (d[b], d[b + 1], d[b + 2], d[b + 3])
+        count, frames = struct.unpack_from("<II", d, b + 4)
+        if count and not frames:
+            raise LmtError(f"float track {g} has {count} keys but no frames offset")
+        keys: list[FloatKey] = []
+        if count:
+            _in(d, frames, FLOAT_KEY * count)
+            for k in range(count):
+                data, x, y, z = struct.unpack_from("<Ifff", d, frames + FLOAT_KEY * k)
+                keys.append(FloatKey(data & 0xFF, (data >> 8) & 0xFFFF, (x, y, z)))
+        out.append(FloatTrack(remaps, keys, frames))
+    return out
 
 
 def read(d: bytes) -> tuple[int, list[Animation | None]]:
@@ -80,8 +124,10 @@ def read(d: bytes) -> tuple[int, list[Animation | None]]:
             continue
         _in(d, o, ANIM)
         tr, tc, frames, loop = struct.unpack_from("<IIii", d, o)
+        floats = struct.unpack_from("<I", d, o + 0x38)[0]
         a = Animation(o, frames, loop, events=struct.unpack_from("<I", d, o + 0x34)[0],
-                      flags=struct.unpack_from("<I", d, o + 0x30)[0])
+                      flags=struct.unpack_from("<I", d, o + 0x30)[0],
+                      floats=read_float_tracks(d, floats) if floats else None)
         if tc:
             _in(d, tr, TRACK * tc)
         for k in range(tc):
@@ -197,7 +243,8 @@ def bounds(d: bytes, track: Track) -> tuple[tuple[float, ...], tuple[float, ...]
 
 
 def check(d: bytes) -> Counter:
-    """Check L1 (specs/lmt.md): version, readability, counts of animations, tracks and buffer types."""
+    """Checks L1 and L5 (specs/lmt.md): version, readability, counts of animations, tracks and buffer types, and
+    every animation's float-track block and the four bytes after its last field."""
     c = Counter()
     if d[:4] != b"LMT\0":
         c["L1 other magic"] += 1
@@ -216,6 +263,12 @@ def check(d: bytes) -> Counter:
         c["L1 animations"] += 1
         c["L1 tracks"] += len(a.tracks)
         c["L1 with events"] += bool(a.events)
+        c["L5 float-track blocks"] += a.floats is not None
+        c["L5 animations with the float-track flag"] += bool(a.flags & 0x40000)
+        # The animation's named fields end at +0x38; +0x3C is not a field and is only non-zero after the last
+        # header of a list, where the next block starts (specs/lmt.md, animation table).
+        tail = struct.unpack_from("<I", d, a.offset + 0x3C)[0] if a.offset + 0x40 <= len(d) else 0
+        c["L5 padding at +0x3C non-zero"] += bool(tail)
         for t in a.tracks:
             c[f"L1 buffer type {t.buffer_type}"] += 1
     return c

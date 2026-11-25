@@ -416,6 +416,67 @@ def test_every_motion_keyframe_buffer_decodes_in_all_three_games(dump):
                 assert mean < 1e-3 and worst < 0.009, (game, buffer_type, mode, mean, worst)
 
 
+def test_no_motion_list_uses_the_float_track_block_in_all_three_games(dump):
+    """specs/lmt.md check L5: the float-track block at animation +0x38 is unused in all three games
+    (+0x38 is 0 and RevilLib's 0x40000 flag clear in every animation of the 2,841 motion lists), and
+    the four bytes at +0x3C are not a field: they are 0 except in the highest-offset animation of
+    some lists, where the next block starts and they are that block's first word. It also checks the
+    two flags the loader reads: 0x2000000 is never set, and 0x1000000 (702 MHXX animations) marks a
+    motion that shares its track table with an earlier one that doesn't set it."""
+    counts, nonzero, shared = Counter(), Counter(), Counter()
+    flags = {game: Counter() for game in ("mh4u", "mhxx", "mh3u")}
+    for game in ("mh4u", "mhxx", "mh3u"):
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        for name, data in motion_lists(image):
+            version, anims = lmt.read(data)
+            assert version == (66 if game == "mh3u" else 67), name
+            present = [a for a in anims if a is not None]
+            counts["lists"] += 1
+            if not present:                                  # every slot empty: nothing to read
+                counts["empty lists"] += 1
+                continue
+            highest = max(a.offset for a in present)
+            blocks = set()                       # every block start the list names
+            for a in present:
+                blocks.add(struct.unpack_from("<I", data, a.offset)[0])      # track table
+                blocks.add(a.events)
+                for t in a.tracks:
+                    blocks.add(t.buffer)
+                    blocks.add(t.bounds)
+                if a.events:
+                    for g in range(lmt.GROUPS):
+                        blocks.add(struct.unpack_from("<I", data, a.events + lmt.GROUP * g + 0x44)[0])
+            blocks.discard(0)
+            tables: dict[int, list] = {}
+            for a in present:
+                tables.setdefault(struct.unpack_from("<I", data, a.offset)[0], []).append(a)
+            for tr, same in tables.items():                        # a shared track table is relocated once
+                if len(same) == 1:
+                    continue
+                shared[game] += 1
+                unflagged = [a for a in same if not a.flags & 0x1000000]
+                assert len(unflagged) == 1, (name, tr, len(unflagged))
+                assert all(a.offset > unflagged[0].offset for a in same if a.flags & 0x1000000), (name, tr)
+            for a in present:
+                counts["animations"] += 1
+                flags[game][a.flags] += 1
+                assert a.floats is None, (name, a.offset)              # no float-track block
+                assert not a.flags & 0x40000, (name, a.offset)         # no float-track flag
+                assert not a.flags & 0x2000000, (name, a.offset)       # the loader's event-list skip bit
+                if a.offset + 0x40 > len(data):
+                    continue
+                if struct.unpack_from("<I", data, a.offset + 0x3C)[0]:
+                    assert a.offset == highest, (name, a.offset, highest)
+                    assert a.offset + 0x3C in blocks, (name, a.offset)
+                    nonzero[game] += 1
+    assert (counts["lists"], counts["animations"]) == (2841, 52902), dict(counts)
+    assert dict(nonzero) == {"mh4u": 1466, "mhxx": 972, "mh3u": 383}, dict(nonzero)
+    assert dict(shared) == {"mhxx": 525}, dict(shared)
+    assert flags == {"mh4u": {0x800000: 23412},
+                     "mhxx": {0x800000: 19767, 0x800001: 685, 0x1800000: 702},
+                     "mh3u": {0x800000: 8336}}, {g: dict(c) for g, c in flags.items()}
+
+
 def _r_model(image, files, arc_path: str) -> bytes:
     return next(e.data for e in arc.read(image.read(files[arc_path])).entries if e.type_name == "rModel")
 

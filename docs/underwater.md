@@ -19,7 +19,7 @@ Where a part is not marked as checked, "where it likely lives" is a hypothesis t
 
 ## What is known
 
-- MH3U's 387 motion lists are LMT version 66. Version 66 and 67 share one layout, so `mhuc` reads all 387 ([specs/lmt.md](../specs/lmt.md), check L3), underwater motions among them; their keyframe buffers decode too ([specs/lmt.md](../specs/lmt.md#keyframe-buffers), check L4), except that version 66 stores buffer types 11 to 13 signed where version 67 stores them unsigned behind a bounds block, so a converter has to re-encode those tracks' keys.
+- MH3U's 387 motion lists are LMT version 66. Version 66 and 67 share one layout, so `mhuc` reads all 387 ([specs/lmt.md](../specs/lmt.md), check L3), underwater motions among them; their keyframe buffers decode too ([specs/lmt.md](../specs/lmt.md#keyframe-buffers), check L4), except that version 66 stores buffer types 11 to 13 signed where version 67 stores them unsigned behind a bounds block, so a converter has to re-encode those tracks' keys. MH4U's loader takes only version 67 and MH3U's only 66, so converting a 3U motion list means writing the number as well as re-encoding those keys ([specs/lmt.md](../specs/lmt.md#versions)).
 - MH3U's stage collision is MH4U's format ([specs/sbc.md](../specs/sbc.md)).
 - Cha-Cha (MH3U on Wii U) marks some of this. Its Wii U offsets must be re-found on 3DS:
   - swim state: the player's pad block (player + 0xE30 there) holds 3 at +0x3D under water;
