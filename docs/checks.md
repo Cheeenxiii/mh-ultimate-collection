@@ -286,8 +286,9 @@ Status: not done. The GU rows wait for #48 (the ported files) and #105 (the port
 resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
 
 The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
-handlers for 3/98, 12/1-3 and category 17, and leaves shared ids and 12/0 alone (T1). It logs
-one line the first time each translated action runs, and one line per category-17 index.
+handlers for 3/98, 12/1-3, 4/27-32 and category 17, and leaves shared ids and 12/0 alone
+(T1). It logs one line the first time each translated action runs, and one line per
+category-17 index.
 
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
@@ -469,12 +470,13 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <st
 ```
 
 Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (category 17 has
-none), first motions 9/13; translated 5, MH4U's own 1 (12/0), pending 7. Changing a ledger
-motion makes it exit 1 and name the id.
+none), first motions 9/13; translated 11 (3/98, 12/1-3, 4/27-32 and category 17), MH4U's
+own 1 (12/0), pending 1 (8/0). Changing a ledger motion makes it exit 1 and name the id.
 
-T1b, last result (2026-11-25): pass, 15 engine calls checked across 3/98's three frames, the
-12/1-3 blocks and category 17's no-op and base-update paths. Changing 3/98's `6.0` to `5.0`
-fails it with the motion line; making 17/3 a no-op (`index > 3`) fails it with 17/3's line.
+T1b, last result (2026-11-25): pass, the call sequences checked across 3/98's three frames,
+the 12/1-3 blocks, 4/27-32's states and category 17's no-op and base-update paths. Changing
+3/98's `6.0` to `5.0` fails it with the motion line; making 17/3 a no-op (`index > 3`) fails
+it with 17/3's line; giving 4/27 the fast turn step fails it with the turn line.
 
 T1c, last result (2026-11-25, MH4U USA v1.3.0, the #139 code library built with the mod's
 `uEnemy::dispatchAction` hook, headless runner): pass. The log had the plugin's ready line,
@@ -485,6 +487,13 @@ line saying category 17 does nothing for indexes 0 to 2 and naming 12/0 as MH4U'
 `0x006d524c` and the pending slices, and
 `selftest: float stubs at 0x08e44670 (256 bytes, the game's heap)`; the runner exited 0. No
 monster spawned, so no translated action ran: the in-game side is R2p.
+
+The 4/27-32 slice changes that self-test line to `selftest: 11 of the 13 actions: ... 4/27-32
+<- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 17 <-
+the gate 0x008d5bd4 + MH4U's base update 0x00911b48 (slot 89, MHXX's slot 244)`, and the
+pending line names 8/0 only. No headless run has shown that line yet: it needs a code library
+rebuilt with the plugin, and the build machine's one heavy job is the quest-load proof
+([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)).
 
 ## Floats through a guest stub (T0)
 
