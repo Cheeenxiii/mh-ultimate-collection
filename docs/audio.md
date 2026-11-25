@@ -157,16 +157,33 @@ MH4U reserves no heap of its own for sound. MT Framework Mobile creates its allo
 
 So loaded banks, requests and waves share the 47 MiB Resource heap with everything else that is not drawing. There is no fixed sound reservation for a larger MH3U or MHXX bank to exceed: it spends the shared heap on demand. [Check SN5](../specs/sound.md#checks-with-game-files) records the addresses and the procedure.
 
-## How much MH4U's monster banks use
+## How much the three games' monster banks use
 
-The 123 monster ARCs (`/data/emNNN.arc`) carry each monster's sound. The sizes are the decompressed, loaded sizes of the entries:
+A monster's own sounds are its bank, its request and its waves; the figures here are the decompressed, loaded sizes of those entries, counted by [check SN7](../specs/sound.md#checks-with-game-files). MH4U and MHXX ship them inside the monster's own ARC; MH3U keeps them in a second ARC, `snd_emNNN.arc` (next section).
 
-- 232 `SNDB` banks in all, 4,083,511 B together.
-- Largest single bank: 73,066 B (`em017`).
-- Largest complete sound set: 1,583,089 B (`em110` and `em111`): bank 10,693 B, request 14,860 B, waves 1,557,536 B. That is 3.2 % of the 47 MiB Resource heap, and 0.15 % for the largest bank alone.
-- All 232 monster banks together are 8.3 % of it.
+| Game | Monster sets | Banks | Bank bytes | Largest bank total on one monster | Largest single bank | Largest complete set | Share of the 47 MiB Resource heap |
+|---|---|---|---|---|---|---|---|
+| MH4U | 123 | 232 | 4,083,511 | 73,066 (`em017`, 3 banks) | 32,862 (`em114`) | 1,583,089 (`em110`, `em111`: 10,693 bank + 14,860 request + 1,557,536 waves) | 3.2 % |
+| MH3U | 58 | 59 | 460,410 | 20,099 (`snd_em051`, 2 banks) | 16,211 (`snd_em015`) | 1,774,774 (`snd_em020`: 8,146 + 8,696 + 1,757,932) | 3.6 % |
+| MHXX | 137 | 260 | 4,295,309 | 46,632 (`em071_05`, 2 banks) | 23,722 (`em071_05`) | 3,349,540 (`em084_00`: 43,965 + 20,583 + 3,284,992) | 6.8 % |
 
-A quest loading two of the largest monsters puts at most about 3.2 MB of monster sound in the shared heap, under 7 % of it. The banks themselves are small; the waves are what take the room.
+The banks are small; the waves take the room: MH4U's 123 sets hold 5,461 waves (59,676,128 B), MH3U's 58 hold 2,931 (27,606,100 B) and MHXX's 137 hold 24,970 (194,840,320 B). The median set is 602,971 B, 515,837 B and 1,625,666 B.
+
+Most sets repeat a shared bank: MH4U's `snd_common` (22,275 B) is in 108 of its 123 sets and MHXX's `snd_com_qst` (22,910 B) in 123 of its 137; MH3U's sets have no shared bank. Counting each set's own bank only: 124 banks, 1,677,811 B (MH4U); 59, 460,410 B (MH3U); 137, 1,477,379 B (MHXX). Each is a single bank, however many sets carry a copy.
+
+**Every bank in the game**, not only the monster ones: 3,582 banks holding 9,313,817 B (MH4U), 1,225 holding 3,083,367 B (MH3U) and 3,010 holding 8,488,973 B (MHXX) — 18.9 %, 6.3 % and 17.2 % of the heap if every bank were loaded at once, which no quest does. No bank is large: the biggest is 32,862 B (`em114`, MH4U), 21,664 B (an NPC bank, MH3U) and 23,722 B (`em071_05`, MHXX).
+
+A quest loading two of the largest monsters puts at most about 3.2 MB (MH4U, 6.4 %), 3.5 MB (MH3U, 7.1 %) or 6.1 MB (MHXX, 12.3 %) of monster sound in the shared heap. The banks themselves are small; the waves are what take the room.
+
+## What a monster's own sounds are
+
+The three games do not put a monster's audio in the same files, which [#158](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/158) has to follow.
+
+- **MH4U** keeps all of it in the monster's ARC, `/data/emNNN.arc`: its own bank `sound\se\em\emNNN\snd_emNNN` and, in 108 of the 123, the shared `sound\se\common\snd_common`; its request; its waves under `sound\se\em\emNNN\wav\`; and its call sequence `sound\call\em\emNNN`, a `rMHSoundSequence` of 2,866 to 79,320 B in 116 of the 123. The monster's resource record names the call sequence's path; the game then asks for request ids, so the paths stay inside the set.
+- **MH3U** splits it in two: the call sequence `sound\call\em\emNNN` (4,112 to 117,439 B) sits in the monster's ARC, but the bank, request and waves are a separate ARC, `/arc/sound/se/em/emNNN/snd_emNNN.arc`. 58 sound ARCs ship for 85 monster ARCs, and the call sequences show family sharing (em002's is em001's, em062 to em065's is em001's, em051's is em003's); which set each of the 85 ids loads is not read, so a port takes the set its record names rather than guessing from the id.
+- **MHXX** keeps all of it in the monster's own ARC again, one per variant (`/arc/enemy/emNNN_NN.arc`, or `emsNNN_NN.arc` for the small monsters): its own `sound\se\em\emNNN_NN\snd_emNNN_NN` bank plus the shared `sound\se\com\snd_com_qst`, its request, its waves under `sound\se\em\emNNN_NN\wav\`, and the call sequence `sound\call\em\emNNN` (1,040 to 74,251 B; some variants share it, e.g. em005_00's is em004's, and em084_00 carries three).
+
+A port therefore converts one ARC's worth of sound from MH3U or MHXX — two for 3U, whose set sits outside the monster ARC — at most 1.77 MB and 3.35 MB against MH4U's 1.58 MB, all inside the 47 MiB heap. The formats decide the work: 3U's four kinds are MH4U's one version older ([SN6](../specs/sound.md#checks-with-game-files)), MHXX's waves already are MH4U's `MADP` 5, while its banks and requests are GU's next generation ([S3](../specs/sound.md#checks-with-game-files), open, decides whether the layouts match). #158 does the conversion; the in-game check waits for #144.
 
 ## Unknowns
 
