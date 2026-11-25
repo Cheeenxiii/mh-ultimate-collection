@@ -7,7 +7,7 @@ import zlib
 import pytest
 
 from mhuc import monsterdata
-from mhuc.formats import classid, emd, hitdata, lmt, pica, stq
+from mhuc.formats import classid, emd, hitdata, lmt, pica, sound, stq
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -195,3 +195,52 @@ def test_stq_refuses_a_sequence_table_that_does_not_follow_the_stream_table():
     struct.pack_into("<I", d, 0x14, 0x18 + 36 + 1)
     with pytest.raises(stq.StqError, match="sequence table at"):
         stq.read(bytes(d))
+
+
+def wave(version: int = 4, channels: int = 1, seek: int = 0, offset: int | None = None,
+         data_size: int = 0x100) -> bytes:
+    """A hand-built MADP: samples and rate 8000 so the length is 1.0 s, then the data and seek table."""
+    header = 0x2C + sound.WAVE_BLOCK * channels if version == 4 else 0x60
+    d = bytearray((offset if offset is not None else header) + data_size + 20 * seek)
+    struct.pack_into("<4sI4B", d, 0, b"MADP", version, channels, 0, 0, 1)
+    struct.pack_into("<6I", d, 0x0C, 8000, 8000, 0, 0, offset if offset is not None else header, data_size)
+    struct.pack_into("<f", d, 0x24, 1.0)
+    if version == 4:
+        struct.pack_into("<I", d, 0x28, 0x33480000 | seek)
+    else:
+        struct.pack_into("<II", d, 0x28, 0, 0x60)
+    return bytes(d)
+
+
+def test_sound_reads_mh3us_madp_version_4_and_its_seek_table():
+    """specs/sound.md wave version 4: data offset 0x2C + 0x30 per channel, the seek count in 0x28's
+    low half, and the seek table's 20-byte entries after the data"""
+    w = sound.read_wave(wave(seek=2))
+    assert (w.version, w.channels, w.samples, w.rate, w.data_offset, w.data_size) == (4, 1, 8000, 8000, 0x5C, 0x100)
+    assert w.seconds == pytest.approx(1.0)
+    assert (w.seek_count, w.trailing) == (2, 40)
+    assert sound.read_wave(wave(channels=2)).data_offset == 0x8C
+
+
+def test_sound_refuses_a_madp_version_4_offset_that_does_not_follow_the_channels():
+    with pytest.raises(sound.SoundError, match=r"data at 0x5c, expected 0x8c for 2 channels"):
+        sound.read_wave(wave(channels=2, offset=0x5C))
+
+
+def test_sound_refuses_a_seek_count_that_does_not_match_the_bytes_after_the_data():
+    """the seek count is the only record of the table's length, so the file's size must confirm it"""
+    d = bytearray(wave(seek=1))
+    struct.pack_into("<I", d, 0x28, 0x33480000 | 2)
+    with pytest.raises(sound.SoundError, match="20 bytes after the data for 2 seek entries"):
+        sound.read_wave(bytes(d))
+
+
+def test_sound_reads_mh4us_madp_version_5_mono_and_refuses_the_stereo_music_layout():
+    """MH4U's mono effects put the data at 0x60; version 5's stereo music keeps a seek table in
+    the header, which this reader doesn't lay out (specs/sound.md, "Wave")"""
+    assert sound.read_wave(wave(version=5)).data_offset == 0x60
+    d = bytearray(wave(version=5, channels=2, offset=0x60, data_size=0x100))
+    d[8] = 2
+    with pytest.raises(sound.SoundError, match="stereo"):
+        sound.read_wave(bytes(d))
+
