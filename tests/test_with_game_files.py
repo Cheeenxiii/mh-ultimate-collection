@@ -25,6 +25,7 @@ from mhuc.formats import (
     emstatus,
     hitdata,
     lmt,
+    lyt,
     mef,
     mod,
     romfs,
@@ -1098,3 +1099,43 @@ def test_a_mhxx_monsters_own_sound_set_converts_to_what_mh4u_loads(dump):
     assert converted_call.version == 0x20120123
     assert [r.key for r in converted_call.records] == [r.key for r in source_call.records]
     assert all(a.body == b.body for a, b in zip(converted_call.records, source_call.records, strict=True))
+
+
+def test_every_mh4u_layout_reads(dump):
+    """check LY1: every rLayout entry of the five languages reads, and the per-language tallies agree."""
+    layout_id = classid.class_id("rLayout")
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    per: dict[str, Counter] = {}
+    failures = []
+    for f in image.files():
+        if not (f.path.endswith(".arc") and "/data/core_" in f.path):
+            continue
+        counts = per.setdefault(f.path.split("/")[1], Counter())
+        for e in arc.read(image.read(f)).entries:
+            if e.type_id != layout_id:
+                continue
+            counts["layouts"] += 1
+            try:
+                layout = lyt.read(e.data)
+            except (lyt.LytError, struct.error, IndexError, UnicodeDecodeError) as exc:
+                failures.append(f"{f.path}:{e.path}: {exc}")
+                continue
+            for node in layout.nodes:
+                counts[node.type_name] += 1
+            for texture in layout.textures:
+                counts["texture paths" if texture.path else "empty texture slots"] += 1
+            counts["roots with no child"] += sum(1 for r in layout.roots if not layout.children(r))
+            term = layout.nodes[-1].offset + lyt.NODE_SIZES[layout.nodes[-1].type]
+            root_off = struct.unpack_from("<I", e.data, 0x2C)[0]
+            for node in layout.nodes:
+                if node.name:
+                    at = struct.unpack_from("<I", node.raw, 0x0C)[0]
+                    if not term + 0x14 <= at < root_off:
+                        failures.append(f"{f.path}:{e.path}: {node.name} at 0x{at:x}, outside the names")
+    assert not failures, f"{len(failures)} layouts not read, first: {failures[:3]}"
+    expected = Counter({"layouts": 165, "root": 1246, "picture": 18616, "group": 4825, "text": 4256,
+                        "boundary": 702, "texture paths": 636, "empty texture slots": 13,
+                        "roots with no child": 1})
+    assert set(per) == {"eng", "fre", "ger", "ita", "spa"}, sorted(per)
+    for language, counts in sorted(per.items()):
+        assert counts == expected, f"{language}: {counts - expected} over, {expected - counts} short"

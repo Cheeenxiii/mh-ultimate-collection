@@ -6,7 +6,8 @@ a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (te
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
 records against their hit volumes), E9 (MH3U em_status break blocks), E11 (MHXX dtbparts joint record kinds),
-L1 (lmt), C1 (rCameraList), A1 (rEnemyCmd), S1 (rCollision), X1 (XFS files in either byte order), SN1 (sound
+L1 (lmt), C1 (rCameraList), LY1 (MH4U layouts), A1 (rEnemyCmd), S1 (rCollision), X1 (XFS files in either
+byte order), SN1 (sound
 resources by kind, version and class id), SN6 (the MH3U wave, bank, request and stream request layouts), S4 (MH4U
 stream requests), U1 (whether a stage resource references the water-surface class uOcean).
 
@@ -31,6 +32,7 @@ from .formats import (
     gmd,
     hitdata,
     lmt,
+    lyt,
     pica,
     romfs,
     sound,
@@ -236,6 +238,8 @@ def survey_entry(type_name: str | None, data: bytes, st: dict, type_id: int | No
         st.setdefault("lmt", Counter()).update(lmt.check(data))
     elif type_name == "rCameraList" or data[:4] == b"LCM\0":
         st.setdefault("camera", Counter()).update(camera.check(data))
+    elif type_name == "rLayout" or data[:4] == b"lyt\0":
+        st.setdefault("lyt", Counter()).update(lyt.check(data))
     elif data[:4] == b"QTDS":
         c = st.setdefault("quest", Counter())
         try:
@@ -435,7 +439,7 @@ def report(total: dict) -> str:
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
     for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "camera",
-                "emc", "sbc", "xfs", "stage", "sound"):
+                "emc", "sbc", "xfs", "lyt", "stage", "sound"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]

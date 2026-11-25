@@ -127,3 +127,23 @@ def test_survey_counts_a_camera_list_by_version():
     assert counts["C1 read"] == 1
     assert counts["version 4"] == 1
     assert counts["0 table entries"] == 1
+
+
+def test_survey_counts_the_layouts_it_reads_and_refuses():
+    """specs/lyt.md, check LY1: a layout the reader takes is counted by its node types; a broken one is not read"""
+    from test_formats import one_of_each_layout
+
+    good = one_of_each_layout()
+    data = arc.write(arc.Archive(version=0x13, entries=[
+        arc.Entry(path="eng\\lyt\\quest\\ui000", type_id=classid.class_id("rLayout"), data=good),
+        arc.Entry(path="eng\\lyt\\quest\\ui001", type_id=classid.class_id("rLayout"), data=good[:-1]),
+    ]))
+    st: dict = {}
+    survey.survey_arc(data, st)
+    counts = st["lyt"]
+    assert counts["LY1 read"] == 1
+    assert counts["LY1 not read"] == 1
+    assert counts["root nodes"] == 1
+    assert counts["picture nodes"] == 1
+    assert counts["text nodes"] == 1
+    assert counts["boundary nodes"] == 1
