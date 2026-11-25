@@ -1,0 +1,17 @@
+# GU Rathian's 13 MHXX-only actions (MHXX v1.4 roEm001), the facts the translation is
+# checked against. tools/check_actions.py reads the module and verifies each row; addresses,
+# action ids and motion numbers only, no game data.
+# action,block,handler,first_motion,status
+3/98,0x020089a8,0x020062d4,0x101,translated
+4/27,0x02018af8,0x0200e3b4,0x90b,pending
+4/28,0x02018b1c,0x0200e3b4,0x90b,pending
+4/29,0x02018b40,0x0200e3b4,0x90b,pending
+4/30,0x02018b64,0x0200e3b4,0x90b,pending
+4/31,0x02018b88,0x0200e3b4,0x90b,pending
+4/32,0x02018bac,0x0200e3b4,0x90b,pending
+8/0,0x020097a4,0x0201b460,0x403,pending
+12/0,0x0201c1c4,0x0201177c,0x101,mh4u
+12/1,0x0201c1d0,0x008ebab0,,translated
+12/2,0x0201c228,0x008ebab0,,translated
+12/3,0x0201c27c,0x02010aec,,translated
+17,0x020098b8,,,pending

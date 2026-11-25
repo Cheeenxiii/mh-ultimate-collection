@@ -21,3 +21,6 @@ __pycache__/
 *.dll
 *.dylib
 *.o
+
+# The translated-actions test binary (mods/)
+mods/*/test/test_plugin
