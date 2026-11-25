@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import collections
 import os
+import struct
 import sys
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reference"))
 import monster_motions  # noqa: E402
+import monster_versions  # noqa: E402
 
 
 def motion(value):
@@ -174,3 +177,38 @@ def test_placement_takes_an_elsewhere_animation_from_the_source_game():
     rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
     assert unresolved == []
     assert rows == [dict(target=(4, 26), source=(2, 9), how="elsewhere", actions=[(7, 1)])]
+
+
+def lmt(version: int = 67) -> bytes:
+    """One animation (frames 1, loop 0, no tracks) at offset 12."""
+    return (b"LMT\0" + struct.pack("<HH", version, 1) + struct.pack("<I", 12)
+            + struct.pack("<IIii", 0, 0, 1, 0) + bytes(44))
+
+
+class FakeFiles:
+    """Only what lmts() reads: the archive's entries, each with a type, a path and data."""
+
+    def __init__(self, entries):
+        self._entries = entries
+
+    def entries(self, game, path):
+        return self._entries
+
+
+def entry(path: str, data: bytes) -> SimpleNamespace:
+    return SimpleNamespace(type_id=monster_versions.LMT_CLASS, path=path.replace("/", "\\"), data=data)
+
+
+def test_motion_lists_are_indexed_by_the_file_number_each_game_encodes():
+    # MH3U names its lists mot_emNNN_{file}00 and packs a motion index as file * 100 + slot.
+    files = FakeFiles([entry("enemy/em001/mot/mot_em001_000", lmt(66)),
+                       entry("enemy/em001/mot/mot_em001_100", lmt(66))])
+    lists = monster_versions.lmts(files, "mh3u", "em001")
+    assert len(lists) == 2 and all(x == [(1, 0, 0)] for x in lists), lists
+
+    # MH4U names them emNNN_{file} and a variant's archive holds the base's; a missing file stays None.
+    files = FakeFiles([entry("enemy/em001/mot/em001_0", lmt()),
+                       entry("enemy/em001/mot/em001_2", lmt())])
+    lists = monster_versions.lmts(files, "mh4u", "em003")
+    assert len(lists) == 3
+    assert lists[0] == [(1, 0, 0)] and lists[1] is None and lists[2] == [(1, 0, 0)], lists

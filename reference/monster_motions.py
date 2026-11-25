@@ -253,6 +253,8 @@ def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) ->
     `elsewhere` item also carries where in the source game's lists its signature was found."""
     index_a = {}
     for fi, anims in enumerate(lmts_a):
+        if not anims:
+            continue
         for slot, sig in enumerate(anims):
             if sig:
                 index_a.setdefault(sig, []).append((fi, slot))
@@ -266,8 +268,8 @@ def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) ->
             continue
         fa, sa = decode_motion(game_a, a[key]["motion"])
         fb, sb = decode_motion(game_b, b[key]["motion"])
-        xa = lmts_a[fa][sa] if fa < len(lmts_a) and sa < len(lmts_a[fa]) else None
-        xb = lmts_b[fb][sb] if fb < len(lmts_b) and sb < len(lmts_b[fb]) else None
+        xa = lmts_a[fa][sa] if fa < len(lmts_a) and lmts_a[fa] and sa < len(lmts_a[fa]) else None
+        xb = lmts_b[fb][sb] if fb < len(lmts_b) and lmts_b[fb] and sb < len(lmts_b[fb]) else None
         if xa is None or xb is None:
             hits = index_a.get(xb, []) if xb is not None else []
             if len(hits) == 1:

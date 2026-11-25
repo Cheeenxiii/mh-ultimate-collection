@@ -27,9 +27,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 
-import fork  # noqa: E402,F401  (the fork's tools on sys.path)
-
-import monster_actions  # noqa: E402
 import monster_motions  # noqa: E402
 
 from mhuc import monsterdata  # noqa: E402
@@ -162,6 +159,8 @@ def dispatcher(files, game, em):
 
 
 def code_and_tables(files, game, em):
+    import monster_actions
+
     if game == "mhxx":
         import cro as crolib
         mm = mhxx_module(files, em)
@@ -187,6 +186,8 @@ def code_and_tables(files, game, em):
     if game not in files._code:
         header = open({"mh4u": files.args.mh4u_exheader, "mh3u": files.args.mh3u_exheader}[game], "rb").read()
         code = open({"mh4u": files.args.mh4u_code, "mh3u": files.args.mh3u_code}[game], "rb").read()
+        import fork  # noqa: F401  (puts the fork's tools on sys.path)
+
         import codebin2elf
         import exheader as exh
         h = exh.parse(header)
@@ -199,6 +200,8 @@ def code_and_tables(files, game, em):
 
 
 def inventory_with_calls(code, dispatcher, follow_tails):
+    import monster_actions
+
     top = monster_actions.find_switch(code, dispatcher, limit=12)
     if top is None:
         raise ValueError(f"no switch on the category at 0x{dispatcher:08x}")
@@ -264,21 +267,43 @@ def inventory(files, game, em):
     return rows
 
 
+LMT_CLASS = 0x76820D81
+
+
 def lmts(files, game, em):
+    """A monster's motion lists, indexed by the file number a motion index encodes.
+
+    MH4U and MHXX pack a motion index as file << 8 | slot; MH3U as file * 100 + slot and names
+    its files `mot_emNNN_{file}00`. A variant's archive can hold the base monster's lists
+    (MH4U em003 holds em001's), and a list can be absent from the archive (MH4U em045 holds
+    em019's files 0, 2, 3 and 4), so the list is indexed by the number in the file name and
+    absent files stay None.
+    """
     if game == "mh4u":
-        path, pat = f"/data/{em}.arc", f"/mot/{em}_"
-    elif game == "mh3u":
-        path, pat = f"/arc/enemy/{em}.arc", f"/mot/mot_{em}_"
+        path = f"/data/{em}.arc"
     else:
-        path, pat = f"/arc/enemy/{em}.arc", f"/mot/{em}_"
-    ents = files.entries(game, path)
-    got = []
-    for e in ents:
+        path = f"/arc/enemy/{em}.arc"
+    got = {}
+    for e in files.entries(game, path):
+        if e.type_id != LMT_CLASS:
+            continue
         q = e.path.replace("\\", "/")
-        if e.type_id == 0x76820D81 and pat in q and q.endswith(tuple(f"_{i}" for i in range(5))):
-            got.append((int(q.rsplit("_", 1)[-1]), e.data))
-    got.sort()
-    return [monster_motions.read_lmt(d) for _, d in got]
+        if "/mot/" not in q:
+            continue
+        name = q.rsplit("/", 1)[-1]
+        if game == "mh3u":
+            m = re.fullmatch(rf"mot_{re.escape(em)}_(\d+)00", name)
+        else:
+            m = re.fullmatch(r"(?:mot_)?em\d{3}(?:_\d{2})?_(\d+)", name)
+        if not m:
+            continue
+        got[int(m.group(1))] = e.data
+    if not got:
+        return []
+    out = [None] * (max(got) + 1)
+    for f, data in got.items():
+        out[f] = monster_motions.read_lmt(data)
+    return out
 
 
 def motion_lists(files, game, em):
