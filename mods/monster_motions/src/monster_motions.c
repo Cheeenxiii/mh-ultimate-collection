@@ -12,8 +12,12 @@
  * handler asks; a missing entry passes the number through unchanged and is logged once.
  *
  * The work block is this+0xe28, with the id byte at +0x1c0 and the current action at +0x1ca
- * and +0x1cb (mods/force_action; docs/checks.md R1p). Ids below MHUC_MONSTER_FIRST are MH4U's
- * own and are left alone.
+ * and +0x1cb (mods/force_action; docs/checks.md R1p). A ported monster is created as its
+ * stand-in (mods/monster_ids rewrites the factory's id), so its id byte holds the stand-in's
+ * id. The plugin therefore also wraps the factory (uEnemyFactory::create, 0x006901f4) and
+ * remembers each enemy the factory makes for a ported id; this mod comes after
+ * mods/monster_ids in the mod order, so its hook runs first and sees the id the quest asked
+ * for. Every other enemy is MH4U's own and is left alone.
  *
  * Logging, each line once and at most 64 of each: the first ready line, one line per distinct
  * translation, and one line per distinct missing entry. Nothing is logged per frame.
@@ -45,6 +49,14 @@ static uint32_t translated[LOG_CAP];
 static int translated_count;
 static uint32_t missing[LOG_CAP];
 static int missing_count;
+
+/* The enemies the factory made for a ported id, and that id. A slot is reused when the
+ * factory hands the same address out again, for a ported id or not. */
+#define PORTED_CAP 32
+static struct {
+    uint32_t enemy;
+    unsigned id;
+} ported[PORTED_CAP];
 
 static void say(int level, const char *text) {
     host->log(host, level, text);
@@ -105,6 +117,54 @@ static int first_time(uint32_t *keys, int *count, uint32_t key) {
     return 1;
 }
 
+/* The ported id the factory made `enemy` for, or 0. */
+static unsigned ported_id(uint32_t enemy) {
+    for (int i = 0; i < PORTED_CAP; i++) {
+        if (ported[i].enemy == enemy) {
+            return ported[i].id;
+        }
+    }
+    return 0;
+}
+
+/* uEnemyFactory::create(owner, id, ...): r1 is the id the quest asked for (this hook runs
+ * before mods/monster_ids rewrites it to the stand-in's), r0 the enemy on return. */
+static void factory(MH4UCall *call, void *user) {
+    (void)user;
+    const unsigned id = (unsigned)host->reg(call, 1);
+    host->call_original(call);
+    const uint32_t enemy = host->reg(call, 0);
+    if (!enemy) {
+        return;
+    }
+    int slot = -1;
+    for (int i = 0; i < PORTED_CAP; i++) {
+        if (ported[i].enemy == enemy) {
+            slot = i;
+            break;
+        }
+    }
+    if (!table_for(id)) {
+        if (slot >= 0) {
+            ported[slot].enemy = 0;
+            ported[slot].id = 0;
+        }
+        return;
+    }
+    for (int i = 0; slot < 0 && i < PORTED_CAP; i++) {
+        if (!ported[i].enemy) {
+            slot = i;
+        }
+    }
+    if (slot < 0) {
+        say(MH4U_LOG_WARNING, "more ported enemies than the plugin tracks; this one keeps "
+                              "MH4U's motion numbers");
+        return;
+    }
+    ported[slot].enemy = enemy;
+    ported[slot].id = id;
+}
+
 /* uEnemy::startMotion(this, motion, flags): r0 is the enemy, r1 the motion number. */
 static void start_motion(MH4UCall *call, void *user) {
     (void)user;
@@ -114,8 +174,11 @@ static void start_motion(MH4UCall *call, void *user) {
         host->call_original(call);
         return;
     }
-    const unsigned id = (unsigned)host->read8(call, work + WORK_ID);
-    const MhucPortedMotions *table = table_for(id);
+    unsigned id = (unsigned)host->read8(call, work + WORK_ID);
+    if (!table_for(id)) {
+        id = ported_id(enemy);
+    }
+    const MhucPortedMotions *table = id ? table_for(id) : NULL;
     if (!table) {
         host->call_original(call);
         return;
@@ -148,6 +211,11 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
     if (!host->hook(host, "uEnemy::startMotion", start_motion, NULL)) {
         say(MH4U_LOG_ERROR, "uEnemy::startMotion (0x0094e318) isn't a hook point: the code "
                             "library needs building with this mod");
+        return 0;
+    }
+    if (!host->hook(host, "uEnemyFactory::create", factory, NULL)) {
+        say(MH4U_LOG_ERROR, "uEnemyFactory::create (0x006901f4) isn't a hook point: a ported "
+                            "monster created as its stand-in can't be told apart");
         return 0;
     }
     int entries = 0;

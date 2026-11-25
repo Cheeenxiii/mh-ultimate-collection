@@ -43,13 +43,16 @@ python3 tools/check_motion_tables.py
 | Function | Address | What it does |
 |---|---|---|
 | `uEnemy::startMotion` | `0x0094e318` | MH4U's motion-start wrapper (`mov r2,#0; b 0x0091908c`); r0 is the enemy, r1 the motion number |
+| `uEnemyFactory::create` | `0x006901f4` | creates an enemy by id; r1 is the id the quest asked for, r0 the enemy on return |
 
-The plugin reads the monster's id byte at `work + 0x1c0` and its current action at
-`work + 0x1ca` and `+0x1cb`, where `work` is the pointer at `this + 0xe28` (the same work block
-`mods/force_action` and `mods/monster_ids` read). Ids below `MHUC_MONSTER_FIRST` (124) are
-MH4U's own and are left alone. `mod.json` names the hook point, so a code library built with
-this mod carries it; `#48`/#49's converted files and `#105`'s resource paths are what make a
-spawned monster's block hold the ported id.
+The plugin reads the monster's current action at `work + 0x1ca` and `+0x1cb`, where `work` is
+the pointer at `this + 0xe28` (the same work block `mods/force_action` and `mods/monster_ids`
+read). A ported monster is created as its stand-in (`mods/monster_ids` rewrites the factory's
+id), so its id byte at `work + 0x1c0` holds the stand-in's id. The plugin therefore also wraps
+the factory (`uEnemyFactory::create`, `0x006901f4`) and remembers each enemy made for a ported
+id. This mod comes after `mods/monster_ids` in the mod order, so its factory hook runs first and
+sees the id the quest asked for. Every other enemy is MH4U's own and is left alone. Both hook
+points are in `mod.json`; `mods/monster_ids` builds the factory one into the library too.
 
 Logging, one line per distinct case and at most 64 of each:
 

@@ -1,7 +1,8 @@
 {
   "name": "Ported monsters' motion numbers",
   "hooks": [
-    {"name": "uEnemy::startMotion", "address": "0x0094e318"}
+    {"name": "uEnemy::startMotion", "address": "0x0094e318"},
+    {"name": "uEnemyFactory::create", "address": "0x006901f4"}
   ],
   "plugin": {"linux": "monster_motions.so", "windows": "monster_motions.dll", "macos": "monster_motions.dylib"}
 }

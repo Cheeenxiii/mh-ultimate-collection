@@ -24,7 +24,7 @@ struct MH4UCall {
 
 static uint8_t memory[0x10000];
 static char logged[4096];
-static MH4UHookFn hooked;
+static MH4UHookFn hooked, hooked_factory;
 static void *hooked_user;
 static int hook_calls, original_calls, failures;
 
@@ -81,6 +81,11 @@ static void h_log(const MH4UPluginHost *self, int level, const char *text) {
 }
 static int h_hook(const MH4UPluginHost *self, const char *name, MH4UHookFn fn, void *user) {
     (void)self;
+    if (strcmp(name, "uEnemyFactory::create") == 0) {
+        hooked_factory = fn;
+        hook_calls++;
+        return 1;
+    }
     if (strcmp(name, "uEnemy::startMotion") != 0) {
         return 0;
     }
@@ -150,9 +155,19 @@ static void run(void) {
     hooked(&call, hooked_user);
 }
 
+/* The factory asked for `id` and returns `enemy` (the fake chain leaves r0 as set). */
+static void create(unsigned id, uint32_t enemy) {
+    MH4UCall made;
+    memset(&made, 0, sizeof made);
+    made.r[0] = enemy;
+    made.r[1] = id;
+    hooked_factory(&made, NULL);
+}
+
 int main(void) {
     CHECK(mh4u_plugin_init(&fake_host, MH4U_PLUGIN_ABI) == 1);
-    CHECK(hook_calls == 1);
+    CHECK(hook_calls == 2);
+    CHECK(hooked_factory != NULL);
     CHECK(hooked != NULL);
     CHECK(strstr(logged, "ready: translating motion numbers") != NULL);
 
@@ -207,6 +222,22 @@ int main(void) {
     place(125, 7, 1, 0x41a);
     run();
     CHECK(call.r[1] == 0x209);
+
+    /* A ported monster is created as its stand-in: its id byte holds 1. The factory call for
+     * 125 is what marks it, and only that enemy. */
+    place(1, 13, 5, 2);
+    run();
+    CHECK(call.r[1] == 2);                      /* not created through the factory: MH4U's */
+    create(125, ENEMY);
+    place(1, 13, 5, 2);
+    run();
+    CHECK(call.r[1] == 0x13);
+    CHECK(occurrences("monster 125: action 13/5 asks motion 0x002 -> source 0x013") == 1);
+    /* The same address handed out again for MH4U's own Rathian forgets the mark. */
+    create(1, ENEMY);
+    place(1, 13, 5, 2);
+    run();
+    CHECK(call.r[1] == 2);
 
     if (failures) {
         fprintf(stderr, "%d check(s) failed\n", failures);
