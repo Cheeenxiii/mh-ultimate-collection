@@ -229,6 +229,7 @@ static HookInfo h_dropa_m = {"drop base A", NO_REG, 0, 0};
 static HookInfo h_dropb_m = {"drop base B", NO_REG, 0, 0};
 static HookInfo h_res = {"resource index", 1, 0, 0};       /* enemyResource::get(id) */
 static HookInfo h_resload = {"resource load", 2, 0, 0};    /* enemyResource::load(a, out, id) */
+static HookInfo h_datapath = {"data resource", 2, 0, 0};  /* the engine's "data\\em%03d" path */
 static HookInfo h_effects = {"effect lists", 2, 0, 0};     /* enemyResource::effectLists(_, _, id) */
 static HookInfo h_icon = {"monster icon", 1, 0, 0};        /* monsterIcon::get(id) */
 static HookInfo h_icon_ui = {"monster icon", 2, 0, 0};     /* monsterIcon::put(_, out, id) */
@@ -391,6 +392,27 @@ static int read_text(MH4UCall *call, uint32_t addr, char *out, size_t size) {
     }
     out[i] = '\0';
     return i != 0;
+}
+
+/* The map/area init (0x00bc3284) builds the engine's enemy resource path for the quest's
+ * wave id with the "data\\em%03d" format and asks the engine's own archive loader for it;
+ * the readers above never see that request. The port ships no data resource of its own yet,
+ * so build the stand-in's path for a registered id. Only that exact format is touched. */
+static void data_path_builder(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    char text[24];
+    if (!read_text(call, host->reg(call, 1), text, sizeof text) ||
+        strcmp(text, "data\\em%03d") != 0) {
+        host->call_original(call);
+        return;
+    }
+    const uint32_t id = host->reg(call, 2);
+    const MhucMonsterId *row = lookup(id, NULL);
+    if (row) {
+        host->set_reg(call, 2, row->stand_in);
+        note(info, id, row->stand_in);
+    }
+    host->call_original(call);
 }
 
 /* A reader that takes the id in a register: rewrite it for a registered id, leave MH4U's
@@ -1398,6 +1420,7 @@ static const struct {
     {"message::getRecordById", "0x00cdfa30", message_record_by_id_reader, &h_msg_by_id},
     {"QuestFlow::startQuest", "0x00b7c010", quest_start_reader, NULL},
     {"aQuest::endSequence", "0x0065a378", quest_end_reader, NULL},
+    {"uc_dataPath", "0x00b7300c", data_path_builder, &h_datapath},
 };
 
 MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint32_t abi) {

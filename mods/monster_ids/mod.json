@@ -19,8 +19,15 @@
     {"name": "aQuest::endSequence", "address": "0x0065a378"},
     {"name": "message::getFormat", "address": "0x00cdfb30"},
     {"name": "message::getRecord", "address": "0x00cdfa18"},
-    {"name": "message::getRecordById", "address": "0x00cdfa30"}
+    {"name": "message::getRecordById", "address": "0x00cdfa30"},
+    {"name": "uc_dataPath", "address": "0x00b7300c"}
   ],
-  "plugin": {"linux": "monster_ids.so", "windows": "monster_ids.dll", "macos": "monster_ids.dylib"},
-  "config": {"selftest": "0"}
+  "plugin": {
+    "linux": "monster_ids.so",
+    "windows": "monster_ids.dll",
+    "macos": "monster_ids.dylib"
+  },
+  "config": {
+    "selftest": "0"
+  }
 }

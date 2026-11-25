@@ -581,6 +581,30 @@ model and the motion slots their rows list while keeping the stand-in's `em015` 
 #159 added `cmd` on the plan to convert 125's EMC, but that converter is a follow-up after #49,
 so the row lists no `cmd` and the record keeps the stand-in's script. That run is not done yet.
 
+### The quest's load, fixed (P2, headless)
+
+The P4 harness (#144) starts quest 10212; the map/area init builds the engine's enemy resource
+path `data\emNNN` from the quest's wave monster id (0x00bc3284, the format at 0x00e062a4) and
+asks the engine's own archive loader for it. With a ported id the path is `data\em125`: the
+engine never asks the readers the plugin answers, and the init waits in state 1. Two parts fix
+that, both outside the engine:
+
+1. The quest file is written in place: `mib4_set_wave_monster` keeps MH4U's own quest bytes and
+   changes only the large-monster wave's id. The builder's layout shifts the texts and the
+   map/area init reads a stale zone index (99); the in-place path is covered by
+   `tests/test_with_game_files.py` (an unchanged patch returns the file exactly).
+2. `mods/monster_ids` hooks the `data\em%03d` builder (0x00b7300c) and answers a registered id
+   with the stand-in's `data\em001`; ids 0..123 pass through. The error reporter and the engine
+   mutex are not touched.
+
+Result (2026-11-25, USA v1.3.0 update, headless runner, the #144 route): the 125 quest starts,
+the log shows `data resource: id 125 -> stand-in 1`, `enemyResource::load: id 125 -> its own
+record` and `uEnemyFactory::create: id 125 -> stand-in 1`, and the player and the Palicoes are in
+the Ancestral Steppe at about 140 s — the map loads. The 125 load is slow (about 88 s from the
+departure) but it completes; the base quest with the original file is the control (map at about
+60 s). 124 (GU) uses the same fix but was not replayed: the 3U route does not start a quest on
+the GU profile's save.
+
 ## A ported camera's cut-in (C2)
 
 MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an action posts by
