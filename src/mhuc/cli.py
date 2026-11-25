@@ -476,7 +476,7 @@ def _convert_monster_files(args) -> int:
     from collections import Counter
 
     from . import monsterassets, monsters
-    from .formats import romfs
+    from .formats import mfx, romfs
     if args.id is None or not args.out or not args.mh4u_romfs:
         print("mhuc convert monster --id N --romfs SOURCE_ROMFS --mh4u-romfs MH4U_ROMFS "
               "--out MOD_FOLDER [--variant V] (docs/architecture.md#a-ported-monsters-files)",
@@ -501,16 +501,18 @@ def _convert_monster_files(args) -> int:
             f.seek(entry.offset)
             data = f.read(entry.size)
         stand_in_data = monsters.stand_in_archive(args.mh4u_romfs, row.stand_in)
+        # A material's shader ids are slots of its own game's package (specs/mfx.md).
+        shaders = (mfx.from_romfs(args.romfs, row.source_game), mfx.from_romfs(args.mh4u_romfs, "mh4u"))
         report = None
         copied = []
         if row.source_game == "mh3u":
-            mod = monsterassets.convert(data, row.id)
+            mod = monsterassets.convert(data, row.id, shaders)
             arc_data, copied = monsters.with_stand_in(mod.archive(), row, stand_in_data)
         else:
-            arc_data, report = monsters.convert(data, row, stand_in_data, args.variant)
+            arc_data, report = monsters.convert(data, row, stand_in_data, shaders, args.variant)
         path = monsters.build_mod(args.out, row, arc_data)
     except (monsterassets.ConvertError, monsters.ConvertError, monstersound.ConvertError, arc.ArcError,
-            OSError) as e:
+            mfx.MfxError, OSError) as e:
         print(f"mhuc convert monster: {e}", file=sys.stderr)
         return 1
     if report is None:
@@ -898,7 +900,8 @@ def build_parser() -> argparse.ArgumentParser:
                                    "read from it by the registry's source key")
     p.add_argument("--mh4u-romfs", help="monster files: MH4U's own RomFS image; the stand-in's "
                                         "data/emNNN.arc is read from it for the paths the port's "
-                                        "record keeps and the port's archive must carry")
+                                        "record keeps and the port's archive must carry, and its "
+                                        "shader package for the materials' shader ids")
     p.add_argument("--arc", help="monster sounds: the monster's source archive "
                                  "(arc/enemy/emNNN[_VV].arc or data/emNNN.arc)")
     p.add_argument("--sound-arc", help="monster sounds, MH3U: its separate sound archive "

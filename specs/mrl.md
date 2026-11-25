@@ -9,10 +9,12 @@ status: unknown
 
 A monster's model names its materials in its 128-byte material name strings ([mod](mod.md)); the
 material file the model loads holds one record per material whose first word hashes the name. The
-three 3DS games share one layout at version 0x20, but not the value at 0x10: each game's files
-carry that game's own signature, and MH4U's rMaterial load refuses any other. A ported material
-therefore keeps the source's file and body and has only the signature rewritten, which is what
-`mhuc.formats.mrl.for_mh4u` does for a converted MH3U or MHXX monster.
+three 3DS games share one layout at version 0x20, but a material names its shader objects by
+their slot in its own game's shader package ([mfx](mfx.md)), and carries that package's hash at
+0x10. MH4U's rMaterial load refuses any other signature. A ported material therefore keeps the
+source's file and body, with its shader ids moved to MH4U's slots for the same names and the
+signature rewritten, which is what `mhuc.formats.mrl.for_mh4u` does for a converted MH3U or MHXX
+monster.
 
 ## Header (0x1c bytes)
 
@@ -22,7 +24,7 @@ therefore keeps the source's file and body and has only the signature rewritten,
 | 0x04 | u32 | version: 0x20 in MH4U, MH3U and MHXX | verified | check MR1 |
 | 0x08 | u32 | material record count (0x3c-byte records at +0x18 + 4) | verified | ours, MH4U rMaterial::findMaterial `0x00be6e88`; check MR1 |
 | 0x0c | u32 | reference count (0x4c-byte entries at +0x14) | verified | ours, MH4U rMaterial load `0x00be7000`; check MR1 |
-| 0x10 | u32 | signature: MH4U 0xcec1aa61, MH3U 0x3810b2e2, MHXX 0xeaca0cbd | verified | ours, the load's check; check MR1 |
+| 0x10 | u32 | signature, the hash of the shader package the file was made against: MH4U 0xcec1aa61, MH3U 0x3810b2e2, MHXX 0xeaca0cbd | verified | ours, the load's check; checks MR1 and [mfx](mfx.md) X1 |
 | 0x14 | u32 | reference array offset, 0x1c | verified | ours, the load; check MR1 |
 | 0x18 | u32 | material record array offset, 0x14 + 0x4c × reference count | verified | ours, the load; check MR1 |
 
@@ -49,7 +51,11 @@ decoded.
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
 | 0x00 | u32 | name hash: `(~crc32(name)) & 0xffffffff` of one of the model's material names | verified | ours, rMaterial::findMaterial `0x00be6e88`; check MR2 |
-| 0x04 | u32 × 14 | the material's shader and parameter data | unknown | not decoded |
+| 0x04 | u32 | unknown (0x150 or 0x80 in Rathian's files) | unknown | ours |
+| 0x08 | u32 | blend state id ([mfx](mfx.md)) | verified | ours; mfx check X2 |
+| 0x0c | u32 | depth-stencil state id | verified | ours; mfx check X2 |
+| 0x10 | u32 | rasterizer state id | verified | ours; mfx check X2 |
+| 0x14 | u32 × 11 | flags, counts and the command block's offsets, not decoded; the blocks after the records hold more shader ids | unknown | ours |
 
 The model's material table gives names, not hashes: `rModel::createMaterials` (`0x00681650`) asks
 the material for each name, and the lookup hashes the name and scans these records in file order.
@@ -58,12 +64,14 @@ records and hashes, so a port's model keeps binding the source's material names 
 
 ## Conversion
 
-MH3U's and MHXX's material files have MH4U's version and layout but their own signature; MH4U's
-loader refuses them, and the archive they came in stalls (an MH3U monster archive with one MH3U
-material never completes its load). `mhuc convert monster` rewrites the signature to MH4U's and
-moves the texture paths to the port's folder (the paths are absolute and the two file names are
-the same length). Every other byte, the material records and their hashes included, stays the
-source's.
+MH3U's and MHXX's material files have MH4U's version and layout, but their shader ids are slots of
+their own game's package and their signature is that package's hash. MH4U's loader refuses the
+signature, and the archive the file came in stalls: an MH3U monster archive with one MH3U material
+never completes its load. With the signature alone rewritten, the file loads but MH4U uses the
+slots as stored: MH3U Rathian's blend state then reads MH4U's sampler `SSLinear`. `mhuc convert monster` rewrites every shader id to MH4U's slot for the same object
+name, rewrites the signature to MH4U's package hash, and moves the texture paths to the port's
+folder (the paths are absolute and the two file names are the same length). Every other byte,
+the material records' name hashes included, stays the source's.
 
 ## Checks
 
@@ -80,8 +88,9 @@ source's.
   `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k three_games_material`.
 - **MR3 (done, 2026-11-25, game):** a converted material loads in MH4U. In the headless 125
   quest the archive resource's +0x50 reaches done (`0x00928a01`) and `HW.Memory UnmappedAccess`
-  is 0 through the load, where the source signature stalled it. The ported model still does not
-  draw, which is the model's binding to the material, not the material's load. Procedure in
+  is 0 through the load, where the source signature stalled it. With only the signature
+  rewritten its shader ids still named MH3U's slots, and the #182 runs drew no Rathian;
+  whether the moved ids make the model draw is [mfx](mfx.md) X4. Procedure in
   [checks.md](../docs/checks.md#a-converted-material-loads-m3).
 - **MR4 (done, 2026-11-25, static):** every model/material pair of every monster archive of MH4U
   (`/data/emNNN.arc`, 123 archives) and MH3U (`/arc/enemy/emNNN.arc`, 85 archives). For every
