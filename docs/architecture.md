@@ -107,5 +107,5 @@ What the mod needs, what is known and the unknowns: [audio.md](audio.md).
 
 ## Progression
 
-How players reach 3U and GU content is an open decision ([decisions.md](decisions.md#open)). The options range from separate hubs per game to new quest categories on MH4U's existing boards.
+Players reach 3U and GU content through one story in MH4U's hubs, whose key quests are drawn from all three games ([decisions.md](decisions.md#0007-progression)).
 

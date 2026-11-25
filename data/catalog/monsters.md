@@ -13,4 +13,4 @@ One row per monster per game, in the order of each game's list page (large, then
 | source_game | the dump this version would come from (fidelity rule), not a wiki fact | README.md |
 | list_source, page_source | the two pages read | — |
 
-Monsters in more than one game are listed once per game: which version the mod uses is an open decision ("Monster versions").
+Monsters in more than one game are listed once per game: the mod ports each version as a monster of its own ([decision 0004](../../docs/decisions.md#0004-monster-versions)).

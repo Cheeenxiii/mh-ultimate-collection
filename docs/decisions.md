@@ -44,7 +44,7 @@ Still open: where in MH4U's save the mod's data goes and in what format (MH4U's 
 
 The facts and options it was chosen from, as the open entry held them:
 
-A ported monster or item is a row MH4U never shipped with: an id, a row in every table indexed by that id, and a place in the save for what the base game's structures don't hold. The two halves are one question, because the id is what a save and a quest both record. The entry complemented [Monster versions](#monster-versions), which chooses which version of a monster runs; this one chooses what number it takes and where the mod's own data lives. [Progression](#progression) names a side file as likely for per-game progress, which is this entry's save half.
+A ported monster or item is a row MH4U never shipped with: an id, a row in every table indexed by that id, and a place in the save for what the base game's structures don't hold. The two halves are one question, because the id is what a save and a quest both record. The entry complemented [Monster versions](#0004-monster-versions), which chooses which version of a monster runs; this one chooses what number it takes and where the mod's own data lives. [Progression](#0007-progression) names a side file as likely for per-game progress, which is this entry's save half.
 
 **What is known**
 
@@ -153,22 +153,40 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 
 **Sources for Definitive Edition's side:** its `allocations.toml`, `migrations.toml`, `tools/alloc.py`, `notes/registry.md`, `notes/save-store.md`, `notes/mod-save-format.md` and `notes/items-append.md`, read at commit dd5c666 (2026-11-24, core 3.1.0). The project is credited in [sources.md](sources.md); no code is copied.
 
-## Open
+### 0004. Monster versions
 
-| Decision | The question | Options |
+Settled by the maintainer on 2026-11-25.
+
+**Every version comes in, side by side.** MH4U's own version of a monster stays as it is; the 3U and GU versions of a monster MH4U has are ported as monsters of their own, each with its own id ([0003](#0003-id-allocation-and-mod-saves)). The Rathian milestone therefore adds two Rathians beside MH4U's.
+
+| Alternative | Why not |
+|---|---|
+| MH4U's version wherever MH4U has the monster | the 3U and GU versions are lost |
+| The newest game's version | ports replace MH4U monsters, which "Add, never replace" forbids |
+| A pick per monster | a choice to justify per monster, and the others are still lost |
+
+The facts and options it was chosen from, as the open entry held them:
+
+Some monsters appear in more than one game ([data/catalog/monsters.md](../data/catalog/monsters.md) lists each once per game). The versions differ in data, moves, AI and model. How a 3U or GU monster runs is settled (0002); which version of a shared monster the mod uses is not.
+
+| Option | Gives | Costs |
 |---|---|---|
-| Combat base | which GU combat systems come in | MH4U's only; some as switches; GU's on GU content only |
-| Monster versions | which version of a monster that several games have | MH4U's where it exists; the newest; a pick per monster |
-| Runtime | stay on Azahar's core or go native | Azahar core; the fork's `native` branch; wait for upstream |
-| Progression | how players reach 3U and GU content | hubs per game; one shared hub; quest categories per game; merged key quests; hubs later |
-| Shared systems | skills, meals, Kinsect, Palicos, points, rank unlocks | 4U's everywhere; each content's own; a pick per system |
-| Map versions | 3U's or GU's version of a shared locale, and whose lighting | 3U's (keeps water); GU's; both as separate maps |
-| Music versions | which game's arrangement of a shared theme | first game's; the content's own game's; MH4U's |
-| GU Switch assets | whether HD Switch assets may come in | no; an optional pack from the player's Switch dump; change the source rule |
+| MH4U's version wherever MH4U has the monster | no porting for those | 3U and GU versions are lost |
+| The newest game's version | the latest design | ports replace MH4U monsters |
+| A pick per monster | the best of each | a choice to justify per monster |
 
-Each one in detail below. Facts and options only: none of them is chosen.
+### 0005. Combat base
 
-### Combat base
+Settled by the maintainer on 2026-11-25.
+
+**MH4U's combat only.** GU's Hunter Styles, Hunter Arts, GU's Kinsect, the Sword and Shield oils and Palico customisation don't come in; GU's and 3U's weapons are played with MH4U's movesets. The question can be reopened later as optional switches, which this choice doesn't rule out.
+
+| Alternative | Why not |
+|---|---|
+| Some GU systems as switches | each system ported as code and tested against the others, before any content |
+| GU's combat on GU content only | two combat systems side by side |
+
+The facts and options it was chosen from, as the open entry held them:
 
 GU's combat systems are code, not data, so they are the costliest content in the mod: Hunter Styles, Hunter Arts, GU's Kinsect (nectar stats, evolution forms, elements), the Sword and Shield oils, Palico customisation.
 
@@ -180,17 +198,18 @@ GU's combat systems are code, not data, so they are the costliest content in the
 
 Underwater, Styles and Arts would also need movesets no game ever had (see [underwater.md](underwater.md)).
 
-### Monster versions
+### 0006. Runtime
 
-Some monsters appear in more than one game ([data/catalog/monsters.md](../data/catalog/monsters.md) lists each once per game). The versions differ in data, moves, AI and model. How a 3U or GU monster runs is settled (0002); which version of a shared monster the mod uses is not.
+Settled by the maintainer on 2026-11-25.
 
-| Option | Gives | Costs |
-|---|---|---|
-| MH4U's version wherever MH4U has the monster | no porting for those | 3U and GU versions are lost |
-| The newest game's version | the latest design | ports replace MH4U monsters |
-| A pick per monster | the best of each | a choice to justify per monster |
+**Azahar's core now, native later.** Content work targets the port on Azahar's core, which runs today with multiplayer; the fork's `native` branch carries on beside it without blocking content. The plugin ABI stays the only contract between mod and engine, so the mod moves with the engine.
 
-### Runtime
+| Alternative | Why not |
+|---|---|
+| Carry the native branch forward first | a large amount of engine work before any content |
+| Wait for upstream | no date |
+
+The facts and options it was chosen from, as the open entry held them:
 
 The engine runs the game's code natively, but system services, graphics, audio and multiplayer come from Azahar's 3DS core. The fork's `native` branch mirrors upstream's work towards a build without Azahar. Network rooms, the base of the port's multiplayer, work on the Azahar core today. Upstream's maintainer had not answered an issue between 2026-11-01 and 2026-11-23.
 
@@ -202,7 +221,22 @@ The engine runs the game's code natively, but system services, graphics, audio a
 
 Whatever the runtime, the plugin ABI stays the only contract between mod and engine, so the mod moves with the engine without a rewrite. [MHGURecomp](https://github.com/morerokk/MHGURecomp) is a reference for a native system layer.
 
-### Progression
+### 0007. Progression
+
+Settled by the maintainer on 2026-11-25.
+
+**Merged key quests (option E below).** One story through MH4U's hubs. Each rank's key quests are drawn from all three games, and the urgent quest is picked among theirs. Every quest stays its own game's; which ones are chosen, and the re-ranking of 3U's quests, are authored balance work recorded in the authored register. There is one Hunter Rank, so the Wyporium and the Wyceum unlock as in MH4U.
+
+Still open, as work rather than a decision: which quests each rank takes, and how the quest lists and clear flags make room for them (the inputs listed below).
+
+| Alternative | Why not |
+|---|---|
+| A. A hub per game | each hub's stage, NPCs, shops and board converted; per-game progress in the save |
+| B. One shared hub, quests in MH4U's ranks | the lowest work, but no authored route through the content |
+| C. A quest line per game on MH4U's boards | three stories end to end make the whole very long |
+| D. Hubs later | two systems to keep working |
+
+The facts and options it was chosen from, as the open entry held them:
 
 MH4U has its own hubs (Val Habar, Cheeko Sands, Dundorma), village and guild quest lines, and High and G Rank gates. 3U brings Moga and Port Tanzia; GU brings Bherna and its other villages. New monsters and maps must be reachable somehow.
 
@@ -224,7 +258,24 @@ Constraints whatever the option:
 
 Inputs before deciding: how MH4U stores quest lists and clear flags, whether quest categories are a fixed set, how hub stages load NPCs and shops.
 
-### Shared systems
+### 0008. Shared systems
+
+Settled by the maintainer on 2026-11-25.
+
+**A pick per system, and each pick is MH4U's:**
+
+- **Skills:** MH4U's. 3U and GU armour carries MH4U skill points; a skill MH4U lacks gets an authored conversion, recorded in the authored register.
+- **Meals:** MH4U's canteen.
+- **Kinsect:** MH4U's (follows [0005](#0005-combat-base)).
+- **Palicos:** MH4U's two Palicos and their skills; 3U's and GU's Palico systems don't come in.
+- **Points:** one pot, MH4U's. Every quest pays MH4U's points, and the 3U and GU trades worth keeping move into MH4U's shops.
+- **Rank unlocks:** as in MH4U, reached through the one story ([0007](#0007-progression)).
+
+| Alternative | Why not |
+|---|---|
+| Each content's own game's systems | several parallel systems to make coexist in code and in the save |
+
+The facts and options it was chosen from, as the open entry held them:
 
 All three games have these systems but run them differently. Each needs its own choice: 4U's everywhere, each content's own game's, or a pick per system.
 
@@ -237,7 +288,18 @@ All three games have these systems but run them differently. Each needs its own 
 
 Facts for each choice go in `data/catalog/`, with a source URL per row, before options are costed.
 
-### Map versions and lighting
+### 0009. Map versions and lighting
+
+Settled by the maintainer on 2026-11-25.
+
+**Both versions, as separate maps.** A locale in 3U and GU (Deserted Island, Misty Peaks) comes in twice: 3U's version keeps its water, GU's its layout. Each map keeps its own game's lighting.
+
+| Alternative | Why not |
+|---|---|
+| 3U's version only | GU's layout is lost |
+| GU's version only | the underwater areas are lost |
+
+The facts and options it was chosen from, as the open entry held them:
 
 Some locales exist in several games, in different versions: Deserted Island in MH3U (12 areas) and MHGU (10 areas), Misty Peaks in both ([data/catalog/maps.csv](../data/catalog/maps.csv)). Our GU-era source for maps is MHXX.
 
@@ -249,7 +311,20 @@ Some locales exist in several games, in different versions: Deserted Island in M
 
 Lighting: each game lights a locale differently, and lighting affects the whole scene. Either each map keeps its own game's lighting, or MH4U's lighting style is applied to imported maps (authored work, recorded in the register).
 
-### Music and sound versions
+### 0010. Music and sound versions
+
+Settled by the maintainer on 2026-11-25.
+
+**The version of the game the content comes from.** 3U Rathian has 3U's theme and sounds, GU Rathian GU's; MH4U's content keeps MH4U's.
+
+Still open: whether a monster with no theme in its own game gets one from another.
+
+| Alternative | Why not |
+|---|---|
+| Its first game's version | may clash with the content's own game |
+| MH4U's, where MH4U has it | 3U and GU arrangements are lost |
+
+The facts and options it was chosen from, as the open entry held them:
 
 Many themes and monster sounds exist in several games, sometimes rearranged (GU revisits older games' themes). Some monsters have a theme in one game and none in another, and the conventions differ: some games give most large monsters a theme, others play the area's music.
 
@@ -263,7 +338,18 @@ A second question: whether a monster with no theme in its own game gets one from
 
 The mechanism takes no side: in MH4U a theme is a sequence id in a stream request (`bgm_bat.stq`, or a stage's `bgm_st_NN.stq` for a stage theme), and a hardcoded per-monster switch in `sSoundControl` picks it ([audio.md](audio.md#how-mh4u-picks-a-monsters-theme)). Every option above is therefore a choice of sequence and audio, and none of them changes how the game asks for it; a ported monster reusing another's theme only needs the switch to answer with that theme's id.
 
-### GU Switch assets
+### 0011. GU Switch assets
+
+Settled by the maintainer on 2026-11-25.
+
+**The base mod stays 3DS; an optional HD pack may come later.** The source rule (CLAUDE.md rule 2, [sources.md](sources.md)) is unchanged for the mod itself. A separate, optional pack built from the player's own Switch dump (textures, interface, audio) may come later as a second pipeline; nothing from it is needed to play the mod.
+
+| Alternative | Why not |
+|---|---|
+| No HD ever | closes a door for no gain |
+| Change the rule | the mod would depend on a Switch dump |
+
+The facts and options it was chosen from, as the open entry held them:
 
 MHGU on Switch has HD textures and a single-screen interface. The source rule takes only English text from it; GU-era models and textures come from MHXX 3DS.
 
@@ -274,3 +360,7 @@ MHGU on Switch has HD textures and a single-screen interface. The source rule ta
 | Change the rule | HD everywhere | the mod depends on a Switch dump |
 
 Changing the rule means changing CLAUDE.md's rule 2 and [sources.md](sources.md).
+
+## Open
+
+None. A new structural question goes here, with its facts and options, until the maintainer settles it.

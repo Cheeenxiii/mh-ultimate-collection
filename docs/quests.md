@@ -2,7 +2,7 @@
 
 Every 3U and GU quest in the mod is the source game's own quest, rewritten as an MH4U `.mib` (rule 2). This page maps each source field onto MH4U's, describes the three routes into the game, and says what a first converted quest needs.
 
-Which quests to carry, and how progression unlocks them, are open decisions ([decisions.md](decisions.md#open)).
+Progression is one story whose key quests come from all three games ([decisions.md](decisions.md#0007-progression)); which quests each rank takes is authored work.
 
 ## What exists
 
