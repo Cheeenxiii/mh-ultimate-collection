@@ -1,0 +1,20 @@
+{
+  "name": "Ported monster ids",
+  "hooks": [
+    {"name": "uEnemyFactory::create", "address": "0x006901f4"},
+    {"name": "enemyData::load", "address": "0x00689490"},
+    {"name": "enemyData::get", "address": "0x0068882c"},
+    {"name": "getCrown", "address": "0x0068877c"},
+    {"name": "dropRecord::get", "address": "0x00684b40"},
+    {"name": "dropRecord::getForMonster", "address": "0x0092600c"},
+    {"name": "dropBaseA::getForMonster", "address": "0x00911f20"},
+    {"name": "dropBaseB::getForMonster", "address": "0x009357b4"},
+    {"name": "enemyResource::get", "address": "0x0068d8c8"},
+    {"name": "enemyResource::load", "address": "0x00682ca0"},
+    {"name": "monsterIcon::get", "address": "0x00c0e800"},
+    {"name": "monsterIcon::put", "address": "0x00c0e164"},
+    {"name": "monsterListOrder::position", "address": "0x0061dc58"}
+  ],
+  "plugin": {"linux": "monster_ids.so", "windows": "monster_ids.dll", "macos": "monster_ids.dylib"},
+  "config": {"selftest": "0"}
+}
