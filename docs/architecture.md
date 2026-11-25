@@ -6,7 +6,7 @@ How the mod is built, what exists today, and where each part of the work stands.
 
 | Repository | Holds |
 |---|---|
-| this one | content: the `mhuc` toolkit, format specs, the reference recompiles, and later the mod's own files |
+| this one | content: the `mhuc` toolkit, format specs, the reference recompiles, and the mod's own files |
 | [MH4UltimateDC-fork](https://github.com/Cheeenxiii/MH4UltimateDC-fork), branch `uc/main` | the engine: upstream's port, plus native plugins and hooks by name |
 
 The mod reaches the engine only through the fork's plugin API. Its reference is the fork's [docs/PLUGINS.md](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/docs/PLUGINS.md). In short:
@@ -16,7 +16,11 @@ The mod reaches the engine only through the fork's plugin API. Its reference is 
 - the fork's `tools/build_game.py` builds those hooks into the recompiled game;
 - at start-up the port loads the library, which can read and write game memory and allocate from the game's heap.
 
-The mod has no `mod.json` and no plugin yet.
+The first plugin is `mods/force_action`. Its `mod.json` names `uEnemy`'s action setter (USA
+v1.3.0 address `0x0090ef74`); the C library replaces the category and index the AI asks for
+with the forced pair, so the game's own setter initializes the chosen action and it plays (the
+plugin's check, R1p). The dispatcher (`0x006e9cac`) is a fallback hook only. The library is
+built into the code library by the fork's `tools/build_game.py`, like any other plugin.
 
 ## From dumps to a mod
 
@@ -57,7 +61,7 @@ A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source g
 
 What makes this tractable:
 
-- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U.
+- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most ids, so a port maps the indices instead of reusing them; 13/5, 13/6 and 13/8 are the ids whose motion itself differs.
 - **A GU monster's code assumes MHXX's enemy layer.** Rathian's MHXX module calls 330 engine functions, and MH4U lacks 262 of them. That is why handlers are rewritten instead of linked.
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.
