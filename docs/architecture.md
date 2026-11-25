@@ -107,7 +107,7 @@ Sounds and music come from each piece of content's own game and play through MH4
 
 - MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1); `mhuc` now reads the older wave, bank, request and stream request layouts against the whole MH3U RomFS (SN6), so a 3U monster's sound can be read. Converting it to MH4U's versions is still undone.
 - MHXX uses the next generation of classes, shared with MHGU on Switch: its waves are MH4U's version, its banks and requests are GU's.
-- MH4U's wave, bank and emitter layouts come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files and every stream request in the image (214, loose and inside ARCs) is read ([specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table), check S4).
+- MH4U's wave, bank and emitter layouts come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files and every stream request in the image (214, loose and inside ARCs) is read (check S4), and the 100-byte sequence record's readers and the loader's id-to-row index are named from the game's code (check S7).
 - A monster's theme is a sequence id in a stream request, chosen by a hardcoded switch over its id, not by a table ([audio.md](audio.md#how-mh4u-picks-a-monsters-theme)).
 - **There is no separate sound heap.** MH4U loads banks, requests and waves from the 47 MiB Resource heap it shares with every other non-drawing resource; the SoundBuffer allocator is an alias of Resource ([audio.md](audio.md#memory)).
 
