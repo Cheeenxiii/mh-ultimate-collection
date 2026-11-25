@@ -1,0 +1,3 @@
+kind,id,key,source_game,source_key,name,stand_in,files,notes
+monster,124,rathian-gu,mhxx,em001,Rathian,1,model,"A permanent test row, as the shipped registry has"
+monster,256,pool-test,mhxx,em999,Pooled test monster,1,model,"A synthetic pooled row: a registry test fixture, not a shipped monster"

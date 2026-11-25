@@ -11,6 +11,7 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "files", "notes")
+POOLED_FIXTURE = os.path.join(ROOT, "tests", "fixtures", "registry-pooled.csv")
 
 
 def write_registry(path, rows):
@@ -32,10 +33,28 @@ def test_a_valid_registry_passes():
     assert check_ids.check_rows([as_dict(row(124))]) == []
 
 
-@pytest.mark.parametrize("ident", [123, 256])
-def test_a_monster_id_outside_124_to_255_is_refused(ident):
+@pytest.mark.parametrize("ident", [123, 0xFFFFFFFF])
+def test_a_monster_id_outside_the_registry_ranges_is_refused(ident):
     problems = check_ids.check_rows([as_dict(row(ident))])
-    assert any("isn't in 124..255" in p for p in problems), problems
+    assert any("isn't in 124..223" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("ident", [224, 239, 255])
+def test_a_permanent_row_above_223_is_refused(ident):
+    problems = check_ids.check_rows([as_dict(row(124)), as_dict(row(ident, key="pooled"))])
+    assert any("is a byte the plugin lends from the pool" in p for p in problems), problems
+
+
+def test_a_pooled_id_from_256_up_is_accepted():
+    assert check_ids.check_rows([as_dict(row(124)), as_dict(row(256, key="pooled"))]) == []
+
+
+def test_a_pooled_id_needs_no_consecutive_id_before_it():
+    assert check_ids.check_rows([as_dict(row(124)), as_dict(row(300, key="pooled"))]) == []
+
+
+def test_a_pooled_row_may_be_the_only_row():
+    assert check_ids.check_rows([as_dict(row(256, key="pooled"))]) == []
 
 
 def test_two_rows_may_not_share_an_id():
@@ -43,8 +62,16 @@ def test_two_rows_may_not_share_an_id():
     assert any("is already" in p for p in check_ids.check_rows(rows))
 
 
-def test_monster_ids_may_not_skip_one():
+def test_a_permanent_id_may_not_skip_one():
     rows = [as_dict(row(124)), as_dict(row(126, key="rathian-3u"))]
+    assert any("consecutive" in p for p in check_ids.check_rows(rows))
+
+
+def test_a_pooled_id_fills_no_permanent_gap():
+    # 125 is missing from the permanent range; a pooled row doesn't stand in for it.
+    rows = [as_dict(row(124)), as_dict(row(256, key="pooled"))]
+    assert check_ids.check_rows(rows) == []
+    rows = [as_dict(row(124)), as_dict(row(126, key="rathian-3u")), as_dict(row(256, key="pooled"))]
     assert any("consecutive" in p for p in check_ids.check_rows(rows))
 
 
@@ -104,22 +131,38 @@ def test_the_header_carries_the_kinds_each_port_ships(tmp_path):
     assert "{125, 1, 3, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL}," in text
 
 
-def test_the_header_the_registry_generates_is_what_the_check_compares(tmp_path, capsys):
+def test_the_header_the_registry_generates_has_both_arrays(tmp_path, capsys):
     registry = tmp_path / "registry.csv"
     header = tmp_path / "ids.h"
-    write_registry(registry, [row(124), row(125, key="rathian-3u")])
+    write_registry(registry, [row(124), row(125, key="rathian-3u"), row(256, key="pooled")])
     args = ["--registry", str(registry), "--header", str(header)]
     assert check_ids.main(args + ["--write"]) == 0
-    assert "MHUC_MONSTER_ID_RATHIAN_GU 124" in header.read_text()
+    text = header.read_text()
+    assert "MHUC_MONSTER_ID_RATHIAN_GU 124" in text
+    assert "MHUC_MONSTER_COUNT 2" in text
+    assert "MHUC_POOLED_MONSTER_COUNT 1" in text
+    assert "static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT]" in text
+    assert "static const MhucMonsterId mhuc_pooled_monster_ids[MHUC_POOLED_MONSTER_COUNT]" in text
+    assert "{256, 1, 5, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD}," in text
+    assert "MHUC_MONSTER_ID_POOLED 256" in text
     assert check_ids.main(args) == 0
     # A stale header is refused, so the plugin can never build from another id set.
-    header.write_text(header.read_text().replace("124", "126"))
+    header.write_text(text.replace("124", "126"))
     assert check_ids.main(args) == 1
     assert "isn't what the registry generates" in capsys.readouterr().out
+
+
+def test_the_pooled_fixture_is_a_registry_the_checker_accepts():
+    with open(POOLED_FIXTURE, newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+    assert tuple(rows[0]) == COLUMNS
+    assert check_ids.check_rows([as_dict(r) for r in rows[1:]]) == []
+    assert any(row[1] == "256" for row in rows[1:]), rows
 
 
 def test_the_repository_registry_and_its_header_agree():
     res = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_ids.py")], cwd=ROOT,
                          capture_output=True, text=True)
     assert res.returncode == 0, res.stdout + res.stderr
-    assert "2 monsters" in res.stdout
+    assert "2 permanent monsters" in res.stdout
+    assert "0 pooled" in res.stdout
