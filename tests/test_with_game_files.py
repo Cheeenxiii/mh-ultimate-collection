@@ -11,7 +11,22 @@ import pytest
 from mhuc import monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
-from mhuc.formats import arc, dtbase, dtbparts, dttune, emd, emstatus, hitdata, lmt, mod, romfs, sound, stq
+from mhuc.formats import (
+    arc,
+    classid,
+    dtbase,
+    dtbparts,
+    dttune,
+    emd,
+    emstatus,
+    hitdata,
+    lmt,
+    mod,
+    romfs,
+    sound,
+    stq,
+    xfs,
+)
 from mhuc.quests import mibwrite, quest
 
 pytestmark = pytest.mark.game_files
@@ -616,3 +631,59 @@ def test_every_mh3u_sound_file_reads_and_its_stream_requests_match_their_waves(d
                 f"{path}: {stream.name}"
             streams += 1
     assert streams == 290, f"{streams} streams"
+
+
+XFS_CLASSES = ("rTexLayout", "rStageData", "rStageCamera", "rSoundAttributeSe", "rDemoFade",
+               "rDemoListeningPoint", "rQuestList", "rAinpc")
+
+
+def xfs_entries(image):
+    """Every known XFS file of an image: loose .supp/.pop/.list, and the XFS classes inside ARCs."""
+    ids = {classid.class_id(n) for n in XFS_CLASSES}
+    for f in image.files():
+        data = image.read(f)
+        if f.path.endswith(".arc"):
+            for e in arc.read(data).entries:
+                if e.type_id in ids:
+                    yield f"{f.path}:{e.path}", e.type_id, e.data
+        elif f.path.endswith((".supp", ".pop", ".list")):
+            yield f.path, None, data
+
+
+def test_every_mh3u_xfs_file_reads(dump):
+    """check X1: MH3U's 543 XFS entries in ARCs and 302 loose XFS files all read and end exactly."""
+    ids = {classid.class_id(n) for n in XFS_CLASSES}
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    counts: Counter = Counter()
+    failures = []
+    for label, type_id, data in xfs_entries(image):
+        counts[type_id] += 1
+        try:
+            x = xfs.read(data)
+        except (xfs.XfsError, struct.error, IndexError, UnicodeDecodeError) as e:
+            failures.append(f"{label}: {e}")
+            continue
+        if x.endian != "little":
+            failures.append(f"{label}: {x.endian}-endian")
+    assert not failures, f"{len(failures)} of {sum(counts.values())} XFS files not read, first: {failures[:3]}"
+    assert counts[None] == 302, counts          # 196 .supp, 105 .pop, 1 .list
+    assert sum(counts[t] for t in ids) == 543, counts   # 285 texlayouts and 258 other XFS entries
+    assert counts[classid.class_id("rTexLayout")] == 285, counts
+
+
+def test_mh4u_ships_no_texlayout_and_its_xfs_files_read(dump):
+    """check X1: MH4U's only XFS files are eight rSoundAttributeSe; it has no rTexLayout anywhere."""
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    counts: Counter = Counter()
+    failures = []
+    for label, type_id, data in xfs_entries(image):
+        counts[type_id] += 1
+        try:
+            x = xfs.read(data)
+        except (xfs.XfsError, struct.error, IndexError, UnicodeDecodeError) as e:
+            failures.append(f"{label}: {e}")
+            continue
+        if x.endian != "little":
+            failures.append(f"{label}: {x.endian}-endian")
+    assert not failures, f"{len(failures)} XFS files not read, first: {failures[:3]}"
+    assert counts == Counter({classid.class_id("rSoundAttributeSe"): 8}), counts

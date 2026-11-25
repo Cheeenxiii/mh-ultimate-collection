@@ -3,10 +3,18 @@
 An XFS file carries its own schema: one definition per class (DTI id and the property list its
 createProperty() registers), then the root object. So any XFS file decodes without per-class code.
 
-Byte order follows the magic: `XFS\\0` in file order is a little-endian file (3DS), `\\0SFX` a big-endian
-one (Wii U). Packed words (a property's type/attr/size, an object's class/instance) are read as u32 in the
-file's byte order, which reproduces the big-endian layout Cha-Cha documents; for little-endian files that
-reading is unverified (specs/xfs.md, check X1).
+Byte order follows the magic: `XFS\\0` in file order is a little-endian file (the 3DS games, MH4U too),
+`\\0SFX` a big-endian one (Wii U). Three words differ between the two:
+
+- a class definition's property count is the count itself in a little-endian file and twice the count in a
+  big-endian one (Cha-Cha xfs.md);
+- a property's type, attr and size are three fields (u8, u8, u16), so the size is a u16 in the file's byte
+  order;
+- an object's class word is `class index << 1 | 1` little-endian and `0x8000 | class index` big-endian, the
+  same flag-and-index bitfield laid out from the other end. The index is 0-based into the file's offsets.
+
+The little-endian layout is checked against every XFS file of MH3U's and MH4U's RomFS (specs/xfs.md, check
+X1); the big-endian one is Cha-Cha's and is not checked here.
 """
 from __future__ import annotations
 
@@ -79,13 +87,18 @@ def read(data: bytes) -> Xfs:
     classes = []
     for off in offsets:
         o = HEADER + off
-        dti_id, count2, _ = struct.unpack_from(e + "IHH", data, o)
+        dti_id = struct.unpack_from(e + "I", data, o)[0]
+        count_word = struct.unpack_from(e + "H", data, o + 4)[0]
+        # the same field as the count in a little-endian file and as twice the count in a big-endian one
+        count = count_word // 2 if e == ">" else count_word
         cd = ClassDef(dti_id)
-        for i in range(count2 // 2):
+        for i in range(count):
             p = o + 8 + i * PROP_ENTRY
-            name_off, packed = struct.unpack_from(e + "II", data, p)
+            name_off = struct.unpack_from(e + "I", data, p)[0]
             name, _ = _cstring(data, HEADER + name_off)
-            cd.props.append(Prop(name, packed >> 24, (packed >> 16) & 0xFF, packed & 0xFFFF))
+            typ, attr = data[p + 4], data[p + 5]
+            size = struct.unpack_from(e + "H", data, p + 6)[0]
+            cd.props.append(Prop(name, typ, attr, size))
         classes.append(cd)
     root, end = _object(data, HEADER + def_size, e, classes)
     if end != len(data):
@@ -94,9 +107,14 @@ def read(data: bytes) -> Xfs:
 
 
 def _object(data: bytes, o: int, e: str, classes: list[ClassDef]) -> tuple[dict, int]:
-    head, size = struct.unpack_from(e + "II", data, o)
-    index, instance = (head >> 16) & 0x7FFF, head & 0xFFFF
-    if not head & 0x80000000 or index >= len(classes):
+    if e == "<":
+        head, instance = struct.unpack_from("<HH", data, o)
+        flag, index = head & 1, head >> 1
+    else:
+        head, instance = struct.unpack_from(">HH", data, o)
+        flag, index = head & 0x8000, head & 0x7FFF
+    (size,) = struct.unpack_from(e + "I", data, o + 4)
+    if not flag or index >= len(classes):
         raise XfsError(f"bad object header at 0x{o:x}")
     start, p = o + 4, o + 8
     cd = classes[index]
