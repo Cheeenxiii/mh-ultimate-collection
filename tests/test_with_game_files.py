@@ -63,7 +63,8 @@ def test_every_mh4u_quest_rebuilds_with_the_same_fields(dump):
     assert not failed, f"{len(failed)} of {checked} quests change, first: {failed[:3]}"
 
 
-MODES = {"quest": "quest", "card": "card", "otomo": "normal"}
+# names match by prefix, so cardbox comes before card
+MODES = {"quest": "quest", "cardbox": "normal", "card": "card", "otomo": "normal"}
 
 
 def test_extra_data_files_reencrypt_byte_for_byte(dump):
