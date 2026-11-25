@@ -2,7 +2,7 @@
 
 Underwater play comes from MH3U, which has it in full. Each part is read from MH3U's files or its recompiled code, and carried into MH4U as data plus plugin hooks. Only what no game ever had is authored.
 
-Where a part is not marked as checked, "where it likely lives" is a hypothesis to confirm in the reference recompile. The hunter skeleton comparison below is checked against both games' files.
+Where a part is not marked as checked, "where it likely lives" is a hypothesis to confirm in the reference recompile. The hunter skeleton and weapon-rig comparisons below are checked against both games' files.
 
 ## What comes from MH3U
 
@@ -39,6 +39,18 @@ The two hunters are the same rig with one bone dropped and one renumbered.
 **The mapping.** Rewrite each MH3U track's bone id: 1 to 12 and 14 to 19 stay; 13 becomes 0; 0 stays 0; 20 and 21 are dropped; 255 stays. MH3U's translation track on id 0 and its rotation track on id 13 become MH4U's two tracks on id 0, so no keyframe has to be composed. The keyframe buffers decode (first known bullet above), so this mapping says where each track goes; only version 66's types 11 to 13 need their keys re-encoded into version 67's form, and nothing composes a key.
 
 Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k "hunter_skeleton or address_bones_by_id"` ([specs/mod.md](../specs/mod.md), check M4; [specs/lmt.md](../specs/lmt.md), check L2).
+
+## Weapon rigs
+
+The Sword and Shield weapon rigs need no mapping: every bone the two games use has the same id and parent, and MH3U has no weapon-rig motion of its own to rewrite.
+
+- **The rig.** Both games' SnS models use the same three rigs, and every one is present in both. A sword has two bones (id 0, the root, and id 1, its child) or one (id 0); a shield has one (id 0), two (id 0 with child 1), or four records forming two such skeletons in one bone block. MH3U's 54 SnS arcs hold 39 two-bone and 15 one-bone swords and 33 one-bone, 20 two-bone and 1 two-skeleton shields; MH4U's 128 hold 99, 29, 100, 22 and 6. No model in either game has a bone id above 1, and no id or parent differs between the games. Unlike the hunter's pelvis, nothing is dropped or renumbered.
+- **MH3U ships no weapon motion.** Its RomFS has no motion list for a weapon rig: the 15 arcs under `/arc/player/mot/` hold its 50 player motion lists, all naming hunter bones (check L2), and none of its 574 arcs under `/arc/weapon/` holds a motion list. Its code builds the player's path (`%s\player\mot\w%02d\mot_w%02d`) and the NPCs' and monsters' paths, but no `weapon\...\mot\wg` path. So in MH3U the SnS has no animation of its own: nothing in its files animates the weapon's bones, and the weapon's motion comes only from the hunter's hand.
+- **MH4U has one.** MH4U keeps a weapon-rig motion list beside each class's player one: `weapon/one/mot/wg01.lmt` in `/data/pl_w01.arc` is version 67, with 19 animations in 25 slots, and addresses bone ids 0, 1, 2 and 255 (11, 22, 10 and 2 tracks). Ids 0 and 1 are the sword's bones; id 2 is not a bone of any SnS sword or shield in either game, so what it drives is unverified — the shield, if the game merges a weapon's models into one rig, but that is not checked.
+
+**The answer: a weapon motion crosses as it is.** A weapon motion that addresses ids 0 and 1 plays on every SnS model in both games without a bone-id rewrite (a one-bone model simply has no bone 1 to move), so the SnS needs no weapon-rig mapping. For the 3U underwater set there is nothing to carry in the first place: 3U's weapon has no motion of its own, so a port plays the 3U player motion on the converted hunter rig and the weapon follows the hand. If it wants the weapon to move on its own as MH4U's does, it uses MH4U's `wg01.lmt` unchanged on the 3U model; which of its slots the converted actions use, if any, is the swim work's choice, not a rig difference.
+
+Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k sns_weapon_rig` ([specs/mod.md](../specs/mod.md), check M5). The code paths come from `strings` over each game's decompressed `code.bin`, as in the checks below.
 
 ## What MH4U kept
 

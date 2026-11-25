@@ -622,6 +622,62 @@ def test_mh4u_motion_tracks_address_bones_by_id(dump):
         assert seen - {255} == human, (path, sorted(seen - {255} ^ human))
 
 
+def test_the_sns_weapon_rig_is_the_same_in_mh3u_and_mh4u_and_mh3u_has_no_weapon_motion(dump):
+    """specs/mod.md check M5: MH3U's and MH4U's Sword and Shield models use the same three weapon
+    rigs, with no bone renumbered, and MH3U ships no motion list for the weapon rig: its 50 player
+    motion lists address the hunter, and its weapon arcs hold no motion list. MH4U's own weapon
+    motion list addresses ids 0, 1 and 2; no SnS model has id 2."""
+    games = _images(dump)
+
+    def rigs(game, pattern):
+        image, files = games[game]
+        sword, shield = Counter(), Counter()
+        for path in files:
+            if not re.fullmatch(pattern, path):
+                continue
+            for e in arc.read(image.read(files[path])).entries:
+                if e.type_name != "rModel":
+                    continue
+                sig = tuple((b["id"], b["parent_id"]) for b in mod.bones(e.data))
+                (shield if "/sld" in e.file_name else sword)[sig] += 1
+        return sword, shield
+
+    sword3, shield3 = rigs("mh3u", r"/arc/weapon/mod/w01/w01_\d+\.arc")
+    sword4, shield4 = rigs("mh4u", r"/data/pl_one\d+\.arc")
+    two = ((0, 0xFF), (1, 0))          # id 0 root, id 1 its child: the sword's rig, and some shields'
+    one = ((0, 0xFF),)                 # id 0 root alone: a one-bone sword or shield
+    two_skeletons = two + ((0, 0xFF), (1, 0))   # two skeletons in one bone block: some shields'
+    assert dict(sword3) == {two: 39, one: 15}, dict(sword3)
+    assert dict(shield3) == {one: 33, two: 20, two_skeletons: 1}, dict(shield3)
+    assert dict(sword4) == {two: 99, one: 29}, dict(sword4)
+    assert dict(shield4) == {one: 100, two: 22, two_skeletons: 6}, dict(shield4)
+    assert set(sword3) == set(sword4) and set(shield3) == set(shield4), "a rig exists in only one game"
+    # every bone is id 0 or 1: no SnS model in either game has a bone id 2 or higher
+    for counts in (sword3, shield3, sword4, shield4):
+        assert all({i for i, _parent in sig} <= {0, 1} for sig in counts), "a SnS model has a bone above id 1"
+
+    # MH4U's weapon motion list: ids 0, 1, 2 and 255; id 2 is not a bone of any SnS model
+    image, files = games["mh4u"]
+    wg = next(e.data for e in arc.read(image.read(files["/data/pl_w01.arc"])).entries
+              if e.file_name == "weapon/one/mot/wg01.lmt")
+    version, anims = lmt.read(wg)
+    present = [a for a in anims if a]
+    assert (version, len(anims), len(present)) == (67, 25, 19), (version, len(anims), len(present))
+    assert dict(Counter(t.bone for a in present for t in a.tracks)) == {0: 11, 1: 22, 2: 10, 255: 2}, \
+        "MH4U's wg01.lmt addresses bones other than 0, 1, 2 and 255"
+
+    # MH3U has no weapon-rig motion list: the player's 50 lists are all it has, and none is in a weapon arc
+    image, files = games["mh3u"]
+    mot = [p for p in files if p.startswith("/arc/player/mot/")]
+    player = [e for p in mot for e in arc.read(image.read(files[p])).entries if e.data[:4] == b"LMT\0"]
+    assert len(mot) == 15 and len(player) == 50, (len(mot), len(player))
+    assert all(e.file_name.startswith("player/mot/") for e in player)
+    weapons = [p for p in files if p.startswith("/arc/weapon/")]
+    assert len(weapons) == 574, len(weapons)
+    assert not [e for p in weapons for e in arc.read(image.read(files[p])).entries if e.data[:4] == b"LMT\0"], \
+        "an MH3U weapon arc holds a motion list"
+
+
 def test_every_monster_camera_list_reads_and_converts(dump):
     """specs/camera.md check C1: the camera lists of MH4U's and MHXX's monster arcs, and MH3U's none."""
     def monster_cameras(game, pattern):
