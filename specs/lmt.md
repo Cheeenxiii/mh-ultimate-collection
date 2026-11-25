@@ -9,7 +9,7 @@ status: unknown
 
 A list of animations for one skeleton: per animation, tracks (one per bone and channel) pointing at keyframe buffers, optional bounds, and an event block. MH3U's underwater motions and every converted monster's moves are LMT files, so this format sits under both the underwater work (docs/architecture.md#underwater) and monster conversion.
 
-**Source.** Scrimas's MHGU Definitive Edition (GPL-3.0-or-later), `tools/lmt.py`, which copies animations between MH4U and MHGU LMT files and states the layout as read off MH4U's em022 and em092 and MHGU's em067_00 (version 67 in both). Offsets are relative to the file (the game relocates them at load). PredatorCZ's [RevilLib](https://github.com/PredatorCZ/RevilLib) (GPL-3.0) states the layout of each version in `src/mtf_lmt/*.inl`: its animation layout covers LMT 66 to 68, its bone track 56 to 67, its event block 56 to 68, and its events and float tracks 22 to 95, so **version 66 and 67 share every structure**; check L3 read all 387 MH3U lists that way. RevilLib also names the fields MHGU-DE leaves unknown (the animation's flags, scene position and rotation, and float-track block, the track's reference data and bounds, the track type and buffer-type enums) and gives the keyframe encodings in `codecs.hpp`, which this spec doesn't lay out. Check L1 read every MH4U and MHXX motion list; the rows it reaches are marked verified. Reader: `src/mhuc/lmt.py`.
+**Source.** Scrimas's MHGU Definitive Edition (GPL-3.0-or-later), `tools/lmt.py`, which copies animations between MH4U and MHGU LMT files and states the layout as read off MH4U's em022 and em092 and MHGU's em067_00 (version 67 in both). Offsets are relative to the file (the game relocates them at load). PredatorCZ's [RevilLib](https://github.com/PredatorCZ/RevilLib) (GPL-3.0) states the layout of each version in `src/mtf_lmt/*.inl`: its animation layout covers LMT 66 to 68, its bone track 56 to 67, its event block 56 to 68, and its events and float tracks 22 to 95, so **version 66 and 67 share every structure**; check L3 read all 387 MH3U lists that way. RevilLib also names the fields MHGU-DE leaves unknown (the animation's flags, scene position and rotation, and float-track block, the track's reference data and bounds, the track type and buffer-type enums) and gives the keyframe encodings in `codecs.hpp` and the per-version buffer-type registry in `bone_track.cpp`, which the [Keyframe buffers](#keyframe-buffers) section below lays out. Check L1 read every MH4U and MHXX motion list; check L4 then decoded every keyframe buffer of the three games. The rows those checks reach are marked verified. Reader: `src/mhuc/lmt.py`.
 
 ## Versions
 
@@ -18,7 +18,7 @@ A list of animations for one skeleton: per animation, tracks (one per bone and c
 | 66 | MH3U | the layout below; read on all 387 MH3U lists (check L3) |
 | 67 | MH4U, MHXX, MHGU | the layout below; read on every MH4U and MHXX list (check L1) |
 
-The version number is the only thing that differs between 66 and 67 as far as these structures go: every field's offset, size and meaning is the same in RevilLib's per-version layouts, and one reader covers them all. What may differ is a keyframe buffer's encoding, which goes by buffer type and isn't decoded here.
+The version number is the only thing that differs between 66 and 67 as far as these structures go: every field's offset, size and meaning is the same in RevilLib's per-version layouts, and one reader covers them all. The keyframe buffers decode the same in both versions except types 11 to 13, which version 66 stores signed and version 67 unsigned with a bounds block; that is the [Keyframe buffers](#keyframe-buffers) section, and check L4 is the reading on the three games' files.
 
 ## Header
 
@@ -48,7 +48,7 @@ The version number is the only thing that differs between 66 and 67 as far as th
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u8 | buffer type (the keyframe encoding): 1 to 7 and 11 to 13 in MH3U; 1 to 7 and 11 to 13 in MH4U and MHXX. RevilLib's enum for versions 56 and up names them | verified | MHGU-DE `lmt.py`; RevilLib `bone_track.cpp`; check L1, L3 |
+| +0x00 | u8 | buffer type (the keyframe encoding): 3 to 7 and 11 to 13 on every track that carries a buffer; 1 and 2 occur too, but only on tracks without one. RevilLib's registry for versions 56 and up names them; the [Keyframe buffers](#keyframe-buffers) section lays each out | verified | MHGU-DE `lmt.py`; RevilLib `bone_track.cpp`; check L1, L3, L4 |
 | +0x01 | u8 | usage (track type): 0 and 3 on rotation-buffer tracks, 1, 2, 4 and 5 on vector3-buffer tracks. RevilLib names 0 local rotation, 1 local position, 2 local scale, 3 absolute rotation and 4 absolute position, and has no 5 | verified | RevilLib `bone_track.cpp` (`TrackType_er`); check L2, L3 |
 | +0x02 | u8 | joint type (RevilLib's `BoneType`): 0 in every track read | unverified | MHGU-DE `lmt.py`; RevilLib `bone_track.hpp`; check L1, L3 |
 | +0x03 | u8 | bone id: the id in the model's bone table, not its index; 255 on the root track | verified | MHGU-DE `lmt.py`; RevilLib `bone_track.cpp`; check L2 |
@@ -58,7 +58,79 @@ The version number is the only thing that differs between 66 and 67 as far as th
 | +0x10 | f32 ×4 | reference data (RevilLib's `referenceData`) | unverified | RevilLib `bone_track.hpp` |
 | +0x20 | u32 | bounds offset (0x20 bytes; 0 none) | verified | MHGU-DE `lmt.py`; RevilLib `bone_track.inl`; check L1, L3 |
 
-The bounds block is two `f32 ×4` (RevilLib's `TrackMinMax`), which RevilLib applies as offset + scale × value: the pair isn't a min and a max, so the first vector is often the larger one. The meaning of either is unverified.
+The bounds block is two `f32 ×4` (RevilLib's `TrackMinMax`), which RevilLib applies to a key as offset + scale × value: the second vector offsets and the first scales, so the pair isn't a min and a max and the first vector is often the larger one. Check L4 confirms that order on the rotation types whose keys must be unit quaternions after it (type 7, and types 11 to 13 in version 67). Whether the engine applies it to type 6 as well is unverified: 2,991 MH3U tracks carry one.
+
+## Keyframe buffers
+
+A track with a non-zero buffer size points at its keys, and every buffer type here packs one key in a fixed number of bytes, so the buffer size is a whole number of keys; the reader refuses a buffer it can't split. Keys are read in order and their frames accumulate: the first key is at frame 0, and each next key's frame is the previous key's frame plus that key's frame gap. Types 1 and 2 carry no gap field, so their keys are one frame apart. In every animation read, the last key is at frame count − 1 (the animation's +0x08), and a key at or past the frame count is an error (check L4).
+
+The components a key decodes to are its buffer's own values, four of them (x, y, z, w): a rotation type's are the quaternion, and a position type's are (x, y, z, 1). Where the track has a bounds block the engine applies it on top ([Track](#track-0x24-bytes) above), and for the compressed types that block is what turns the normalized components into the real values.
+
+Offsets are from the start of a key.
+
+### Type 3: `LinearVector3`, 16 bytes
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | f32 × 3 | x, y, z | verified | RevilLib `codecs.hpp` (`Buf_LinearVector3`); check L4 |
+| 0x0C | u32 | frame gap to the next key | verified | RevilLib `codecs.hpp`; check L4 |
+
+### Type 4: `BiLinearVector3_16bit`, 8 bytes
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | u16 × 3 | x, y, z, each divided by 0xFFFF | verified | RevilLib `codecs.hpp` (`Buf_BiLinearVector3_16bit`); check L4 |
+| 0x06 | u16 | frame gap | verified | RevilLib `codecs.hpp`; check L4 |
+
+### Type 5: `BiLinearVector3_8bit`, 4 bytes
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | u8 × 3 | x, y, z, each divided by 0xFF | verified | RevilLib `codecs.hpp` (`Buf_BiLinearVector3_8bit`); check L4 |
+| 0x03 | u8 | frame gap | verified | RevilLib `codecs.hpp`; check L4 |
+
+### Type 6: `LinearRotationQuat4_14bit`, 8 bytes
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | u64 | bits 0–13 w, 14–27 z, 28–41 y, 42–55 x; each field's upper half is negative (a value above 8191.5 means the field minus 16383), and the scale is 0x3FFF / 4 = 4095.75, so a component spans −2 to 2 | verified | RevilLib `codecs.hpp` (`Buf_LinearRotationQuat4_14bit`); check L4 |
+| 0x07 | u8 | frame gap (bits 56–63) | verified | RevilLib `codecs.hpp`; check L4 |
+
+The game's components stay within −1 to 1: every key is a unit quaternion to within 0.00048 before any bounds ([check L4](#checks)).
+
+### Type 7: `BiLinearRotationQuat4_7bit`, 4 bytes
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | u32 | bits 0–6 w, 7–13 z, 14–20 y, 21–27 x; each divided by 0x7F | verified | RevilLib `codecs.hpp` (`Buf_BiLinearRotationQuat4_7bit`); check L4 |
+| 0x03 | u8 | frame gap (bits 28–31) | verified | RevilLib `codecs.hpp`; check L4 |
+
+The components are unsigned magnitudes and every type 7 track carries a bounds block, which supplies their signs and scales. After it a key is a quaternion within 0.13 of unit (mean 0.003 to 0.006; about 2% of keys are more than 0.02 off, the 7-bit field being coarse, and a quaternion defines the same rotation at any length).
+
+### Types 11 to 13: `BiLinearRotationQuat{X,Y,Z}W_14bit`, 4 bytes
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | u32 | bits 0–13 the named axis component (x for 11, y for 12, z for 13), 14–27 w | verified | RevilLib `codecs.hpp` (`Buf_BiLinearRotationQuatXW_14bit` and its YW and ZW variants); check L4 |
+| 0x03 | u8 | frame gap (bits 28–31) | verified | RevilLib `codecs.hpp`; check L4 |
+
+The two components are encoded differently in the two versions:
+
+- **Version 67 (MH4U, MHXX):** unsigned, each divided by 0x3FFF. Every track carries a bounds block, which supplies the sign and scale; after it a key is a unit quaternion to within 0.00851 (check L4).
+- **Version 66 (MH3U):** as type 6 does it, the upper half of each 14-bit field negative and the scale 4095.75. No type 11 to 13 track in MH3U carries a bounds block, and the value is already a quaternion: 2,369,015 of 2,373,039 keys are unit to within 0.01 (check L4).
+
+What the version change was for is unknown. RevilLib's registry gives all versions from 56 up the same codecs, so its reading is version 67's; MH3U's files only decode under the signed reading.
+
+### Types 1 and 2: `SingleVector3` and `StepRotationQuat3` (no keys in any file)
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | f32 × 3 | type 1: x, y, z. Type 2: x, y, z with w = sqrt(1 − x² − y² − z²), and 0 when that isn't positive | unverified | RevilLib `codecs.hpp` (`Buf_SingleVector3`, `Buf_StepRotationQuat3`) |
+| none | — | frame: one apart, no gap field | unverified | RevilLib `codecs.hpp` |
+
+No type 1 or type 2 track in the three games carries a keyframe buffer: all 128,784 of MH4U's, 108,611 of MHXX's and 39,278 of MH3U's type 1 and type 2 tracks have buffer size 0 (check L4). The layout above is RevilLib's alone, and `mhuc` decodes it, but no real key of either type exists to check it against.
+
+Types 8, 9 and 10 have no codec in RevilLib's registry for version 56 and up, and types 14 (`BiLinearRotationQuat4_11bit`, 6 bytes) and 15 (`BiLinearRotationQuat4_9bit`, 5 bytes) occur in none of the three games; `mhuc` doesn't decode them and raises instead.
 
 ## Event block (4 groups × 0x48 bytes)
 
@@ -76,12 +148,28 @@ Four groups per animation in versions 56 and up (RevilLib's `AnimationEvent` lay
   - MH4U: 1,466 motion lists, all version 67, all readable (every animation, track table, keyframe buffer, bounds block and event block inside its file): 23,412 animations, 25,633 empty slots, 732,404 tracks, buffer types 1–7 and 11–13. Every animation has an event block.
   - MHXX JPN: 988, all version 67, all readable: 21,154 animations, 57,010 empty slots, 677,909 tracks, the same buffer types (type 3 three times). So MHXX motions are MH4U's format: a GU monster's LMT can be read, and probably loaded, as it is.
   - MH3U USA: 387, all **version 66**. The reader now takes them, because RevilLib puts 66 and 67 in one layout; check L3 is their read.
-  - Not reached: the meaning of the fields marked unverified (frame counts, loop frames, reference data, the scene position and rotation, the tail at +0x3C, the bounds block's two vectors) and the keyframe encodings.
+  - Not reached: the meaning of the fields marked unverified (frame counts, loop frames, reference data, the scene position and rotation, the tail at +0x3C, the bounds block's two vectors). The keyframe buffers are check L4.
 - **L2 (done):** a track's bone field is a bone id, not an index.
   - MH4U's em001 model has 43 bones whose ids run to 202 with gaps, and its five motion lists carry ids from 60 to 145, which no 43-entry list could index. The player lists say the same: the common and per-weapon lists carry exactly the hunter body's ids (0 to 12 and 14 to 19) and never 13.
-  - MH3U's 50 player motion lists, read as version 66, carry ids 0 to 21 and the root's 255: rotation tracks on 1 to 21 (one list also gives id 0 a rotation track with no keyframes) and a translation track on 0, with 20 and 21 never keyframed. That part reads the tracks only: the keyframe buffers aren't decoded.
+  - MH3U's 50 player motion lists, read as version 66, carry ids 0 to 21 and the root's 255: rotation tracks on 1 to 21 (one list also gives id 0 a rotation track with no keyframes) and a translation track on 0, with 20 and 21 never keyframed. That part reads the tracks; the keyframe buffers are check L4.
   - Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k address_bones_by_id`, for MH4U and MH3U.
 - **L3 (done, version 66):** every MH3U motion list reads as version 66.
   - Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k mh3u_motion_lists_read` (the read, the counts and the tracks' fields); `mhuc survey <ROMFS> --workers 1` (section `lmt`) for the version count.
-  - Result: 387 motion lists, all version 66, all readable (every animation, track table, keyframe buffer, bounds block and event block inside its file): 15,594 slots, 8,336 animations, 7,258 empty slots, 270,420 tracks, buffer types 1–7 and 11–13. Every track weighs 1.0; 231,142 tracks have a keyframe buffer, whose size is a whole number of keys at its type's stride, and 51,794 have a bounds block. Every animation has flags 0x00800000 and a non-zero event block offset. The track types (usage) come out 237,990 of 0, 75 of 3, and 13,286, 10,696, 8,300 and 73 of 1, 2, 4 and 5.
-  - Not reached: why the version number rose from 66 to 67 when the structures are the same; the values at +0x3C and at +0x38.
+  - Result: 387 motion lists, all version 66, all readable (every animation, track table, keyframe buffer, bounds block and event block inside its file): 15,594 slots, 8,336 animations, 7,258 empty slots, 270,420 tracks, buffer types 1–7 and 11–13, with 1 and 2 only on keyless tracks (check L4). Every track weighs 1.0; 231,142 tracks have a keyframe buffer, whose size is a whole number of keys at its type's stride, and 51,794 have a bounds block. Every animation has flags 0x00800000 and a non-zero event block offset. The track types (usage) come out 237,990 of 0, 75 of 3, and 13,286, 10,696, 8,300 and 73 of 1, 2, 4 and 5.
+  - Not reached: why the version number rose from 66 to 67 when the structures are the same; the values at +0x3C and at +0x38; and why version 66 encodes buffer types 11 to 13 differently (check L4).
+
+- **L4 (done):** every keyframe buffer of the three games decodes.
+  - Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k motion_keyframe`.
+  - Read all 2,841 motion lists (1,466 MH4U, 988 MHXX, 387 MH3U), 52,902 animations and 1,680,733 tracks. 1,404,060 tracks carry a keyframe buffer, holding 90,536,863 keys (40,672,238 MH4U, 33,075,719 MHXX, 16,788,906 MH3U). Every buffer is a whole number of keys of its type; every animation's keys start at frame 0 and end at its frame count − 1, with every frame gap positive; every value is finite.
+  - Tracks with a buffer, by buffer type:
+
+    | Game | 3 | 4 | 5 | 6 | 7 | 11 | 12 | 13 |
+    |---|---|---|---|---|---|---|---|---|
+    | MH4U | 641 | 24,613 | 12,999 | 362,290 | 110,522 | 66,482 | 19,469 | 6,604 |
+    | MHXX | 3 | 21,593 | 13,735 | 321,115 | 113,725 | 71,569 | 20,887 | 6,671 |
+    | MH3U | 214 | 10,000 | 6,470 | 143,814 | 32,333 | 26,368 | 11,310 | 633 |
+
+  - No type 1 or type 2 track carries a buffer: 128,784 such tracks in MH4U, 108,611 in MHXX and 39,278 in MH3U. Every track of types 3 to 7 and 11 to 13 has one.
+  - Bounds blocks: every type 4, 5, 7, 11, 12 and 13 track has one in MH4U and MHXX, and so does every type 4, 5 and 7 track in MH3U; MH3U's types 11 to 13 have none, type 3 never has one, and type 6 has one on 2,991 MH3U tracks and none elsewhere.
+  - The quaternion types: type 6's keys are unit to within 0.00048 before any bounds; type 7's, after its bounds block, within 0.13 (mean 0.003 to 0.006, the field being 7-bit); version 67's types 11 to 13, after their bounds block, within 0.00851 (mean 0.00009); version 66's types 11 to 13, under the signed-magnitude reading and with no bounds, are unit to within 0.01 for 2,369,015 of their 2,373,039 keys (type 11: 1,628,374; type 12: 718,846; type 13: 21,795).
+  - Not reached: why version 66 and 67 encode types 11 to 13 differently; why the type 7 keys more than 0.02 from unit are so (the field is 7-bit), and why about 4,000 version 66 type 11 to 13 keys are more than 0.01 from unit; whether the engine applies a bounds block to type 6; types 1 and 2 (no real key exists), 14 and 15 (no file).
