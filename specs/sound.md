@@ -112,16 +112,39 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 | +0x18 (record) | char[64] | path: the area bank (type 1) or the stage reverb or EQ file (types 3, 4) | unverified | Definitive Edition snd_area.py |
 | then | vec4 ×points | positions | unverified | Definitive Edition snd_area.py |
 
-## Stream request (`.stq`)
+## Stream request (`STRQ`): a stream table and a sequence table
+
+The resource `rLtSoundStreamRequest` loads. Checked on all 50 MH4U `.stq` files (procedure S4): the stream table starts at the offset in the header, the sequence table at the next offset, and every stream record's fields match the `.mca` it names.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | ? | layout not documented for MH4U. Definitive Edition names sequence ids in `bgm_bat.stq` (Gogmazios's two phases are ids 32 and 33, with a volume in dB) | unknown | Definitive Edition snd_bgm.py |
+| 0x00 | char[4] | magic `STRQ` | verified | all 50 files |
+| 0x04 | u32 | version 34 | verified | all 50 files |
+| 0x08 | u32 | stream count | verified | all 50 files |
+| 0x0C | u32 | sequence count | verified | all 50 files |
+| 0x10 | u32 | stream table offset (0x18 in all 50) | verified | all 50 files |
+| 0x14 | u32 | sequence table offset | verified | all 50 files |
+| +0x00 (stream) | u32 | name offset from the file start; a NUL-terminated ASCII path, `sound\bgm\...` | verified | all 497 stream records |
+| +0x04 | u32 | the `.mca`'s file size in bytes | verified | as above |
+| +0x08 | u32 | sample count | verified | as above |
+| +0x0C | u32 | channels (2 for every music stream) | verified | as above |
+| +0x10 | u32 | sample rate (32728 Hz for every music stream) | verified | as above |
+| +0x14 | u32 | loop start in samples | verified | as above |
+| +0x18 | u32 | loop end in samples | verified | as above |
+| +0x1C | u32 | source class id `0x67195a2e` (`rLtSoundSourceADPCM`) | verified | all 50 files |
+| +0x20 | u32 | 2, meaning not traced | unverified | all 50 files |
+| +0x00 (sequence) | u32 | sequence id | verified | all 1154 sequence records |
+| +0x24 | f32 | volume in dB (0 to -5 in the battle and stage themes; one control row holds 100.0, meaning unknown) | unverified | Definitive Edition snd_bgm.py; values checked on all 50 files, the two Dalamadur ids matching their stream names |
+| +0x5C | u32 | stream index into the stream table, `0xFFFFFFFF` for no stream | verified | all 1154 sequence records |
+| +0x04..+0x23, +0x28..+0x5B, +0x60.. | | not traced | unknown | not read |
+
+Stream records are 36 bytes and sequence records 100. The lookup compares the id at +0; the table is not sorted by id (`bgm_bat.stq` happens to hold 0 to 39 in order, the event files go up to 773). The music streams are stereo DSP-ADPCM at 32728 Hz, so a stream record's +0x04 size equals the `.mca` file size and +0x08, +0x0C, +0x10, +0x14 and +0x18 equal its header's sample count, channels, rate, loop start and loop end: that is the check.
+
 
 ## Checks (with game files)
 
 - **SN1 (done, 2026-11-25):** `mhuc survey <romfs.bin>` on MH4U USA (cartridge), MH3U USA and MHXX JPN v1.0 counts every sound resource in its report's `sound` section, by kind, magic and version, and by class id inside ARCs. Result: the versions and counts table above. Every sound file in every game matched one magic and one version of its kind, and every ARC entry's class id was that game's registry class for the kind. MH3U's versions are not MH4U's: each is one older (wave 4 against 5, bank 10 against 11, request 6 against 8, stream 0x20 against 0x22), so 3U's files need version-aware readers or a conversion. MHXX keeps MH4U's wave version (5) but has GU's banks and requests (`SBKR` 4, `SRQR` 5), so only its waves may convert unchanged; S3 checks whether the GU layouts really fit. MH3U ships no area emitter file; MHXX's emitters are `rFestaSoundEmitter`, version 0x20160706.
 - **SN2:** parse every MH4U `MADP`, `SNDB`, `SREQ` and `SES` with this layout. Count files whose sizes and offsets close exactly, and record the counts, never bytes. A field becomes verified when every file agrees.
 - **S3:** MHXX's bank and request against Definitive Edition's GU layouts (`SBKR` v4, `SRQR` v5). SN1 already matches their magics and versions; if the layouts agree, the XX → 4U conversion is the 4U → GU rule run backwards. MHXX's wave is `MADP` version 5, MH4U's version and not GU's 2, so it needs no GU layout.
-- **S4:** the `.stq` layout, from `rLtSoundStreamRequest`'s loader in the MH4U recompile.
+- **S4 (done for the tables above):** parse every `.stq` of MH4U USA v1.3.0's RomFS. 50 files, 497 streams and 1154 sequences parse with the layout above; each stream record's size, sample count, channels, rate and loop start and end equal the `MADP` header of the `.mca` it names, 497 of 497. Still open: the sequence record's remaining fields, the lookup's index at `+0x94`/`+0x98` of the loaded resource, and `sSoundControl`'s loader `0x3099c8` at run time.
 - **SN5 (done, 2026-11-25):** read the allocator setup in the MH4U USA v1.3.0 image instead of the files, to say where sound memory comes from. The heap table is at 0x00f2bb44: nine 0x18-byte records {name pointer, allocator index, type, size, flags, 0}, read by 0x0010612c; the alias table is at 0x00f2bc1c and holds seven {index, target index} pairs. The class-to-index table is built by the function at 0x00104904. Result: Resource (index 11) is 0x2F00000 = 47 MiB and receives every `cResource` subclass; SoundBuffer (21) is aliased to Resource; no heap is made for Sound (15), the index of `cMHSoundEmitter`, `cMHSoundSequence` and `nMHSoundSequence`, which therefore allocate from the default heap. The sound resource classes have no entry of their own and their parent is `cResource`. The shipped `/memory.ini` `[Allocators: CTR]` agrees: Resource 47MB, `SOUND_BUF = RESOURCE`, no SOUND. Unverified: that the index lookup follows a class's parent (the table has 128 rows for 992 classes); the sound resource classes are assumed to take `cResource`'s index, and nothing was run to watch an allocation. Sizes and the largest monster sets: [audio.md](../docs/audio.md#memory).

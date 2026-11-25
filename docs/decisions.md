@@ -243,6 +243,8 @@ Many themes and monster sounds exist in several games, sometimes rearranged (GU 
 
 A second question: whether a monster with no theme in its own game gets one from another. Formats and the work are in [audio.md](audio.md).
 
+The mechanism takes no side: in MH4U a theme is a sequence id in a stream request (`bgm_bat.stq`, or a stage's `bgm_st_NN.stq` for a stage theme), and a hardcoded per-monster switch in `sSoundControl` picks it ([audio.md](audio.md#how-mh4u-picks-a-monsters-theme)). Every option above is therefore a choice of sequence and audio, and none of them changes how the game asks for it; a ported monster reusing another's theme only needs the switch to answer with that theme's id.
+
 ### GU Switch assets
 
 MHGU on Switch has HD textures and a single-screen interface. The source rule takes only English text from it; GU-era models and textures come from MHXX 3DS.
