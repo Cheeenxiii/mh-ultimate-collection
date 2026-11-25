@@ -193,7 +193,8 @@ ATTACK_FLAGS2_READ = 0x1 | 0x2 | 0x4
 
 
 def check_attack_records(d: bytes) -> Counter:
-    """E10 of specs/emd.md: the attack record list's terminator and the bytes MH4U's own reader never reads."""
+    """E10 of specs/emd.md: the attack record list's terminator and the bytes MH4U's own reader never reads; the
+    `.etd`'s two header counts (the u16 at 0x0a, the u32 at 0x0c) against the tables they count."""
     c = Counter()
     recs = attack_records(d)
     if recs is None:
@@ -204,6 +205,13 @@ def check_attack_records(d: bytes) -> Counter:
     if recs and not any(recs[0]):
         c["E10 etd attack record 0 all zero"] += 1
     groups = (_w(d, 28) - _w(d, 27)) // 4 if _w(d, 27) < _w(d, 28) else 0
+    if len(d) >= 0x10:
+        # The loader 0x3572f8 relocates u16@0x0a word-27 entries (specs/emd.md, ".etd header"): the group count.
+        count = struct.unpack_from("<H", d, 0x0A)[0]
+        c["E10 etd group count field equals the word-27 table length" if count == groups else
+          "E10 etd group count field MISMATCH"] += 1
+        c["E10 etd record count field equals the records before the terminator"
+          if struct.unpack_from("<I", d, 0x0C)[0] == len(recs) else "E10 etd record count field MISMATCH"] += 1
     for r in recs:
         for lo, hi in ATTACK_ZERO:
             name = f"+{lo:#04x}..+{hi - 1:#04x}" if hi - lo > 1 else f"+{lo:#04x}"
