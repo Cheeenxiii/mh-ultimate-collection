@@ -1,5 +1,7 @@
 """MT Framework motion lists (`.lmt`, rMotionList), as specs/lmt.md lays them out (from MHGU Definitive Edition's
-`tools/lmt.py`, read off MH4U files: version 67). `read` returns the structure; `check` gives check L1's counts.
+`tools/lmt.py`, read off MH4U files: version 67; and from RevilLib's version layouts, which put 66 and 67 in the
+same class layouts, so MH3U's files read with the same code). `read` returns the structure; `check` gives check
+L1's counts.
 """
 from __future__ import annotations
 
@@ -8,6 +10,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 ANIM, TRACK, BOUNDS, GROUP, GROUPS = 0x40, 0x24, 0x20, 0x48, 4
+VERSIONS = (66, 67)      # 66 is MH3U's, 67 MH4U's, MHXX's and MHGU's; one layout covers both
 
 
 class LmtError(ValueError):
@@ -33,6 +36,7 @@ class Animation:
     loop_frame: int
     tracks: list[Track] = field(default_factory=list)
     events: int = 0          # event block offset (0 none)
+    flags: int = 0           # bit 0x800000 is set exactly when `events` is
 
 
 def _in(d: bytes, at: int, size: int) -> None:
@@ -45,8 +49,8 @@ def read(d: bytes) -> tuple[int, list[Animation | None]]:
     if d[:4] != b"LMT\0":
         raise LmtError("not an LMT")
     version, count = struct.unpack_from("<HH", d, 4)
-    if version != 67:
-        raise LmtError(f"LMT version {version}: only 67 is laid out")
+    if version not in VERSIONS:
+        raise LmtError(f"LMT version {version}: only {' and '.join(map(str, VERSIONS))} are laid out")
     out: list[Animation | None] = []
     for o in struct.unpack_from(f"<{count}I", d, 8):
         if not o:
@@ -54,7 +58,8 @@ def read(d: bytes) -> tuple[int, list[Animation | None]]:
             continue
         _in(d, o, ANIM)
         tr, tc, frames, loop = struct.unpack_from("<IIii", d, o)
-        a = Animation(o, frames, loop, events=struct.unpack_from("<I", d, o + 0x34)[0])
+        a = Animation(o, frames, loop, events=struct.unpack_from("<I", d, o + 0x34)[0],
+                      flags=struct.unpack_from("<I", d, o + 0x30)[0])
         if tc:
             _in(d, tr, TRACK * tc)
         for k in range(tc):

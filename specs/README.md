@@ -27,6 +27,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [Silvris/MH-Tools-and-Scripts](https://github.com/Silvris/MH-Tools-and-Scripts) | see repository | MOD (MH3U, MHGU), TEX (mobile), GMD |
 | [beeequeue/gmd](https://github.com/beeequeue/gmd) | MIT | the GMD v2 label hash functions (`src/encode.ts`); no code copied |
 | [Scrimas/MHGU-Definitive-Edition](https://github.com/Scrimas/MHGU-Definitive-Edition) | GPL-3.0-or-later | MH4U `.emd`/`.etd` layouts (`tools/emdata4u.py`, `tools/dt_convert.py`, `notes/data.md`), read from its MH4U-to-MHGU monster ports; the 4U-to-GU mappings of hitsize, attackdata, sensor and rage blocks, of the `.emd` blocks `dtbase` holds, and the break records (`monsters/dalamadur/module/dala_break.c`); the three monster pairs used by specs/dttune.md; no code copied |
+| [PredatorCZ/RevilLib](https://github.com/PredatorCZ/RevilLib) | GPL-3.0 | MT Framework LMT layouts per version (`src/mtf_lmt/*.inl`): the version groups that put 66 and 67 in one layout, the animation's flags, scene position and rotation and float-track block, the track's reference data and bounds, and the track type and buffer type enums; no code copied |
 | [Kuriimu2](https://github.com/FanTranslatorsInternational/Kuriimu2) (`plugin_mt_framework`) | GPL-3.0 | ARC header variants, GMD v1/v2 |
 | [3dbrew: GPU/Textures](https://www.3dbrew.org/wiki/GPU/Textures) | wiki | PICA200 texture formats and tiling |
 | MH4UltimateDC `config/mt_classes.tsv`, `docs/research/mt-classes.md` | GPL-3.0 | class names, ids, sizes |
@@ -41,7 +42,7 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [gmd](gmd.md) | rGUIMessage | layouts verified (MH3U v1-short, MHXX v2 and v2-32); v2 hashes open |
 | [mod](mod.md) | rModel | version and header shape verified, the same in all three games; fields partial |
 | [quest](quest.md) | rQuestData, rSetEmMain, rEmSetList, rRem, rQuestBattleData, rSuppItem | MH4U, MHXX `.mib` and MH3U `QTDS` headers verified on DLC quests; DLC crypto of all three; `.quest_btl` unknown |
-| [lmt](lmt.md) | rMotionList | animations: MHGU Definitive Edition's version-67 layout, read on every MH4U and MHXX file (L1); MH3U is version 66 |
+| [lmt](lmt.md) | rMotionList | animations: MHGU Definitive Edition's layout and RevilLib's version groups, read on every MH4U and MHXX file (L1) and on all 387 MH3U files, which are version 66 (L3); keyframe encodings open |
 | [emd](emd.md) | rEnemyData, rEnemyTuneData | MH4U body volumes, hitzones, parts, attacks: from MHGU Definitive Edition, structure checked on all 110 pairs and hitzone columns laid out (E1); the 40-byte attack record placed from MH4U's own reader and checked against MHXX's and MH3U's records (E10) |
 | [sound](sound.md) | rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rMHSoundEmitter, … | MH4U layouts from MHGU Definitive Edition, unverified; class ids from the registries; every file's magic and version counted in all three games (SN1): MH3U one version older, MHXX's banks and requests GU's |
 | [dttune](dttune.md) | rEnemyDtTune | MHXX HP, parts, hitzones, tuning: layout from MHXX's loader, checked on all 138 files (E2); blocks matched to MH4U's `.etd` on three monsters (E5) |

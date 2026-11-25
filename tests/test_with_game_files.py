@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import struct
+from collections import Counter
 
 import pytest
 
@@ -186,6 +187,76 @@ def _images(dump) -> dict:
         image = romfs.open_image(dump(game, "romfs.bin"))
         out[game] = (image, {f.path: f for f in image.files()})
     return out
+
+
+def motion_lists(image):
+    """(name, bytes) for every motion list in an image: entries of its ARCs and loose `.lmt` files."""
+    for f in image.files():
+        if f.path.endswith(".arc"):
+            for e in arc.read(image.read(f)).entries:
+                if e.data[:4] == b"LMT\0":
+                    yield e.file_name, e.data
+        elif f.path.endswith(".lmt"):
+            data = image.read(f)
+            if data[:4] == b"LMT\0":
+                yield f.path, data
+
+
+# bytes one key takes in each keyframe buffer type, from RevilLib's src/mtf_lmt/codecs.hpp
+LMT_KEY_STRIDE = {1: 12, 2: 12, 3: 16, 4: 8, 5: 4, 6: 8, 7: 4, 11: 4, 12: 4, 13: 4, 14: 6, 15: 6}
+
+
+def test_mh3u_motion_lists_read_as_version_66(dump):
+    """specs/lmt.md check L3: MH3U's motion lists are LMT version 66. RevilLib puts 66 and 67 in the
+    same class layouts, so one reader covers both: every animation, track table, keyframe buffer,
+    bounds block and event block the files name lies inside its file, every buffer is a whole number
+    of keys at its type's stride, every track weighs 1.0, and every animation carries an event block,
+    marked by bit 0x800000 of its flags."""
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    versions, buffer_types, weights, usage = set(), set(), set(), Counter()
+    lists = animations = empty = tracks = 0
+    buffered = bounds = 0
+    for name, data in motion_lists(image):
+        lists += 1
+        version, anims = lmt.read(data)
+        versions.add(version)          # read raises if a block is outside the file
+        for a in anims:
+            if a is None:
+                empty += 1
+                continue
+            animations += 1
+            tracks += len(a.tracks)
+            assert a.events and a.flags & 0x800000, name
+            for t in a.tracks:
+                buffer_types.add(t.buffer_type)
+                weights.add(t.weight)
+                usage[t.usage] += 1
+                buffered += bool(t.buffer_size)
+                bounds += bool(t.bounds)
+                assert not t.buffer_size or t.buffer_size % LMT_KEY_STRIDE[t.buffer_type] == 0, (name, t.buffer_size)
+    assert versions == {66}, versions
+    assert (lists, animations, empty, tracks) == (387, 8336, 7258, 270420), \
+        (lists, animations, empty, tracks)
+    assert buffer_types == {1, 2, 3, 4, 5, 6, 7, 11, 12, 13}, sorted(buffer_types)
+    assert weights == {1.0}, weights
+    assert usage == {0: 237990, 1: 13286, 2: 10696, 3: 75, 4: 8300, 5: 73}, usage
+    assert (buffered, bounds) == (231142, 51794), (buffered, bounds)
+
+
+def test_mh3u_player_motion_tracks_address_bones_by_id(dump):
+    """specs/lmt.md check L2, on MH3U: the 15 player motion lists carry the hunter body's bone ids,
+    not indexes into a 20-entry list; ids 20 and 21 belong to some armour sets' helms and are never
+    keyframed, and track 255 is root motion."""
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    seen = set()
+    for f in image.files():
+        if not f.path.startswith("/arc/player/mot/"):
+            continue
+        for e in arc.read(image.read(f)).entries:
+            if e.data[:4] == b"LMT\0":
+                _version, anims = lmt.read(e.data)
+                seen |= {t.bone for a in anims if a for t in a.tracks}
+    assert seen == set(range(22)) | {255}, sorted(seen)
 
 
 def _r_model(image, files, arc_path: str) -> bytes:

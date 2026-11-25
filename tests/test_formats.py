@@ -36,14 +36,24 @@ def test_etc1_differential_block_matches_hand_decoding():
     assert colours[8] == (0x7D, 0x7D, 0x7D)     # second half (x >= 2), +2
 
 
-def lmt_with_track_buffer_at(buffer: int) -> bytes:
+def lmt_with_track_buffer_at(buffer: int, version: int = 67) -> bytes:
     track_at = 0x10 + lmt.ANIM
     d = bytearray(track_at + lmt.TRACK)
-    d[:8] = b"LMT\0" + struct.pack("<HH", 67, 1)
+    d[:8] = b"LMT\0" + struct.pack("<HH", version, 1)
     struct.pack_into("<I", d, 8, 0x10)                       # one animation at 0x10
     struct.pack_into("<IIii", d, 0x10, track_at, 1, 10, 0)   # one track
     struct.pack_into("<fII", d, track_at + 4, 1.0, 16, buffer)
     return bytes(d)
+
+
+def test_lmt_reads_mh3us_version_66_with_the_version_67_layout():
+    # RevilLib puts LMT 66 and 67 in one layout (src/mtf_lmt/animation.inl, bone_track.inl)
+    assert lmt.read(lmt_with_track_buffer_at(0x10, version=66))[0] == 66
+
+
+def test_lmt_refuses_a_version_it_does_not_lay_out():
+    with pytest.raises(lmt.LmtError, match="version 68"):
+        lmt.read(lmt_with_track_buffer_at(0x10, version=68))
 
 
 def test_lmt_refuses_a_track_buffer_outside_the_file():
