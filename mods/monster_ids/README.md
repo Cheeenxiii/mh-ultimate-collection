@@ -27,6 +27,8 @@ ids 0 to 123 go to the game's function unchanged, so MH4U's own monsters are unt
 | name/notes text (`emName`, `emExp`) | `0x0109a080` slots 6, 7 | `0x00cdfb30` (`message::getFormat`) | r0 the table, r1 the id |
 | name/notes text | — | `0x00cdfa18` (`message::getRecord`) | r0 the table, r1 the format entry |
 | name/notes text | — | `0x00cdfa30` (`message::getRecordById`) | r0 the table, r1 the id |
+| the quest task (`uc_questTask`) | `0x0065bcd0` | the state machine itself, before its state 0 preload (`0x0065bd7c`) | the stand-in's byte at `task + 0xd4`, see [the enemy data](#the-enemy-data) |
+| the monster archive's name (`uc_dataPath`) | `0x00b7300c` | the `data\em%03d` builder, before the area init asks the archive loader | r2 the quest's wave id, see [the port's archive](#the-ports-archive) |
 
 Most readers take the id in a register; the plugin rewrites that register and calls the game's
 function. Four read the id from the monster's data block (`this+0xe28`, byte `+0x1c0`); the
@@ -157,6 +159,44 @@ record for the call, runs the reader as the stand-in, and puts the row back. The
 (`enemyDataPathIndex`, 0x00efc268) still answers with the stand-in's: the ports ship no
 MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
 
+## The enemy data
+
+Before the area exists, the quest task's state machine (`uc_questTask`, 0x0065bcd0) fills a
+124-byte monster-presence array at `task + 0xd4`, one byte per MH4U id 0 to 123, from the
+quest's monster set. In state 0 its preload loop (`0x0065bd7c`) then loads the enemy data of
+every id whose byte is set, through `loadEnemyData` (`0x00689490`). The loader answers a
+registered id with the stand-in's data row, so the stand-in's `.emd`/`.etd` from
+`data/em_data.arc` is what the ported monster's factory reads.
+
+The array has no row for a ported id: a quest that fields id 125 sets a byte past its end,
+which the preload loop never visits, so the stand-in's data is never loaded and every later
+`enemyData::get(1)` returns null, which the callers dereference. At quest start the plugin
+already finds the quest's loaded `.mib` (the pool's hook, below); there it reads the
+large-monster waves, and for every registered id they name it records the stand-in's byte.
+Before the state 0 preload runs, it sets those bytes in the presence array. The game's own
+preload then loads the stand-in's data, at the same point and with the same call as for an
+MH4U quest that fields the stand-in. A quest that names no registered id is untouched.
+
+The run logs `quest 10212: id 125 -> stand-in 1 marked present so the state 0 preload loads its
+enemy data`, then `quest task: marked stand-in 1 present before the preload`.
+
+## The port's archive
+
+The map/area init builds the monster archive's path from the quest's wave id with the
+`data\em%03d` format (`0x00b7300c`) and asks the engine's archive loader for it. A port that
+ships a model has its own archive at that path (`data/em125.arc`), and its record's
+`enemy\em125\...` paths only resolve if that archive is the one mounted, so a model port's id
+passes through the builder unchanged (the log line is `data resource: id 125 -> its own
+archive`). A port that ships no model keeps the stand-in's model in its record, so for it the
+builder still answers with the stand-in's archive. MH4U's own ids 0 to 123 always pass through.
+
+The material signature was what made the port's archive never load (#203): MH4U's
+`rMaterial` loader refuses a file whose signature at +0x10 isn't its own, and
+`mhuc convert monster` now writes it ([specs/mrl.md](../../specs/mrl.md)). A model port's
+archive must also carry the stand-in's entries the record keeps (its camera, motion effects,
+command and effect lists), so the one archive the game opens holds every path the record names:
+`mhuc convert monster --mh4u-romfs` copies them in from MH4U's own `data/emNNN.arc`.
+
 ## The name and notes text
 
 MH4U answers a monster's name and its Hunter's Notes text by the id: the message tables
@@ -236,7 +276,9 @@ time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; 
 readers log `resource index: id 124 -> its own record`, `resource load: id 124 -> its own
 record` and `effect lists: id 124 -> its own record`. A quest that names a pooled monster logs
 `quest 60012: pooled id 256 -> lent 224`, and its end logs `quest 60012 ends: freed the pool
-byte(s) 224`.
+byte(s) 224`. A quest that names a registered monster logs `quest 10212: id 125 -> stand-in 1
+marked present so the state 0 preload loads its enemy data`, then `quest task: marked stand-in
+1 present before the preload` and `data resource: id 125 -> its own archive`.
 
 ## Settings
 
