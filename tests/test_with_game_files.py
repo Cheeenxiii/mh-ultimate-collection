@@ -117,6 +117,14 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
             assert len(data["guild_quests"]) == 10, name
             assert len(data["palicos"]) >= 1, name
             assert data["profile"]["hunter_rank"] <= 999, name
+            # S8: every item id the save holds has its bit in the 2,176-bit array at 0xF220.
+            held = {slot["item"] for slot in data["item_box"]}
+            for pouch in data["pouches"].values():
+                held |= {slot["item"] for slot in pouch if slot["item"]}
+            assert all((plain[save.ITEM_FLAGS_AT + (i >> 3)] >> (i & 7)) & 1 for i in held), \
+                f"{name}: an item id the save holds has no flag bit"
+            candidate = data["quest_lists"]["candidate_clear_flags"]
+            assert 0 <= candidate["set_bits"] <= 512, name
             characters += 1
         else:
             assert not save.system_problems(plain), name

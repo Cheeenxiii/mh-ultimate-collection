@@ -65,8 +65,10 @@ WEAPON_USAGE_NAMES = ("great_sword", "sns", "hammer", "lance", "hbg", "lbg", "lo
                       "switch_axe", "gunlance", "bow", "dual_blades", "hunting_horn",
                       "insect_glaive", "charge_blade")
 BRIGADE_POINTS_AT = 0xE8A0
-BITFIELD_AT = 0xF220
-BITFIELD_SIZE = 280             # 2,240 bits; meaning unknown (specs/save.md)
+ITEM_FLAGS_AT = 0xF220          # one bit per item id (2,176 bits); meaning unverified (specs/save.md)
+ITEM_FLAGS_SIZE = 272
+QUEST_FLAGS_AT = 0x11E          # 512 bits; candidate for the village quest clear list, unproved
+QUEST_FLAGS_SIZE = 64
 SHARP_ARENA_AT = 0x131A4        # the arena leaderboard block (specs/save.md); partly mapped
 
 # The blocks the spec lists. (name, offset, size); the unknown blocks keep their extent only.
@@ -86,7 +88,7 @@ BLOCKS = (
     ("unknown_0xCB74", 0xCB74, 0x1134),
     ("guild_quests", GUILD_QUEST_AT, GUILD_QUEST_COUNT * GUILD_QUEST_SIZE),
     ("unknown_0xE888", 0xE888, 0x998),
-    ("bitfield", BITFIELD_AT, BITFIELD_SIZE),
+    ("item_flags", ITEM_FLAGS_AT, 280),     # the 2,176 bits, then 8 zero bytes
     ("palicos", PALICO_AT, (PALICO_COUNT - 1) * PALICO_SIZE),
     ("unknown_0x12510", 0x12510, 0xF0),
     ("guild_card", 0x12600, 0xBA4),
@@ -234,6 +236,11 @@ def monster_log(data: bytes) -> list[dict]:
     return out
 
 
+def _bit_indices(data: bytes, at: int, size: int) -> list[int]:
+    """The indices of the set bits of a little-endian bit array, bit 0 first."""
+    return [i for i in range(size * 8) if (data[at + (i >> 3)] >> (i & 7)) & 1]
+
+
 def guild_card(data: bytes) -> dict:
     """The guild-card records in the character save: quest counts, weapon usage and brigade points."""
     _check_size(data, CHARACTER_SIZE, "character save")
@@ -242,8 +249,29 @@ def guild_card(data: bytes) -> dict:
     for table, at in zip(("village", "gathering", "arena"), WEAPON_USAGE_AT, strict=True):
         usage[table] = {name: _u16(data, at + 2 * i) for i, name in enumerate(WEAPON_USAGE_NAMES)}
     return {"quest_counts": counts, "weapon_usage": usage,
-            "brigade_points": _u32(data, BRIGADE_POINTS_AT),
-            "bitfield_set_bits": sum(bin(b).count("1") for b in data[BITFIELD_AT:BITFIELD_AT + BITFIELD_SIZE])}
+            "brigade_points": _u32(data, BRIGADE_POINTS_AT)}
+
+
+def quest_lists(data: bytes) -> dict:
+    """The per-category quest completion counts, and the unproved candidate for the per-quest clear list.
+
+    The 512 bits at 0x11E are all set in the completed saves and partly set in the mid-game one, but no
+    check proves what they index, so they are reported as a candidate, not as cleared quests (specs/save.md).
+    """
+    _check_size(data, CHARACTER_SIZE, "character save")
+    counts = {name: _u16(data, QUEST_COUNTS_AT + 2 * i) for i, name in enumerate(QUEST_COUNT_NAMES)}
+    bits = _bit_indices(data, QUEST_FLAGS_AT, QUEST_FLAGS_SIZE)
+    return {"counts": counts,
+            "candidate_clear_flags": {"offset": QUEST_FLAGS_AT, "size": QUEST_FLAGS_SIZE,
+                                      "set_bits": len(bits), "indices": bits, "status": "unproved"}}
+
+
+def item_flags(data: bytes) -> dict:
+    """The 2,176-bit array at 0xF220, indexed by item id: how many bits are set and the highest one."""
+    _check_size(data, CHARACTER_SIZE, "character save")
+    bits = _bit_indices(data, ITEM_FLAGS_AT, ITEM_FLAGS_SIZE)
+    return {"offset": ITEM_FLAGS_AT, "size": ITEM_FLAGS_SIZE, "set_bits": len(bits),
+            "highest_set": bits[-1] if bits else None}
 
 
 def unmapped_blocks(data: bytes) -> list[dict]:
@@ -267,6 +295,7 @@ def dump_character(data: bytes) -> dict:
         "equipment_box": equipment_box(data), "guild_quests": guild_quests(data),
         "palicos": [p for p in palicos(data) if p["used"]],
         "monster_log": monster_log(data), "guild_card": guild_card(data),
+        "quest_lists": quest_lists(data), "item_flags": item_flags(data),
         "unmapped_blocks": unmapped_blocks(data),
     }
 
