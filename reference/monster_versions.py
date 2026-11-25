@@ -364,15 +364,22 @@ def moves_visible(files, game, em4, src):
     for anims in la:
         if anims:
             sig4 |= {sig for sig in anims if sig}
-    new, unresolved = [], []
-    if refs is not None:
-        for k in ai:
-            f, slot = monster_motions.decode_motion(game, b[k]["motion"])
-            sig = lb[f][slot] if f < len(lb) and lb[f] and slot < len(lb[f]) else None
-            if sig is None:
-                unresolved.append(k)
-            elif sig not in sig4:
-                new.append(k)
+    known, new, new_other, unresolved = [], [], [], []
+    for k in only_motion:
+        f, slot = monster_motions.decode_motion(game, b[k]["motion"])
+        sig = lb[f][slot] if f < len(lb) and lb[f] and slot < len(lb[f]) else None
+        if sig is None:
+            unresolved.append(k)
+        elif sig in sig4:
+            known.append(k)
+        elif k[0] == 7:
+            # Category 7's shared handler can start more than one motion, so a source-only
+            # action's first constant is not reliable enough to call the animation new.
+            unresolved.append(k)
+        elif k in ai:
+            new.append(k)
+        else:
+            new_other.append(k)
     shared = (game == "mhxx" and mhxx_class(files, src) != f"uEm{int(src[2:5]):03d}_00")
     detail = (("shared family class; " if shared else "")
               + f"common {r['common']}; {compared} compared; {len(r['same'])} start the same animation, "
@@ -385,10 +392,16 @@ def moves_visible(files, game, em4, src):
         detail += "; AI-picked: " + (monster_motions.fmt_ids(ai).replace("\n", " ") or "none")
         detail += "; not named by the AI script: " + (
             monster_motions.fmt_ids([k for k in only if k not in ai]).replace("\n", " ") or "none")
+    if known:
+        detail += "; " + str(len(known)) + " start an animation MH4U already holds"
     if new:
         detail += "; new animations the AI picks: " + monster_motions.fmt_ids(new).replace("\n", " ")
+    if new_other:
+        detail += ("; new animations not named by the AI script: "
+                   + monster_motions.fmt_ids(new_other).replace("\n", " "))
     if unresolved:
-        detail += "; animation not in the source's own lists: " + monster_motions.fmt_ids(unresolved).replace("\n", " ")
+        detail += ("; animation not in either game's own lists: "
+                   + monster_motions.fmt_ids(unresolved).replace("\n", " "))
     return ("differs" if (diff or new) else "same"), detail
 
 

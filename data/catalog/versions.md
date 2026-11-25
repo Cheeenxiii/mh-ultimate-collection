@@ -31,8 +31,9 @@ with the page it came from (read on 2026-11-25).
 ## The rule
 
 Decision 0004's amendment gives a version an id only when **a player would easily notice the
-difference**. An axis is `differs` when any of these holds, `same` when none does and the axis
-was compared, and `not compared` when the files or the wiki could not answer it:
+difference**. The three axes are `data`, `moves` and `model`; `wiki` records the attack-list
+comparison alone. An axis is `differs` when any of these holds, `same` when none does and the
+axis was compared, and `not compared` when the files could not answer it:
 
 - **`data`** — base HP differs by 10 % or more; a weakness (one of the eight damage types in a
   hitzone row) differs by 10 points or more on a hitzone row both games' body records use; or the
@@ -43,8 +44,10 @@ was compared, and `not compared` when the files or the wiki could not answer it:
   at another index is the same animation; the track count is recorded but doesn't decide); a
   source-only action starts an animation MH4U's motion lists do not hold and the source game's
   AI script names it; or the wiki's attack lists differ after dropping the translation marker
-  and a trailing qualifier from each name. An action the AI script does not name is not met in
-  a normal fight; one whose animation MH4U already plays is not a new move.
+  and a trailing qualifier from each name. An action the AI script does not name is not one the
+  monster chooses in a normal fight, and one whose animation MH4U already holds is not a new
+  move; `moves_detail` names each source-only action's class (AI-picked, not named by the AI,
+  animation MH4U holds, new, unresolved), so the judgement can be read per action.
 - **`model`** — the main body model's bound box differs by more than 2 % on a side where the two
   games share a bind space (MHXX against MH4U). MH3U's bind space differs in every row, so its
   box is not comparable. Bone numbering and an emptied root never decide; a mesh or texture
