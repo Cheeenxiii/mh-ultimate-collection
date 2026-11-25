@@ -29,7 +29,10 @@ import re
 import struct
 from dataclasses import dataclass
 
-from .formats import arc, lmt, mod, mrl
+from .formats import arc, lmt, mfx, mod, mrl
+
+# (the source game's shader package, MH4U's): a material's and a model's shader ids move between them.
+Shaders = tuple[mfx.Package, mfx.Package]
 
 MODEL, MATERIAL, TEXTURE, MOTION = "rModel", "rMaterial", "rTexture", "rMotionList"
 TAKEN = (MODEL, MATERIAL, TEXTURE)          # same versions in MH3U and MH4U; paths and the material's signature change
@@ -80,18 +83,26 @@ def _rename(name: str, stem: str, target: str) -> str:
     return target + name[len(stem):]
 
 
-def _material(data: bytes, stem: str, target: str) -> bytes:
+def _material(data: bytes, stem: str, target: str, shaders: Shaders) -> bytes:
     """A material file MH4U's loader accepts, naming the target's textures.
 
     The paths look like `enemy\\em001\\mod\\em001_BM`; the source and target file names are both three digits,
-    so the substitution keeps every string's length and the file's other offsets. The signature at 0x10 is
-    MH4U's, the value its rMaterial load checks; every other byte stays the source's."""
+    so the substitution keeps every string's length and the file's other offsets. The shader ids and the
+    signature at 0x10 are moved to MH4U's shader package (specs/mfx.md); every other byte stays the source's."""
     old = f"enemy\\{stem}\\mod\\{stem}".encode("ascii")
     new = f"enemy\\{target}\\mod\\{target}".encode("ascii")
     try:
-        return mrl.for_mh4u(data.replace(old, new))
+        return mrl.for_mh4u(data.replace(old, new), *shaders)
     except mrl.MrlError as e:
         raise ConvertError(f"the material is not an MRL 0x20 file: {e}") from None
+
+
+def _model(data: bytes, shaders: Shaders) -> bytes:
+    """The model with its meshes' vertex formats in MH4U's shader package's slots (specs/mfx.md)."""
+    try:
+        return mod.for_mh4u(data, *shaders)
+    except (mod.ModError, struct.error) as e:
+        raise ConvertError(f"the model's vertex formats don't convert: {e}") from None
 
 
 def material_names(model: bytes) -> list[bytes]:
@@ -116,8 +127,9 @@ def unbound_materials(model: bytes, material: bytes) -> list[bytes]:
         raise ConvertError(f"the material doesn't read: {e}") from None
 
 
-def convert(src: bytes, monster_id: int) -> Mod:
-    """The mod for `monster_id` (124 and up, [data/ids](../../data/ids/README.md)) from the source archive."""
+def convert(src: bytes, monster_id: int, shaders: Shaders) -> Mod:
+    """The mod for `monster_id` (124 and up, [data/ids](../../data/ids/README.md)) from the source archive;
+    `shaders` is (the source game's shader package, MH4U's), whose slots the material and model ids move between."""
     if not 1 <= monster_id < 1000:
         raise ConvertError(f"monster id {monster_id} isn't a file id (1 to 999)")
     archive = arc.read(src)
@@ -130,7 +142,12 @@ def convert(src: bytes, monster_id: int) -> Mod:
     for e in archive.entries:
         if e.type_name in TAKEN and e.path.startswith(f"enemy\\{stem}\\mod\\"):
             base = e.path.rsplit("\\", 1)[1]
-            data = _material(e.data, stem, target) if e.type_name == MATERIAL else e.data
+            if e.type_name == MATERIAL:
+                data = _material(e.data, stem, target, shaders)
+            elif e.type_name == MODEL:
+                data = _model(e.data, shaders)
+            else:
+                data = e.data
             entries.append(arc.Entry(f"enemy\\{target}\\mod\\{_rename(base, stem, target)}", e.type_id, data,
                                       flags=MODEL_FLAGS if e.type_name == MODEL else 0))
     motions = sorted((e for e in archive.entries

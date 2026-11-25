@@ -7,6 +7,8 @@ from __future__ import annotations
 import struct
 from collections import Counter
 
+from . import mfx
+
 MESH = 0x30
 GROUP = 0x20
 BONE = 0x18
@@ -43,6 +45,29 @@ def meshes(d: bytes, h: dict | None = None) -> list[dict]:
                     "vertex_stream_offset": vstream, "vertex_format": vfmt, "index_start": istart,
                     "index_count": icount, "index_value_offset": ivoff, "skin_bone_begin": skin, "envelopes": env})
     return out
+
+
+VERTEX_FORMAT_AT = 0x14
+
+
+def for_mh4u(d: bytes, source: mfx.Package, mh4u: mfx.Package) -> bytes:
+    """A source game's model with each mesh's vertex format (an input-layout id of its game's
+    shader package, specs/mfx.md) moved to MH4U's slot for the same layout. Every other byte is
+    kept; a layout MH4U's package lacks, or a word that is not one of the source's ids, is
+    refused."""
+    out = bytearray(d)
+    h = header(d)
+    for i, m in enumerate(meshes(d, h)):
+        at = h["meshes_at"] + MESH * i + VERTEX_FORMAT_AT
+        name = source.name_of(m["vertex_format"])
+        if name is None:
+            raise ModError(f"mesh {i}'s vertex format {m['vertex_format']:#x} is not an id of the "
+                           "source's shader package")
+        new = mh4u.id_for(name)
+        if new is None:
+            raise ModError(f"mesh {i}'s vertex format {name} is not in MH4U's shader package")
+        struct.pack_into("<I", out, at, new)
+    return bytes(out)
 
 
 def group_ids(d: bytes, h: dict | None = None) -> list[int]:

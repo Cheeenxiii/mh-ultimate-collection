@@ -93,7 +93,7 @@ Field names from mhff and MHGU Definitive Edition's `mod.py` (after RevilLib). "
 | 0x0B | u8 | unknown | unverified | mhff io_import_scene_mod.py |
 | 0x0C | u32 | vertex start | verified | MHGU-DE `mod.py`; check M3 (stream bound) |
 | 0x10 | u32 | vertex stream offset, from the vertex buffer | verified | MHGU-DE `mod.py`; check M3 (stream bound) |
-| 0x14 | u32 | vertex format | unverified | MHGU-DE `mod.py` |
+| 0x14 | u32 | vertex format: an input-layout id of the game's shader package: the name's hash in the high 20 bits, the slot in the low 12 ([mfx](mfx.md)) | verified | MHGU-DE `mod.py`; mfx check X3 (every MH3U and MHXX monster mesh) |
 | 0x18 | u32 | index start | verified | MHGU-DE `mod.py`; check M3 |
 | 0x1C | u32 | index count (start + count inside the index buffer) | verified | MHGU-DE `mod.py`; check M3 |
 | 0x20 | u32 | index value offset | unverified | MHGU-DE `mod.py` |

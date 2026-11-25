@@ -30,6 +30,7 @@ from mhuc.formats import (
     lmt,
     lyt,
     mef,
+    mfx,
     mod,
     mrl,
     romfs,
@@ -1286,7 +1287,8 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
     image4 = romfs.open_image(dump("mh4u", "romfs.bin"))
     stand_in = image4.read(next(f for f in image4.files() if f.path == "/data/em001.arc"))
     row = monsters.registry_row(124)
-    converted_data, report = monsters.convert(source_data, row, stand_in)
+    shaders = (mfx.from_romfs(dump("mhxx", "romfs.bin"), "mhxx"), mfx.from_romfs(dump("mh4u", "romfs.bin"), "mh4u"))
+    converted_data, report = monsters.convert(source_data, row, stand_in, shaders)
     converted = arc.read(converted_data)
     source = {e.file_name: e.data for e in arc.read(source_data).entries}
     stand_in_entries = {e.file_name: e.data for e in arc.read(stand_in).entries}
@@ -1334,11 +1336,14 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
     for port_path, source_path in taken.items():
         got = next(e for e in converted.entries if e.file_name == port_path).data
         if port_path.endswith(".mrl"):
-            # specs/mrl.md check MR1: the one byte range a taken material changes is the
-            # signature at 0x10, which MH4U's loader checks for its own value.
+            # specs/mrl.md check MR1 and specs/mfx.md: a taken material changes only its signature
+            # at 0x10, which MH4U's loader checks, and its shader ids, moved to MH4U's slots.
+            before = source[source_path]
             assert struct.unpack_from("<I", got, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"], port_path
-            assert [i for i in range(len(source[source_path])) if source[source_path][i] != got[i]] \
-                == list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4)), port_path
+            ids = {at for at, _ in mrl.shader_ids(before, shaders[0])}
+            assert {i & ~3 for i in range(len(before)) if before[i] != got[i]} <= ids | {mrl.SIGNATURE_AT}
+            assert [name for _, name in mrl.shader_ids(got, shaders[1])] == \
+                [name for _, name in mrl.shader_ids(before, shaders[0])], port_path
         else:
             assert got == source[source_path], port_path
     for entry in converted.entries:
@@ -1359,13 +1364,15 @@ def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump)
     image = romfs.open_image(dump("mh3u", "romfs.bin"))
     src = next(image.read(f) for f in image.files() if f.path == "/arc/enemy/em001.arc")
     source = [e for e in arc.read(src).entries if e.path.startswith("enemy\\em001\\")]
-    mod = monsterassets.convert(src, 125)
+    shaders = (mfx.from_romfs(dump("mh3u", "romfs.bin"), "mh3u"), mfx.from_romfs(dump("mh4u", "romfs.bin"), "mh4u"))
+    mod = monsterassets.convert(src, 125, shaders)
     built = arc.read(mod.archive())
     assert {e.type_name for e in built.entries} == {"rModel", "rMaterial", "rTexture", "rMotionList"}
     assert Counter(e.type_name for e in built.entries) == {"rModel": 2, "rMaterial": 2, "rTexture": 2,
                                                            "rMotionList": 3}
     assert all(e.path.startswith("enemy\\em125\\") for e in built.entries)
-    # the kept files are the source's bytes; only their paths (and the materials' texture paths) differ
+    # the kept files are the source's bytes; only their paths (and the materials' texture paths) differ. Her
+    # models' vertex format, IAObj4wtT, has the same slot in both games' shader packages (specs/mfx.md).
     kept = {e.path.rsplit("\\", 1)[1]: e for e in source if e.type_name in ("rModel", "rTexture")}
     for e in built.entries:
         if e.type_name in ("rModel", "rTexture"):
@@ -1377,14 +1384,17 @@ def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump)
             assert b"enemy\\em001\\" not in e.data, e.path
             for path in monsterassets.TEXTURE_PATH.findall(e.data):
                 assert path.decode() in textures, (e.path, path)
-            # specs/mrl.md check MR1: MH4U's loader accepts its own signature only, so the one
-            # field the material changes besides its texture paths is that signature.
+            # specs/mrl.md check MR1 and specs/mfx.md: besides its texture paths, the material changes its
+            # signature, which MH4U's loader checks, and its shader ids, moved to MH4U's slots by name.
             assert struct.unpack_from("<I", e.data, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
             source_material = next(x for x in source
                                    if x.path == e.path.replace("em125", "em001"))
             restored = e.data.replace(b"em125", b"em001")
-            assert [i for i in range(len(source_material.data)) if source_material.data[i] != restored[i]] \
-                == list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4)), e.path
+            ids = {at for at, _ in mrl.shader_ids(source_material.data, shaders[0])}
+            changed = {i & ~3 for i in range(len(source_material.data)) if source_material.data[i] != restored[i]}
+            assert changed <= ids | {mrl.SIGNATURE_AT}, e.path
+            assert [n for _, n in mrl.shader_ids(e.data, shaders[1])] == \
+                [n for _, n in mrl.shader_ids(source_material.data, shaders[0])], e.path
     # the motion lists are version 67 and hold the source's animations and tracks
     source_motions = sorted((e for e in source if e.type_name == "rMotionList"), key=lambda e: e.path)
     built_motions = sorted((e for e in built.entries if e.type_name == "rMotionList"), key=lambda e: e.path)
@@ -1452,6 +1462,72 @@ def test_every_material_a_monster_model_names_is_keyed_in_its_material_file(dump
                     assert mrl.material_key(material_name) in keys, (entry.path, name, material_name)
                 checked += 1
     assert checked > 100, f"only {checked} model/material pairs found"
+
+
+def test_each_games_shader_package_hash_is_the_signature_its_materials_carry(dump):
+    """specs/mfx.md check X1: the three packages read (version 0x34, every object named, every name's hash
+    unique within its package) and each package's hash at 0x08 is the signature its own game's material
+    files carry at 0x10 (specs/mrl.md, check MR1); the slots of one object differ between the games."""
+    packages = {}
+    for game in ("mh4u", "mh3u", "mhxx"):
+        package = mfx.from_romfs(dump(game, "romfs.bin"), game)
+        assert package.signature == mrl.SIGNATURES[game], game
+        assert len(package.names) > 700 and len(package.by_hash) == len(package.names), game
+        packages[game] = package
+    slots = {game: p.id_for("BSSolid") & mfx.INDEX_MASK for game, p in packages.items()}
+    assert slots["mh4u"] != slots["mh3u"], slots
+
+
+def test_mh3u_rathians_converted_states_are_mh4u_rathians_own(dump):
+    """specs/mfx.md check X2, issue #203: MH4U uses a material's shader ids as slots of its own package, so
+    MH3U Rathian's material with only its signature rewritten reads a sampler (MH4U slot 0x91) as her blend
+    state. Converted, her records' blend, depth-stencil and rasterizer ids are
+    ids MH4U's own Rathian material uses, which nothing of ours wrote."""
+    from mhuc import monsterassets
+
+    shaders = (mfx.from_romfs(dump("mh3u", "romfs.bin"), "mh3u"), mfx.from_romfs(dump("mh4u", "romfs.bin"), "mh4u"))
+    image3 = romfs.open_image(dump("mh3u", "romfs.bin"))
+    src = next(image3.read(f) for f in image3.files() if f.path == "/arc/enemy/em001.arc")
+    image4 = romfs.open_image(dump("mh4u", "romfs.bin"))
+    own = next(image4.read(f) for f in image4.files() if f.path == "/data/em001.arc")
+
+    def states(material: bytes) -> list[tuple[int, int, int]]:
+        h = mrl.read(material)
+        return [struct.unpack_from("<III", material, h["records_at"] + 4 + mrl.MATERIAL_RECORD * i + 8)
+                for i in range(h["materials"])]
+
+    mh4u_body = next(e.data for e in arc.read(own).entries
+                     if e.type_name == "rMaterial" and e.path == "enemy\\em001\\mod\\em001")
+    port_body = next(e.data for e in monsterassets.convert(src, 125, shaders).entries
+                     if e.type_name == "rMaterial" and e.path == "enemy\\em125\\mod\\em125")
+    source_body = next(e.data for e in arc.read(src).entries
+                       if e.type_name == "rMaterial" and e.path == "enemy\\em001\\mod\\em001")
+    assert set(states(port_body)) <= set(states(mh4u_body))
+    assert not set(states(source_body)) & set(states(mh4u_body))   # unconverted, none of them is MH4U's
+
+
+def test_every_mh3u_and_mhxx_monster_material_and_model_converts_to_mh4us_shader_package(dump):
+    """specs/mfx.md check X3: every shader object a MH3U or MHXX monster material or model names is in MH4U's
+    package, so `mhuc convert monster` can move every id; none is refused."""
+    mh4u_package = mfx.from_romfs(dump("mh4u", "romfs.bin"), "mh4u")
+    counts = Counter()
+    for game, pattern in (("mh3u", r"/arc/enemy/em\d+\.arc"), ("mhxx", r"/arc/enemy/em\d+_\d+\.arc")):
+        source_package = mfx.from_romfs(dump(game, "romfs.bin"), game)
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        for entry in image.files():
+            if not re.fullmatch(pattern, entry.path):
+                continue
+            for e in arc.read(image.read(entry)).entries:
+                if e.type_name == "rMaterial" and len(e.data) >= mrl.HEADER.size:
+                    out = mrl.for_mh4u(e.data, source_package, mh4u_package)
+                    counts[game, "materials"] += 1
+                    counts[game, "ids"] += len(mrl.shader_ids(out, mh4u_package))
+                elif e.type_name == "rModel":
+                    mod.for_mh4u(e.data, source_package, mh4u_package)
+                    counts[game, "models"] += 1
+    for game in ("mh3u", "mhxx"):
+        assert counts[game, "materials"] > 300 and counts[game, "models"] > 300, counts
+        assert counts[game, "ids"] > 10 * counts[game, "materials"], counts
 
 
 def test_every_mh3u_motion_list_converts_to_version_67(dump):
@@ -1545,6 +1621,7 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
                            registry=None, game="mhxx", report=str(tmp_path / "report.txt"),
                            mh4u_romfs=dump("mh4u", "romfs.bin"))
     assert cli._convert_monster_files(args) == 0
+    shaders = (mfx.from_romfs(dump("mhxx", "romfs.bin"), "mhxx"), mfx.from_romfs(dump("mh4u", "romfs.bin"), "mh4u"))
     converted = arc.read((out / "romfs" / "data" / "em126.arc").read_bytes())
     source = {e.file_name: e.data for e in arc.read(source_data).entries}
     assert converted.version == 0x13
@@ -1586,11 +1663,14 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
     for port_path, source_path in taken.items():
         got = next(e for e in converted.entries if e.file_name == port_path).data
         if port_path.endswith(".mrl"):
-            # specs/mrl.md check MR1: the one byte range a taken material changes is the
-            # signature at 0x10, which MH4U's loader checks for its own value.
+            # specs/mrl.md check MR1 and specs/mfx.md: a taken material changes only its signature
+            # at 0x10, which MH4U's loader checks, and its shader ids, moved to MH4U's slots.
+            before = source[source_path]
             assert struct.unpack_from("<I", got, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"], port_path
-            assert [i for i in range(len(source[source_path])) if source[source_path][i] != got[i]] \
-                == list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4)), port_path
+            ids = {at for at, _ in mrl.shader_ids(before, shaders[0])}
+            assert {i & ~3 for i in range(len(before)) if before[i] != got[i]} <= ids | {mrl.SIGNATURE_AT}
+            assert [name for _, name in mrl.shader_ids(got, shaders[1])] == \
+                [name for _, name in mrl.shader_ids(before, shaders[0])], port_path
         else:
             assert got == source[source_path], port_path
     for entry in converted.entries:
