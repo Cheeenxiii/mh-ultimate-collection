@@ -42,6 +42,12 @@ Still open: where in MH4U's save the mod's data goes and in what format (MH4U's 
 | Relocating every table | one patch per reference, possibly impossible at run time on a recompiled game |
 | A save file of the mod's own, MH4U's save kept vanilla (Definitive Edition) | hooks on the save's write, read and parse and a format to maintain; the converter gives the same way back to a clean save |
 
+**Amended by the maintainer on 2026-11-25: fitting in one byte.** The engine keeps a monster's id in one byte (`+0x1c0` of its data block, read with `ldrb` by the table readers, [reference](../reference/README.md#mh4u-monster-tables)), and a guild quest card's id is one byte too, so 255 is a hard limit; widening it would mean finding and hooking every read of that byte. With every 3U and GU version side by side ([0004](#0004-monster-versions)), the catalog's 51 3U and 93 GU large monsters alone are more than the 132 ids from 124 to 255. So:
+
+- **Ids 124 to 223 are permanent**, given to monsters in the order they are ported, as now.
+- **Ids 224 to 255 are a pool lent per quest.** A monster ported after the permanent range is full takes a registry id from 256 up, which quests (whose monster id is a u32, [specs/quest.md](../specs/quest.md)) and the mod's data in the save record; when a quest loads, the plugin lends it a free byte from the pool, and the hooked readers answer that byte with the monster's rows. A quest names a few large monsters, so 32 bytes are enough ([#101](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/101)). A pooled monster can't be on a guild quest card, and its hunt records go through the mod's data in the save, not MH4U's byte-indexed structures.
+- Fewer ids are needed in the first place: [0004](#0004-monster-versions)'s amendment ports a version only when it differs, and shared small monsters use MH4U's.
+
 The facts and options it was chosen from, as the open entry held them:
 
 A ported monster or item is a row MH4U never shipped with: an id, a row in every table indexed by that id, and a place in the save for what the base game's structures don't hold. The two halves are one question, because the id is what a save and a quest both record. The entry complemented [Monster versions](#0004-monster-versions), which chooses which version of a monster runs; this one chooses what number it takes and where the mod's own data lives. [Progression](#0007-progression) names a side file as likely for per-game progress, which is this entry's save half.
@@ -164,6 +170,12 @@ Settled by the maintainer on 2026-11-25.
 | MH4U's version wherever MH4U has the monster | the 3U and GU versions are lost |
 | The newest game's version | ports replace MH4U monsters, which "Add, never replace" forbids |
 | A pick per monster | a choice to justify per monster, and the others are still lost |
+
+**Amended by the maintainer on 2026-11-25: only versions that differ.** Ids are scarce ([0003](#0003-id-allocation-and-mod-saves)'s amendment), and MHXX carried many MH4U monsters over almost unchanged. So:
+
+- A 3U or GU version of a monster MH4U has gets an id of its own only when it differs from MH4U's: its moves (action handlers and the motions they start), its model, or its monster data beyond values MH4U's version already has. The comparison is made per monster with the repository's tools (`mhuc monsterdata`, `reference/monster_motions.py`) and recorded in the catalog ([#102](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/102)); a version that doesn't differ is not ported, and MH4U's plays its quests.
+- A small monster MH4U has is never ported again: 3U and GU quests use MH4U's. Only small monsters MH4U lacks take ids.
+- The two Rathians keep 124 and 125: the milestone ports both on purpose, and they are the first monsters the comparison is run on.
 
 The facts and options it was chosen from, as the open entry held them:
 
