@@ -19,7 +19,7 @@ it builds for the ported id so the game loads the port's files from their own pa
 | crowns (`crownSizeTable`) | `0x00f32008` | `getCrown`, `0x0068877c` | r0 |
 | list order (`monsterListOrder`) | `0x00df35b0` | `0x0061dc58` (find a monster's position) | r0 |
 | icon (`monsterIconIndex`) | `0x00e06698` | `0x00c0e800`, `0x00c0e164` | r1, r2 |
-| resource index (`enemyResourceIndex`) | `0x00efbd08` | `0x0068d8c8`, `0x00682ca0` | r1, r2 |
+| resource index (`enemyResourceIndex`) | `0x00efbd08` | `0x0068d8c8`, `0x00682ca0`, `0x00c0b830` | r1, r2, r2 |
 | drops (`dropRecordIndex`) | `0x01003bec` | `0x00684b40`, `0x0092600c` | r1; the monster's own id |
 | drops (`dropBaseA`, `dropBaseB`) | `0x01003ddc`, `0x01003ed4` | `0x00911f20`, `0x009357b4` | the monster's own id |
 
@@ -64,9 +64,10 @@ not an id and stays). The record, its slots and its strings are one block from t
 heap (`alloc`, ABI 2), and it is kept for the run.
 
 `enemyResource::get` is answered with the built record's +0x14 field. `enemyResource::load`
-reads the record from the table itself, and ids 124 and up have no row there (the table ends
-where `enemyDataPaths` begins), so the hook points the stand-in's row at the built record for
-the call, runs the loader as the stand-in, and puts the row back. The data path
+and `enemyResource::effectLists` (0x00c0b830, called with the spawned monster's own id after
+the loader) read the record from the table itself, and ids 124 and up have no row there (the
+table ends where `enemyDataPaths` begins), so the hook points the stand-in's row at the built
+record for the call, runs the reader as the stand-in, and puts the row back. The data path
 (`enemyDataPathIndex`, 0x00efc268) still answers with the stand-in's: the ports ship no
 MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
 
@@ -77,9 +78,6 @@ MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
   the message layer, not one per-monster getter, so this plugin doesn't hook it.
 - **The Hunter's Notes list** that walks all 124 rows (`0x0061df4c`) and the notes list's sort.
   Only the position lookup (`0x0061dc58`) is answered.
-- **The effect allocator** at `0x00c0b830`, the third reader of `enemyResourceIndex`, is not
-  hooked: it is called with the spawned monster's own id after `enemyResource::load`, so a
-  ported id reads past the table there. It needs a hook point and a build.
 - **The data path** stays the stand-in's until the ports ship MH4U-format `.emd`/`.etd`.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
   stand-in, and the monster's data block still holds the stand-in's own id byte, so a spawned
@@ -109,7 +107,8 @@ python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Az
 A run logs `ready: answering MH4U's monster tables for 2 ported id(s), 124 and up, ...`, then
 one line per reader the first time it answers a registered id and one the first time it passes
 an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource readers log
-`resource index: id 124 -> its own record` and `resource load: id 124 -> its own record`.
+`resource index: id 124 -> its own record`, `resource load: id 124 -> its own record` and
+`effect lists: id 124 -> its own record`.
 
 ## Settings
 

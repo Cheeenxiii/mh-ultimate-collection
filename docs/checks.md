@@ -300,7 +300,7 @@ P1, headless:
    (`tools/mods.py add mods/monster_ids`). Set `selftest = 1` in the installed mod's
    `config.ini`. Build the code library with the mod on:
    `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`. The
-   build lists the mod's 13 hook points.
+   build lists the mod's 14 hook points.
 2. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
 3. Pass: the log has `ready: answering MH4U's monster tables for 2 ported id(s), 124 and up`
@@ -318,8 +318,9 @@ P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod, headless
 runner. Result: the plugin loaded, and the log showed the ready line, a line per registered
 id naming the paths of the record it built in the game's heap (`enemy\em124\...` and
-`enemy\em125\...`), a self-test line for each reader with `ids 0..123 pass through`, and the
-stand-in's data path `enemy\em001\data\em001`. P2 is not done; until it is, whether the
+`enemy\em125\...`), a self-test line for each reader with `ids 0..123 pass through` (including the effect lists
+reader, the third reader of the record), and the stand-in's data path
+`enemy\em001\data\em001`. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.
 
 ## Calling the engine from a plugin (P3)

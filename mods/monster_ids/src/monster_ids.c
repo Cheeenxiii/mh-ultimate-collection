@@ -30,24 +30,23 @@
  * camera's `e001` -> `e124`), so the port's files live under its own id's paths. The record,
  * its slots and its strings are guest memory from the game's own heap (alloc, ABI 2).
  *
- * The two readers of the record are answered with the built one:
+ * The three readers of the record are answered with the built one:
  *   - `enemyResource::get` (0x0068d8c8) returns one field of the record; the hook returns the
  *     field of the built record instead;
- *   - `enemyResource::load` (0x00682ca0) reads the whole record from `enemyResourceIndex`
- *     itself, so the hook points the stand-in's table row at the built record for the call and
- *     puts the row back afterwards. A record is not relocated into the table: ids 124 and up
- *     have no row there, and the table ends where `enemyDataPaths` begins.
+ *   - `enemyResource::load` (0x00682ca0) and `enemyResource::effectLists` (0x00c0b830) read
+ *     the whole record from `enemyResourceIndex` themselves, so the hook points the stand-in's
+ *     table row at the built record for the call and puts the row back afterwards. A record
+ *     is not relocated into the table: ids 124 and up have no row there, and the table ends
+ *     where `enemyDataPaths` begins.
  *
  * The data path (`enemyDataPathIndex`, 0x00efc268) still answers with the stand-in's: the
  * ports ship no MH4U-format `.emd`/`.etd` yet (mods/monster_ids/README.md), so the stand-in's
  * data row is what loads their monster data.
  *
  * What is not answered yet (left undone): the name and notes text (`emName` and
- * `emExp` message N names id N; its reader is the message layer, not one per-monster getter),
- * the Hunter's Notes list that walks all 124 rows (0x0061df4c), and the third reader of
- * `enemyResourceIndex` (0x00c0b830, which reads the record's effect lists and is called with
- * the spawned monster's own id after `enemyResource::load`). The stand-in also means the
- * spawned monster is MH4U's own (the data block keeps its own id byte) until #48/#49's
+ * `emExp` message N names id N; its reader is the message layer, not one per-monster getter)
+ * and the Hunter's Notes list that walks all 124 rows (0x0061df4c). The stand-in also means
+ * the spawned monster is MH4U's own (the data block keeps its own id byte) until #48/#49's
  * converted files and the port's own rows replace it.
  *
  * Settings (mod.json "config", the player's config.ini over it):
@@ -113,13 +112,14 @@ static HookInfo h_dropa_m = {"drop base A", NO_REG, 0, 0};
 static HookInfo h_dropb_m = {"drop base B", NO_REG, 0, 0};
 static HookInfo h_res = {"resource index", 1, 0, 0};       /* enemyResource::get(id) */
 static HookInfo h_resload = {"resource load", 2, 0, 0};    /* enemyResource::load(a, out, id) */
+static HookInfo h_effects = {"effect lists", 2, 0, 0};     /* enemyResource::effectLists(_, _, id) */
 static HookInfo h_icon = {"monster icon", 1, 0, 0};        /* monsterIcon::get(id) */
 static HookInfo h_icon_ui = {"monster icon", 2, 0, 0};     /* monsterIcon::put(_, out, id) */
 static HookInfo h_order = {"list order", 0, 0, 0};         /* monsterListOrder::position(id) */
 
 static HookInfo *const readers[] = {
     &h_factory, &h_load, &h_data, &h_crown, &h_droprec, &h_droprec_m, &h_dropa_m,
-    &h_dropb_m, &h_res, &h_resload, &h_icon, &h_icon_ui, &h_order,
+    &h_dropb_m, &h_res, &h_resload, &h_effects, &h_icon, &h_icon_ui, &h_order,
 };
 
 
@@ -414,26 +414,27 @@ static void resource_get_reader(MH4UCall *call, void *user) {
     host->call_original(call);
 }
 
-/* The resource loader reads the whole record from the table itself. Point the stand-in's row
- * at the ported id's record for the call, run the game's loader as the stand-in, and put the
- * row back: ids 124 and up have no row of their own to point anywhere. */
-static void resource_load_reader(MH4UCall *call, void *user) {
+/* A reader that reads the whole record from the table itself (the loader and the effect-list
+ * reader, both with the id in r2). Point the stand-in's row at the ported id's record for the
+ * call, run the game's function as the stand-in, and put the row back: ids 124 and up have no
+ * row of their own to point anywhere. */
+static void record_reader(MH4UCall *call, void *user) {
     HookInfo *info = user;
-    const uint32_t id = host->reg(call, 2);
+    const uint32_t id = host->reg(call, info->reg);
     const int which = find_index(id);
     if (which >= 0 && records[which].address) {
         const uint32_t row_at =
             ENEMY_RESOURCE_INDEX + (uint32_t)mhuc_monster_ids[which].stand_in * 4u;
         const uint32_t was = host->read32(call, row_at);
         host->write32(call, row_at, records[which].address);
-        host->set_reg(call, 2, mhuc_monster_ids[which].stand_in);
+        host->set_reg(call, info->reg, mhuc_monster_ids[which].stand_in);
         note_own(info, id);
         host->call_original(call);
         host->write32(call, row_at, was);
         return;
     }
     if (which >= 0) {
-        host->set_reg(call, 2, mhuc_monster_ids[which].stand_in);
+        host->set_reg(call, info->reg, mhuc_monster_ids[which].stand_in);
         note(info, id, mhuc_monster_ids[which].stand_in);
     } else if (id <= MHUC_MONSTER_FIRST - 1) {
         note_old(info, id);
@@ -493,7 +494,7 @@ static void self_test(MH4UCall *call) {
                      "record's +0x%x field; ids 0..%u pass through", readers[i]->name,
                      (unsigned)(FIELD_MOTION_EFFECTS * 4u),
                      (unsigned)(MHUC_MONSTER_FIRST - 1));
-        } else if (readers[i] == &h_resload) {
+        } else if (readers[i] == &h_resload || readers[i] == &h_effects) {
             snprintf(line, sizeof line, "self-test: %s answers a ported id with its own record, "
                      "read as stand-in %u; ids 0..%u pass through", readers[i]->name,
                      (unsigned)(MHUC_MONSTER_COUNT ? mhuc_monster_ids[0].stand_in : 0),
@@ -543,7 +544,8 @@ static const struct {
     {"dropBaseA::getForMonster", "0x00911f20", work_block_reader, &h_dropa_m},
     {"dropBaseB::getForMonster", "0x009357b4", work_block_reader, &h_dropb_m},
     {"enemyResource::get", "0x0068d8c8", resource_get_reader, &h_res},
-    {"enemyResource::load", "0x00682ca0", resource_load_reader, &h_resload},
+    {"enemyResource::load", "0x00682ca0", record_reader, &h_resload},
+    {"enemyResource::effectLists", "0x00c0b830", record_reader, &h_effects},
     {"monsterIcon::get", "0x00c0e800", argument_reader, &h_icon},
     {"monsterIcon::put", "0x00c0e164", argument_reader, &h_icon_ui},
     {"monsterListOrder::position", "0x0061dc58", argument_reader, &h_order},

@@ -470,7 +470,7 @@ The readers are what `mods/monster_ids` hooks for a ported id
 register or from the monster's data block, so the plugin rewrites that one value and calls the
 game's function, which leaves MH4U's 0 to 123 untouched. The resource record is the exception:
 a ported id's files live under its own id's paths, so the plugin builds the id a record of its
-own and answers the two table readers with it. The name and notes text and the notes list's
+own and answers the three table readers with it. The name and notes text and the notes list's
 walk are not answered yet: the message layer is shared by every text kind, and the walk reads
 all 124 rows rather than one id. [The plugin's check](../docs/checks.md#ported-monster-ids) is
 the headless one.
