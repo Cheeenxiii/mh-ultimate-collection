@@ -454,11 +454,12 @@ Monster ids run 0 to 123. Id N's files are `emNNN`. Every table below has to gro
 | `crownSizeTable` | 0x00f32008 | 124 rows of 4 floats | `getCrown` 0x0068877c, id in r0 |
 | `monsterListOrder` | 0x00df35b0 | 124 rows of 8 bytes, by list position | 0x0061dc58, id in r0 (a monster's position); the notes list walks all 124 rows at 0x0061df4c |
 | `monsterIconIndex` | 0x00e06698 | 124 bytes, 0x7f = no icon | 0x00c0e800, id in r1; 0x00c0e164, id in r2 |
-| `enemyResourceIndex` | 0x00efbd08 | 124 pointers to 0x2c-byte path records | 0x0068d8c8, id in r1; 0x00682ca0, id in r2 |
+| `enemyResourceIndex` | 0x00efbd08 | 124 pointers to 0x2c-byte path records | 0x0068d8c8, id in r1; 0x00682ca0, id in r2; 0x00c0b830, the spawned monster's own id |
 | `dropRecordIndex`, `dropBaseA`, `dropBaseB` | 0x01003bec, 0x01003ddc, 0x01003ed4 | 124 entries each, into `itemListTable` (0x01002a5c) | `dropRecordIndex`: 0x00684b40, id in r1, and 0x0092600c, the monster's own id; `dropBaseA`: 0x00911f20; `dropBaseB`: 0x009357b4, both the monster's own id |
 | names and notes text | `emName`, `emExp` in `core_common.arc` | message N names id N; 123 messages | the message layer: the 71-file list at 0x00f006c4 holds `emName` at 6 and `emExp` at 7, loaded into 0x0109a080; no per-id getter found |
 
 - The current monster's id is the byte at +0x1c0 of the block that `this+0xe28` points to.
+- A resource record's eleven pointers are, at +0x00 the model, +0x04 six motion lists, +0x08 the camera, +0x0c a second motion list (it ends at its first empty slot, up to six), +0x10 two tail-model paths, +0x14 two motion-effect paths, +0x18 unused (null in all 123 records), +0x1c the sound, +0x20 four extra paths (the fourth is the command/EMC), +0x24 the effect lists and +0x28 a second effect list. `enemyResource::get` returns +0x14; `enemyResource::load` loads the paths of +0x00 to +0x28, skipping a null field; 0x00c0b830 reads +0x24 and +0x28. The 124 records run 0xefa7b4..0xefbd08, so the table itself begins where they end.
 - Ids map to class `uEmN`, or to a sibling's class for variants and subspecies.
 - Several tables hold 123 entries, not 124: reading them for id 123 reads the next table.
 - 54 functions compare a register with 0x7c. Only some are monster code.
@@ -467,10 +468,12 @@ Monster ids run 0 to 123. Id N's files are `emNNN`. Every table below has to gro
 The readers are what `mods/monster_ids` hooks for a ported id
 ([its README](../mods/monster_ids/README.md#what-it-hooks)): each takes the id either in a
 register or from the monster's data block, so the plugin rewrites that one value and calls the
-game's function, which leaves MH4U's 0 to 123 untouched. The name and notes text and the notes
-list's walk are not answered yet: the message layer is shared by every text kind, and the walk
-reads all 124 rows rather than one id. [The plugin's check](../docs/checks.md#ported-monster-ids)
-is the headless one.
+game's function, which leaves MH4U's 0 to 123 untouched. The resource record is the exception:
+a ported id's files live under its own id's paths, so the plugin builds the id a record of its
+own and answers the two table readers with it. The name and notes text and the notes list's
+walk are not answered yet: the message layer is shared by every text kind, and the walk reads
+all 124 rows rather than one id. [The plugin's check](../docs/checks.md#ported-monster-ids) is
+the headless one.
 
 The game's heap allocator, which plugins use, is named in the fork's `config/symbols.txt`, section "Heap".
 

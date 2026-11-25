@@ -285,12 +285,13 @@ is a debugging tool for later move investigations, not part of this check.
 
 `mods/monster_ids` answers MH4U's monster-id-indexed tables for the ids in
 [data/ids](../data/ids/README.md): a registered id is answered with the MH4U monster the
-registry names as its stand-in, and 0 to 123 fall through. The headless check needs no
-converted monster files, so it runs before #48 and #49.
+registry names as its stand-in, except its resource record, which the plugin builds for the
+ported id so the game loads the port's files from its own paths; 0 to 123 fall through. The
+headless check needs no converted monster files, so it runs before #48 and #49.
 
 | Check | What | Pass |
 |---|---|---|
-| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the path the stand-in's data comes from, and ids 0 to 123 passing through |
+| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built and the paths it names under its own id, the path the stand-in's data comes from, and ids 0 to 123 passing through |
 | P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
 
 P1, headless:
@@ -303,18 +304,23 @@ P1, headless:
 2. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
 3. Pass: the log has `ready: answering MH4U's monster tables for 2 ported id(s), 124 and up`
-   and, for each reader, `self-test: <reader> answers id 124 -> 1, id 125 -> 1; ids 0..123
-   pass through`; the factory's and data path's lines name the path the stand-in's files are
-   read from (`enemy\em001\data\em001`). MH4U's own monsters were not loaded, so only the
-   self-test's mapping shows here; a real spawn's reader lines are P2's.
+   and one `self-test: id 124 resource record at <address>, built from stand-in 1, names:
+   enemy\em124\mod\em124; ...` line per registered id, listing the paths read back from the
+   record built in guest memory; and, for each reader, `self-test: <reader> answers ...; ids
+   0..123 pass through`. The factory's and data path's lines name the path the stand-in's
+   files are read from (`enemy\em001\data\em001`), which the record does not change. MH4U's
+   own monsters were not loaded, so only the self-test's mapping shows here; a real spawn's
+   reader lines are P2's.
 
 P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 ([quests.md](quests.md)). Not done.
 
 Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod, headless
-runner. Result: the plugin loaded, and the log showed the ready line and a self-test line
-for each reader it logs, with `id 124 -> 1` and `id 125 -> 1` and `ids 0..123 pass through`, and the
-stand-in's path `enemy\em001\data\em001`. P2 is not done.
+runner. Result: the plugin loaded, and the log showed the ready line, a line per registered
+id naming the paths of the record it built in the game's heap (`enemy\em124\...` and
+`enemy\em125\...`), a self-test line for each reader with `ids 0..123 pass through`, and the
+stand-in's data path `enemy\em001\data\em001`. P2 is not done; until it is, whether the
+files a port does not ship are tolerated as missing is unverified.
 
 ## Calling the engine from a plugin (P3)
 
