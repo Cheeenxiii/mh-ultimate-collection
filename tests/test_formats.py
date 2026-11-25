@@ -7,7 +7,7 @@ import zlib
 import pytest
 
 from mhuc import monsterdata
-from mhuc.formats import classid, emd, hitdata, lmt, pica, sound, stq
+from mhuc.formats import classid, emd, hitdata, lmt, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -528,3 +528,73 @@ def test_sound_refuses_a_request_string_table_that_does_not_follow_the_records()
     struct.pack_into("<I", d, 0x0C, sound.REQUEST_HEADER + sound.REQUEST_RECORD + 4)
     with pytest.raises(sound.SoundError, match="string table at"):
         sound.read_request(bytes(d))
+
+
+def xfs_one_class(endian: str) -> bytes:
+    """An XFS file laid out by hand from specs/xfs.md: one class, two properties, one root object.
+
+    The class is `mFlags` (u32) and `mNames` (string array); the root is class 0, instance 7, with
+    mFlags 0x11223344 and mNames ["one", "two"]. Little-endian files write the count itself and the
+    class word `index << 1 | 1`; big-endian ones twice the count and `0x8000 | index`.
+    """
+    def_at = 0x1C                     # offset 4 from 0x18, as the 3DS files do
+    prop_at = def_at + 8
+    names_at = prop_at + 2 * xfs.PROP_ENTRY
+    names = b"mFlags\0mNames\0"
+    def_size = names_at - 0x18 + len(names)
+    root_at = 0x18 + def_size
+    d = bytearray(root_at + 8 + 4 + 4 + 4 + 4 + 4)
+    d[:4] = b"XFS\0" if endian == "<" else b"\0SFX"
+    struct.pack_into(endian + "HH", d, 4, 15, 1)
+    struct.pack_into(endian + "II", d, 0x10, 1, def_size)
+    struct.pack_into(endian + "I", d, 0x18, def_at - 0x18)
+    struct.pack_into(endian + "I", d, def_at, 0x12345678)
+    if endian == "<":
+        struct.pack_into("<I", d, def_at + 4, 2)                  # the count
+    else:
+        struct.pack_into(">HH", d, def_at + 4, 4, 0)              # the count, twice
+    struct.pack_into(endian + "I", d, prop_at, names_at - 0x18)   # "mFlags"
+    d[prop_at + 4], d[prop_at + 5] = 0x06, 0x00                   # type, attr
+    struct.pack_into(endian + "H", d, prop_at + 6, 4)             # size
+    p1 = prop_at + xfs.PROP_ENTRY
+    struct.pack_into(endian + "I", d, p1, names_at - 0x18 + 7)    # "mNames"
+    d[p1 + 4], d[p1 + 5] = 0x0E, 0x20                             # type, attr: array
+    struct.pack_into(endian + "H", d, p1 + 6, 4)                  # size
+    d[names_at:names_at + len(names)] = names
+    struct.pack_into(endian + "HH", d, root_at, 1 if endian == "<" else 0x8000, 7)
+    struct.pack_into(endian + "I", d, root_at + 4, 24)            # counts itself
+    p = root_at + 8
+    struct.pack_into(endian + "I", d, p, 1)
+    struct.pack_into(endian + "I", d, p + 4, 0x11223344)
+    struct.pack_into(endian + "I", d, p + 8, 2)
+    d[p + 12:p + 16] = b"one\0"
+    d[p + 16:p + 20] = b"two\0"
+    return bytes(d)
+
+
+def test_xfs_reads_the_little_endian_layout_of_the_3ds_games():
+    """specs/xfs.md, little-endian: the count is itself, the class word `index << 1 | 1`, the flag bit 0"""
+    x = xfs.read(xfs_one_class("<"))
+    assert (x.endian, x.version, x.subversion) == ("little", 15, 1)
+    assert [(p.name, p.type, p.attr, p.size) for p in x.classes[0].props] == [
+        ("mFlags", 0x06, 0x00, 4), ("mNames", 0x0E, 0x20, 4)]
+    assert x.root == {"class": "0x12345678", "instance": 7,
+                      "mFlags": 0x11223344, "mNames": ["one", "two"]}
+
+
+def test_xfs_reads_the_big_endian_layout_cha_cha_documents():
+    """specs/xfs.md, big-endian: twice the count, the class word `0x8000 | index`, the flag bit 15"""
+    x = xfs.read(xfs_one_class(">"))
+    assert (x.endian, x.version, x.subversion) == ("big", 15, 1)
+    assert len(x.classes[0].props) == 2
+    assert x.root == {"class": "0x12345678", "instance": 7,
+                      "mFlags": 0x11223344, "mNames": ["one", "two"]}
+
+
+def test_xfs_refuses_a_little_endian_object_without_its_flag():
+    """the little-endian object word carries its flag in bit 0; without it the file is not an object"""
+    d = bytearray(xfs_one_class("<"))
+    root_at = 0x18 + struct.unpack_from("<I", d, 0x14)[0]
+    struct.pack_into("<H", d, root_at, 0)
+    with pytest.raises(xfs.XfsError, match="bad object header"):
+        xfs.read(bytes(d))

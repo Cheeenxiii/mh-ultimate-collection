@@ -87,3 +87,29 @@ def test_survey_reads_the_sound_files_it_counts():
     st = {}
     survey.survey_entry(None, wave4()[:-1], st)
     assert st["sound"]["SN6 wave not read"] == 1
+
+
+def empty_xfs() -> bytes:
+    """A hand-built little-endian XFS: one class with no properties and a root object that has none."""
+    d = bytearray(0x2C)
+    d[:4] = b"XFS\0"
+    struct.pack_into("<HH", d, 4, 15, 1)
+    struct.pack_into("<II", d, 0x10, 1, 0x0C)      # one class, its definition block is 0x0C bytes
+    struct.pack_into("<I", d, 0x18, 4)             # class 0 at 0x18 + 4
+    struct.pack_into("<I", d, 0x1C, 0x12345678)    # its DTI id
+    struct.pack_into("<I", d, 0x20, 0)             # no properties
+    struct.pack_into("<HHI", d, 0x24, 1, 0, 4)     # class 0, instance 0, size 4
+    return bytes(d)
+
+
+def test_survey_counts_the_xfs_files_it_reads_and_refuses():
+    """check X1: an XFS file the reader takes is counted by version and endianness, a broken one as not read"""
+    st: dict = {}
+    survey.survey_entry(None, empty_xfs(), st)
+    assert st["xfs"]["X1 read"] == 1
+    assert st["xfs"]["version 15.1"] == 1
+    assert st["xfs"]["little-endian"] == 1
+    assert st["xfs"]["loose"] == 1
+    st = {}
+    survey.survey_entry(None, empty_xfs()[:-1], st)
+    assert st["xfs"]["X1 not read"] == 1

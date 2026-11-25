@@ -93,18 +93,18 @@ The gauge is drawn by `uIDCockpitMain` (`0x3f4318b3`, DTI `0xd461f8`), the quest
 
 The timer itself is player code. `0xa39c20(player, delta)` adds `delta` to the current air and clamps it to `[0, capacity]`; `0xa3a478(player, delta)` raises the capacity (cap 150) and sets the current to it. The player's update (`0x8d60c0`) calls `0xa39c20(player, -1)` at `0x8d6fe4` while `status+0x3d == 3` (underwater) and `0xa39c20(player, +150)` at `0x8d6ad8` otherwise; `0x8eccb8` calls `0xa3a478` at `0x8ecd70`.
 
-So the gauge is a display of the player's oxygen timer, not the oxygen system's HUD half. The drain, capacity and refill are player code, and the gauge is a few sprites in the quest cockpit layout `GUI\texlayout\quest\coc_main_eng` (in `/arc/ID/ID_cock_eng.arc`), whose 52 nodes include `ariA1` to `ari_eff` at indices 8 to 15. A port carries the timer with the swim state and redraws the gauge as a layout; there is no `uIDCockpitAir` behaviour to rebuild.
+So the gauge is a display of the player's oxygen timer, not the oxygen system's HUD half. The drain, capacity and refill are player code, and the gauge is a few sprites in the quest cockpit layout `GUI\texlayout\quest\coc_main_eng` (in `/arc/ID/ID_cock_eng.arc`), whose 52 nodes include `ariA1` to `ari_eff` at indices 8 to 15. A port carries the timer with the swim state and redraws the gauge as a layout; there is no `uIDCockpitAir` behaviour to rebuild. MH4U's own HUD layouts are `rLayout` (`.lyt`) entries, not XFS: it ships no XFS texlayout at all ([specs/xfs.md](../specs/xfs.md#checks), check X1).
 
 **How the air gauge was read.** Addresses and names only.
 
 1. Decompress MH3U's `code.bin`; its SHA-1 matches `reference/games/mh3u/game.json`.
 2. Recover the class registry and instance vtables with `reference/mt_dti.py` and `reference/mt_vtables.py`, then compare `uIDCockpitAir`'s vtable with `uIDCockpit`'s slot by slot; the five differing slots are read with capstone.
 3. Follow `uIDCockpitMain`'s slot 59 (`0x33ff2c`) to `0x341a58` and then `0x33f3fc`, and read the status offsets and layout node indices there.
-4. Extract `/arc/ID/ID_cock_eng.arc` from the RomFS (one file, 47 entries) and read `GUI\texlayout\quest\coc_main_eng` (14,960 bytes) with `mhuc`'s RomFS and ARC readers; walk its 52 nodes to read their names and indices.
+4. Extract `/arc/ID/ID_cock_eng.arc` from the RomFS (one file, 47 entries) and read `GUI\texlayout\quest\coc_main_eng` (14,960 bytes) with `mhuc`'s RomFS, ARC and XFS readers; its 52 nodes' names and indices come from that XFS read (check X1).
 5. Read the player update `0x8d60c0` at its two calls to `0xa39c20`, `0x8eccb8` at its call to `0xa3a478`, and both functions' clamps.
 6. Search the decompressed image and the RomFS for the class id, DTI, vtable and name.
 
-The texlayout is a little-endian XFS variant that `mhuc`'s XFS reader rejects as it stands (its object-header flag and property count differ; check X1 is open), so step 4 walks its objects directly.
+The texlayout is a little-endian XFS file; `mhuc`'s XFS reader reads it as the other 3DS XFS files (its object-header flag, property count and property sizes are laid out per byte order, [specs/xfs.md](../specs/xfs.md), check X1), so step 4 reads its objects rather than walking the bytes.
 
 ## Unknowns
 
