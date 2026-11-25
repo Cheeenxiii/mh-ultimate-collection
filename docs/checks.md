@@ -617,6 +617,45 @@ the map loads; the reader lines, the map and the timing are P4's result below. T
 (about 76 s from the departure) but it completes, and the base quest with the original file is
 the control (map at about 60 s). 124 (GU) uses the same two parts; P4 has its route and result.
 
+### The enemy data the monster spawns with (P2, headless)
+
+The map, the archive and the resource record load, but the monster still does not appear: the
+quest task's presence array gates the enemy data. The task (`0x0065bcd0`) fills a 124-byte
+array at `task + 0xd4`, one byte per MH4U id, from the quest's monster set, and in state 0
+(`0x0065bd7c`) calls `loadEnemyData` (`0x00689490`) for every id whose byte is set, 0 to 0x7b.
+A quest that fields a ported id sets a byte past the array, which the loop never visits: the
+stand-in's data is never loaded, `enemyData::get(stand_in)` returns null, and the first caller
+dereferences it (`ldr r0,[r0,#0x18]` at `0x00922160`; 553,321 `UnmappedAccess` reads in the
+next 100 s without this part).
+
+`mods/monster_ids` finds the starting quest's loaded `.mib` with the lookup the id pool
+already uses (`QuestFlow::startQuest`, `0x00b7c010`), reads the registered ids its large-monster
+waves name, and sets their stand-ins' bytes in the presence array before the state 0 preload.
+The game's own loop then loads the stand-in's data, with its own `loadEnemyData` call, exactly
+as for an MH4U quest that fields the stand-in. A quest that names no registered id is
+untouched.
+
+Procedure:
+
+1. Deploy the port's own archive at `data/em125.arc` (the #203 conversion: the port's files
+   plus the stand-in's kept entries, with MH4U's material signature) and the quest whose large
+   monster is 125.
+2. Build the code library with the mod's hooks, now including `uc_questTask` (`0x0065bcd0`).
+3. Run the P4 route (#144) headless for 150 s, count `HW.Memory UnmappedAccess`, and take
+   screenshots after the factory.
+
+Result (2026-11-25, USA v1.3.0 update, headless runner, the #144 route): **pass.** The run
+logged `quest 10212: id 125 -> stand-in 1 marked present so the state 0 preload loads its enemy
+data` at 43.87 s, `quest task: marked stand-in 1 present before the preload` at 43.96 s, then
+the preload's first `data path: id 1 is MH4U's own; passed through` at 46.27 s: the marked row
+made the stand-in the first id the loop loaded. The resource load and the factory followed at
+47.57 s (`resource load: id 125 -> its own record`, `factory: id 125 -> stand-in 1`), and
+`HW.Memory UnmappedAccess` was **0** for the whole 150 s (553,321 without the marking, the
+first at `0x00922160`). P2's headless half passes; a player's run and the base quest's in-game
+control remain. The monster is created and placed at the wave's spawn in area 3 (`enemy + 0xf80`
+holds the wave's position), but nothing is drawn there yet: that is
+[#203](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/203)'s render check.
+
 ## A converted material loads (M3)
 
 MH4U's rMaterial load (`0x00be7000`) accepts only its own MRL signature at +0x10: it compares it

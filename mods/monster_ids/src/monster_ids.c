@@ -80,6 +80,24 @@
  * ports ship no MH4U-format `.emd`/`.etd` yet (mods/monster_ids/README.md), so the stand-in's
  * data row is what loads their monster data.
  *
+ * The enemy data's preload. Before the area exists, the quest task (0x0065bcd0) fills a
+ * 124-byte presence array at +0xd4 from the quest's monster set and, in state 0, loads the
+ * enemy data of every id whose row is set (the loop at 0x0065bd7c, ids 0 to 0x7b). A quest
+ * that fields a ported id has that id in the set, past the array, so the stand-in's data is
+ * never loaded: every later `enemyData::get(stand_in)` returns null and the game dereferences
+ * it. The plugin reads the quest's `.mib` at quest start (where it already finds it for the
+ * pool), and marks the stand-ins of the registered ids the quest names present before the
+ * state machine's preload runs. The game's own loop then loads the stand-in's data, from the
+ * stand-in's data path, exactly as it would for an MH4U quest that fields it.
+ *
+ * The port's own archive. The map/area init builds the monster archive's path `data\emNNN`
+ * from the quest's wave id (0x00b7300c) before any reader above runs. A port that ships a
+ * model has its own archive at that path, and the record's `enemy\emNNN\...` paths only
+ * resolve if that archive is the one mounted; the material signature a converted material
+ * carries is what lets it load (#203), so a model port's id passes through. A port that ships
+ * no model keeps the stand-in's model in its record and is answered with the stand-in's
+ * archive, which holds it.
+ *
  * The name and notes text. MH4U's `emName` and `emExp` message tables (0x0109a080 slots 6
  * and 7; message N names id N) are read through three per-id getters: 0x00cdfb30 (format
  * entry), 0x00cdfa18 (string record) and 0x00cdfa30 (record by id). The plugin wraps all
@@ -146,6 +164,14 @@
 #define MONSTER_LIST_END 0xffffffffu
 #define MONSTER_MAX_WAVES 64u
 #define MONSTER_MAX_DEFS 64u
+
+/* The quest task (uc_questTask, 0x0065bcd0): the state machine's state byte at +1 and its
+ * 124-byte monster-presence array at +0xd4, one row per MH4U id. In state 0 its preload loop
+ * (0x0065bd7c) loads the enemy data of every id whose row is set, 0 to 0x7b. */
+#define QUEST_TASK_STATE 0x0u
+#define QUEST_TASK_PRESENCE 0xd4u
+#define GUEST_FIRST 0x08000000u
+#define GUEST_LAST 0x10000000u
 
 /* The record's shape, from its readers: field_slots[f] path slots at offset f*4, and the
  * second motion list (+0x0c) ends at its first empty slot instead of a fixed count. The two
@@ -246,6 +272,13 @@ static int lent_row[MHUC_MONSTER_POOL_SIZE];
 static uint32_t active_quest;     /* the quest that holds the lent bytes, or 0 */
 static uint32_t warned_quest;     /* the quest whose missing data was logged */
 static int warned_no_data;
+/* The stand-ins (ids below MHUC_MONSTER_FIRST) of the registered monsters the starting
+ * quest fields: one row per stand-in id. The quest task marks their presence rows, so the
+ * game's own preload loads their enemy data; see quest_task_reader. */
+static unsigned char quest_stand_ins[MHUC_MONSTER_FIRST];
+static int quest_stand_ins_any;              /* any row set */
+static uint32_t quest_stand_ins_quest;       /* the quest the rows belong to, or 0 */
+static uint32_t quest_stand_ins_logged;      /* the quest whose marking was logged */
 
 static HookInfo h_factory = {"factory", 1, 0, 0};          /* uEnemyFactory::create(owner, id, a2, a3) */
 static HookInfo h_load = {"data path", 1, 0, 0};           /* loadEnemyData(this, id, slot) */
@@ -371,6 +404,9 @@ static void free_quest(MH4UCall *call, int log_it) {
         say(MH4U_LOG_INFO, line);
     }
     active_quest = 0;
+    memset(quest_stand_ins, 0, sizeof quest_stand_ins);
+    quest_stand_ins_any = 0;
+    quest_stand_ins_logged = 0;
 }
 
 /* One line the first time a reader answers a registered id, one the first time it passes an
@@ -424,8 +460,12 @@ static int read_text(MH4UCall *call, uint32_t addr, char *out, size_t size) {
 
 /* The map/area init (0x00bc3284) builds the engine's enemy resource path for the quest's
  * wave id with the "data\\em%03d" format and asks the engine's own archive loader for it;
- * the readers above never see that request. The port ships no data resource of its own yet,
- * so build the stand-in's path for a registered id. Only that exact format is touched. */
+ * the readers above never see that request. A port that ships a model has its own archive at
+ * that path: the record's `enemy\emNNN\...` paths only resolve if that archive is the one
+ * mounted, and the material signature a converted material carries lets it load (#203), so
+ * the id passes through unchanged. A port that ships no model keeps the stand-in's model in
+ * its record, and the stand-in's archive is the one that holds it, so the id is answered
+ * with the stand-in's. Only that exact format is touched. */
 static void data_path_builder(MH4UCall *call, void *user) {
     HookInfo *info = user;
     char text[24];
@@ -436,9 +476,14 @@ static void data_path_builder(MH4UCall *call, void *user) {
     }
     const uint32_t id = host->reg(call, 2);
     const MhucMonsterId *row = lookup(id, NULL);
-    if (row) {
+    if (row && !(row->files & MHUC_FILES_MODEL)) {
         host->set_reg(call, 2, row->stand_in);
         note(info, id, row->stand_in);
+    } else if (row && !info->seen_new) {
+        char line[160];
+        info->seen_new = 1;
+        snprintf(line, sizeof line, "%s: id %u -> its own archive", info->name, (unsigned)id);
+        say(MH4U_LOG_INFO, line);
     }
     host->call_original(call);
 }
@@ -853,21 +898,107 @@ static int lend_quest(MH4UCall *call, uint32_t quest, uint32_t data) {
     return lent;
 }
 
+/* The stand-ins of the registered monsters the quest's large-monster waves name. The quest
+ * task marks their presence rows so the game's own state 0 preload loads their enemy data;
+ * a quest that names no registered id leaves every row clear and nothing changes. */
+static void note_quest_stand_ins(MH4UCall *call, uint32_t quest, uint32_t data) {
+    memset(quest_stand_ins, 0, sizeof quest_stand_ins);
+    quest_stand_ins_any = 0;
+    const uint32_t waves = host->read32(call, data + MIB_LARGE_MONSTERS);
+    if (!waves || waves >= MIB_MAX_SIZE) {
+        return;
+    }
+    char line[220];
+    size_t used = 0;
+    line[0] = '\0';
+    for (uint32_t w = 0; w < MONSTER_MAX_WAVES; w++) {
+        const uint32_t wave = host->read32(call, data + waves + w * 4u);
+        if (!wave) {
+            break;
+        }
+        if (wave >= MIB_MAX_SIZE) {
+            return;
+        }
+        for (uint32_t d = 0; d < MONSTER_MAX_DEFS; d++) {
+            const uint32_t at = data + wave + d * MONSTER_DEF_SIZE;
+            const uint32_t id = host->read32(call, at);
+            if (id == MONSTER_LIST_END) {
+                break;
+            }
+            const MhucMonsterId *row = lookup(id, NULL);
+            if (!row || row->stand_in >= MHUC_MONSTER_FIRST) {
+                continue;
+            }
+            quest_stand_ins[row->stand_in] = 1;
+            quest_stand_ins_any = 1;
+            if (quest != quest_stand_ins_logged) {
+                const int n = snprintf(line + used, sizeof line - used, "%sid %u -> stand-in %u",
+                                       used ? ", " : "", (unsigned)id, (unsigned)row->stand_in);
+                if (n > 0 && (size_t)n < sizeof line - used) {
+                    used += (size_t)n;
+                }
+            }
+        }
+    }
+    if (quest_stand_ins_any && quest != quest_stand_ins_logged) {
+        quest_stand_ins_logged = quest;
+        char full[300];
+        snprintf(full, sizeof full, "quest %u: %s marked present so the state 0 preload loads "
+                 "its enemy data", (unsigned)quest, line);
+        say(MH4U_LOG_INFO, full);
+    }
+}
+
+/* The quest task (0x0065bcd0), state 0: before its preload loop reads the 124-byte presence
+ * array, mark the stand-ins of the registered monsters the quest fields. A ported id itself
+ * is past the array, so without this the stand-in's enemy data never loads and every later
+ * enemyData::get(stand_in) returns null. The game's loop then loads it with its own call. */
+static void quest_task_reader(MH4UCall *call, void *user) {
+    (void)user;
+    const uint32_t task = host->reg(call, 1);
+    if (task >= GUEST_FIRST && task < GUEST_LAST && quest_stand_ins_any &&
+        host->read8(call, task + 1u) == QUEST_TASK_STATE) {
+        for (unsigned s = 0; s < MHUC_MONSTER_FIRST; s++) {
+            if (!quest_stand_ins[s]) {
+                continue;
+            }
+            const uint32_t at = task + QUEST_TASK_PRESENCE + s;
+            if (host->read8(call, at) == 0) {
+                host->write8(call, at, 1);
+                char line[160];
+                snprintf(line, sizeof line, "quest task: marked stand-in %u present before the "
+                         "preload", s);
+                say(MH4U_LOG_INFO, line);
+            }
+        }
+    }
+    host->call_original(call);
+}
+
 /* QuestFlow::startQuest: lend the pooled monsters the starting quest names before the game
- * copies its data out of the quest list. */
+ * copies its data out of the quest list, and note the stand-ins the quest task must mark. */
 static void quest_start_reader(MH4UCall *call, void *user) {
     (void)user;
     const uint32_t id = next_quest_id(call);
-    if (id && MHUC_POOLED_MONSTER_COUNT > 0) {
+    if (id && id != quest_stand_ins_quest) {
+        memset(quest_stand_ins, 0, sizeof quest_stand_ins);
+        quest_stand_ins_any = 0;
+        quest_stand_ins_logged = 0;
+        quest_stand_ins_quest = id;
+    }
+    if (id) {
         const uint32_t data = quest_data(call, id);
         if (data) {
-            lend_quest(call, id, data);
+            if (MHUC_POOLED_MONSTER_COUNT > 0) {
+                lend_quest(call, id, data);
+            }
+            note_quest_stand_ins(call, id, data);
         } else if (warned_quest != id || !warned_no_data) {
             char line[200];
             warned_quest = id;
             warned_no_data = 1;
             snprintf(line, sizeof line, "quest %u: its loaded .mib wasn't found among the "
-                     "quest holder's resources; a pooled monster in it keeps its registry id",
+                     "quest holder's resources; a ported monster in it isn't preloaded",
                      (unsigned)id);
             say(MH4U_LOG_WARNING, line);
         }
@@ -1462,6 +1593,7 @@ static const struct {
     {"message::getRecord", "0x00cdfa18", message_record_reader, &h_msg_record},
     {"message::getRecordById", "0x00cdfa30", message_record_by_id_reader, &h_msg_by_id},
     {"QuestFlow::startQuest", "0x00b7c010", quest_start_reader, NULL},
+    {"uc_questTask", "0x0065bcd0", quest_task_reader, NULL},
     {"aQuest::endSequence", "0x0065a378", quest_end_reader, NULL},
     {"uc_dataPath", "0x00b7300c", data_path_builder, &h_datapath},
 };
