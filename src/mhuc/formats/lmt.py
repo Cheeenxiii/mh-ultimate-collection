@@ -2,8 +2,7 @@
 `tools/lmt.py`, read off MH4U files: version 67; and from RevilLib's version layouts, which put 66 and 67 in the
 same class layouts, so MH3U's files read with the same code). `read` returns the structure, `decode_keys` its
 keyframes, `bounds` a track's bounds block and `read_float_tracks` an animation's float-track block; `convert`
-rebuilds a version 66 list as version 67, `assemble` writes a list from chosen animations; `check` gives checks
-L1 and L5's counts.
+rebuilds a version 66 list as version 67; `check` gives checks L1 and L5's counts.
 """
 from __future__ import annotations
 

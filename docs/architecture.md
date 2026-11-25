@@ -167,6 +167,13 @@ her sound set (`--arc --sound-arc`).
 | sound (`MSS`, 0x20110404) | 1 | converted by the command's sound mode | MH4U's is 0x20120123; `--arc --sound-arc` converts her 48 waves, bank, request and call into the same archive ([sound.md](../specs/sound.md), check SN9) |
 | effects (`EFL` 0x30110616, `EAN`, `ESQ`, the effect model, material and textures) | 57 | left out | MH4U's effect lists are 0x30111104; effects are their own work, and MH4U's own effects play for now |
 
+**Motion numbers.** MH4U starts an animation by the index `file << 8 | slot` and MH3U by `file * 100 + slot`, and
+the port reuses MH4U's handler for every action id MH4U has, so that handler asks for an MH4U index while the
+converted list keeps MH3U's grouping ([0002](decisions.md#0002-monsters-are-ported-onto-mh4us-engine)). Nothing is
+placed at conversion time: the ported monster's plugin hooks MH4U's motion-start wrapper (`0x0094e318`, R1's) and
+translates the number with a table generated from R1's comparison, one per ported monster (issue #125). What that
+table cannot resolve yet — category 7's computed indices and their 19 action ids — is listed there.
+
 Nothing is authored. A conversion adds no value, name or path the source game doesn't have; the only thing it
 fixes is the mod's own layout, `enemy\em<id>\mod\em<id>` and `enemy\em<id>\mot\em<id>_<n>`, which the
 resource-path answers for a ported id read ([issue #105](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/105)).

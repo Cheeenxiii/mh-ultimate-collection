@@ -135,7 +135,10 @@ What the version change was for is unknown. RevilLib's registry gives all versio
 
 ### Converting a version 66 list to version 67
 
-Nothing else differs, so `mhuc.formats.lmt.convert` copies every block and re-encodes the keyframe buffers of types 11 to 13 only: a component v in −1 to 1 becomes the unsigned field round((v + 1) × 0x3FFF / 2) in 0 to 0x3FFF (a value outside −1 to 1 clamps), and the track gains a bounds block with scale 2 and offset −1 on the two components it stores, the other two left 0. The version-67 reading, offset + scale × value, gives v back within 6.11e-5, half the unsigned field's step, so a converted list decodes to the source's keys. The frame gaps, the animation headers and event blocks, and every other track's bytes stay the source's.
+Nothing else differs, so `mhuc.formats.lmt.convert` copies every block and re-encodes the keyframe buffers of types 11 to 13 only: a component v in −1 to 1 becomes the unsigned field round((v + 1) × 0x3FFF / 2) in 0 to 0x3FFF (a value outside −1 to 1 clamps), and the track gains a bounds block with scale 2 and offset −1 on the two components it stores, the other two left 0. The version-67 reading, offset + scale × value, gives v back within 6.11e-5, half the unsigned field's step, so a converted list decodes to the source's keys. The frame gaps, the animation headers and event blocks, and every other track's bytes stay the source's. That
+includes a type 6 track's bounds block, which 2,991 MH3U tracks carry: MH4U's loader does not relocate +0x20
+for type 6 ([Versions](#versions)), so the pointer stays a file offset there, and whether MH4U's motion code
+reads one is unverified.
 
 ### Types 1 and 2: `SingleVector3` and `StepRotationQuat3` (no keys in any file)
 
