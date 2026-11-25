@@ -46,6 +46,16 @@
  * paths of the kinds the port ships rewritten to the ported id so its files live under its
  * own id's paths.
  *
+ * The two effect-list fields are the exception to the per-field slot counts: they are arrays
+ * without a null terminator, and `enemyResource::effectLists` (0x00c0b830) takes their lengths
+ * from a per-id table of two u16 at 0x00fb7a70 (the count for +0x24, then for +0x28, both for
+ * the id it is called with). A record that gives either field fewer slots than the table says
+ * makes that reader walk past the array: in the block the plugin builds, the next words are
+ * the record's path strings, so their first bytes (`enem`, `y\em`, `125\`, `mod\`) are passed
+ * as path pointers, and the load faults. The record is therefore built with the stand-in's
+ * counts: the reader runs as the stand-in, and a port ships no effect lists yet, so its paths
+ * are the stand-in's anyway.
+ *
  * A port ships only some of those path kinds (its arc holds the model, motions, tail and
  * command for 124, the model, the first three motion lists and the tail for 125); MH4U stops
  * the load on a path that is not there. The registry's `files` column, generated into
@@ -138,12 +148,20 @@
 #define MONSTER_MAX_DEFS 64u
 
 /* The record's shape, from its readers: field_slots[f] path slots at offset f*4, and the
- * second motion list (+0x0c) ends at its first empty slot instead of a fixed count. */
+ * second motion list (+0x0c) ends at its first empty slot instead of a fixed count. The two
+ * effect-list fields' counts are per id instead (EFFECT_LIST_COUNTS). */
 #define RECORD_SIZE 0x2cu
 #define RECORD_FIELDS 11u
-#define RECORD_SLOTS_MAX 6u
+#define RECORD_SLOTS_MAX 64u
 #define PATH_MAX 128u
 #define FIELD_MOTION_EFFECTS 5u   /* +0x14, what enemyResource::get returns */
+#define FIELD_EFFECT_LISTS 9u     /* +0x24 */
+#define FIELD_SECOND_EFFECT_LISTS 10u  /* +0x28 */
+
+/* The per-id effect-list counts: two u16 at 0x00fb7a70 + id*4, the number of path slots
+ * enemyResource::effectLists (0x00c0b830) reads from the record's +0x24 and +0x28 fields.
+ * Neither field is null-terminated, so this table is their length. */
+#define EFFECT_LIST_COUNTS 0x00fb7a70u
 
 static const uint8_t field_slots[RECORD_FIELDS] = {1, 6, 1, 6, 2, 2, 1, 1, 4, 1, 1};
 static const uint8_t field_ends_at_null[RECORD_FIELDS] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0};
@@ -168,11 +186,20 @@ static const uint16_t field_kinds[RECORD_FIELDS][RECORD_SLOTS_MAX] = {
     {MHUC_FILES_EFL},                                               /* +0x28 second effect list */
 };
 
+/* The kind of file a slot holds. The effect-list and second-effect-list fields are
+ * MHUC_FILES_EFL at every one of their (per-id) slots; the other fields use the table. */
+static uint16_t slot_kind(unsigned f, unsigned k) {
+    if (f == FIELD_EFFECT_LISTS || f == FIELD_SECOND_EFFECT_LISTS) {
+        return MHUC_FILES_EFL;
+    }
+    return k < RECORD_SLOTS_MAX ? field_kinds[f][k] : 0;
+}
+
 /* Whether a slot's path is the port's (rewrite the id) or the stand-in's (copy it as it is):
  * its kind must be in the port's `files`, and a motion slot must be one of the slots its
  * `motions` names, because a port keeps MH4U's path for the slots it does not ship. */
 static int slot_is_ours(const MhucMonsterId *row, unsigned f, unsigned k) {
-    const uint16_t kind = field_kinds[f][k];
+    const uint16_t kind = slot_kind(f, k);
     if (!(kind & row->files)) {
         return 0;
     }
@@ -206,6 +233,7 @@ typedef struct HookInfo {
 typedef struct PortedRecord {
     uint32_t address;   /* guest address of the 0x2c record, 0 until it is built */
     int warned;         /* the first failure was logged already */
+    uint16_t slots[RECORD_FIELDS];  /* path slots each field was built with */
 } PortedRecord;
 
 static const MH4UPluginHost *host;
@@ -508,10 +536,21 @@ static char staged[RECORD_FIELDS][RECORD_SLOTS_MAX][PATH_MAX];
 
 /* Builds one registered id's record from its stand-in's in guest memory: the same fields and
  * slots; a path the port ships is rewritten to its id, the other kinds keep the stand-in's.
- * Returns the record's guest address, or 0. */
-static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row) {
+ * `slots_out` receives each field's slot count. Returns the record's guest address, or 0. */
+static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row, uint16_t *slots_out) {
     const uint32_t src = host->read32(call, ENEMY_RESOURCE_INDEX + row->stand_in * 4u);
     if (!src) {
+        return 0;
+    }
+    unsigned slots[RECORD_FIELDS];
+    for (unsigned f = 0; f < RECORD_FIELDS; f++) {
+        slots[f] = field_slots[f];
+    }
+    const uint32_t counts = host->read32(call, EFFECT_LIST_COUNTS + row->stand_in * 4u);
+    slots[FIELD_EFFECT_LISTS] = counts & 0xffffu;
+    slots[FIELD_SECOND_EFFECT_LISTS] = counts >> 16;
+    if (slots[FIELD_EFFECT_LISTS] > RECORD_SLOTS_MAX
+        || slots[FIELD_SECOND_EFFECT_LISTS] > RECORD_SLOTS_MAX) {
         return 0;
     }
     size_t words = 0, text = 0;
@@ -521,8 +560,8 @@ static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row) {
         if (!field) {
             continue;
         }
-        words += field_slots[f];
-        for (unsigned k = 0; k < field_slots[f]; k++) {
+        words += slots[f];
+        for (unsigned k = 0; k < slots[f]; k++) {
             const uint32_t slot = host->read32(call, field + k * 4u);
             if (!slot) {
                 if (field_ends_at_null[f]) {
@@ -532,7 +571,7 @@ static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row) {
                  * against Great Jaggi's four lists. The converter names the port's motion
                  * lists by id and slot, so the record can name it with no stand-in path to
                  * rewrite. */
-                if (field_kinds[f][k] == MHUC_FILES_MOTIONS && slot_is_ours(row, f, k)) {
+                if (slot_kind(f, k) == MHUC_FILES_MOTIONS && slot_is_ours(row, f, k)) {
                     const int n = snprintf(staged[f][k], PATH_MAX, "enemy\\em%03u\\mot\\em%03u_%u",
                                            (unsigned)row->id, (unsigned)row->id, k);
                     if (n > 0 && (size_t)n < PATH_MAX) {
@@ -561,10 +600,12 @@ static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row) {
         const uint32_t field = host->read32(call, src + f * 4u);
         if (!field) {
             host->write32(call, block + f * 4u, 0);
+            slots_out[f] = 0;
             continue;
         }
         host->write32(call, block + f * 4u, slot_at);
-        for (unsigned k = 0; k < field_slots[f]; k++) {
+        slots_out[f] = (uint16_t)slots[f];
+        for (unsigned k = 0; k < slots[f]; k++) {
             if (!staged[f][k][0]) {
                 host->write32(call, slot_at + k * 4u, 0);
                 continue;
@@ -577,7 +618,7 @@ static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row) {
                 }
             }
         }
-        slot_at += field_slots[f] * 4u;
+        slot_at += slots[f] * 4u;
     }
     return block;
 }
@@ -588,7 +629,7 @@ static void build_one(MH4UCall *call, const MhucMonsterId *row, PortedRecord *re
     if (record->address) {
         return;
     }
-    record->address = build_record(call, row);
+    record->address = build_record(call, row, record->slots);
     if (!record->address && !record->warned) {
         char line[200];
         record->warned = 1;
@@ -619,16 +660,16 @@ static int build_records(MH4UCall *call) {
 }
 
 /* The paths a built record names, read back from guest memory for the self-test. */
-static void record_paths(MH4UCall *call, uint32_t record, char *out, size_t size) {
+static void record_paths(MH4UCall *call, const PortedRecord *record, char *out, size_t size) {
     char path[PATH_MAX];
     size_t used = 0;
     out[0] = '\0';
     for (unsigned f = 0; f < RECORD_FIELDS; f++) {
-        const uint32_t field = host->read32(call, record + f * 4u);
+        const uint32_t field = host->read32(call, record->address + f * 4u);
         if (!field) {
             continue;
         }
-        for (unsigned k = 0; k < field_slots[f]; k++) {
+        for (unsigned k = 0; k < record->slots[f]; k++) {
             const uint32_t slot = host->read32(call, field + k * 4u);
             if (!slot || !read_text(call, slot, path, sizeof path)) {
                 continue;
@@ -1312,7 +1353,7 @@ static void self_test_text(MH4UCall *call) {
  * a synthetic quest. The hooks use the same records, so this shows what they will do for 124
  * up, for a lent pooled byte, and that 0 to 123 are left alone. */
 static void self_test(MH4UCall *call) {
-    char ids[96], path[160], line[640], texts[512], ships[160], keeps[160];
+    char ids[96], path[160], line[4400], texts[4096], ships[160], keeps[160];
     size_t used = 0;
     ids[0] = '\0';
     for (int i = 0; i < MHUC_MONSTER_COUNT; i++) {
@@ -1337,7 +1378,7 @@ static void self_test(MH4UCall *call) {
             say(MH4U_LOG_WARNING, line);
             continue;
         }
-        record_paths(call, records[i].address, texts, sizeof texts);
+        record_paths(call, &records[i], texts, sizeof texts);
         snprintf(line, sizeof line, "self-test: id %u resource record at 0x%08x, built from "
                  "stand-in %u, names: %s", (unsigned)row->id, (unsigned)records[i].address,
                  (unsigned)row->stand_in, texts);
