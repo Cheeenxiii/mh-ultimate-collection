@@ -43,7 +43,7 @@ It reads five inputs:
 - **the stage number:** `byte[*(0x00fb6b7c)+0xc8c]` (`sGameControl`+0xc8c), used to override themes on stages 7, 11 and 12;
 - **Gogmazios's phase:** `byte[sound+0x1838]`, set to 1 at `0x308fc4`..`0x308fe8` when the monster's work block `+0xca` is 1 (the phase-2 roar);
 - **the Speartip Crag arena check** for ids 24 and 110: `0x6c3b60(*(0x00fcf45c), 1, 1)`, true once the arena's first breakable is broken (Definitive Edition reads it as kobj 1, area 1, state `+0xb1` of the stage's k00), which picks id 12 over 11;
-- **a check for id 82:** `0x6b9160(*(0x00fbeffc))`, which picks its own theme 39 over 13.
+- **a quest check for id 82:** `0x6b9160(*(0x00fbeffc))`, which picks its own theme 39 over 13. The argument is the quest holder (`[0x00fbeffc]`, the object whose status byte is `+0xad24`), and the function returns 1 iff the u32 at `+0xad50` — the running quest's id — is `0x3ea` (1002). `0x6b3c84` is the same body with 100, and `0x6b3ca0` and `0x6b3cd4` test 101 and 102 behind a flag bit (`+0xad64` bit 0x800); `aQuest::playing` (`0x0065c18c`) reads the 100 and 1002 ones as "the quest ends at once" ([the fork's second-screen notes](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/docs/research/second-screen.md)).
 
 Who calls it:
 
@@ -63,7 +63,7 @@ The switch covers ids 0 to 123. Every id not listed in the table returns kind 1,
 |---|---|---|
 | 1, 11 | every id not listed here or below | the stage `.stq`'s id 11, `bgm_stage_NN` (stage 19 has no id 11, so its lookup finds no sequence) |
 | 2, 11 | 11, 12, 80, 121 | `bgm_em011` |
-| 2, 13 | 31; 82 while its check is false | `bgm_em031` |
+| 2, 13 | 31; 82 unless the current quest is 1002 | `bgm_em031` |
 | 2, 14 | 33 | `bgm_em033` |
 | 2, 15 | 19, 45, 112 | `bgm_em019` |
 | 2, 16 | 30 | `bgm_em030` |
@@ -86,14 +86,30 @@ The switch covers ids 0 to 123. Every id not listed in the table returns kind 1,
 | 2, 35 | 117 | `bgm_em117` |
 | 2, 36 | 116 | `bgm_em116` |
 | 2, 37 | 103 | `bgm_em103` |
-| 2, 39 | 82 while its check is true | `bgm_em082` |
+| 2, 39 | 82 in quest 1002 | `bgm_em082` |
 | 1, 12 | 24, 110 while the arena check is true | the stage `.stq`'s id 12; on stage 8, `bgm_em024_2` |
 | 1, 11 | 24, 110 while the arena check is false | the stage `.stq`'s id 11; on stage 8, `bgm_em024` |
 | 255, 0 | 83, 111 | none |
 
-**Stages 7, 11 and 12 override the theme of 23 ids** to kind 1, theme 11 (the stage's own battle theme): 11, 12, 13, 14, 15, 16, 25, 28, 29, 30, 34, 35, 44, 47, 48, 49, 80, 88, 94, 97, 114, 121, 122. Every other id keeps its answer on those stages.
+**Stages 7, 11 and 12 override the theme of 23 ids** to kind 1, theme 11 (the stage's own battle theme): 11, 12, 13, 14, 15, 16, 25, 28, 29, 30, 34, 35, 44, 47, 48, 49, 80, 88, 94, 97, 114, 121, 122. Every other id keeps its answer on those stages. The three are the Tower Summit, the Arena and the Slayground; the themes they play are in [The stages that override a monster's theme](#the-stages-that-override-a-monsters-theme).
+
+Id 82's check is a quest check, not a stage one: `0x30e348` sends id 0x52 (82) to `0x30e5ac`, which loads `*(0x00fbeffc)` and calls `0x6b9160`; that returns 1 iff the u32 at `+0xad50` is 1002, and `0x30e5b8`..`0x30e5cc` write theme 0x27 (39, `bgm_em082`) or 0xd (13, `bgm_em031`). Quest 1002 is "Kushala Kushowdown": its `.mib` carries quest id 1002, map 19 (the Battlequarters) and monster 82. The other quests that field id 82 — 11023 and 11038 ("Advanced: Winds of Discord") and 11024 ("Operation Rust Remover") — are not 1002, so `bgm_em082` plays only in the one quest. Id 82 is MH4U's other Kushala Daora id: it shares `uEm031` with id 31 ([reference/README.md](../reference/README.md#ids-and-classes)).
 
 43 of the 124 ids have a theme of their own (kind 2); 79 fall back to their stage's theme; 2 have none.
+
+### The stages that override a monster's theme
+
+The stage check is the selector's first block, before the switch. It computes the stage as `byte[*(0x00fb6b7c)+0xc8c]` (`0x30e164`..`0x30e168`) and compares it with 11, 12 and 7 (`0x30e16c`..`0x30e174`). On one of those it tests the monster id against 23 constants (`0x30e17c`..`0x30e2ec`); a match writes kind 1 and theme 11 (`0x30e438`), the stage's own battle theme in place of the monster's, and returns. Every other id falls through to the switch and keeps its answer.
+
+The stage number is the quest file's map id ([specs/quest.md](../specs/quest.md)): 7 is the Tower Summit, 11 the Arena and 12 the Slayground. A kind 1 answer is looked up in the stage's `.stq`, whose path the loader `0x3099c8` takes from the pointer table at `0x00f00624` by the stage number (kind 1 branch at `0x309a28`; stages above 21 are refused, `cmp r3, #0x15`; the pointer is loaded at `0x309a98`, `ldr r4, [r2, r3, lsl #2]`):
+
+| Stage | Locale | Stream request | What theme 11 plays |
+|---|---|---|---|
+| 7 | Tower Summit | `bgm_st_07` | `bgm_stage_07` (id 10 is `bgm_map_07`) |
+| 11 | Arena | `bgm_st_11` | `bgm_stage_11` (id 10 is `bgm_map_11`; id 12 is `bgm_selectchara`) |
+| 12 | Slayground | `bgm_st_11`: the table's row 12 holds row 11's pointer | `bgm_stage_11` |
+
+So on the Tower Summit the 23 ids play `bgm_stage_07`, and on the Arena and the Slayground they play `bgm_stage_11`.
 
 ### The two stream requests
 
@@ -103,12 +119,12 @@ Both are `rLtSoundStreamRequest` resources, and both hold the sequence in a 36-b
 - **`sound/bgm/stage/bgm_st_NN.stq`**: one per stage that has battle music (15 files: stages 1 to 8, 10, 11, 13, 15, 17, 18 and 19; stage 12 uses `bgm_st_11`; 9, 14 and 16 have none). Each has id 10 as the camp jingle (`bgm_map_NN`) and id 11 as the stage's battle theme (`bgm_stage_NN`). Some stages replace id 11 with a monster's theme: stage 6 has `bgm_em046` and `bgm_em046_2` at 11 and 12 and `bgm_Eiyu` at 13, stage 8 has `bgm_em024` and `bgm_em024_2` at 11 and 12, and stage 10 has `bgm_em077` at 11. Stage 19 has only the jingle; there a kind 1 lookup finds no sequence, and only a kind 2 theme (Gogmazios's) plays from the battle `.stq`.
 - **Which file is loaded:** `sSoundControl` keeps the loaded requests at `sound+0x1674` (common), `+0x1678` (stage), `+0x167c` (`bgm_bat`), `+0x1680`/`+0x1684` (event), `+0x1688` (area streams), `+0x168c` (lobby), `+0x1690` (system) and `+0x1694` (download). Its loader `0x3099c8` takes a kind 0 to 8; kind 2 loads `bgm_bat` from the path at `0x00f006a4`, kind 1 loads the stage's `.stq` from the path table at `0x00f00624` indexed by stage, and kind 5 loads the area's stream request from the table at `0x00f005b0`. The paths are the game's own strings the resource manager resolves.
 
-So a monster theme is **not** in the quest, in the stage's data or in a per-monster file: the quest only supplies the monster id, and the selector maps that id to (kind, sequence id). The stage matters twice: it filters 23 ids on stages 7, 11 and 12, and, for kind 1, it chooses which stage's `.stq` holds the sequence.
+So a monster theme is **not** in the quest, in the stage's data or in a per-monster file: the quest only supplies the monster id, and the selector maps that id to (kind, sequence id). The stage matters twice: it filters 23 ids on stages 7, 11 and 12 (the Tower Summit, the Arena and the Slayground), and, for kind 1, it chooses which stage's `.stq` holds the sequence.
 
 ### What a new monster must add
 
 1. **Its id, in the usual places.** The quest's monster list and the id-indexed tables ([reference/README.md](../reference/README.md#mh4u-monster-tables), [decisions.md](decisions.md#0003-id-allocation-and-mod-saves)). The theme follows the id; no sound data goes in the quest.
-2. **A selector answer for the id.** The switch has no row for a new id, so it returns kind 1, theme 11. A plugin hooks `0x30e148` and answers for the new id instead. Kind 2 for a theme of its own; kind 1 if it should share its stage's battle theme; 255 for none. A phase, like Gogmazios's, is a second answer for the same id, keyed on `sound+0x1838` or on the monster's own state.
+2. **A selector answer for the id.** The switch has no row for a new id, so it returns kind 1, theme 11. A plugin hooks `0x30e148` and answers for the new id instead. Kind 2 for a theme of its own; kind 1 if it should share its stage's battle theme; 255 for none. A phase, like Gogmazios's, is a second answer for the same id, keyed on `sound+0x1838` or on the monster's own state. The stage override runs before the switch: on stages 7, 11 and 12 the game returns (1, 11) for its 23 ids whatever their own theme, so a hook for a ported id must copy that rule there if the port should follow the arena's theme.
 3. **A stream and a sequence in the stream request the kind selects.** For kind 2, add the theme to `bgm_bat.stq`: a stream record for the `.mca` and a sequence record with an unused id (12, 24 and 25 carry no stream, or append an id past 39 and raise the count), its volume and its stream index. Copy the other words the game reads ([specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table), S7) from an existing row whose type at +0x08 fits; the type is what picks the track setup. For kind 1, add it to that stage's `bgm_st_NN.stq` at id 11 or 12, as the boss stages do. Nothing else in the game names the theme.
 4. **The wave.** The `MADP` `.mca` in `sound/bgm/battle/wav/` (kind 2) or `sound/bgm/stage/wav/` (kind 1), at the path the stream record gives, with the size, samples, channels, rate and loop the record repeats.
 5. **Its own sound bank and requests**, as for any ported monster; the theme is separate from those.
@@ -120,7 +136,7 @@ A monster that reuses its stage's battle theme needs only steps 1, 2 (kind 1) an
 - **The selector:** read in MH4U USA v1.3.0's `code.bin`. Its answer for every id 0 to 123 was produced by running the function under Unicorn with a stand-in `sSoundControl`, stage 1 and stage 7, and phase states 0, 1 and 2, with the two conditional helpers forced both ways. The addresses above are the entry points; the table is the emulator's output, cross-checked against the stream names in `bgm_bat.stq` and the stage `.stq` files.
 - **The `.stq` tables:** every `.stq` in MH4U USA v1.3.0's RomFS was parsed with the layout in [specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table) and each stream record's file size, sample count, channels, rate, loop start and loop end was compared with the `MADP` header of the `.mca` it names: all 497 loose streams agree. Only counts and names are recorded, never bytes.
 - **The sequence record and the index:** check S7 reads the loader (0x004044b0), its index builder (0x00404310), the lookup (0xcebb8c), `sSoundControl`'s loader (0x003099c8) and the sequence driver (0xbd0ea8), counts every field over all 214 files, and records which words have a reader and which don't.
-- **Still open:** the meaning of `0x6b9160`'s check for id 82, and which of stages 7, 11 and 12 are which locales (the stage's path table shows 12 uses `bgm_st_11`).
+- **The stage overrides and id 82's quest check:** read in the same code, instruction by instruction, with capstone on the decompressed `code.bin` (base 0x00100000). The stage block is `0x30e164`..`0x30e19c` and its 23 ids `0x30e17c`..`0x30e2ec` (the answer at `0x30e438`); the Unicorn run above covered stages 1 and 7, and, with the conditional helpers forced both ways, id 82 with its check true and false. The stage rows are the pointers in the table at `0x00f00624` (row 12 equals row 11), and `mhuc stq` read the two `.stq` files the three rows name. The locale names are the map ids' locales in [specs/quest.md](../specs/quest.md) (checks Q7 and Q20), not strings the stage code carries. For id 82: `0x30e348` sends id 0x52 (82) to `0x30e5ac`, which loads `*(0x00fbeffc)`, calls `0x6b9160` and writes 0x27 or 0xd; `0x6b9160`, `0x6b3c84`, `0x6b3ca0` and `0x6b3cd4` compare the u32 at the holder's `+0xad50` with 1002, 100, 101 and 102; `mhuc quest dump mh4u` read all 508 `.mib` of MH4U's two quest archives: four quest ids field id 82 — 1002, 11023, 11024 and 11038 — and only 1002's `.mib` (`m01002`) carries map 19 and monster 82. Verified: the three stage values and the 23 ids, the `.stq` rows, the holder field's value and the branch. Not verified: the musical reason id 82 gets `bgm_em082` only in quest 1002 while the other quests that field it keep `bgm_em031`; the code only says which quest.
 
 
 ## Memory
