@@ -20,6 +20,8 @@ id). Names and counts only; nothing here is read from a game file by the reader 
 | `verdict` | `differs`, `doesn't differ` or `not decided` |
 | `source_url` | the wiki page the row's name comes from |
 
+**These verdicts are provisional.** They follow the first reading of decision 0004's amendment, where any extra action or rig difference made a version differ. The maintainer refined the rule to what a player would easily notice; [#129](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/129) redoes the verdicts under it, and until then no id is given out on the strength of this table.
+
 ## How the verdict is made
 
 **Which monster pairs with which file.** MH3U's ids are paired with MH4U's in
