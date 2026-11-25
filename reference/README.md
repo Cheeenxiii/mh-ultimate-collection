@@ -40,8 +40,8 @@ This page also records what has been established about the engines. Addresses ar
 
 | Game | Code | Recompile | Check against the original |
 |---|---|---|---|
-| MH3U (3DS, USA) | `code.bin` | every function | gametest: 33,272 of 33,283 agree, the rest are test limits; none returns a different state |
-| MHXX (3DS, v1.4) | `code.bin` plus 109 CRO modules (every monster, weapon type, village…) | everything, modules at fixed bases in one library | module test: all 109 modules, no difference in state, memory or exit |
+| MH3U (3DS, USA) | `code.bin` | every function | gametest: 33,275 of 33,283 agree, the other 8 are test limits (6 run over the instruction budget, 2 read an inline descriptor); none returns a different state |
+| MHXX (3DS, v1.4) | `code.bin` plus 109 CRO modules (every monster, weapon type, village…) | everything, modules at fixed bases in one library | module test: all 109 modules loaded, 36,665 functions in 108 of them (`roPlayerQuest05` has none), one test limit; no difference in state, memory or exit |
 | MHGU (Switch, v1.4.0) | `main`, 32-bit ARM, monsters linked statically | not recompiled | used for matching functions only |
 
 ## Class registries
@@ -554,3 +554,16 @@ The procedure is enough to rewrite the scripts, which stay outside the repositor
 4. **From GMD tables.** The monster-name GMD's string count is an upper bound for monster ids that have names.
 5. **Heaps.** The resource and unit managers are created early in start-up (MH4UltimateDC's docs/research/system-services.md covers the main systems); their sizes are constants passed to their constructors. Record which heap a monster's resources come from.
 6. **Record each table** as: name, address (USA v1.3.0), row size, row count, what indexes it, the functions that read it. Addresses and sizes are fine to commit (LEGAL.md); contents are not.
+
+### Recompiling and testing a reference game
+
+The checks reported in [The reference games](#the-reference-games) are run like this. A recompiled function is not trusted: it runs against the original code in Unicorn from the same random states, and the two must agree on registers, flags, VFP state, writable memory and exit.
+
+1. Extract the dump (`tools/extract_ncch.py`) and compare it with the game's `game.json` (`tools/verify_dump.py`); `recompile_game.py` and `recompile_module.py` also refuse code whose sha1 is not the one `game.json` names.
+2. Static code: `python3 reference/recompile_game.py <game> --exheader <work>/exheader.bin --code <work>/code.bin -o <build>`. It prints the function count, the instructions analysed, the entry points found through data pointers, and any problems.
+3. Library: from the fork's `tools/`, `python3 -m recomp.build <build> --harness --opt O0 -j 4 -o game.so`.
+4. Test: `python3 -m recomp.gametest --lib <build>/game.so --exheader <work>/exheader.bin --code <work>/code.bin --cases 4 --shard <i>/4`, for i 0 to 3; the shards' verdicts add up. A verdict is a test limit when it is `inconclusive` (over the instruction budget), `protocol` (an inline descriptor, tested through its callers), or `native-nofunc` for an indirect call the random state aims outside the function table; every other verdict is a difference.
+5. MHXX's modules: `python3 reference/recompile_module.py --game mhxx --exheader <work>/exheader.bin --code <work>/code.bin --crs <romfs>/modules_MasterRelease/static.crs -o <build> <romfs>/modules_MasterRelease/*.cro` recompiles them with the static code, then build the library as above and test it with `python3 reference/modtest.py --build <build> --exheader <work>/exheader.bin --code <work>/code.bin --crs <romfs>/modules_MasterRelease/static.crs <romfs>/modules_MasterRelease/*.cro --cases 4`.
+6. MHXX's `reference/games/mhxx/extra_entries.txt` lists the 4,256 static functions the modules branch to; `recompile_module.py --static-entries <out>` regenerates it, and it must stay identical. The static recompile reads it.
+
+MH3U gives 33,283 functions: 33,275 agree, 6 run over the budget and 2 read a descriptor, and none differs in state, memory or exit. MHXX gives 109 modules, 36,665 functions in 108 of them (`roPlayerQuest05` has none): 20,718 pass, 15,768 fault the same way in both, 178 run over the budget, one is a test limit in `roEm060` (an indirect call through a pointer taken from the random state), and none differs in state, memory or exit.
