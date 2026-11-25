@@ -338,7 +338,7 @@ def material_file(signature: int = mrl.SIGNATURES["mh3u"],
 
 def source_archive(texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
     """A small MH3U-style monster archive: one model, its material naming one texture, and a motion list."""
-    model = struct.pack("<4sHHHHII", b"MOD\0", 0xE6, 0, 0, 0, 0, 0)
+    model = struct.pack("<4sHHHHII", b"MOD\0", 0xE6, 0, 0, 0, 0, 0) + bytes(0x40 - 20)
     material = material_file(texture=texture)
     entries = [
         arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rModel"), model),
@@ -379,6 +379,52 @@ def test_monsterassets_refuses_a_material_naming_a_texture_the_mod_does_not_hold
     """the conversion checks the material's paths against what it builds, so a stale name fails here, not in game"""
     with pytest.raises(monsterassets.ConvertError, match="em125_02_BM"):
         monsterassets.convert(source_archive(texture=b"enemy\\em001\\mod\\em001_02_BM"), 125)
+
+
+def model_naming(name: bytes) -> bytes:
+    """A 0x40-byte MOD header with one material, its 0x80-byte name right after it."""
+    d = bytearray(0x40 + 0x80)
+    struct.pack_into("<4sHHHHII", d, 0, b"MOD\0", 0xE6, 0, 0, 1, 0, 0)
+    struct.pack_into("<I", d, 0x30, 0x40)
+    d[0x40:0x40 + len(name)] = name
+    return bytes(d)
+
+
+def material_keyed(key: int) -> bytes:
+    """An MRL with one material record, keyed by `key` (specs/mrl.md)."""
+    d = bytearray(0x20 + 0x3C)
+    d[:4] = b"MRL\0"
+    struct.pack_into("<III", d, 4, 0x20, 1, 0)
+    struct.pack_into("<III", d, 0x10, mrl.SIGNATURES["mh3u"], 0x1C, 0x1C)  # signature, blocks
+    struct.pack_into("<I", d, 0x20, key)                 # the record block points 4 bytes before the key
+    return bytes(d)
+
+
+def bound_archive(name: bytes, key: int) -> bytes:
+    entries = [
+        arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rModel"), model_naming(name)),
+        arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rMaterial"), material_keyed(key)),
+        arc.Entry("enemy\\em001\\mot\\mot_em001_000", classid.class_id("rMotionList"),
+                  lmt_version_66_to_convert()),
+    ]
+    return arc.write(arc.Archive(0x10, entries))
+
+
+def test_mrl_material_key_is_the_crc32_with_no_final_inversion():
+    """the engine keys a material by `crc32_string(~0, name)` (specs/mrl.md, check MR2); the CRC-32 of
+    the published test vector "123456789" is 0xCBF43926, so its key is the inverted word"""
+    assert mrl.material_key(b"123456789") == 0x340BC6D9
+
+
+def test_monsterassets_refuses_a_material_whose_record_key_is_not_its_models_name():
+    """the model's name and the material's key are the binding (specs/mrl.md, checks MR2 and MR4): copy both
+    from one source and they agree; give one a different name and the engine finds no material"""
+    assert monsterassets.unbound_materials(model_naming(b"body"), material_keyed(mrl.material_key(b"body"))) == []
+    names = monsterassets.material_names(model_naming(b"body"))
+    assert names == [b"body"]
+    with pytest.raises(monsterassets.ConvertError, match="body"):
+        monsterassets.convert(bound_archive(b"body", mrl.material_key(b"other")), 125)
+
 
 
 def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():

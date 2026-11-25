@@ -83,3 +83,9 @@ source's.
   is 0 through the load, where the source signature stalled it. The ported model still does not
   draw, which is the model's binding to the material, not the material's load. Procedure in
   [checks.md](../docs/checks.md#a-converted-material-loads-m3).
+- **MR4 (done, 2026-11-25, static):** every model/material pair of every monster archive of MH4U
+  (`/data/emNNN.arc`, 123 archives) and MH3U (`/arc/enemy/emNNN.arc`, 85 archives). For every
+  `rModel` with an `rMaterial` at the same path (270 and 409 pairs), every name in the model's
+  material table hashes to one of the material file's record keys; no name was unbound. The 5 and
+  1 files that hold more records than their model's names still bind every name. Procedure:
+  `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k every_material_a_monster`.

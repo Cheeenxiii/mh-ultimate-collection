@@ -11,7 +11,8 @@ that archive for a ported id:
   loader only accepts the signature its own files carry at 0x10: MH4U's rMaterial load checks it and rejects
   a foreign one, which leaves the archive it came in unloaded ([mrl.md](../specs/mrl.md)). The converter
   writes MH4U's signature and moves the absolute texture paths in place; the material names, which hash to
-  the file's material records, stay the source's.
+  the file's material records, stay the source's, so the model still binds them ([mrl.md](../specs/mrl.md),
+  checks MR2 and MR4); the conversion checks that it does.
 - **motion lists are converted** from LMT version 66 to version 67, the version MH4U reads
   ([lmt.md](../specs/lmt.md), `lmt.convert`).
 - **the rest is left out** and why is in docs/architecture.md: the monster's data files become MH4U's `.emd`
@@ -25,9 +26,10 @@ from __future__ import annotations
 
 import os
 import re
+import struct
 from dataclasses import dataclass
 
-from .formats import arc, lmt, mrl
+from .formats import arc, lmt, mod, mrl
 
 MODEL, MATERIAL, TEXTURE, MOTION = "rModel", "rMaterial", "rTexture", "rMotionList"
 TAKEN = (MODEL, MATERIAL, TEXTURE)          # same versions in MH3U and MH4U; paths and the material's signature change
@@ -92,6 +94,28 @@ def _material(data: bytes, stem: str, target: str) -> bytes:
         raise ConvertError(f"the material is not an MRL 0x20 file: {e}") from None
 
 
+def material_names(model: bytes) -> list[bytes]:
+    """The NUL-terminated 0x80-byte names in a model's material table (MOD header +0x30, specs/mod.md)."""
+    try:
+        h = mod.header(model)
+    except (mod.ModError, struct.error) as e:
+        raise ConvertError(f"the model's header doesn't read: {e}") from None
+    at = h["materials_at"]
+    if at + 0x80 * h["materials"] > len(model):
+        raise ConvertError("the model's material table runs past the end of the file")
+    return [model[at + 0x80 * i: at + 0x80 * (i + 1)].split(b"\0")[0] for i in range(h["materials"])]
+
+
+def unbound_materials(model: bytes, material: bytes) -> list[bytes]:
+    """The model's material names the material file has no record keyed by, i.e. the materials the
+    engine's lookup (rMaterial at 0x00be6e88: `crc32_string(~0, name)`) cannot find. Both files are
+    the source's, so this passes while their names and records are kept together."""
+    try:
+        return mrl.unbound(material, material_names(model))
+    except mrl.MrlError as e:
+        raise ConvertError(f"the material doesn't read: {e}") from None
+
+
 def convert(src: bytes, monster_id: int) -> Mod:
     """The mod for `monster_id` (124 and up, [data/ids](../../data/ids/README.md)) from the source archive."""
     if not 1 <= monster_id < 1000:
@@ -119,7 +143,9 @@ def convert(src: bytes, monster_id: int) -> Mod:
 
 
 def _check(entries: list[arc.Entry], src: arc.Archive, stem: str, target: str) -> None:
-    """Refuse a mod the game can't read: no model, material or motion, or a texture a material names is absent."""
+    """Refuse a mod the game can't read: no model, material or motion, a texture a material names
+    is absent, or a material record the model's names can't bind (specs/mrl.md, checks MR2
+    and MR4)."""
     kinds = {e.type_name for e in src.entries}
     for kind in (MODEL, MATERIAL, MOTION):
         if kind not in kinds:
@@ -127,8 +153,17 @@ def _check(entries: list[arc.Entry], src: arc.Archive, stem: str, target: str) -
     if not any(e.type_name == MODEL for e in entries):
         raise ConvertError(f"no model under enemy\\{stem}\\mod\\")
     paths = {e.path for e in entries}
+    materials = {e.path: e for e in entries if e.type_name == MATERIAL}
     for e in entries:
         if e.type_name == MATERIAL:
             for path in TEXTURE_PATH.findall(e.data):
                 if path.decode("ascii") not in paths:
                     raise ConvertError(f"{e.path} names {path.decode('ascii')}, which the mod doesn't hold")
+        elif e.type_name == MODEL and e.path in materials:
+            material = materials[e.path]
+            missing = unbound_materials(e.data, material.data)
+            if missing:
+                named = ", ".join(name.decode("ascii", "replace") for name in missing)
+                raise ConvertError(f"{e.path} names the materials {named}, which {material.path} has "
+                                   "no record keyed by: the engine keys each record by the inverted "
+                                   "CRC-32 of the model's name (specs/mrl.md, checks MR2 and MR4)")
