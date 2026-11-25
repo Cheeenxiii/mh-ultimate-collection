@@ -122,7 +122,8 @@ MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
 - **The data path** stays the stand-in's until the ports ship MH4U-format `.emd`/`.etd`.
 - **The pool's real path.** No pooled monster ships and no quest names one yet, so the quest
   start and end hooks have only run against the synthetic `.mib` of check P1; a real quest with
-  a pooled monster is check P2 and is not done. A quest that never reaches its end sequence
+  a pooled monster is check P2 and is not done, and whether the post-quest screens still read
+  the tables after the end sequence is unverified. A quest that never reaches its end sequence
   keeps its bytes until the next quest starts.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
   stand-in, and the monster's data block still holds the stand-in's own id byte, so a spawned

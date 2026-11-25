@@ -715,13 +715,11 @@ static int lend_quest(MH4UCall *call, uint32_t quest, uint32_t data) {
 static void quest_start_reader(MH4UCall *call, void *user) {
     (void)user;
     const uint32_t id = next_quest_id(call);
-    if (id) {
+    if (id && MHUC_POOLED_MONSTER_COUNT > 0) {
         const uint32_t data = quest_data(call, id);
         if (data) {
-            if (MHUC_POOLED_MONSTER_COUNT > 0) {
-                lend_quest(call, id, data);
-            }
-        } else if (MHUC_POOLED_MONSTER_COUNT > 0 && (warned_quest != id || !warned_no_data)) {
+            lend_quest(call, id, data);
+        } else if (warned_quest != id || !warned_no_data) {
             char line[200];
             warned_quest = id;
             warned_no_data = 1;
