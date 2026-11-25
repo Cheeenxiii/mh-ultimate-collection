@@ -96,6 +96,7 @@ Sounds and music come from each piece of content's own game and play through MH4
 - MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1), so 3U's sound needs a version-aware reader or a conversion.
 - MHXX uses the next generation of classes, shared with MHGU on Switch: its waves are MH4U's version, its banks and requests are GU's.
 - MH4U's layouts come from MHGU Definitive Edition and are unverified ([specs/sound.md](../specs/sound.md)).
+- **There is no separate sound heap.** MH4U loads banks, requests and waves from the 47 MiB Resource heap it shares with every other non-drawing resource; the SoundBuffer allocator is an alias of Resource ([audio.md](audio.md#memory)).
 
 What the mod needs, what is known and the unknowns: [audio.md](audio.md).
 

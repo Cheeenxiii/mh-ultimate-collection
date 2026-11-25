@@ -22,13 +22,41 @@ Every sound and piece of music the mod adds comes from its source game's files, 
 - **Code asks for request ids.** A monster's code and its motions' sound events name request ids, resolved through its own request file, so ids only clash within one loaded set. Area and stage ids are per stage.
 - **Music is per stream request id:** Gogmazios's two phases are ids 32 and 33 of `bgm_bat.stq`. A new theme needs a free id there, or a stream request of its own.
 
+## Memory
+
+MH4U reserves no heap of its own for sound. MT Framework Mobile creates its allocators at start-up from a hardcoded table at 0x00f2bb44, read by 0x0010612c: nine heaps, carved in 4 KiB pages out of the application memory at 0x08000000. The three that concern sound:
+
+| Index | Name | Size | What it holds |
+|---|---|---|---|
+| 11 | Resource | 47 MiB (49,283,072 B) | non-drawing resources: models, motions, sound and the rest |
+| 15 | Sound | no heap | the gameplay sound classes, which fall back to the default "Heap" allocator |
+| 21 | SoundBuffer | aliased to 11 | sound-buffer allocations, on the same Resource heap |
+
+- The sound system object itself, `sLtSound` (0x9d90 bytes), is a `cSystem` (index 12, System 3,316 KiB), but its own size is negligible next to the loaded resources.
+- The class-to-index table built at 0x00104904 gives `cResource` index 11, and `cMHSoundEmitter`, `cMHSoundSequence` and `nMHSoundSequence` index 15. The sound resource classes (`rLtSoundBank`, `rLtSoundRequest`, `rLtSoundSourceADPCM`, `rLtSoundStreamRequest`, `rMHSoundEmitter`, `rMHSoundSequence`) have no row of their own; their class-registry parent is `cResource`, index 11.
+- The alias table at 0x00f2bc1c sends seven derived indices onto the nine heaps: SoundBuffer (21) to Resource (11), Area (14) to Unit (13), Network (17) to System (12), Effect (19), AI (18) and GUI (20) to Unit, and String (2) to Array (3). Nothing creates a heap for Sound (15) and the alias table does not redirect it, so a SOUND-indexed allocation lands on the default heap, the one index 0 uses.
+- The shipped `/memory.ini` says the same for the CTR build: its `[Allocators: CTR]` section makes Resource 47MB, defines `SOUND_BUF = RESOURCE`, and defines no SOUND allocator. Its comment on the PC sections calls SOUND_BUF the sound waveform.
+- The nine heaps total about 61 MiB of application memory: Resource 47 MiB, Unit/Area 7 MiB, System 3,316 KiB, Collision 1,792 KiB, CommandCache 768 KiB, Global 768 KiB, Temp 552 KiB, Array 72 KiB, Develop 100 KiB. A physical allocator of 640 KiB is added at index 5 (0x0010489c).
+
+So loaded banks, requests and waves share the 47 MiB Resource heap with everything else that is not drawing. There is no fixed sound reservation for a larger MH3U or MHXX bank to exceed: it spends the shared heap on demand. [Check SN5](../specs/sound.md#checks-with-game-files) records the addresses and the procedure.
+
+## How much MH4U's monster banks use
+
+The 123 monster ARCs (`/data/emNNN.arc`) carry each monster's sound. The sizes are the decompressed, loaded sizes of the entries:
+
+- 232 `SNDB` banks in all, 4,083,511 B together.
+- Largest single bank: 73,066 B (`em017`).
+- Largest complete sound set: 1,583,089 B (`em110` and `em111`): bank 10,693 B, request 14,860 B, waves 1,557,536 B. That is 3.2 % of the 47 MiB Resource heap, and 0.15 % for the largest bank alone.
+- All 232 monster banks together are 8.3 % of it.
+
+A quest loading two of the largest monsters puts at most about 3.2 MB of monster sound in the shared heap, under 7 % of it. The banks themselves are small; the waves are what take the room.
+
 ## Unknowns
 
 1. Whether MHXX's bank and request layouts match GU's (check S3).
 2. How MH4U picks a monster's theme: a per-monster table, the quest, or the stage.
-3. The `.stq` layout.
-4. The sound memory budget: whether the game reserves a fixed amount for loaded banks and streams, which larger 3U or XX banks could exceed. Where the sound system allocates its heap, in the recompile, says.
-5. How MH3U muffles the mix and swaps the ambience when the hunter dives.
+3. The `.stq` layout, and with it how much of a music stream stays in memory while it plays.
+4. How MH3U muffles the mix and swaps the ambience when the hunter dives.
 
 ## In-game checks, once it runs
 
