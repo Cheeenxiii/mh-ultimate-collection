@@ -498,6 +498,113 @@ Both need guest memory allocation from plugins: the plugin API's `alloc`/`free` 
 
 **Allocating ids, an option:** MHGU Definitive Edition, which adds MH4U monsters to MHGU, keeps every game-wide id a ported monster takes in one file (`allocations.toml`: registry index, monster number, file ids, save slots), each from a pool whose bounds were checked in the game, checked by a script and read by both its C module and its converters. Its rule: ids only ever grow, and an installed monster's ids never move, because saves and quests keep them. The same constraints apply here: a hunter's save keeps per-monster records (mhff's "MH4U user1 Format" lists a monster log of 82 entries of 10 bytes, whose indexing by id is unverified), and quests name monsters by id.
 
+## MH3U's ids to MH4U's
+
+MH3U and MH4U number their monsters differently: MH3U's em006 is MH4U's em099, MH3U's em071 is MH4U's em043, and MH4U's em043 is a Deviljho where MH3U's em043 is a Lagombi. A conversion of a 3U monster needs the pair for every file, so all 85 MH3U ids (`/arc/enemy/emNNN.arc`) are recorded here: 32 have an MH4U monster, 44 are monsters MH4U does not have, and nine are props or placeholders.
+
+**Where the names come from.** Both games carry their own id-indexed monster-name table. MH3U's is `GUI/font/Monster_eng`, a GMD in `/arc/ID/ID_gallery_eng.arc`, whose string N is the name of id N; MH3U's factory groups the same ids by class ([MH3U's factory](#mh3us-factory): 1, 2 and 62-65 on `uEm002`; 7 and 71 on `uEm007`; 25 and 85 on `uEm025`), which agrees with the name table's indexing. MH4U's is `eng/msg/emName_eng` in `/eng/data/core_common.arc`, an rLayoutMessage of 123 UTF-16 messages, whose message N is the name of id N. A shared name is the candidate and the data checks it: every pair below is compared on the 80-byte hitzone table, the base HP, MH3U's part HP and second-level HP against MH4U's part record ([specs/emstatus.md](../specs/emstatus.md), "Part record mapping"), and the attack-volume group count, which `mhuc monsterdata` prints as counts; for MH3U em012 against MH4U em015 (Great Jaggi) it gives `hitzone table: 6 of 8 rows equal`, `part HP: 6 of 8 equal` and `attack volumes: 7 of 8 groups`. The data does not separate every pair: close relatives share most of their tables (MH3U's Rathalos agrees with MH4U's Rathian on 69 of 80 hitzone bytes and with em002 on 61) and small monsters repeat each other's, so the name tables order those; where MH4U gives several ids one name, the data says which is which (below).
+
+In the table's Evidence column, hitzones are bytes of the 80-byte table, part HP and second-level HP are parts of the eight-part record, and the attack-volume groups are MH3U's own count against MH4U's. Each row's MH3U name is MH3U's table's name for that id, and its MH4U name is MH4U's.
+
+| MH3U | Monster | MH4U | Evidence |
+|---|---|---|---|
+| em001 | Rathian | em001 | hitzones 78/80 bytes, part HP 5/8, second HP 7/8, base HP equal, attack-volume groups 18 against 22 |
+| em002 | Rathalos | em002 | hitzones 61/80 bytes, part HP 4/8, second HP 7/8, base HP differs, attack-volume groups 18 against 22 |
+| em006 | Diablos | em099 | hitzones 80/80 bytes, part HP 3/8, second HP 8/8, base HP differs, attack-volume groups 20 against 32 |
+| em007 | Deviljho | em042 | hitzones 79/80 bytes, part HP 8/8, second HP 8/8, base HP equal, attack-volume groups 17 against 22 |
+| em010 | Jaggi | em056 | hitzones 77/80 bytes, part HP 1/8, second HP 8/8, base HP equal, attack-volume groups 3 against 3 |
+| em011 | Jaggia | em057 | hitzones 77/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 3 against 3 |
+| em012 | Great Jaggi | em015 | hitzones 74/80 bytes, part HP 6/8, second HP 8/8, base HP differs, attack-volume groups 7 against 8 |
+| em022 | Delex | em062 | hitzones 77/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 4 against 4 |
+| em027 | Aptonoth | em052 | hitzones 74/80 bytes, part HP 1/8, second HP 8/8, base HP differs, attack-volume groups 4 against 5 |
+| em028 | Popo | em053 | hitzones 74/80 bytes, part HP 1/8, second HP 8/8, base HP differs, attack-volume groups 4 against 5 |
+| em029 | Rhenoplos | em051 | hitzones 76/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 3 against 3 |
+| em030 | Felyne | em065 | hitzones 77/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 2 against 3 |
+| em031 | Melynx | em066 | name only: MH4U's em066 has no `.etd`/`.emd` (its arc loads em065's command) |
+| em033 | Altaroth | em067 | hitzones 76/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 1 against 1 |
+| em034 | Kelbi | em064 | hitzones 77/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 2 against 1 |
+| em036 | Bnahabra | em068 | hitzones 76/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 2 against 2; MH4U's four Bnahabra ids differ only in model and texture, and em068's is the only `.etd`/`.emd` |
+| em037 | Bnahabra | em069 | MH4U's em069-em071 have no `.etd`/`.emd` either (they load em068's command); the four MH3U status files are identical, so em036's check covers them |
+| em038 | Bnahabra | em070 | MH4U's em069-em071 have no `.etd`/`.emd` either (they load em068's command); the four MH3U status files are identical, so em036's check covers them |
+| em039 | Bnahabra | em071 | MH4U's em069-em071 have no `.etd`/`.emd` either (they load em068's command); the four MH3U status files are identical, so em036's check covers them |
+| em041 | Zinogre | em048 | hitzones 54/80 bytes, part HP 1/8, second HP 7/8, base HP differs, attack-volume groups 29 against 32 |
+| em043 | Lagombi | em047 | hitzones 77/80 bytes, part HP 3/8, second HP 8/8, base HP differs, attack-volume groups 19 against 24 |
+| em049 | Slagtoth | em054 | hitzones 74/80 bytes, part HP 1/8, second HP 8/8, base HP differs, attack-volume groups 4 against 5; model 1815 vertices and 4096 indices against em054's 1817 and 4106 (em078's are em055's exactly) |
+| em050 | Gargwa | em050 | hitzones 74/80 bytes, part HP 8/8, second HP 8/8, base HP differs, attack-volume groups 2 against 2 |
+| em058 | Black Diablos | em100 | hitzones 80/80 bytes, part HP 3/8, second HP 8/8, base HP differs, attack-volume groups 20 against 32 |
+| em062 | Pink Rathian | em003 | hitzones 60/80 bytes, part HP 4/8, second HP 7/8, base HP differs, attack-volume groups 18 against 22 |
+| em063 | Gold Rathian | em005 | hitzones 68/80 bytes, part HP 3/8, second HP 8/8, base HP differs, attack-volume groups 18 against 22 |
+| em064 | Azure Rathalos | em004 | hitzones 60/80 bytes, part HP 1/8, second HP 8/8, base HP differs, attack-volume groups 18 against 22 |
+| em065 | Silver Rathalos | em006 | hitzones 64/80 bytes, part HP 2/8, second HP 7/8, base HP differs, attack-volume groups 18 against 22 |
+| em071 | Deviljho | em043 | hitzones 62/80 bytes, part HP 8/8, second HP 7/8, base HP equal, attack-volume groups 17 against 22 |
+| em072 | Stygian Zinogre | em049 | hitzones 60/80 bytes, part HP 1/8, second HP 7/8, base HP differs, attack-volume groups 29 against 32 |
+| em074 | Brachydios | em044 | hitzones 72/80 bytes, part HP 2/8, second HP 7/8, base HP differs, attack-volume groups 11 against 11 |
+| em078 | Slagtoth | em055 | hitzones 74/80 bytes, part HP 1/8, second HP 8/8, base HP equal, attack-volume groups 4 against 5; model 1814 vertices and 4074 indices, em055's exactly |
+
+**Repeated names.** MH4U's table gives one name to several ids, and the files say which is which:
+
+- **Deviljho (em042, em043, em113).** em042 owns `uEm042`; em113 is a second id on the same class whose `.etd` differs from em042's in three words; MH3U's em007 agrees with both on 79 of 80 hitzone bytes and with em043 on 37. em043 is another data set: MH3U's em071 agrees with it on 62 of 80, and with em042 and em113 on 19. Both games have a Deviljho and a Savage Deviljho ([data/catalog/monsters.csv](../data/catalog/monsters.csv)), so em007→em042 is the Deviljho and em071→em043 the second one; em113 has no MH3U distinction.
+- **Diablos (em099, em119) and Black Diablos (em100).** em099 owns `uEm099` and em100 and em119 reuse it. MH3U's em006 agrees with em099 and em119 on all 80 hitzone bytes; em119's base HP is the one MH3U's file has, em099's differs. MH3U's em058 agrees with em100 on all 80.
+- **Zinogre (em048, em114) and Stygian Zinogre (em049).** em048 owns `uEm048`, em049 and em114 reuse it; em114's `.etd` differs from em048's in three words. MH3U's em041 agrees with both on 54 of 80 hitzone bytes, and em072 with em049 on 60.
+- **Bnahabra (em068-em071).** The four MH4U ids differ in model and texture only; only em068 has an `.etd`/`.emd`, and em069-em071 load em068's command. MH3U's four `em_status` files (em036-em039) are byte-identical and match em068's data, so the ids pair in order and the data cannot tell the four variants apart.
+- **Slagtoth (em054, em055).** MH3U's em049 and em078 have byte-identical `em_status` files, so the status data cannot tell them apart; the body model does. em078's vertex and index counts (1814 and 4074) are em055's exactly, while em049's (1815 and 4096) are closest to em054's (1817 and 4106). em055's base HP is MH3U's, em054's differs.
+- **Melynx (em066).** MH4U has no `.etd`/`.emd` for it (its arc loads em065's command), so the pair rests on the name alone.
+
+em113, em114 and em119 are second ids for the base monster; em043, em049 and em100 are the second monster of their family and reuse the base monster's class ([Ids and classes](#ids-and-classes)).
+
+
+**MH3U monsters with no MH4U id.** These 44 ids have a name in MH3U's table that MH4U's 123-message table does not have, so MH4U has no monster of that name. The third column is the most any MH4U file's hitzone table agrees with the MH3U file: the nearest is a different monster in every row, and where it comes close it is a lookalike whose hitzones repeat (MH3U's Baggi and MH4U's Jaggi share 77 of 80 bytes).
+
+| MH3U | Monster | Best MH4U hitzones |
+|---|---|---|
+| em003 | Qurupeco | 33/80 |
+| em004 | Gigginox | 38/80 |
+| em005 | Barioth | 37/80 |
+| em008 | Barroth | 43/80 |
+| em009 | Uragaan | 36/80 |
+| em013 | Baggi | 77/80 |
+| em014 | Great Baggi | 68/80 |
+| em015 | Lagiacrus | 45/80 |
+| em016 | Royal Ludroth | 35/80 |
+| em017 | Ludroth | 67/80 |
+| em018 | Gobul | 37/80 |
+| em019 | Agnaktor | 36/80 |
+| em020 | Ceadeus | 33/80 |
+| em021 | Uroktor | 67/80 |
+| em023 | Epioth | 72/80 |
+| em024 | Alatreon | 46/80 |
+| em025 | Jhen Mohran | 40/80 |
+| em026 | Giggi | 74/80 |
+| em042 | Arzuros | 46/80 |
+| em044 | Volvidon | 38/80 |
+| em045 | Great Wroggi | 66/80 |
+| em046 | Duramboros | 30/80 |
+| em047 | Nibelsnarf | 41/80 |
+| em048 | Wroggi | 73/80 |
+| em051 | Crimson Qurupeco | 36/80 |
+| em052 | Baleful Gigginox | 33/80 |
+| em053 | Sand Barioth | 41/80 |
+| em054 | Jade Barroth | 40/80 |
+| em055 | Steel Uragaan | 36/80 |
+| em056 | Purple Ludroth | 40/80 |
+| em057 | Glacial Agnaktor | 35/80 |
+| em059 | Nargacuga | 34/80 |
+| em060 | Green Nargacuga | 32/80 |
+| em061 | Lucent Nargacuga | 40/80 |
+| em066 | Plesioth | 35/80 |
+| em067 | Green Plesioth | 35/80 |
+| em068 | Ivory Lagiacrus | 38/80 |
+| em069 | Abyssal Lagiacrus | 41/80 |
+| em070 | Goldbeard Ceadeus | 32/80 |
+| em073 | Rust Duramboros | 31/80 |
+| em075 | Dire Miralis | 36/80 |
+| em076 | Bullfango | 73/80 |
+| em077 | Anteka | 74/80 |
+| em085 | Hallowed Jhen Mohran | 34/80 |
+
+- **The four files with the second-level HP block (0x6C)** are em025 Jhen Mohran, em046 Duramboros, em073 Rust Duramboros and em085 Hallowed Jhen Mohran. MH4U has none of them: its closest file to Jhen Mohran is Dah'ren Mohran (em046), a different monster that agrees on 40 of 80 hitzone bytes and has a different base HP, and the closest for the other three agree on at most 34. The block's place in MH4U's part record therefore has no MH4U file to check it ([specs/emstatus.md](../specs/emstatus.md), "Part record mapping").
+- **Props and placeholders (nine ids):** em032 is named Fish, em035 Giggi Sac, and em040 and em079-em084 Rock. They hold data but are not monsters. The seven Rock ids' data matches MH4U's em081 `rock` on 79 of 80 hitzone bytes and the same base HP, so MH4U has the same prop; it has no Fish or Giggi Sac.
+
 ## MH3U's factory
 
 0x005bbc5c: `cmp r1, #0x56`, then an 86-word jump table. Rathian (id 1) runs on `uEm002` with Rathalos and the colour variants (ids 2, 62 to 65). MH4U does the reverse, with ids 1 to 6 on `uEm001`.
@@ -556,6 +663,13 @@ The procedure is enough to rewrite the scripts, which stay outside the repositor
 4. **From GMD tables.** The monster-name GMD's string count is an upper bound for monster ids that have names.
 5. **Heaps.** The resource and unit managers are created early in start-up (MH4UltimateDC's docs/research/system-services.md covers the main systems); their sizes are constants passed to their constructors. Record which heap a monster's resources come from.
 6. **Record each table** as: name, address (USA v1.3.0), row size, row count, what indexes it, the functions that read it. Addresses and sizes are fine to commit (LEGAL.md); contents are not.
+
+### Finding the MH3U-to-MH4U id pairs
+
+1. Read each game's own id-indexed monster-name table. MH3U's is `GUI/font/Monster_eng` in `/arc/ID/ID_gallery_eng.arc`: a GMD whose string N names id N (`mhuc gmd dump` reads an extracted `Monster_eng`). MH4U's is `eng/msg/emName_eng` in `/eng/data/core_common.arc`: an rLayoutMessage whose 123 messages are NUL-terminated UTF-16-LE strings in id order, the first being `No enemy`.
+2. For every name both tables hold, the pair with that name is a candidate; a name MH4U's table lacks has no pair. Read the tables' names and counts, never their bytes.
+3. Check each candidate with `mhuc monsterdata --mh4u data/em_data.arc --id <MH4U id> --mh3u arc/enemy/em<NNN>.arc`; its hitzone, part-table and attack-volume counts are the evidence in [MH3U's ids to MH4U's](#mh3u-ids-to-mh4us).
+4. Where a name repeats, compare every id that holds it. The base HP, the hitzone table and, between byte-identical `em_status` files, the body model's vertex and index counts say which id is which.
 
 ### Recompiling and testing a reference game
 

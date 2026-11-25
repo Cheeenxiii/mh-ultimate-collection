@@ -207,6 +207,19 @@ def test_rathian_part_record_rebuilds_from_mh3u(dump):
     assert second == 7, f"MH3U's second-level HP agrees with MH4U's on {second} of 8 parts, expected 7"
     assert all(a[6] == 0 for a in got), "MH3U has no kind field, so the rebuilt kind must stay 0"
 
+
+def test_only_four_mh3u_status_files_carry_the_second_level_hp_block(dump):
+    """specs/emstatus.md, "Part record mapping": block 0x6C has no MH4U pair because the four files that carry it are
+    Jhen Mohran, Duramboros, Rust Duramboros and Hallowed Jhen Mohran, which MH4U does not have
+    (reference/README.md, "MH3U's ids to MH4U's")."""
+    with_block = sorted({name for name, entries in monster_entries(dump("mh3u", "romfs.bin"))
+                         for e in entries
+                         if e.data[:4] == emstatus.MAGIC
+                         and "block 0x6c" in {n for n, _, _ in emstatus.blocks(e.data)}})
+    assert with_block == ["/arc/enemy/em025.arc", "/arc/enemy/em046.arc",
+                          "/arc/enemy/em073.arc", "/arc/enemy/em085.arc"], with_block
+
+
 def _images(dump) -> dict:
     """Each game's RomFS image and its file paths, so a model can be read without rescanning."""
     out = {}
