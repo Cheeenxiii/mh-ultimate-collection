@@ -6,7 +6,8 @@ a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (te
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
 records against their hit volumes), E9 (MH3U em_status break blocks), E11 (MHXX dtbparts joint record kinds),
-L1 (lmt), A1 (rEnemyCmd), S1 (rCollision), SN1 (sound resources by kind, version and class id).
+L1 (lmt), A1 (rEnemyCmd), S1 (rCollision), SN1 (sound resources by kind, version and class id), S4 (MH4U stream
+requests).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -17,7 +18,7 @@ import struct
 from collections import Counter
 from multiprocessing import Pool
 
-from .formats import arc, classid, dtbase, dtbparts, dttune, emd, emstatus, gmd, hitdata, lmt, pica, romfs, tex
+from .formats import arc, classid, dtbase, dtbparts, dttune, emd, emstatus, gmd, hitdata, lmt, pica, romfs, stq, tex
 from .formats import mod as modfile
 from .quests import quest as questfile
 
@@ -81,11 +82,16 @@ def _sound(st: dict, data: bytes, kind: str, type_id: int | None) -> None:
     """Count one sound resource by kind, magic and version, and by class id when it sits in an ARC."""
     c = st.setdefault("sound", Counter())
     magic = data[:4].decode("latin-1").rstrip("\x00")
+    version = struct.unpack_from("<I", data, 4)[0] if len(data) >= 8 else 0
     if kind in SOUND_VERSIONED and len(data) >= 8:
-        version = struct.unpack_from("<I", data, 4)[0]
         c[f"{kind} {magic} v{version if version < 0x100 else f'0x{version:x}'}"] += 1
     else:
         c[f"{kind} {magic}"] += 1
+    if kind == "stream request" and data[:4] == stq.MAGIC and version == stq.VERSION:
+        try:
+            c.update(stq.check(data))
+        except stq.StqError:
+            c["S4 .stq not read"] += 1
     if type_id is None:
         c[f"{kind} {magic} loose"] += 1
     else:
