@@ -30,7 +30,7 @@ Any other version, or another magic, makes the loader return 0 without relocatin
 
 The bounds rule is not selected by the version either: MH4U's loader relocates +0x20 only for buffer types 4, 5, 7 and 11 to 13 (its switch over the buffer type; no track of type 1, 2, 3 or 6 has a bounds block there, check L4), while MH3U's relocates it for every type except 11 to 13 and, for those three, writes the address of the track's own reference data (+0x10) instead of a file offset (no MH3U type 11 to 13 track has a bounds block, check L4). The build's motion code, not the header, decides how a version's files are handled; the number says which build's motion code the file was written for.
 
-**Consequence for a converter.** Writing version 67 is necessary and sufficient for MH4U's loader to take an MH3U-format file; it is not sufficient for the motion to play as MH3U's, because types 11 to 13's keys must be re-encoded into version 67's form ([Keyframe buffers](#keyframe-buffers)). A type 6 track with a bounds block (2,991 in MH3U, none in MH4U) would load with its +0x20 left as a file offset; what MH4U does with it is unverified. A ported monster's lists also have to hold each animation at the motion index the target game's handler asks for when it plays that action: that is where the animation sits in its list, and it changes no field ([reference/README.md](../reference/README.md#a-3u-rathians-moves-on-mh4us-handlers)).
+**Consequence for a converter.** Writing version 67 is necessary and sufficient for MH4U's loader to take an MH3U-format file; it is not sufficient for the motion to play as MH3U's, because types 11 to 13's keys must be re-encoded into version 67's form ([Keyframe buffers](#keyframe-buffers)). The rebuild is [Converting a version 66 list to version 67](#converting-a-version-66-list-to-version-67). A type 6 track with a bounds block (2,991 in MH3U, none in MH4U) would load with its +0x20 left as a file offset; what MH4U does with it is unverified.
 
 ## Header
 
@@ -133,6 +133,10 @@ The two components are encoded differently in the two versions:
 
 What the version change was for is unknown. RevilLib's registry gives all versions from 56 up the same codecs, so its reading is version 67's; MH3U's files only decode under the signed reading.
 
+### Converting a version 66 list to version 67
+
+Nothing else differs, so `mhuc.formats.lmt.convert` copies every block and re-encodes the keyframe buffers of types 11 to 13 only: a component v in −1 to 1 becomes the unsigned field round((v + 1) × 0x3FFF / 2) in 0 to 0x3FFF (a value outside −1 to 1 clamps), and the track gains a bounds block with scale 2 and offset −1 on the two components it stores, the other two left 0. The version-67 reading, offset + scale × value, gives v back within 6.11e-5, half the unsigned field's step, so a converted list decodes to the source's keys. The frame gaps, the animation headers and event blocks, and every other track's bytes stay the source's.
+
 ### Types 1 and 2: `SingleVector3` and `StepRotationQuat3` (no keys in any file)
 
 | Offset | Type | Name | Status | Source |
@@ -219,3 +223,8 @@ RevilLib reads the key count from a group and then that many 0x10-byte keys from
   - The word at +0x3C is non-zero in 1,466 MH4U animations (one in each of its 1,466 lists), 972 MHXX and 383 MH3U, and each is its list's highest-offset animation; in each, offset + 0x3C is the start of a block the list names (a track table, keyframe buffer, bounds block, event block or event list), so the word is that block's first four bytes. Every other animation has 0 there.
   - The flags the loaders read: 0x40000 and 0x2000000 are set on no animation. Bit 0x1000000 is set on 702 MHXX animations only; each shares its track table with an earlier animation without the bit, and no track table is shared by two animations without it (525 MHXX tables are shared, none in MH4U or MH3U). The animations' flag words are 0x00800000 in MH4U (23,412) and MH3U (8,336), and 0x00800000 (19,767), 0x00800001 (685) or 0x01800000 (702) in MHXX; the meaning of bit 0x1 is unverified.
   - Not reached: the meaning of the float-track block's fields, since no file exercises them (all unverified, [above](#float-track-block-0x38)); what bit 0x1 means.
+
+- **L6 (done):** every MH3U motion list converts to version 67 and decodes to the same keys.
+  - Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k motion_list_converts`.
+  - Result: all 387 lists (384 in ARCs, 3 loose files) rebuilt as version 67. The 8,336 animations and 270,420 tracks keep their frame and loop counts, flags and events, their type, usage, joint type, bone and key frames, and every key its components within 6.11e-5. 38,311 tracks of types 11 to 13 were re-encoded (26,368 type 11, 11,309 type 12 and 633 type 13 in the ARCs, and one more in a loose list), each gaining a 0x20-byte bounds block: the 384 archive lists grow 0.87%, from 135,366,776 to 136,543,444 bytes.
+  - Not reached: whether the game plays a re-encoded track exactly as the source game played the version-66 one; it reads the version-67 form, and the in-game check is [A1](../docs/checks.md#a-ported-monsters-files).

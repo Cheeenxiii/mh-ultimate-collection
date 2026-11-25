@@ -1273,3 +1273,43 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
         assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
     assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == 5
     assert sum(len(v) for v in report.left_out.values()) == 534
+
+def test_every_mh3u_motion_list_converts_to_version_67(dump):
+    """specs/lmt.md check L6: `mhuc.formats.lmt.convert` rebuilds every MH3U motion list as version 67, keeping
+    every animation's frames, tracks and events and every key's frames and components (type 11 to 13 within the
+    version-67 unsigned field's half step)."""
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    lists = animations = tracks = reencoded = 0
+    worst = 0.0
+    for name, data in motion_lists(image):
+        version, source = lmt.read(data)
+        assert version == 66, name
+        out = lmt.convert(data)
+        assert lmt.read(out)[0] == 67, name
+        converted = lmt.read(out)[1]
+        assert len(source) == len(converted), name
+        for a, b in zip(source, converted, strict=True):
+            if a is None:
+                assert b is None, name
+                continue
+            animations += 1
+            assert (a.frames, a.loop_frame, a.flags, bool(a.events)) == (b.frames, b.loop_frame, b.flags,
+                                                                         bool(b.events)), name
+            for t, u in zip(a.tracks, b.tracks, strict=True):
+                tracks += 1
+                assert (t.buffer_type, t.usage, t.joint_type, t.bone) == \
+                       (u.buffer_type, u.usage, u.joint_type, u.bone), name
+                keys, converted_keys = lmt.decode_keys(data, t, 66, a.frames), lmt.decode_keys(out, u, 67, b.frames)
+                assert [k.frame for k in keys] == [k.frame for k in converted_keys], name
+                if t.buffer_type in (11, 12, 13):
+                    reencoded += 1
+                    scale, offset = lmt.bounds(out, u)
+                for k, v in zip(keys, converted_keys, strict=True):
+                    values = v.value
+                    if t.buffer_type in (11, 12, 13):
+                        values = tuple(offset[i] + scale[i] * values[i] for i in range(4))
+                    worst = max(worst, max(abs(p - q) for p, q in zip(k.value, values, strict=True)))
+        lists += 1
+    assert (lists, animations, tracks) == (387, 8336, 270420), (lists, animations, tracks)
+    assert reencoded == 38311, reencoded
+    assert worst < 6.2e-5, worst

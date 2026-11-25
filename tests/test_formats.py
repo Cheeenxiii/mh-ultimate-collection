@@ -271,6 +271,61 @@ def test_camera_read_refuses_an_mhxx_prefix_that_is_not_zero():
     with pytest.raises(camera.CameraError, match="prefix"):
         camera.read(bytes(v5))
 
+def lmt_version_66_to_convert() -> bytes:
+    """One animation with a type 11 track (two hand-made signed keys), a type 3 track and one event."""
+    tracks, buffers, events = 0x50, 0x98, 0xB0
+    d = bytearray(0x1D8)
+    d[:8] = b"LMT\0" + struct.pack("<HH", 66, 1)
+    struct.pack_into("<I", d, 8, 0x10)
+    struct.pack_into("<IIii", d, 0x10, tracks, 2, 10, -1)
+    struct.pack_into("<II", d, 0x10 + 0x30, 0x00800000, events)
+    # type 11, bone 5: x = +1 and -1 as version 66's signed magnitude (raw 4096 and 12287), w = 0 (0x3FFF)
+    struct.pack_into("<4BfII", d, tracks, 11, 0, 0, 5, 1.0, 8, buffers)
+    struct.pack_into("<I", d, buffers, 4096 | 5 << 28)         # x +1.0, w 0.0; the next key is 5 frames on
+    struct.pack_into("<I", d, buffers + 4, 12287 | 0x3FFF << 14)
+    # type 3, bone 0: a position key that conversion must carry untouched
+    struct.pack_into("<4BfII", d, tracks + lmt.TRACK, 3, 1, 0, 0, 1.0, 16, buffers + 8)
+    struct.pack_into("<3fI", d, buffers + 8, 1.5, -2.0, 3.0, 9)
+    struct.pack_into("<II", d, events + 0x40, 1, 0x1D0)       # one event, its list after the block
+    struct.pack_into("<II", d, 0x1D0, 0x1234, 3)
+    return bytes(d)
+
+
+def test_lmt_convert_reencodes_version_66s_rotation_keys_as_version_67s_unsigned_form():
+    """specs/lmt.md, "Keyframe buffers": version 66 stores types 11 to 13 signed and version 67 unsigned behind a
+    bounds block, so a converted list must decode to the same quaternions and keep the frames"""
+    out = lmt.convert(lmt_version_66_to_convert())
+    assert lmt.read(out)[0] == 67
+    animation = lmt.read(out)[1][0]
+    rotation, position = animation.tracks
+    keys = lmt.decode_keys(out, rotation, 67, animation.frames)
+    scale, offset = lmt.bounds(out, rotation)
+    assert [k.frame for k in keys] == [0, 5]
+    for key, (x, w) in zip(keys, [(1.0, 0.0), ((12287 - 0x3FFF) / 4095.75, 0.0)], strict=True):
+        assert abs(offset[0] + scale[0] * key.value[0] - x) < 1e-4
+        assert abs(offset[3] + scale[3] * key.value[3] - w) < 1e-4
+    # the other track's keys are the source's bytes, unchanged, and the event block is carried
+    assert lmt.decode_keys(out, position, 67)[0].value == (1.5, -2.0, 3.0, 1.0)
+    assert lmt.decode_keys(out, position, 67)[0].frame == 0
+    count, events = struct.unpack_from("<II", out, animation.events + 0x40)
+    assert count == 1
+    assert struct.unpack_from("<II", out, events) == (0x1234, 3)
+
+
+def test_lmt_convert_carries_a_version_67_list_unchanged():
+    d = lmt.convert(lmt_version_66_to_convert())
+    assert lmt.convert(d) == d
+    with pytest.raises(lmt.LmtError, match="version 68"):
+        lmt.convert(d[:4] + struct.pack("<H", 68) + d[6:])
+
+
+def test_lmt_convert_refuses_a_float_track_block_it_does_not_move():
+    # no motion list in the three games has one, so the converter has nothing to check a copy of it against
+    d = bytearray(lmt_version_66_to_convert()) + bytes(0x30)
+    struct.pack_into("<I", d, 0x10 + 0x38, len(d) - 0x30)
+    with pytest.raises(lmt.LmtError, match="float-track block"):
+        lmt.convert(bytes(d))
+
 
 def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():
     d = bytearray(0x200)
