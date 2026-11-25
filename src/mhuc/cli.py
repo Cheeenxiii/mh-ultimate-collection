@@ -481,14 +481,18 @@ def _convert_monster_files(args) -> int:
               "(docs/architecture.md#3u-rathians-files)", file=sys.stderr)
         return 2
     try:
-        row = monsters.registry_row(args.id, args.registry)
+        # The MH3U half predates the row's slot-list `motions`, so it reads the row leniently and
+        # builds the kinds it ships from the conversion itself; the MHXX half reads `files` strictly.
+        from . import monstersound
+        row = monstersound.registry_row(args.id, args.registry)
         if row.source_game not in ("mhxx", "mh3u"):
             raise monsters.ConvertError(f"id {args.id} comes from {row.source_game}; this converter "
                                         "reads MHXX and MH3U")
         if args.game and args.game != row.source_game:
             raise monsters.ConvertError(f"id {row.id}'s source game is {row.source_game}, not {args.game}")
-        want = ("/" + monsters.source_archive_path(row, args.variant) if row.source_game == "mhxx"
-                else f"/arc/enemy/{row.source_key}.arc")
+        want = ("/arc/enemy/" + row.source_key + ".arc" if row.source_game == "mh3u"
+                else "/" + monsters.source_archive_path(monsters.registry_row(args.id, args.registry),
+                                                        args.variant))
         entry = next((f for f in romfs.open_image(args.romfs).files() if f.path == want), None)
         if entry is None:
             raise monsters.ConvertError(f"{args.romfs} has no {want}")
@@ -499,10 +503,21 @@ def _convert_monster_files(args) -> int:
         if row.source_game == "mh3u":
             mod = monsterassets.convert(data, row.id)
             arc_data = mod.archive()
+            kinds = set()
+            for e in mod.entries:
+                if e.type_name == "rModel":
+                    kinds.add("tail" if e.path.endswith("_tail") else "model")
+                elif e.type_name == "rMotionList":
+                    kinds.add("motions")
+            slots = sum(1 for e in mod.entries if e.type_name == "rMotionList")
+            row = monsters.Row(row.id, row.key, row.source_game, row.source_key, row.name, row.stand_in,
+                               frozenset(kinds), slots)
         else:
+            row = monsters.registry_row(args.id, args.registry)
             arc_data, report = monsters.convert(data, row, args.variant)
         path = monsters.build_mod(args.out, row, arc_data)
-    except (monsterassets.ConvertError, monsters.ConvertError, arc.ArcError, OSError) as e:
+    except (monsterassets.ConvertError, monsters.ConvertError, monstersound.ConvertError, arc.ArcError,
+            OSError) as e:
         print(f"mhuc convert monster: {e}", file=sys.stderr)
         return 1
     if report is None:
