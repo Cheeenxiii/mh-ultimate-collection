@@ -16,7 +16,7 @@ can be compared: the same action should start the same animation.
 
     list    --game mh4u|mh3u|mhxx ... --dispatcher ADDR [--motion ADDR] [--functions TSV] -o x.tsv
     compare A.tsv B.tsv [--values] [--game-a/--lmt-a, --game-b/--lmt-b] [--mapping FILE]
-    place   A.tsv B.tsv --game-a/--lmt-a --game-b/--lmt-b -o placement.tsv
+    table   --mh4u A.tsv --source GAME B.tsv MAPPING [...] -o motions.h
 
 `list` takes the same code arguments as monster_actions.py: --exheader/--code/--range for
 MH4U and MH3U, --module/--crs/--base for a MHXX CRO module. It writes one row per action
@@ -31,14 +31,18 @@ differing ids into same motion at another index (equal signature, or the signatu
 elsewhere in the other game), different motion, and no animation at the decoded index;
 `--mapping` writes the per-id mapping.
 
-`place` turns the comparison into a port's plan for a monster that runs the target game's
-handlers (reference/README.md, "A 3U Rathian's moves on MH4U's handlers"): for every action
-id both games have whose handler starts a constant animation, one row says which animation
-of the source game goes at which (file, slot) of the target game's motion lists, and which
-action ids ask for it. Actions it cannot place are written as rows of their own: the ones
-whose two handlers' animation has no unique match (`unresolved`), and a target slot two
-actions want with different source animations (`conflict`; running another target handler
-that starts the same animation is then the choice to check, not something the tool decides).
+`table` turns the comparison into the port's run-time translation
+(reference/README.md, "A 3U Rathian's moves on MH4U's handlers"): from the two games'
+inventories and `compare --mapping`'s per-id map, one table per ported monster in the
+registry. An entry says: for this action id, MH4U's handler asks this motion number, and the
+source game's animation sits at that index in the converted motion lists. The lists keep the
+source game's grouping, so a source index is written in MH4U's packing (`file << 8 | slot`)
+whatever the source game's packing was. The action ids the comparison cannot resolve
+(`unresolved`, today category 7's computed index) are left out of the table and listed
+separately; at run time those numbers pass through unchanged. A category-only action (the
+game's category has one action, the index byte is unused) is keyed by category with index
+0x100. The header holds action and motion numbers only and is checked in; its checker is
+tools/check_motion_tables.py.
 
 The output holds motion indices read from the games' code: keep the TSVs outside the
 repository (reference/README.md; CLAUDE.md rule 1).
@@ -51,14 +55,17 @@ import os
 import struct
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
 
 # The wrapper a handler calls to start an animation, per game. Why these: docs/checks.md, R1.
 MOTION = {"mh4u": 0x0094E318, "mhxx": 0x008EB108, "mh3u": 0x00828828}
 SCAN_CAP = 0x600              # a handler block's extent, when no function table bounds it
 MAX_MOTION = 0x2000           # indices above this are a register we didn't follow, not a motion
 HEADER = "# cat\tidx\thandler\tmotion\thow\n"
-PLACEMENT_HEADER = "# target_file\ttarget_slot\tsource_file\tsource_slot\thow\tactions\n"
+NO_INDEX = 0x100              # "the category has one action": the index byte is unused
+GENERATOR = "reference/monster_motions.py table"
 
 
 def functions_table(path: str) -> dict[int, int]:
@@ -286,42 +293,186 @@ def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) ->
                 unresolved=unresolved + ambiguous, ambiguous=ambiguous, same_index=same_index)
 
 
-def placement(s: dict, game_a: str, game_b: str):
-    """Where a ported monster's source animations go in the target game's motion lists.
+def repack_motion(game: str, motion: int) -> int:
+    """`motion`, an animation of `game`, as MH4U's motion start takes it.
 
-    The port runs the target game's handler for an action id both games have, so that handler
-    asks for the target's motion index: the source's animation must be written at that index
-    (reference/README.md, "A 3U Rathian's moves on MH4U's handlers"). Returns one row per
-    (target file, slot) and source slot -- `conflict` when those actions want two different
-    source animations -- plus the ids whose animation is unknown."""
-    placed = collections.defaultdict(list)      # (target file, slot) -> [(action, source, how)]
-    for how, items in (("same", s["same"]), ("same-track", s["same_track"]),
-                       ("different", s["different"])):
-        for item in items:
-            key, ma, mb = item[:3]
-            placed[decode_motion(game_a, ma)].append((key, decode_motion(game_b, mb), how))
-    for key, ma, mb, _sig, _found in s["elsewhere"]:
-        placed[decode_motion(game_a, ma)].append((key, decode_motion(game_b, mb), "elsewhere"))
-    for key, motion in s["same_index"]:
-        placed[decode_motion(game_a, motion)].append(
-            (key, decode_motion(game_b, motion), "same-index"))
-    rows = []
-    for target in sorted(placed):
-        by_source = collections.defaultdict(list)
-        for key, source, how in placed[target]:
-            by_source[source].append((key, how))
-        if len(by_source) > 1:
-            for source in sorted(by_source):
-                rows.append(dict(target=target, source=source, how="conflict",
-                                 actions=sorted((k for k, _ in by_source[source]),
-                                                key=action_key)))
+    The converted motion lists keep the source game's grouping, so the LMT file keeps its
+    position and the animation its slot; MH4U packs the index `file << 8 | slot`. MH3U's list
+    groups are 000, 100, 200, ... (docs/checks.md, R1), so its group is its position."""
+    file, slot = decode_motion(game, motion)
+    return (file << 8) | slot
+
+
+def read_mapping(path: str) -> list[dict]:
+    """R1's per-id comparison, as `compare --mapping` writes it."""
+    out = []
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            cat, idx, motion_a, motion_b, how = line.rstrip("\n").split("\t")[:5]
+            out.append(dict(cat=int(cat), idx=int(idx) if idx else None,
+                            motion_a=int(motion_a) if motion_a else None,
+                            motion_b=int(motion_b) if motion_b else None, how=how))
+    return out
+
+
+def table_index(key: tuple[int, int | None]) -> int:
+    """The table's index field: the action's index byte, or NO_INDEX for a category-only action."""
+    return NO_INDEX if key[1] is None else key[1]
+
+
+def build_table(monster: dict, mh4u: dict, source: dict, mapping: list[dict],
+                source_game: str) -> dict:
+    """One ported monster's translations, the ids they leave out, and R1's counts.
+
+    Refuses a mapping that doesn't match the inventories: every action id both handlers start
+    a constant motion for is either in the mapping (their indices differ) or identical."""
+    common = set(mh4u) & set(source)
+    compared = sorted((k for k in common
+                       if mh4u[k]["how"] == "constant" and source[k]["how"] == "constant"),
+                      key=action_key)
+    seen = {}
+    for row in mapping:
+        key = (row["cat"], row["idx"])
+        if key in seen:
+            raise ValueError(f"{monster['key']}: {fmt_id(key)} appears twice in the mapping")
+        seen[key] = row
+        if key not in compared:
+            raise ValueError(f"{monster['key']}: the mapping has {fmt_id(key)}, which isn't an "
+                             "action id both games start a constant motion for")
+        if row["motion_a"] is None or row["motion_b"] is None:
+            raise ValueError(f"{monster['key']}: {fmt_id(key)} has a mapping row without both "
+                             "motion numbers")
+        if row["motion_a"] != mh4u[key]["motion"] or row["motion_b"] != source[key]["motion"]:
+            raise ValueError(f"{monster['key']}: {fmt_id(key)}'s mapping numbers aren't the two "
+                             "inventories'")
+        if mh4u[key]["motion"] == source[key]["motion"]:
+            raise ValueError(f"{monster['key']}: {fmt_id(key)} starts the same index in both "
+                             "games and needs no mapping row")
+    entries, unresolved = [], []
+    for key in compared:
+        row = seen.get(key)
+        if row is None:
+            if mh4u[key]["motion"] != source[key]["motion"]:
+                raise ValueError(f"{monster['key']}: {fmt_id(key)}'s indices differ but the "
+                                 "mapping has no row for it")
             continue
-        source, hits = next(iter(by_source.items()))
-        rows.append(dict(target=target, source=source,
-                         how="+".join(sorted({h for _, h in hits})),
-                         actions=sorted((k for k, _ in hits), key=action_key)))
-    unresolved = [(item[0], decode_motion(game_a, item[1])) for item in s["unresolved"]]
-    return rows, unresolved
+        entry = dict(cat=key[0], index=table_index(key), motion=row["motion_a"])
+        if row["how"] == "unresolved":
+            unresolved.append(entry)
+        else:
+            entry["source"] = repack_motion(source_game, row["motion_b"])
+            entries.append(entry)
+    order = lambda e: (e["cat"], e["index"], e["motion"])  # noqa: E731
+    entries.sort(key=order)
+    unresolved.sort(key=order)
+    return dict(monster=monster, source=source_game, entries=entries, unresolved=unresolved,
+                common=len(common), compared=len(compared),
+                same_index=sum(1 for k in compared if k not in seen),
+                not_compared=len(common) - len(compared))
+
+
+def render_header(tables: list[dict]) -> str:
+    """The plugin's header: one motion table per ported monster, keyed by its id."""
+    lines = [
+        f"/* Generated from R1's comparison by {GENERATOR}.",
+        " * Do not edit: run the tool against the player's own dumps. Licence: GPL-3.0-or-later. */",
+        "#ifndef MHUC_MOTIONS_H",
+        "#define MHUC_MOTIONS_H",
+        "",
+        "#include <stdint.h>",
+        "",
+        "/* One translation for a ported monster: for `category`/`index` (its current action),",
+        " * MH4U's handler asks `motion`; the source game's animation is at `source` in the",
+        " * converted motion lists, in MH4U's packing (`file << 8 | slot`; the converted lists",
+        " * keep the source game's grouping). `index` is 0x100 for a category-only action.",
+        " */",
+        "typedef struct MhucMotion {",
+        "    uint8_t category;",
+        "    uint16_t index;",
+        "    uint16_t motion;",
+        "    uint16_t source;",
+        "} MhucMotion;",
+        "",
+        "/* One ported monster's translations, keyed by its MH4U id (data/ids/registry.csv).",
+        " * `unresolved` holds the action ids R1 cannot resolve yet, as",
+        " * `category << 8 | index`: the plugin passes their motion numbers through unchanged.",
+        " * The four counts are R1's for the pair this table was compared with;",
+        " * tools/check_motion_tables.py checks them. */",
+        "typedef struct MhucPortedMotions {",
+        "    uint8_t id;",
+        "    uint16_t entry_count;",
+        "    uint16_t unresolved_count;",
+        "    uint16_t common;",
+        "    uint16_t compared;",
+        "    uint16_t same_index;",
+        "    uint16_t not_compared;",
+        "    const MhucMotion *entries;",
+        "    const uint16_t *unresolved;",
+        "} MhucPortedMotions;",
+        "",
+    ]
+    for t in tables:
+        m, ident = t["monster"], int(t["monster"]["id"], 0)
+        lines.append(f"/* {m['name']}, ported from {m['source_game']} {m['source_key']} "
+                     f"({m['key']}, id {ident}): {len(t['entries'])} of R1's {t['compared']} "
+                     f"compared action ids translated, {len(t['unresolved'])} left out "
+                     f"(category 7's computed index), {t['same_index']} start the same index in "
+                     f"both games; {t['not_compared']} of the {t['common']} common ids aren't "
+                     f"compared. */")
+        if t["entries"]:
+            lines.append(f"static const MhucMotion mhuc_motions_{ident}[] = {{")
+            lines += [f"    {{{e['cat']}, {e['index']}, 0x{e['motion']:03x}, 0x{e['source']:03x}}},"
+                      for e in t["entries"]]
+            lines.append("};")
+        else:
+            lines.append(f"static const MhucMotion *const mhuc_motions_{ident} = NULL;")
+        if t["unresolved"]:
+            lines.append(f"static const uint16_t mhuc_unresolved_{ident}[] = {{")
+            lines += [f"    0x{(e['cat'] << 8) | (e['index'] & 0xff):04x}, "
+                      f"/* {fmt_id((e['cat'], None if e['index'] == NO_INDEX else e['index']))} */"
+                      for e in t["unresolved"]]
+            lines.append("};")
+        else:
+            lines.append(f"static const uint16_t *const mhuc_unresolved_{ident} = NULL;")
+        lines.append("")
+    lines += [
+        f"#define MHUC_PORTED_MOTIONS_COUNT {len(tables)}",
+        "static const MhucPortedMotions mhuc_ported_motions[MHUC_PORTED_MOTIONS_COUNT] = {",
+    ]
+    for t in tables:
+        ident = int(t["monster"]["id"], 0)
+        lines.append(f"    {{{ident}, {len(t['entries'])}, {len(t['unresolved'])}, "
+                     f"{t['common']}, {t['compared']}, {t['same_index']}, {t['not_compared']}, "
+                     f"mhuc_motions_{ident}, mhuc_unresolved_{ident}}},")
+    lines += ["};", "", "#endif", ""]
+    return "\n".join(lines)
+
+
+def read_registry(path: str) -> list[dict]:
+    """The ported content rows data/ids/registry.csv holds (tools/check_ids.py's shape)."""
+    import check_ids
+
+    rows, problems = check_ids.read_registry(path)
+    if problems:
+        raise ValueError("; ".join(problems))
+    return [r for r in rows if r["kind"] == "monster"]
+
+
+def tables_from(registry: list[dict], mh4u: dict, sources: dict[str, tuple[dict, list[dict]]]) -> list[dict]:
+    """One table per ported monster, in registry order.
+
+    `sources` maps a source game to its R1 inventory and mapping. A ported monster whose source
+    game has no comparison (a port from MH4U itself, or a game R1 wasn't run on) is refused."""
+    out = []
+    for row in sorted(registry, key=lambda r: int(r["id"], 0)):
+        game = row["source_game"]
+        if game not in sources:
+            raise ValueError(f"{row['key']}: no --source for {game}, so its table can't be built")
+        source, mapping_rows = sources[game]
+        out.append(build_table(row, mh4u, source, mapping_rows, game))
+    return out
 
 
 def action_key(key: tuple[int, int | None]) -> tuple[int, int]:
@@ -414,35 +565,23 @@ def cmd_compare(args) -> int:
     return 0
 
 
-def cmd_place(args) -> int:
-    a, b = read_rows(args.a), read_rows(args.b)
-    lmts_a = [read_lmt(open(path, "rb").read()) for path in args.lmt_a]
-    lmts_b = [read_lmt(open(path, "rb").read()) for path in args.lmt_b]
-    s = content_split(a, b, args.game_a, lmts_a, args.game_b, lmts_b)
-    rows, unresolved = placement(s, args.game_a, args.game_b)
-    with open(args.output, "w") as f:
-        f.write(PLACEMENT_HEADER)
-        for r in rows:
-            (tf, ts), (sf, ss) = r["target"], r["source"]
-            f.write(f"{tf}\t{ts}\t{sf}\t{ss}\t{r['how']}\t"
-                    f"{' '.join(fmt_id(k) for k in r['actions'])}\n")
-        for key, (tf, ts) in unresolved:
-            f.write(f"{tf}\t{ts}\t\t\tunresolved\t{fmt_id(key)}\n")
-    placed = sum(len(r["actions"]) for r in rows if r["how"] != "conflict")
-    slots = sum(1 for r in rows if r["how"] != "conflict")
-    conflicts = [r for r in rows if r["how"] == "conflict"]
-    print(f"placement: {slots} target slots for {placed} actions; "
-          f"conflict on {len({r['target'] for r in conflicts})} slot "
-          f"({sum(len(r['actions']) for r in conflicts)} actions), "
-          f"unresolved {len(unresolved)}, "
-          f"not compared {sum(compare(a, b)['skipped'].values())}")
-    for r in conflicts:
-        print(f"conflict: target {r['target'][0]}/{r['target'][1]} from source "
-              f"{r['source'][0]}/{r['source'][1]}: "
-              f"{' '.join(fmt_id(k) for k in r['actions'])}")
-    if unresolved:
-        print("unresolved ids:")
-        print(fmt_ids([k for k, _ in unresolved]))
+def cmd_table(args) -> int:
+    mh4u = read_rows(args.mh4u)
+    sources = {}
+    for game, inventory, mapping in args.source:
+        sources[game] = (read_rows(inventory), read_mapping(mapping))
+    registry = read_registry(args.registry)
+    tables = tables_from(registry, mh4u, sources)
+    if not tables:
+        raise ValueError(f"{args.registry} has no ported monster to build a table for")
+    text = render_header(tables)
+    with open(args.output, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    for t in tables:
+        print(f"{t['monster']['key']}: {len(t['entries'])} entries, {len(t['unresolved'])} "
+              f"unresolved, {t['same_index']} same index, {t['not_compared']} not compared "
+              f"(of {t['common']} common)")
+    print(f"wrote {args.output}")
     return 0
 
 
@@ -472,15 +611,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lmt-b", nargs="+", help="game B's LMT files, in file order")
     p.add_argument("--mapping", help="write the per-id motion mapping to this TSV")
     p.set_defaults(fn=cmd_compare)
-    p = sub.add_parser("place", help="where a ported monster's source animations go")
-    p.add_argument("a")
-    p.add_argument("b")
-    p.add_argument("--game-a", required=True, choices=tuple(MOTION))
-    p.add_argument("--lmt-a", nargs="+", required=True, help="game A's LMT files, in file order")
-    p.add_argument("--game-b", required=True, choices=tuple(MOTION))
-    p.add_argument("--lmt-b", nargs="+", required=True, help="game B's LMT files, in file order")
-    p.add_argument("-o", "--output", required=True)
-    p.set_defaults(fn=cmd_place)
+    p = sub.add_parser("table", help="the port's run-time motion table, one per ported monster")
+    p.add_argument("--mh4u", required=True, help="R1's MH4U inventory (list -o)")
+    p.add_argument("--source", nargs=3, action="append", required=True,
+                   metavar=("GAME", "INVENTORY", "MAPPING"),
+                   help="a source game's R1 inventory and its compare --mapping TSV; repeatable")
+    p.add_argument("--registry", default=os.path.join(HERE, "..", "data", "ids", "registry.csv"),
+                   help="the ported content registry (default: data/ids/registry.csv)")
+    p.add_argument("-o", "--output", required=True, help="the generated header")
+    p.set_defaults(fn=cmd_table)
     a = ap.parse_args(argv)
     return a.fn(a)
 

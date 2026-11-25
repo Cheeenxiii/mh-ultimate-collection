@@ -29,7 +29,8 @@ def test_guard_accepts_prose_and_the_reference_function_tables():
     assert guard.problems("reference/games/mhxx/functions.tsv", table) == []
 
 
-@pytest.mark.parametrize("script", ["check_no_game_data.py", "check_specs.py", "check_ids.py"])
+@pytest.mark.parametrize("script", ["check_no_game_data.py", "check_specs.py", "check_ids.py",
+                                        "check_motion_tables.py"])
 def test_repository_passes_its_own_checks(script):
     res = subprocess.run([sys.executable, os.path.join(ROOT, "tools", script)], cwd=ROOT,
                          capture_output=True, text=True)

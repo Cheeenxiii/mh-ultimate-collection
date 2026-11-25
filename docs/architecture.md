@@ -34,6 +34,15 @@ Which reader each table is, and what is not answered yet, are in
 [reference/](../reference/README.md#mh4u-monster-tables) and the plugin's
 [README](../mods/monster_ids/README.md).
 
+The third plugin is `mods/monster_motions`. It translates the motion number a ported monster's
+MH4U handler asks into the source game's animation: it wraps MH4U's motion-start wrapper
+(`0x0094e318`, R1's) and looks (current action, the number MH4U asks) up in a table generated
+from R1's comparison, one per ported monster ([`src/motions.h`](../mods/monster_motions/src/motions.h),
+`reference/monster_motions.py table`, check [M1](checks.md#the-motion-translation-m1)). A
+missing entry passes the number through and is logged once; ids 0 to 123 are untouched. The
+converted animation lists keep the source game's grouping, so no animation is placed at
+conversion time.
+
 ## From dumps to a mod
 
 1. The player dumps MH4U, MH3U, MHXX and MHGU themselves.
@@ -73,7 +82,7 @@ A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source g
 
 What makes this tractable:
 
-- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most 3U ids, so a 3U port maps the indices instead of reusing them; 13/5, 13/6 and 13/8 are the ids whose motion itself differs. For GU the index agrees on every comparable id (R2) and #48 ships MHXX's motion lists, so a shared GU id needs no index remap. The converted animation files keep the source game's grouping and the ported monster's plugin translates the motion number at run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)): each action keeps its own animation, so 13/5, 13/6 and 13/8 each play theirs.
+- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most 3U ids, so a 3U port maps the indices instead of reusing them; 13/5, 13/6 and 13/8 are the ids whose motion itself differs. For GU the index agrees on every comparable id (R2) and #48 ships MHXX's motion lists, so a shared GU id needs no index remap. The converted animation files keep the source game's grouping and `mods/monster_motions` translates the motion number at run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)): each action keeps its own animation, so 13/5, 13/6 and 13/8 each play theirs.
 - **A GU monster's code assumes MHXX's enemy layer.** Rathian's MHXX module calls 330 engine functions, and MH4U lacks 262 of them. That is why handlers are rewritten instead of linked.
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.

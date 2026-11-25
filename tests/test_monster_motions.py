@@ -6,7 +6,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reference"))
+import check_motion_tables  # noqa: E402
 import monster_motions  # noqa: E402
+import pytest
 
 
 def motion(value):
@@ -110,67 +112,92 @@ def test_content_split_records_where_the_animation_was_found_elsewhere():
     assert s["elsewhere"] == [((7, 1), 0x41A, 209, (175, -1, 42), (0, 3))]
 
 
-def test_placement_groups_actions_by_target_slot_and_source():
-    a = {
-        (3, 17): dict(motion=0x101, how="constant"),     # file 1, slot 1
-        (7, 6): dict(motion=0x010, how="constant"),      # file 0, slot 16
-        (7, 7): dict(motion=0x010, how="constant"),      # the same target and source
-        (9, 1): dict(motion=17, how="constant"),         # the same index in both games
-    }
-    b = {
-        (3, 17): dict(motion=26, how="constant"),        # file 0, slot 26
-        (7, 6): dict(motion=19, how="constant"),         # file 0, slot 19
-        (7, 7): dict(motion=19, how="constant"),
-        (9, 1): dict(motion=17, how="constant"),
-    }
-    lmts_a = [[None] * 100 for _ in range(5)]
-    lmts_a[1][1] = (133, 0, 42)
-    lmts_a[0][16] = (489, 62, 42)
-    lmts_b = [[None] * 30 for _ in range(3)]
-    lmts_b[0][26] = (133, 0, 42)
-    lmts_b[0][19] = (489, 62, 42)
-    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
-    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
-    assert unresolved == []
-    assert rows == [
-        dict(target=(0, 16), source=(0, 19), how="same", actions=[(7, 6), (7, 7)]),
-        dict(target=(0, 17), source=(0, 17), how="same-index", actions=[(9, 1)]),
-        dict(target=(1, 1), source=(0, 26), how="same", actions=[(3, 17)]),
+def test_repack_motion_addresses_the_converted_list_in_mh4u_packing():
+    # MH3U packs file * 100 + slot; the converted list keeps the file order, MH4U file << 8 | slot.
+    assert monster_motions.repack_motion("mh3u", 26) == 26
+    assert monster_motions.repack_motion("mh3u", 209) == 0x209
+    assert monster_motions.repack_motion("mh3u", 202) == 0x202
+    # MHXX already packs file << 8 | slot, so its animations keep their index.
+    assert monster_motions.repack_motion("mhxx", 0x41A) == 0x41A
+
+
+def config(tmp_path, a, b, mapping):
+    a_path = tmp_path / "a.tsv"
+    b_path = tmp_path / "b.tsv"
+    map_path = tmp_path / "map.tsv"
+    a_path.write_text(monster_motions.HEADER + "".join(a))
+    b_path.write_text(monster_motions.HEADER + "".join(b))
+    map_path.write_text("# cat\tidx\tmotion_a\tmotion_b\thow\tsignature_a\tsignature_b\n" + "".join(mapping))
+    return monster_motions.read_rows(str(a_path)), monster_motions.read_rows(str(b_path)), \
+        monster_motions.read_mapping(str(map_path))
+
+
+def test_the_table_translates_what_r1_resolved_and_leaves_the_rest_out(tmp_path):
+    a = ["13\t5\t0x1000\t2\tconstant\n", "13\t6\t0x1000\t2\tconstant\n",
+         "13\t8\t0x1000\t19\tconstant\n", "7\t36\t0x1000\t1052\tconstant\n",
+         "1\t11\t0x1000\t17\tconstant\n", "8\t\t0x1000\t1027\tconstant\n",
+         "2\t0\t0x1000\t\tnone\n", "3\t0\t0x1000\t\tno-handler\n"]
+    b = ["13\t5\t0x2000\t19\tconstant\n", "13\t6\t0x2000\t26\tconstant\n",
+         "13\t8\t0x2000\t26\tconstant\n", "7\t36\t0x2000\t211\tconstant\n",
+         "1\t11\t0x2000\t17\tconstant\n", "8\t\t0x2000\t202\tconstant\n",
+         "2\t0\t0x2000\t\tnone\n", "3\t0\t0x2000\t\tno-handler\n"]
+    mapping = ["13\t5\t2\t19\tsame\t(1, 0, 1)\t(1, 0, 1)\n",
+               "13\t6\t2\t26\tdifferent\t(1, 0, 1)\t(2, 0, 1)\n",
+               "13\t8\t19\t26\tdifferent\t(1, 0, 1)\t(2, 0, 1)\n",
+               "7\t36\t1052\t211\tunresolved\t\t\n",
+               "8\t\t1027\t202\tsame\t(1, 0, 1)\t(1, 0, 1)\n"]
+    rows_a, rows_b, rows_map = config(tmp_path, a, b, mapping)
+    monster = dict(id="125", key="rathian-3u", name="Rathian", source_game="mh3u", source_key="em001")
+    table = monster_motions.build_table(monster, rows_a, rows_b, rows_map, "mh3u")
+    assert table["entries"] == [
+        dict(cat=8, index=monster_motions.NO_INDEX, motion=0x403, source=0x202),
+        dict(cat=13, index=5, motion=2, source=0x13),
+        dict(cat=13, index=6, motion=2, source=0x1a),
+        dict(cat=13, index=8, motion=0x13, source=0x1a),
     ]
+    assert table["unresolved"] == [dict(cat=7, index=36, motion=0x41c)]
+    assert (table["common"], table["compared"], table["same_index"], table["not_compared"]) == (8, 6, 1, 2)
 
 
-def test_placement_refuses_a_target_slot_two_animations_want():
-    a = {
-        (13, 5): dict(motion=2, how="constant"),         # both target file 0, slot 2
-        (13, 6): dict(motion=2, how="constant"),
-    }
-    b = {
-        (13, 5): dict(motion=19, how="constant"),
-        (13, 6): dict(motion=26, how="constant"),
-    }
-    lmts_a = [[None] * 100 for _ in range(5)]
-    lmts_a[0][2] = (347, 0, 42)
-    lmts_b = [[None] * 30 for _ in range(3)]
-    lmts_b[0][19] = (489, 62, 42)
-    lmts_b[0][26] = (133, 0, 42)
-    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
-    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
-    assert unresolved == []
-    assert all(r["how"] == "conflict" and r["target"] == (0, 2) for r in rows)
-    assert [r["actions"] for r in rows] == [[(13, 5)], [(13, 6)]]
-    assert [r["source"] for r in rows] == [(0, 19), (0, 26)]
+def test_a_mapping_that_does_not_match_the_inventories_is_refused(tmp_path):
+    a = ["13\t5\t0x1000\t2\tconstant\n", "13\t6\t0x1000\t2\tconstant\n", "1\t11\t0x1000\t17\tconstant\n"]
+    b = ["13\t5\t0x2000\t19\tconstant\n", "13\t6\t0x2000\t26\tconstant\n", "1\t11\t0x2000\t17\tconstant\n"]
+    monster = dict(id="125", key="rathian-3u", name="Rathian", source_game="mh3u", source_key="em001")
+    good = ["13\t5\t2\t19\tsame\t\t\n", "13\t6\t2\t26\tsame\t\t\n"]
+    rows_a, rows_b, rows_map = config(tmp_path, a, b, good)
+    assert monster_motions.build_table(monster, rows_a, rows_b, rows_map, "mh3u")["entries"]
+    for bad in (
+        ["1\t11\t17\t17\tsame\t\t\n"],                    # a same-index id needs no row
+        ["3\t0\t2\t19\tsame\t\t\n"],                      # not an id both games have
+        ["13\t5\t2\t19\tsame\t\t\n", "13\t5\t2\t19\tsame\t\t\n"],   # 13/5 twice
+        ["13\t5\t2\t19\tsame\t\t\n", "13\t6\t3\t26\tsame\t\t\n"],   # 13/6 asks 2, not 3
+    ):
+        rows_a, rows_b, rows_map = config(tmp_path, a, b, bad)
+        with pytest.raises(ValueError):
+            monster_motions.build_table(monster, rows_a, rows_b, rows_map, "mh3u")
+    # 13/6's indices differ and the mapping has no row for it.
+    rows_a, rows_b, rows_map = config(tmp_path, a, b, ["13\t5\t2\t19\tsame\t\t\n"])
+    with pytest.raises(ValueError):
+        monster_motions.build_table(monster, rows_a, rows_b, rows_map, "mh3u")
 
 
-def test_placement_takes_an_elsewhere_animation_from_the_source_game():
-    """`elsewhere` is a fact about the target's own lists; the port still copies the source's
-    animation from the source game's slot."""
-    a = {(7, 1): dict(motion=0x41A, how="constant")}          # file 4, slot 26: empty
-    b = {(7, 1): dict(motion=209, how="constant")}            # file 2, slot 9
-    lmts_a = [[None] * 100 for _ in range(5)]
-    lmts_a[0][3] = (175, -1, 42)                              # the same animation, another slot
-    lmts_b = [[None] * 30 for _ in range(3)]
-    lmts_b[2][9] = (175, -1, 42)
-    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
-    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
-    assert unresolved == []
-    assert rows == [dict(target=(4, 26), source=(2, 9), how="elsewhere", actions=[(7, 1)])]
+def test_the_header_has_one_table_per_ported_monster():
+    monster = dict(id="125", key="rathian-3u", name="Rathian", source_game="mh3u", source_key="em001")
+    table = dict(monster=monster, source="mh3u",
+                 entries=[dict(cat=13, index=5, motion=2, source=0x13)],
+                 unresolved=[dict(cat=7, index=36, motion=0x41c)],
+                 common=174, compared=117, same_index=2, not_compared=57)
+    other = dict(monster=dict(monster, id="124", key="rathian-gu", source_game="mhxx", source_key="em001"),
+                 source="mhxx", entries=[], unresolved=[], common=273, compared=167,
+                 same_index=167, not_compared=106)
+    text = monster_motions.render_header([table, other])
+    assert "#define MHUC_PORTED_MOTIONS_COUNT 2" in text
+    assert "static const MhucMotion mhuc_motions_124 = NULL;" not in text
+    assert "static const MhucMotion *const mhuc_motions_124 = NULL;" in text
+    assert "    {13, 5, 0x002, 0x013}," in text
+    assert "    0x0724, /* 7/36 */" in text
+    assert "{125, 1, 1, 174, 117, 2, 57, mhuc_motions_125, mhuc_unresolved_125}," in text
+    parsed = check_motion_tables.parse_header(text)
+    assert parsed["count"] == 2
+    assert parsed["meta"][0]["id"] == 125
+    assert parsed["tables"][125]["entries"] == [dict(category=13, index=5, motion=2, source=0x13)]

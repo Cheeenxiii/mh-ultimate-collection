@@ -19,7 +19,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `loader_trace.py` | runs MHXX's `dttune`, `dtbase` or `dtbparts` loader, or MH3U's `em_status` walk, on every such file and checks `mhuc`'s readers against it ([specs/dttune.md](../specs/dttune.md), [specs/dtbase.md](../specs/dtbase.md), [specs/dtbparts.md](../specs/dtbparts.md), [specs/emstatus.md](../specs/emstatus.md)) |
 | `trace_calls.py` | logs who calls chosen functions while the game runs in Azahar, through its GDB stub (standard library only; procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) |
 | `force_action.py` | forces the next action of the monster at the dispatcher in MHXX or MH3U through the same GDB stub; a debugging tool for a move, not check R1 |
-| `monster_motions.py` | lists the motion each of a monster's action handlers starts, compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)), and plans where a port writes the source's animations ([3U Rathian's moves](#a-3u-rathians-moves-on-mh4us-handlers)) |
+| `monster_motions.py` | lists the motion each of a monster's action handlers starts, compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)), and generates the port's run-time motion table from the comparison, one per ported monster ([3U Rathian's moves](#a-3u-rathians-moves-on-mh4us-handlers); check M1) |
 | `action_map.py` | joins two games' action and motion inventories: the MH4U handler each shared action id reaches, the ids only one game has, and the ids where the two sides' start motions differ (check R2 in [docs/checks.md](../docs/checks.md#the-shared-action-map-r2)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:
@@ -423,15 +423,23 @@ fork's ABI 3); the 19 calls of #55 whose MH4U counterpart is unknown belong to t
 handlers have one, 8 have none.
 
 **Where the port's animations go.** The converted animation file keeps the source game's
-grouping, and the port translates the motion number at run time: the ported monster's plugin
-hooks MH4U's motion-start wrapper (0x0094e318) and maps (current action, the number MH4U's
-handler asks) to the source game's motion number with a table `monster_motions.py` generates
-from this comparison — one checked generated header per ported monster, like `ids.h`, holding
-action and motion numbers only. An entry the table lacks passes the number through unchanged
-and logs once. So each action gets its own animation and no placement conflict exists: 13/5
-and 13/6 keep the animations their own handlers start, and 13/8 keeps its own. The 19
-category-7 ids whose computed index this comparison cannot resolve are listed as entries the
-table leaves out for now; the 57 not-compared ids pass through unchanged. The plan that
+grouping, and the port translates the motion number at run time: the plugin
+[`mods/monster_motions`](../mods/monster_motions/README.md) hooks MH4U's motion-start wrapper
+(0x0094e318) and maps (current action, the number MH4U's handler asks) to the source game's
+motion number with a table `monster_motions.py table` generates from this comparison — one
+checked generated header per ported monster, like `ids.h`, holding action and motion numbers
+only. An entry the table lacks passes the number through unchanged and is logged once. So each
+action gets its own animation and no placement conflict exists: 13/5 and 13/6 keep the
+animations their own handlers start, and 13/8 keeps its own.
+
+The 3U Rathian's table (id 125) holds 96 of her 117 compared ids; the other 2 (1/11 and 1/12)
+start the same index in both games and need no entry, and the 19 category-7 ids whose computed
+index this comparison cannot resolve are left out and listed in the header; the 57 not-compared
+ids pass through. The GU Rathian's table (id 124) is empty: MH4U and MHXX start the same index
+on all 167 of their compared ids (R2), so her port needs no translation for them and the 106
+not-compared ids pass through. The header is generated and checked, never edited:
+`tools/check_motion_tables.py` checks it against R1's counts and, given the same inputs as the
+generator, that it is exactly what the generator writes. The plan that
 `monster_motions.py place` used to write is retired (issue #125).
 
 ### Lessons from MHGU Definitive Edition's ports
