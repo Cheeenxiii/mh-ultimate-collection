@@ -238,6 +238,11 @@ def test_sound_refuses_a_madp_version_4_offset_that_does_not_follow_the_channels
         sound.read_wave(wave(channels=2, offset=0x5C))
 
 
+def test_sound_reads_an_empty_placeholder_wave():
+    """one MH3U wave is a placeholder with no samples and no data (em045's blank voice)"""
+    assert sound.read_wave(wave(data_size=0)).data_size == 0
+
+
 def test_sound_refuses_a_seek_count_that_does_not_match_the_bytes_after_the_data():
     """the seek count is the only record of the table's length, so the file's size must confirm it"""
     d = bytearray(wave(seek=1))

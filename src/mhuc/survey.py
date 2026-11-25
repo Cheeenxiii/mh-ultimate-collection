@@ -6,8 +6,8 @@ a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (te
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
 records against their hit volumes), E9 (MH3U em_status break blocks), E11 (MHXX dtbparts joint record kinds),
-L1 (lmt), A1 (rEnemyCmd), S1 (rCollision), SN1 (sound resources by kind, version and class id), S4 (MH4U stream
-requests).
+L1 (lmt), A1 (rEnemyCmd), S1 (rCollision), SN1 (sound resources by kind, version and class id), SN6 (the
+MH3U wave, bank, request and stream request layouts), S4 (MH4U stream requests).
 
 Memory: each worker holds one archive and its decompressed entries at a time; keep the
 worker count low on machines with little RAM (default 4).
@@ -18,7 +18,23 @@ import struct
 from collections import Counter
 from multiprocessing import Pool
 
-from .formats import arc, classid, dtbase, dtbparts, dttune, emd, emstatus, gmd, hitdata, lmt, pica, romfs, stq, tex
+from .formats import (
+    arc,
+    classid,
+    dtbase,
+    dtbparts,
+    dttune,
+    emd,
+    emstatus,
+    gmd,
+    hitdata,
+    lmt,
+    pica,
+    romfs,
+    sound,
+    stq,
+    tex,
+)
 from .formats import mod as modfile
 from .quests import quest as questfile
 
@@ -78,6 +94,12 @@ def tex_expected_size(data: bytes) -> int | None:
     return size
 
 
+def _read_stream_request(data: bytes) -> dict:
+    """Check SN6's stream request read; the S4 counters belong to MH4U's version only."""
+    stq.read(data)
+    return {}
+
+
 def _sound(st: dict, data: bytes, kind: str, type_id: int | None) -> None:
     """Count one sound resource by kind, magic and version, and by class id when it sits in an ARC."""
     c = st.setdefault("sound", Counter())
@@ -92,6 +114,18 @@ def _sound(st: dict, data: bytes, kind: str, type_id: int | None) -> None:
             c.update(stq.check(data))
         except stq.StqError:
             c["S4 .stq not read"] += 1
+    # Check SN6: read the kind with the version-aware reader. MH4U's wave version 5 is read for
+    # its mono effects; its stereo music layout isn't laid out, so those count as not read.
+    reader = {"wave": sound.check_wave, "bank": sound.check_bank,
+              "request": sound.check_request}.get(kind)
+    if reader is None and kind == "stream request" and data[:4] == stq.MAGIC:
+        reader = _read_stream_request
+    if reader is not None:
+        try:
+            c.update(reader(data))
+            c[f"SN6 {kind} read"] += 1
+        except (sound.SoundError, stq.StqError):
+            c[f"SN6 {kind} not read"] += 1
     if type_id is None:
         c[f"{kind} {magic} loose"] += 1
     else:

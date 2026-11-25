@@ -2,9 +2,9 @@
 
 The layouts are in specs/sound.md. MH4U and MH3U share the classes, but MH3U ships one file version
 older in every kind: waves `MADP` 4 against 5, banks `SNDB` 10 against 11 and requests `SREQ` 6
-against 8. The older layouts are laid out and checked against MH3U's RomFS by check SN6; the wave
-and bank records are the same size, and a wave's decoder fields are byte-identical to MH4U's for
-audio both games ship (SN6).
+against 8. Check SN6 lays the older layouts out and checks them against MH3U's whole RomFS: the
+bank and request containers are MH4U's, and a wave's decoder fields are MH4U's moved down by four
+bytes, byte-identical for audio both games ship.
 
 Little endian throughout.
 """
@@ -67,8 +67,8 @@ def read_wave(data: bytes) -> Wave:
     seconds, = struct.unpack_from("<f", data, 0x24)
     if rate == 0:
         raise SoundError("sample rate 0")
-    if data_size == 0 or data_size % 0x100:
-        raise SoundError(f"data size {data_size} isn't a positive multiple of 0x100")
+    if data_size % 0x100:
+        raise SoundError(f"data size {data_size:#x} isn't a multiple of 0x100")
     if abs(seconds - samples / rate) > max(1e-3, samples / rate * 1e-5):
         raise SoundError(f"{seconds} s for {samples} samples at {rate} Hz")
     if version == 4:
@@ -103,7 +103,13 @@ def read_wave(data: bytes) -> Wave:
 
 def check_wave(data: bytes) -> dict:
     """The counts check SN6 keeps for one wave; read_wave has already validated it."""
-    return {}
+    wave = read_wave(data)
+    counts = {f"SN6 wave {('mono', 'stereo')[wave.channels - 1]}": 1}
+    if wave.seek_count:
+        counts["SN6 wave with a seek table"] = 1
+    if wave.data_size == 0:
+        counts["SN6 empty wave"] = 1
+    return counts
 
 
 # ---------------------------------------------------------------- banks
@@ -175,11 +181,21 @@ def read_bank(data: bytes) -> Bank:
     return Bank(version, groups, tuple(entries), tail)
 
 
+WAVE_TYPE_ID = 0x67195A2E     # rLtSoundSourceADPCM, the type every bank entry names
+
+
 def check_bank(data: bytes) -> dict:
     """The counts check SN6 keeps for one bank; read_bank has already validated it."""
     bank = read_bank(data)
-    return {"SN6 bank entries": len(bank.entries), "SN6 bank groups": len(bank.groups),
-            "SN6 bank tail records": len(bank.tail)}
+    counts = {"SN6 bank entries": len(bank.entries), "SN6 bank groups": len(bank.groups),
+              "SN6 bank tail records": len(bank.tail)}
+    other = sum(1 for e in bank.entries if e.type_id != WAVE_TYPE_ID)
+    if other:
+        counts["SN6 bank entries not a wave"] = other
+    out_of_order = sum(1 for i, (_, index) in enumerate(bank.tail) if index & 0xFF != i)
+    if out_of_order:
+        counts["SN6 bank tail index out of order"] = out_of_order
+    return counts
 
 
 # ---------------------------------------------------------------- requests
