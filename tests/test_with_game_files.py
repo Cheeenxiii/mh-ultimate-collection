@@ -423,7 +423,7 @@ def test_no_motion_list_uses_the_float_track_block_in_all_three_games(dump):
     some lists, where the next block starts and they are that block's first word. It also checks the
     two flags the loader reads: 0x2000000 is never set, and 0x1000000 (702 MHXX animations) marks a
     motion that shares its track table with an earlier one that doesn't set it."""
-    counts, nonzero = Counter(), Counter()
+    counts, nonzero, shared = Counter(), Counter(), Counter()
     flags = {game: Counter() for game in ("mh4u", "mhxx", "mh3u")}
     for game in ("mh4u", "mhxx", "mh3u"):
         image = romfs.open_image(dump(game, "romfs.bin"))
@@ -453,6 +453,7 @@ def test_no_motion_list_uses_the_float_track_block_in_all_three_games(dump):
             for tr, same in tables.items():                        # a shared track table is relocated once
                 if len(same) == 1:
                     continue
+                shared[game] += 1
                 unflagged = [a for a in same if not a.flags & 0x1000000]
                 assert len(unflagged) == 1, (name, tr, len(unflagged))
                 assert all(a.offset > unflagged[0].offset for a in same if a.flags & 0x1000000), (name, tr)
@@ -470,6 +471,7 @@ def test_no_motion_list_uses_the_float_track_block_in_all_three_games(dump):
                     nonzero[game] += 1
     assert (counts["lists"], counts["animations"]) == (2841, 52902), dict(counts)
     assert dict(nonzero) == {"mh4u": 1466, "mhxx": 972, "mh3u": 383}, dict(nonzero)
+    assert dict(shared) == {"mhxx": 525}, dict(shared)
     assert flags == {"mh4u": {0x800000: 23412},
                      "mhxx": {0x800000: 19767, 0x800001: 685, 0x1800000: 702},
                      "mh3u": {0x800000: 8336}}, {g: dict(c) for g, c in flags.items()}
