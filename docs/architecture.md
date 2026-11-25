@@ -157,7 +157,7 @@ her sound set (`--arc --sound-arc`).
 
 | File kind | MH3U entries | In the mod | Why |
 |---|---|---|---|
-| models (`MOD`, 0xE6) | 2 | as they are | the same version in MH3U and MH4U ([mod.md](../specs/mod.md), checks M1 to M3); her body's 44 bones (MH4U's Rathian has 43) and her tail's 3 are kept whole, because her motions are hers too |
+| models (`MOD`, 0xE6) | 2 | as they are, under MH4U's model flag | the same version in MH3U and MH4U ([mod.md](../specs/mod.md), checks M1 to M3); her body's 44 bones (MH4U's Rathian has 43) and her tail's 3 are kept whole, because her motions are hers too; the archive's entry flag is MH4U's `0xA0000000` on models ([arc.md](../specs/arc.md#size-word-flags)) |
 | materials (`MRL`, 0x20) | 2 | as they are, their texture paths rewritten | the same version in both games; the paths are absolute and are moved in place from `enemy\em001\mod\em001*` to `enemy\em125\mod\em125*`, the two names being the same length |
 | model textures (`TEX`, 0xA5) | 2 | as they are | the same version in both games ([tex.md](../specs/tex.md), check T1) |
 | motion lists (`LMT`, 66) | 3 | converted to version 67 | the layouts are the same, but version 66 stores keyframe types 11 to 13 signed and version 67 unsigned behind a bounds block ([lmt.md](../specs/lmt.md#keyframe-buffers)): each key is re-encoded, within 6.11e-5 of the source's component (check L6) |

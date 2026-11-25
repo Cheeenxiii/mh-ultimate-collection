@@ -27,6 +27,7 @@ from .formats import arc, lmt
 
 MODEL, MATERIAL, TEXTURE, MOTION = "rModel", "rMaterial", "rTexture", "rMotionList"
 TAKEN = (MODEL, MATERIAL, TEXTURE)          # same format in MH3U and MH4U; only the path changes
+MODEL_FLAGS = 0xA0000000                   # MH4U's own model entries carry this (specs/arc.md, size word flags)
 TEXTURE_PATH = re.compile(rb"enemy\\[^\x00]{1,62}")
 
 
@@ -98,7 +99,8 @@ def convert(src: bytes, monster_id: int) -> Mod:
         if e.type_name in TAKEN and e.path.startswith(f"enemy\\{stem}\\mod\\"):
             base = e.path.rsplit("\\", 1)[1]
             data = _material(e.data, stem, target) if e.type_name == MATERIAL else e.data
-            entries.append(arc.Entry(f"enemy\\{target}\\mod\\{_rename(base, stem, target)}", e.type_id, data))
+            entries.append(arc.Entry(f"enemy\\{target}\\mod\\{_rename(base, stem, target)}", e.type_id, data,
+                                      flags=MODEL_FLAGS if e.type_name == MODEL else 0))
     motions = sorted((e for e in archive.entries
                       if e.type_name == MOTION and e.path.startswith(f"enemy\\{stem}\\mot\\")),
                      key=lambda e: e.path)

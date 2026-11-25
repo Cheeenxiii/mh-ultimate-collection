@@ -350,6 +350,9 @@ def test_monsterassets_moves_the_source_files_to_the_ported_ids_paths():
         ("rModel", "enemy\\em125\\mod\\em125"), ("rMaterial", "enemy\\em125\\mod\\em125"),
         ("rTexture", "enemy\\em125\\mod\\em125_BM"), ("rMotionList", "enemy\\em125\\mot\\em125_0")}
     assert lmt.read(paths["rMotionList", "enemy\\em125\\mot\\em125_0"].data)[0] == 67
+    built = arc.read(mod.archive())
+    assert {e.flags for e in built.entries if e.type_name == "rModel"} == {0xA0000000}
+    assert {e.flags for e in built.entries if e.type_name != "rModel"} == {0x20000000}
     # the material's texture path is absolute, so it must name the texture at the ported id's path
     material = paths["rMaterial", "enemy\\em125\\mod\\em125"]
     assert b"enemy\\em125\\mod\\em125_BM" in material.data
