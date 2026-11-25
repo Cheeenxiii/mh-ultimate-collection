@@ -7,7 +7,7 @@ import zlib
 import pytest
 
 from mhuc import monsterdata
-from mhuc.formats import classid, emd, hitdata, lmt, pica
+from mhuc.formats import classid, emd, hitdata, lmt, pica, stq
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -150,3 +150,41 @@ def test_htd_volume_group_must_be_below_the_hts_group_count():
     counts = hitdata.check_htd(htd, hts)
     assert counts["E8 htd volume group below the HTS group count"] == 1
     assert counts["E8 htd volume group OUTSIDE"] == 1
+
+
+def stq_with_stream(name: str = "sound\\bgm\\test") -> bytes:
+    """A hand-built STRQ: one stream, one sequence, then the stream's name."""
+    stream_at, sequence_at = 0x18, 0x18 + 36
+    name_at = sequence_at + 100
+    d = bytearray(name_at + len(name) + 1)
+    struct.pack_into("<4s5I", d, 0, b"STRQ", 0x22, 1, 1, stream_at, sequence_at)
+    struct.pack_into("<9I", d, stream_at, name_at, 0x1234, 0x1000, 2, 32728, 0, 0, 0x67195A2E, 2)
+    struct.pack_into("<I", d, sequence_at, 7)
+    struct.pack_into("<f", d, sequence_at + 0x24, -0.9)
+    struct.pack_into("<I", d, sequence_at + 0x5C, 0)
+    d[name_at:name_at + len(name)] = name.encode()
+    return bytes(d)
+
+
+def test_stq_reads_a_hand_built_stream_request():
+    """specs/sound.md stream request: header 0x18, stream record 36 at 0x18, sequence record 100, then the names"""
+    s = stq.read(stq_with_stream())
+    assert [(x.name, x.size, x.samples, x.channels, x.rate, x.loop_start, x.loop_end, x.type_id, x.unknown_20)
+            for x in s.streams] == [("sound\\bgm\\test", 0x1234, 0x1000, 2, 32728, 0, 0, 0x67195A2E, 2)]
+    assert s.sequences[0].id == 7
+    assert s.sequences[0].level == pytest.approx(-0.9)
+    assert s.sequences[0].stream == 0
+
+
+def test_stq_refuses_a_sequence_naming_a_stream_past_the_table():
+    d = bytearray(stq_with_stream())
+    struct.pack_into("<I", d, 0x18 + 36 + 0x5C, 1)
+    with pytest.raises(stq.StqError, match="stream 1 of 1"):
+        stq.read(bytes(d))
+
+
+def test_stq_refuses_names_that_do_not_fill_the_file():
+    d = bytearray(stq_with_stream())
+    struct.pack_into("<I", d, 0x18, 0x18 + 36 + 100 + 1)     # name offset one past the first name
+    with pytest.raises(stq.StqError, match="name at"):
+        stq.read(bytes(d))
