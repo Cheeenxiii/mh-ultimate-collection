@@ -13,7 +13,7 @@ The 13 ids split into four slices (the issues are in the same milestone):
 |---|---|---|
 | 3/98 and the 12/1-3 chain | 3/98, 12/1, 12/2, 12/3 | this plugin |
 | 4/27 to 4/32 | six ids on one handler | this plugin |
-| 8/0 | one handler, with its combo tail | pending |
+| 8/0 | one handler, with its combo tail | this plugin |
 | category 17 | a gate plus a base-class routine | this plugin |
 
 12/0 needs no code. MH4U's category-12 case checks index 0 and runs its own handler
@@ -31,6 +31,15 @@ is in [checks.md](../../docs/checks.md#the-shared-action-map-r2).
 | 12/3 | block `0x0201c27c` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/9 handler `0x006d5e98` (r1=1, r2=0) |
 | 17 | case `0x020098b8` -> gate `0x008d5bd4`; 0-2 return, others the base update `0x008ae50c` (vtable slot `0x3d0`) | indexes 0-2 nothing; others MH4U's base action update `0x00911b48` (`uEnemy` vtable slot 89) |
 | 4/27-32 | handler `0x0200e3b4`, blocks `0x02018af8`, `0x02018b1c`, `0x02018b40`, `0x02018b64`, `0x02018b88`, `0x02018bac`, r1/r2 2/0, 1/0, 2/1, 1/1, 2/0, 1/0 | one C state machine in `src/rathian_actions.c`, three states: line setup and motion `0x418`/`0x417` at 6.0; a turn, a line point and a step, motion `0x90a`/`0x909` at 0.0; a turn at +-0x2000, then the finish flag and MH4U's base update `0x00911b48`, or motion `0x90b`/`0x90d` at 2.0 and the source's next-action request |
+| 8/0 | block `0x020097a4`, handler `0x0201b460`, 3 states, motion `0x403` | a C state machine in `src/rathian_actions.c`: copy the data entry and aim at the target at 300.0/38.0; the per-mode check at 12.0/50.0 and the position advance; the finish flag, motion `0x403` at 4.0 and the 180.0 timer; then the timer, the two hit checks at 300.0/0.0/150.0 and the request for `9/1`, or `2/6` when they fail or the timer is spent |
+
+8/0 is the same action as MH4U's own 8/0: MH4U's category-8 case runs `0x006e9770`,
+which uses the same frame values (300.0/38.0, 12.0/50.0, 180.0, 4.0, 300.0/0.0/150.0) and
+the same tail (`9/1` or `2/6`). So its calls map onto MH4U functions at the same points,
+and its work offsets are MH4U's: the state is kept by the plugin, the timer is work+0x1d4,
+the pending-action mode work+0x1d9, the two hit-check bytes work+0x278/+0x27c and the
+velocity work+0x160. The entry stores are MH4U's work+0x7738/+0x7739 cleared and
+work+0x7a3c set to 2, and the tail flag is work+0x7993.
 
 Each engine call maps to the MH4U function of the same steps, from the reference's call
 mapping (the MHXX address in brackets): motion start `0x0094e318` [`0x008eb108`], data float
@@ -96,12 +105,44 @@ getter `0x008bb4e4` reads the float at `this+0x298`, which MH4U's same handler r
 `*(this+0xb770)` is MH4U's `*(this+0x8d88)` and keeps its layout: origin x,z at `+0x30`,
 direction x,y,z,w at `+0x40` to `+0x4c`.
 
+8/0's calls, each the MH4U function MH4U's own 8/0 handler calls at the same point: data
+entry `0x009167b4` [`0x008b1700`], aim at a point `0x00948674` [`0x008df28c`], per-mode
+speed/distance `0x0091aae4` [`0x008a7360`], position advance `0x00955440` [`0x008f1f30`],
+countdown `0x00b0704c` [`0x008a78ec`'s worker; MHXX's worker multiplies the frame delta by
+the call's `s0`, which is 1.0 here, and both clamp at 0], hit check `0x009122fc`
+[`0x008ae8ec`], hit check with its mode in r3 `0x0092b2b0` [`0x008c024c`], request next
+action `0x0094ef64` [`0x008ebab0`].
+
 **What it does not translate yet.** The 12/1 and 12/2 blocks end through MHXX's
-request-next-action helper `0x008ebab0` (also 13/4's tail). MH4U has neither the helper's
-work-block bytes nor its pending-action queue, so the chain stops after the move and returns
-to idle instead of following on to 12/2 or 12/3. The plugin logs that once per action. 3/98's
-second motion gets `s1 = 0.0`; the source leaves `s1` from the previous state, which is
-`0.0` while the move is current. Both are recorded in the slice's issue and R2p.
+request-next-action helper `0x008ebab0`. Its MH4U counterpart is `0x0094ef64` — the same
+steps: refuse category 0x0b, otherwise take the immediate path through the action setter
+when work+0x1d9 is 1, else store the pending pair at work+0x1d0/+0x1d1 with the flag at
+work+0x1cf. The 8/0 slice uses it, but the 12/1-3 slice still returns to idle instead of
+following on to 12/2 or 12/3; wiring those two is a follow-up (the chain is visible in
+R2p).
+
+8/0 has four gaps, recorded here and in the plugin's log:
+
+- **The leaf `0x008c4184` is MH4U's `0x0092f6e8`.** Both take `(this, table)` with the mode
+  in r2: 0x008c4184 clears r2 and falls into `0x008c418c`, which picks one of the table's
+  entries by work+0x331, adds this+0x2a4 times the frame delta to the float at work+0x334,
+  and sets flags at work+0x32e. MH4U's own handler calls it with `0x00e094d8` where MHXX
+  uses `0x20220ac`. The MHXX table is the port's data and is not carried yet, so the
+  handler does not call it; when it does, the table goes with it.
+- **`0x008ae5e4` (MH4U `0x00911c0c`) takes its 4th and 5th arguments in r3 and on the
+  stack**, which the ABI 3 `call` cannot set. It is the data setup for this action and waits
+  on #134.
+- **`0x008d0528` has no confirmed MH4U counterpart.** It reads this+0x6dd0, calls
+  0x00add004 and then 0x008da42c or 0x008b58c0, and ends in 0x008d057c(this, 0), which
+  adjusts a float at work+0x59d4 and the work+0x5800 area. MH4U's own 8/0 handler has no
+  call at that point. The port skips it.
+- The source's `[this+0xa304] == 2 && [this+0xa305] == 4` branch sets the tail flag to 1
+  instead of 3. The MH4U handler has no such branch and the two bytes have no MH4U
+  counterpart, so the port takes the source's other path.
+
+Both slices leave one small detail: 3/98's second motion gets `s1 = 0.0` (the source leaves
+`s1` from the previous state, which is `0.0` while the move is current), and 8/0's state 1
+calls the per-mode check every frame as the source does.
 
 The 4/27-32 slice has two more gaps:
 
@@ -119,10 +160,12 @@ The 4/27-32 slice has two more gaps:
 The host's ABI 3 `call` runs a game function with `r0`-`r2` and returns its `r0`. MH4U's
 engine functions take motion speeds and points in VFP registers (`s0`, `s1`), which `call`
 does not set, and a source case block receives target points in `s0`-`s3`, which a hook
-cannot read. So the plugin builds tiny ARM stubs in a 256-byte block from the game's own heap
+cannot read. So the plugin builds tiny ARM stubs in a 384-byte block from the game's own heap
 (`alloc`, ABI 2):
 
 - `vldr s0/s1` from a literal, then branch to the engine function;
+- `vldr s0/s1/s2` for the 8/0 hit check, which takes three floats;
+- `ldr r3` for the 8/0 mode hit check, which takes its mode in `r3`;
 - for a function that hands a float back, set `lr` to a continuation that moves `s0` to `r0`;
 - `vmov r0, sN; bx lr` to read the caller's `s0`-`s3`.
 
@@ -154,10 +197,10 @@ python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Az
 ```
 
 A run logs the ready line, then `running the translated action 3/98` (or 12/1, 12/2, 12/3,
-4/27 to 4/32) the first time one runs; category 17 logs one line per index, either
-`17/N: nothing (the gate returns for 0 to 2)` or `17/N: running MH4U's base action update
-0x00911b48`. The dispatcher must be a hook point, so the code library needs the mod's hooks
-(the build above).
+4/27 to 4/32, 8/0) the first time one runs; 8/0 logs its uncovered calls once; category 17
+logs one line per index, either `17/N: nothing (the gate returns for 0 to 2)` or `17/N:
+running MH4U's base action update 0x00911b48`. The dispatcher must be a hook point, so the
+code library needs the mod's hooks (the build above).
 
 ## Settings
 

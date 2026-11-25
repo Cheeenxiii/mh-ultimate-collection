@@ -31,11 +31,12 @@ static char logs[16][512];
 static int nlogs;
 
 typedef struct {
-    uint32_t fn, a0, a1, a2, s0, s1;
-    int has_s0, has_s1;
+    uint32_t fn, a0, a1, a2, s0, s1, s2, r3;
+    int has_s0, has_s1, has_s2, has_r3;
 } Call;
 static Call calls[64];
 static int ncalls;
+static int fake_hit_check = 1, fake_hit_r3 = 1;
 
 static void fail(const char *fmt, ...) {
     va_list ap;
@@ -71,19 +72,22 @@ static void h_write8(MH4UCall *c, uint32_t a, uint32_t v) { (void)c; mem[a]=(uin
 
 static uint32_t h_call(MH4UCall *c, uint32_t addr, uint32_t a0, uint32_t a1, uint32_t a2) {
     (void)c;
-    if (addr >= HEAP_AT && addr < HEAP_AT + 256) {
+    if (addr >= HEAP_AT && addr < HEAP_AT + STUB_BLOCK_SIZE) {
         const uint32_t w0 = h_read32(c, addr);
         const uint32_t fn = (w0 == 0xED9F0A01u) ? h_read32(c, addr + 16)
                           : (w0 == 0xED9F0A02u) ? h_read32(c, addr + 24)
-                          : (w0 == 0xED9F0A03u) ? h_read32(c, addr + 32) : 0;
+                          : (w0 == 0xED9F0A03u) ? h_read32(c, addr + 32)
+                          : (w0 == 0xED9F0A04u) ? h_read32(c, addr + 36) : 0;
         uint32_t got = (fn == FN_SET_SPEED || fn == FN_FLAG || fn == FN_MODE_CLEAR) ? 1u
+                     : (fn == FN_HIT_CHECK) ? (uint32_t)fake_hit_check
+                     : (fn == FN_HIT_CHECK_R3) ? (uint32_t)fake_hit_r3
                      : (fn == FN_DATA_FLOAT) ? 0x3fc00000u : 0u;
         if (fn == FN_MODE_CLEAR && fail_mode_clear) {
             fail_mode_clear = 0;
             got = 0;
         }
         if (w0 == 0xED9F0A01u) {                 /* set s0, branch */
-            Call k = {h_read32(c, addr + 16), a0, a1, a2, h_read32(c, addr + 12), 0, 1, 0};
+            Call k = {h_read32(c, addr + 16), a0, a1, a2, h_read32(c, addr + 12), 0, 0, 0, 1, 0, 0, 0};
             calls[ncalls++] = k;
             if (k.fn == FN_LINE_POINT) {         /* the engine fills the caller's point */
                 const uint32_t w = h_read32(c, a0 + ENEMY_WORK);
@@ -95,14 +99,25 @@ static uint32_t h_call(MH4UCall *c, uint32_t addr, uint32_t a0, uint32_t a1, uin
             return got;
         }
         if (w0 == 0xED9F0A02u) {                 /* set s0 and s1, branch */
-            Call k = {h_read32(c, addr + 24), a0, a1, a2, h_read32(c, addr + 16), h_read32(c, addr + 20), 1, 1};
+            Call k = {h_read32(c, addr + 24), a0, a1, a2, h_read32(c, addr + 16), h_read32(c, addr + 20), 0, 0, 1, 1, 0, 0};
             calls[ncalls++] = k;
             return got;
         }
         if (w0 == 0xED9F0A03u) {                 /* set s0, call, hand s0 back */
-            Call k = {h_read32(c, addr + 32), a0, a1, a2, h_read32(c, addr + 20), 0, 1, 0};
+            Call k = {h_read32(c, addr + 32), a0, a1, a2, h_read32(c, addr + 20), 0, 0, 0, 1, 0, 0, 0};
             calls[ncalls++] = k;
             return k.fn == FN_DATA_FLOAT ? (uint32_t)0x3fc00000u : 0;
+        }
+        if (w0 == 0xED9F0A04u) {                 /* set s0, s1 and s2, branch */
+            Call k = {h_read32(c, addr + 36), a0, a1, a2, h_read32(c, addr + 24),
+                      h_read32(c, addr + 28), h_read32(c, addr + 32), 0, 1, 1, 1, 0};
+            calls[ncalls++] = k;
+            return got;
+        }
+        if (w0 == 0xE59F3004u) {                 /* set r3, branch */
+            Call k = {h_read32(c, addr + 16), a0, a1, a2, 0, 0, 0, h_read32(c, addr + 12), 0, 0, 0, 1};
+            calls[ncalls++] = k;
+            return (uint32_t)fake_hit_r3;
         }
         if ((w0 & 0xFFF0FFFFu) == 0xEE100A10u) { /* vmov r0,sN; bx lr */
             return fake_s[(w0 >> 16) & 3u];
@@ -111,16 +126,16 @@ static uint32_t h_call(MH4UCall *c, uint32_t addr, uint32_t a0, uint32_t a1, uin
         return 0;
     }
     if (addr == FN_DATA_FLOAT) {
-        Call k = {addr, a0, a1, a2, 0, 0, 0, 0};
+        Call k = {addr, a0, a1, a2, 0, 0, 0, 0, 0, 0, 0, 0};
         calls[ncalls++] = k;
         return 0x3fc00000u;                      /* 1.5f, handed back through s0 */
     }
     if (addr == FN_SET_SPEED || addr == FN_FLAG) {
-        Call k = {addr, a0, a1, a2, 0, 0, 0, 0};
+        Call k = {addr, a0, a1, a2, 0, 0, 0, 0, 0, 0, 0, 0};
         calls[ncalls++] = k;
         return 1;
     }
-    Call k = {addr, a0, a1, a2, 0, 0, 0, 0};
+    Call k = {addr, a0, a1, a2, 0, 0, 0, 0, 0, 0, 0, 0};
     calls[ncalls++] = k;
     return 0;
 }
@@ -196,7 +211,7 @@ int main(void) {
     CHECK(hooked_frame != NULL, "no frame hook");
     hooked_frame(NULL, NULL);                 /* allocates the stubs and runs the self-test */
     int saw_selftest = 0;
-    for (int i = 0; i < nlogs; i++) if (strstr(logs[i], "selftest: 11 of the 13")) saw_selftest = 1;
+    for (int i = 0; i < nlogs; i++) if (strstr(logs[i], "selftest: 12 of the 13")) saw_selftest = 1;
     CHECK(saw_selftest, "the self-test didn't log the translated actions");
 
     /* ── 3/98, three frames ── */
@@ -469,6 +484,110 @@ int main(void) {
     CHECK(calls[3].fn == FN_TURN_TO && calls[3].a1 == TURN_STEP_FAST,
           "4/31 doesn't take the fast turn step when the mode-clear call fails");
 
+
+    /* ── 8/0: three frames, then the 9/1 tail ── */
+    const uint32_t enemy3 = 0x00050000u, work3 = 0x00060000u;
+    enemy = enemy3;
+    work = work3;
+    h_write32(NULL, enemy3 + ENEMY_WORK, work3);
+    h_write8(NULL, work3 + WORK_ID, 124);
+    h_write8(NULL, work3 + WORK_CATEGORY, 8);
+    h_write8(NULL, work3 + WORK_INDEX, 0);
+    regs[0] = enemy3;
+
+    reset_run();
+    frame_with(8, 0);                        /* state 0 */
+    CHECK(ncalls == 2, "8/0 state 0 made %d calls, want 2", ncalls);
+    CHECK(calls[0].fn == FN_MODE && calls[0].a1 == 0,
+          "8/0 doesn't copy the data entry with mode 0");
+    CHECK(calls[1].fn == FN_MOVE_TO && calls[1].a1 == work3 + WORK_VELOCITY
+          && calls[1].a2 == work3 + WORK_TARGET
+          && ffrom(calls[1].s0) == 300.0f && ffrom(calls[1].s1) == 38.0f,
+          "8/0 doesn't aim the velocity at the target at 300.0/38.0");
+    CHECK(h_read8(NULL, work3 + WORK_FLAG_ZERO_A) == 0
+          && h_read8(NULL, work3 + WORK_FLAG_ZERO_B) == 0
+          && h_read8(NULL, work3 + WORK_FLAG_MODE) == 2,
+          "8/0 doesn't clear the entry flags");
+    CHECK(skipped_calls == 1 && original_calls == 0, "8/0 didn't skip the dispatcher");
+
+    reset_run();
+    frame_with(8, 0);                        /* state 1 */
+    CHECK(ncalls == 4, "8/0 state 1 made %d calls, want 4", ncalls);
+    CHECK(calls[0].fn == FN_MODE_CLEAR && calls[0].a1 == 3 && calls[0].a2 == 0
+          && ffrom(calls[0].s0) == 12.0f && ffrom(calls[0].s1) == 50.0f,
+          "8/0 doesn't run the per-mode speed check at 12.0/50.0");
+    CHECK(calls[1].fn == FN_APPLY_MOVE, "8/0 doesn't advance the position when the check holds");
+    CHECK(calls[2].fn == FN_FLAG, "8/0 doesn't wait for the finish flag");
+    CHECK(calls[3].fn == FN_MOTION && calls[3].a1 == MOTION_8_0
+          && ffrom(calls[3].s0) == 4.0f && ffrom(calls[3].s1) == 0.0f,
+          "8/0 doesn't start motion 0x403 at 4.0");
+    CHECK(ffrom(h_read32(NULL, work3 + WORK_TIMER)) == 180.0f, "8/0 doesn't arm the 180.0 timer");
+
+    reset_run();
+    h_write8(NULL, work3 + WORK_PENDING, 1);
+    h_write8(NULL, work3 + WORK_BYTE_A, 2);
+    h_write8(NULL, work3 + WORK_BYTE_B, 4);
+    frame_with(8, 0);                        /* state 2: the 9/1 tail */
+    CHECK(ncalls == 4, "8/0 state 2 made %d calls, want 4", ncalls);
+    CHECK(calls[0].fn == FN_COUNTDOWN && calls[0].a1 == work3 + WORK_TIMER,
+          "8/0 doesn't count the timer down");
+    CHECK(calls[1].fn == FN_HIT_CHECK && calls[1].a1 == 4 && calls[1].a2 == 2
+          && ffrom(calls[1].s0) == 300.0f && ffrom(calls[1].s1) == 0.0f
+          && ffrom(calls[1].s2) == 150.0f,
+          "8/0 doesn't run the first hit check at 300.0/0.0/150.0");
+    CHECK(calls[2].fn == FN_HIT_CHECK_R3 && calls[2].a1 == 1 && calls[2].a2 == 4
+          && calls[2].r3 == 2, "8/0 doesn't run the second hit check with mode 1");
+    CHECK(calls[3].fn == FN_REQUEST_NEXT && calls[3].a1 == 9 && calls[3].a2 == 1,
+          "8/0 doesn't request the 9/1 combo tail");
+    CHECK(h_read8(NULL, work3 + WORK_FLAG_TAIL) == 3, "8/0 doesn't set the tail flag");
+
+    /* ── 8/0: a failed hit check and a spent timer request 2/6 ── */
+    reset_run();
+    h_write8(NULL, work3 + WORK_PENDING, 1);
+    h_write32(NULL, work3 + WORK_TIMER, fbits(0.0f));
+    fake_hit_check = 0;
+    frame_with(8, 0);                        /* state 2: hit check fails, timer spent */
+    CHECK(ncalls == 3, "8/0's spent timer path made %d calls, want 3", ncalls);
+    CHECK(calls[0].fn == FN_COUNTDOWN && calls[1].fn == FN_HIT_CHECK
+          && calls[2].fn == FN_REQUEST_NEXT && calls[2].a1 == 2 && calls[2].a2 == 6,
+          "8/0 doesn't request 2/6 when the hit check fails and the timer is spent");
+    fake_hit_check = 1;
+
+    /* ── 8/0: a failed fallback check while the timer runs also requests 2/6 ── */
+    reset_run();
+    h_write32(NULL, work3 + WORK_TIMER, fbits(10.0f));
+    fake_hit_check = 0;
+    fake_hit_r3 = 0;
+    frame_with(8, 0);
+    CHECK(ncalls == 4, "8/0's fallback path made %d calls, want 4", ncalls);
+    CHECK(calls[1].fn == FN_HIT_CHECK && calls[2].fn == FN_HIT_CHECK_R3
+          && calls[2].a1 == 0 && calls[3].fn == FN_REQUEST_NEXT
+          && calls[3].a1 == 2 && calls[3].a2 == 6,
+          "8/0 doesn't request 2/6 when the fallback check fails");
+    fake_hit_check = 1;
+    fake_hit_r3 = 1;
+
+    /* ── 8/0: the gate closed leaves the velocity alone, the flag still starts the motion ── */
+    const uint32_t enemy4 = 0x00070000u, work4 = 0x00080000u;
+    enemy = enemy4;
+    work = work4;
+    h_write32(NULL, enemy4 + ENEMY_WORK, work4);
+    h_write8(NULL, work4 + WORK_ID, 124);
+    h_write8(NULL, work4 + WORK_CATEGORY, 8);
+    h_write8(NULL, work4 + WORK_INDEX, 0);
+    regs[0] = enemy4;
+    reset_run();
+    frame_with(8, 0);                        /* state 0 */
+    fail_mode_clear = 1;
+    reset_run();
+    frame_with(8, 0);                        /* state 1, the gate closed */
+    CHECK(ncalls == 3 && calls[0].fn == FN_MODE_CLEAR && calls[1].fn == FN_FLAG
+          && calls[2].fn == FN_MOTION,
+          "8/0 doesn't skip the position step when the per-mode check fails");
+    fail_mode_clear = 0;
+    enemy = 0x00010000u;
+    work = 0x00020000u;
+
     /* ── shared ids and other monsters fall through ── */
     reset_run();
     frame_with(3, 17);
@@ -488,6 +607,6 @@ int main(void) {
         fprintf(stderr, "%d check(s) failed\n", failures);
         return 1;
     }
-    printf("ok: the call sequences checked across 3/98, 12/1-3, 4/27-32 and category 17\n");
+    printf("ok: the call sequences checked across 3/98, 12/1-3, 4/27-32, 8/0 and category 17\n");
     return 0;
 }

@@ -213,9 +213,13 @@ Two of those 28 are not missing. MH4U's category-8 and category-12 cases test th
 - **12/0 is MH4U's own action.** Its category-12 case runs `0x006d524c`, the handler MH4U's
   shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0 (`0x0201177c`). The port needs no
   code for it, and forcing it on the ported monster plays MH4U's handler.
-- **8/0 is a shared id with different handlers.** MH4U's category-8 case runs `0x006e9770`
-  for index 0, while MHXX's 8/0 is `0x0201b460`, which has no MH4U body pair. It stays in
-  [#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112)'s 8/0 slice.
+- **8/0 is a shared id with the same action.** MH4U's category-8 case runs `0x006e9770`
+  for index 0, which uses the same frame values as MHXX's `0x0201b460` (300.0/38.0,
+  12.0/50.0, the 180.0 timer, motion 0x403 at 4.0, 300.0/0.0/150.0) and the same tail
+  (9/1 or 2/6). The two bodies differ, so the port translates MHXX's handler onto MH4U's
+  calls and layout (`mods/rathian_actions`); its leaf `0x008c4184` is MH4U's
+  `0x0092f6e8`, whose table is not carried yet. Both 8/0 and 12/0 are missing from the
+  inventory because their cases are `cmp #0; bne`, not switches.
 
 `reference/monster_actions.py`'s `find_switch` needs that `cmp #0; bne` case before R2's counts
 can include the two ids; the counts above were made without it.
@@ -236,6 +240,8 @@ For each id in R2's map (the GU port, id 124), set it in `mods/force_action`'s `
 the move. R2's map says what to expect: a shared id starts MHXX's motion at the same index, and
 the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
 what differs: no motion, another motion, a different timing, a missing effect or projectile.
+The translated ids on the GU port are 3/98, 12/1, 12/2, 12/3 and 8/0; 8/0 should play motion
+0x403 at 4.0 and then ask for 9/1 (or 2/6), and its leaf effect is the one part not carried.
 
 Category 17 has no motion to watch. MHXX's case jumps to the gate `0x008d5bd4`, which returns
 for indexes 0 to 2 and otherwise tail-calls the base update `0x008ae50c`; the port maps that
@@ -286,9 +292,9 @@ Status: not done. The GU rows wait for #48 (the ported files) and #105 (the port
 resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
 
 The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
-handlers for 3/98, 12/1-3, 4/27-32 and category 17, and leaves shared ids and 12/0 alone
-(T1). It logs one line the first time each translated action runs, and one line per
-category-17 index.
+handlers for 3/98, 12/1-3, 4/27-32, 8/0 and category 17, and leaves shared ids and
+12/0 alone (T1). It logs one line the first time each translated action runs, one line per
+category-17 index and, for 8/0, one line naming its uncovered calls.
 
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
@@ -470,29 +476,31 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <st
 ```
 
 Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (category 17 has
-none), first motions 9/13; translated 11 (3/98, 12/1-3, 4/27-32 and category 17), MH4U's
-own 1 (12/0), pending 1 (8/0). Changing a ledger motion makes it exit 1 and name the id.
+none), first motions 9/13; translated 12 (3/98, 12/1-3, 4/27-32, 8/0 and category
+17), MH4U's own 1 (12/0), pending 0. Changing a ledger motion makes it exit 1 and name the
+id.
 
 T1b, last result (2026-11-25): pass, the call sequences checked across 3/98's three frames,
-the 12/1-3 blocks, 4/27-32's states and category 17's no-op and base-update paths. Changing
-3/98's `6.0` to `5.0` fails it with the motion line; making 17/3 a no-op (`index > 3`) fails
-it with 17/3's line; giving 4/27 the fast turn step fails it with the turn line.
+the 12/1-3 blocks, 4/27-32's states, 8/0's three states and category 17's no-op and
+base-update paths. Changing 3/98's `6.0` to `5.0` fails it with the motion line; making
+17/3 a no-op (`index > 3`) fails it with 17/3's line; giving 4/27 the fast turn step fails
+it with the turn line; changing 8/0's motion speed `4.0` to `5.0` fails it with 8/0's line.
 
 T1c, last result (2026-11-25, MH4U USA v1.3.0, the #139 code library built with the mod's
-`uEnemy::dispatchAction` hook, headless runner): pass. The log had the plugin's ready line,
+`uEnemy::dispatchAction` hook, headless runner): pass, when only the 3/98 and 12/1-3 slices
+were in the build. The log had the plugin's ready line,
 `ready: translating 5 of GU Rathian's 13 MHXX-only actions on monster 124`, then
-`selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...,
-17 <- the gate 0x008d5bd4 + MH4U's base update 0x00911b48 (slot 89, MHXX's slot 244)`, the
-line saying category 17 does nothing for indexes 0 to 2 and naming 12/0 as MH4U's own
-`0x006d524c` and the pending slices, and
+`selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...`,
+the line naming 12/0 as MH4U's own `0x006d524c` and the pending slices, and
 `selftest: float stubs at 0x08e44670 (256 bytes, the game's heap)`; the runner exited 0. No
 monster spawned, so no translated action ran: the in-game side is R2p.
 
-The 4/27-32 slice changes that self-test line to `selftest: 11 of the 13 actions: ... 4/27-32
-<- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 17 <-
-the gate 0x008d5bd4 + MH4U's base update 0x00911b48 (slot 89, MHXX's slot 244)`, and the
-pending line names 8/0 only. No headless run has shown that line yet: it needs a code library
-rebuilt with the plugin, and the build machine's one heavy job is the quest-load proof
+The 4/27-32 and 8/0 slices change that line to `selftest: 12 of the 13 actions: ... 4/27-32
+<- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0
+<- 0x0201b460 (3 states, motion 0x403 at 4.0, ...), 17 <- the gate 0x008d5bd4 + MH4U's base
+update 0x00911b48`, and the last line names 8/0's leaf and no pending slice. No headless run
+has shown that line yet: it needs a code library rebuilt with the plugin, and the build
+machine's one heavy job is the quest-load proof
 ([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)).
 
 ## Floats through a guest stub (T0)
