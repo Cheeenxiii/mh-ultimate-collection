@@ -7,7 +7,7 @@ import zlib
 import pytest
 
 from mhuc import monsterdata
-from mhuc.formats import classid, emd, hitdata, lmt, pica, stq
+from mhuc.formats import classid, emd, hitdata, lmt, pica, sound, stq
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -152,12 +152,12 @@ def test_htd_volume_group_must_be_below_the_hts_group_count():
     assert counts["E8 htd volume group OUTSIDE"] == 1
 
 
-def stq_with_stream(name: str = "sound\\bgm\\test") -> bytes:
+def stq_with_stream(name: str = "sound\\bgm\\test", version: int = 0x22) -> bytes:
     """A hand-built STRQ: one stream, one sequence, then the stream's name."""
     stream_at, sequence_at = 0x18, 0x18 + 36
     name_at = sequence_at + 100
     d = bytearray(name_at + len(name) + 1)
-    struct.pack_into("<4s5I", d, 0, b"STRQ", 0x22, 1, 1, stream_at, sequence_at)
+    struct.pack_into("<4s5I", d, 0, b"STRQ", version, 1, 1, stream_at, sequence_at)
     struct.pack_into("<9I", d, stream_at, name_at, 0x1234, 0x1000, 2, 32728, 0, 0, 0x67195A2E, 2)
     struct.pack_into("<I", d, sequence_at, 7)
     struct.pack_into("<f", d, sequence_at + 0x24, -0.9)
@@ -174,6 +174,17 @@ def test_stq_reads_a_hand_built_stream_request():
     assert s.sequences[0].id == 7
     assert s.sequences[0].level == pytest.approx(-0.9)
     assert s.sequences[0].stream == 0
+
+
+def test_stq_reads_mh3us_version_0x20_with_the_same_layout():
+    """specs/sound.md stream request: MH3U's 0x20 closes exactly as MH4U's 0x22 does (check SN6)"""
+    s = stq.read(stq_with_stream(version=0x20))
+    assert (s.version, s.streams[0].name, s.sequences[0].id) == (0x20, "sound\\bgm\\test", 7)
+
+
+def test_stq_refuses_a_stream_request_version_it_does_not_lay_out():
+    with pytest.raises(stq.StqError, match="version 0x21"):
+        stq.read(stq_with_stream(version=0x21))
 
 
 def test_stq_refuses_a_sequence_naming_a_stream_past_the_table():
@@ -195,3 +206,132 @@ def test_stq_refuses_a_sequence_table_that_does_not_follow_the_stream_table():
     struct.pack_into("<I", d, 0x14, 0x18 + 36 + 1)
     with pytest.raises(stq.StqError, match="sequence table at"):
         stq.read(bytes(d))
+
+
+def wave(version: int = 4, channels: int = 1, seek: int = 0, offset: int | None = None,
+         data_size: int = 0x100) -> bytes:
+    """A hand-built MADP: samples and rate 8000 so the length is 1.0 s, then the data and seek table."""
+    header = 0x2C + sound.WAVE_BLOCK * channels if version == 4 else 0x60
+    d = bytearray((offset if offset is not None else header) + data_size + 20 * seek)
+    struct.pack_into("<4sI4B", d, 0, b"MADP", version, channels, 0, 0, 1)
+    struct.pack_into("<6I", d, 0x0C, 8000, 8000, 0, 0, offset if offset is not None else header, data_size)
+    struct.pack_into("<f", d, 0x24, 1.0)
+    if version == 4:
+        struct.pack_into("<I", d, 0x28, 0x33480000 | seek)
+    else:
+        struct.pack_into("<II", d, 0x28, 0, 0x60)
+    return bytes(d)
+
+
+def test_sound_reads_mh3us_madp_version_4_and_its_seek_table():
+    """specs/sound.md wave version 4: data offset 0x2C + 0x30 per channel, the seek count in 0x28's
+    low half, and the seek table's 20-byte entries after the data"""
+    w = sound.read_wave(wave(seek=2))
+    assert (w.version, w.channels, w.samples, w.rate, w.data_offset, w.data_size) == (4, 1, 8000, 8000, 0x5C, 0x100)
+    assert w.seconds == pytest.approx(1.0)
+    assert (w.seek_count, w.trailing) == (2, 40)
+    assert sound.read_wave(wave(channels=2)).data_offset == 0x8C
+
+
+def test_sound_refuses_a_madp_version_4_offset_that_does_not_follow_the_channels():
+    with pytest.raises(sound.SoundError, match=r"data at 0x5c, expected 0x8c for 2 channels"):
+        sound.read_wave(wave(channels=2, offset=0x5C))
+
+
+def test_sound_reads_an_empty_placeholder_wave():
+    """one MH3U wave is a placeholder with no samples and no data (em045's blank voice)"""
+    assert sound.read_wave(wave(data_size=0)).data_size == 0
+
+
+def test_sound_refuses_a_seek_count_that_does_not_match_the_bytes_after_the_data():
+    """the seek count is the only record of the table's length, so the file's size must confirm it"""
+    d = bytearray(wave(seek=1))
+    struct.pack_into("<I", d, 0x28, 0x33480000 | 2)
+    with pytest.raises(sound.SoundError, match="20 bytes after the data for 2 seek entries"):
+        sound.read_wave(bytes(d))
+
+
+def test_sound_reads_mh4us_madp_version_5_mono_and_refuses_the_stereo_music_layout():
+    """MH4U's mono effects put the data at 0x60; version 5's stereo music keeps a seek table in
+    the header, which this reader doesn't lay out (specs/sound.md, "Wave")"""
+    assert sound.read_wave(wave(version=5)).data_offset == 0x60
+    d = bytearray(wave(version=5, channels=2, offset=0x60, data_size=0x100))
+    d[8] = 2
+    with pytest.raises(sound.SoundError, match="stereo"):
+        sound.read_wave(bytes(d))
+
+
+def bank(version: int = 10, tail: int = 1) -> bytes:
+    """A hand-built SNDB: one group, two wave entries, then one {f32, u32} tail record per word 0x10."""
+    groups, names = [(0, 0x8000 | 2, 0, 0)], ["sound\\se\\em\\em001\\wav\\a", "sound\\se\\em\\em001\\wav\\b"]
+    d = bytearray(struct.pack("<4s4I", b"SNDB", version, len(groups), len(names), tail))
+    for g in groups:
+        d += struct.pack("<HHII", *g)
+    for name in names:
+        d += name.encode() + b"\0" + struct.pack("<I", 0x67195A2E) + bytes(sound.BANK_PARAMS)
+    for i in range(tail):
+        d += struct.pack("<fI", 0.5, i)
+    return bytes(d)
+
+
+def test_sound_reads_mh3us_sndb_version_10():
+    """specs/sound.md bank version 10: header 0x14, 12-byte group records, entries of a NUL path,
+    a type id and 76 parameter bytes, then 8 × 0x10's value tail records"""
+    b = sound.read_bank(bank())
+    assert (b.version, len(b.groups), len(b.entries), len(b.tail)) == (10, 1, 2, 1)
+    assert b.groups[0] == sound.BankGroup(id=0, flags=0x8002, first=0, x=0)
+    assert [(e.name, e.type_id, len(e.params)) for e in b.entries] == \
+        [("sound\\se\\em\\em001\\wav\\a", 0x67195A2E, 76), ("sound\\se\\em\\em001\\wav\\b", 0x67195A2E, 76)]
+    assert b.tail == ((0.5, 0),)
+
+
+def test_sound_refuses_a_bank_tail_that_does_not_end_the_file():
+    d = bytearray(bank())
+    struct.pack_into("<I", d, 0x10, 2)
+    with pytest.raises(sound.SoundError, match="tail of 2 records"):
+        sound.read_bank(bytes(d))
+
+
+def test_sound_refuses_a_bank_group_whose_first_entry_is_past_the_entries():
+    d = bytearray(bank())
+    struct.pack_into("<I", d, sound.BANK_HEADER + 4, 3)
+    with pytest.raises(sound.SoundError, match="first entry 3 of 2"):
+        sound.read_bank(bytes(d))
+
+
+def request(version: int = 6, records: int = 2) -> bytes:
+    """A hand-built SREQ: request ids 0 and 1, both naming bank 0, then the one bank's path."""
+    banks = ["sound\\se\\em\\em001\\snd_em001"]
+    strings_at = sound.REQUEST_HEADER + sound.REQUEST_RECORD * records
+    names_at = strings_at + 4 * len(banks)
+    d = bytearray(names_at + len(banks[0]) + 1)
+    struct.pack_into("<4s3I", d, 0, b"SREQ", version, records, strings_at)
+    for i in range(records):
+        words = [0] * sound.REQUEST_WORDS
+        words[0], words[21] = 0x7F010000 | i, 0
+        struct.pack_into(f"<{sound.REQUEST_WORDS}I", d, sound.REQUEST_HEADER + sound.REQUEST_RECORD * i, *words)
+    struct.pack_into("<I", d, strings_at, names_at)
+    d[names_at:names_at + len(banks[0])] = banks[0].encode()
+    return bytes(d)
+
+
+def test_sound_reads_mh3us_sreq_version_6():
+    """specs/sound.md request version 6: header 0x10, 92-byte records, then one offset per bank and the
+    NUL-terminated bank paths; word 0's low half is the request id and word 0x54 the bank index"""
+    r = sound.read_request(request())
+    assert (r.version, len(r.records), r.banks) == (6, 2, ("sound\\se\\em\\em001\\snd_em001",))
+    assert [(x.id, x.bank) for x in r.records] == [(0, 0), (1, 0)]
+
+
+def test_sound_refuses_a_request_record_naming_a_bank_past_the_string_table():
+    d = bytearray(request())
+    struct.pack_into("<I", d, sound.REQUEST_HEADER + sound.REQUEST_RECORD + 0x54, 1)
+    with pytest.raises(sound.SoundError, match="record 1: bank 1 of 1"):
+        sound.read_request(bytes(d))
+
+
+def test_sound_refuses_a_request_string_table_that_does_not_follow_the_records():
+    d = bytearray(request())
+    struct.pack_into("<I", d, 0x0C, sound.REQUEST_HEADER + sound.REQUEST_RECORD + 4)
+    with pytest.raises(sound.SoundError, match="string table at"):
+        sound.read_request(bytes(d))

@@ -43,3 +43,24 @@ def test_survey_counts_a_loose_sound_file_that_has_no_class_id():
     assert counts["stream request STQR v4"] == 1
     assert counts["stream request STQR loose"] == 1
     assert not [k for k in counts if "type 0x" in k]
+
+
+def wave4() -> bytes:
+    """A hand-built MH3U wave: mono, 8000 samples at 8000 Hz, 0x100 bytes of data at 0x5C."""
+    d = bytearray(0x5C + 0x100)
+    struct.pack_into("<4sI4B", d, 0, b"MADP", 4, 1, 0, 0, 1)
+    struct.pack_into("<6I", d, 0x0C, 8000, 8000, 0, 0, 0x5C, 0x100)
+    struct.pack_into("<f", d, 0x24, 1.0)
+    struct.pack_into("<I", d, 0x28, 0x33480000)
+    return bytes(d)
+
+
+def test_survey_reads_the_sound_files_it_counts():
+    """check SN6: a wave the reader accepts is counted as read; one it refuses as not read"""
+    st: dict = {}
+    survey.survey_entry(None, wave4(), st)
+    assert st["sound"]["wave MADP v4"] == 1
+    assert st["sound"]["SN6 wave read"] == 1
+    st = {}
+    survey.survey_entry(None, wave4()[:-1], st)
+    assert st["sound"]["SN6 wave not read"] == 1

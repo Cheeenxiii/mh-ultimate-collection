@@ -1,10 +1,11 @@
-"""MH4U stream requests (`.stq`, STRQ version 0x22): specs/sound.md, check S4.
+"""MH4U's and MH3U's stream requests (`.stq`, STRQ versions 0x22 and 0x20): specs/sound.md.
 
 A stream request names the waves one music context can play and maps a request id to one of them
-with a level. Layout (little endian):
+with a level. MH3U ships the same layout one version older, 0x20 (check SN6). Layout (little
+endian):
 
     0x00  char[4]  magic "STRQ"
-    0x04  u32      version 0x22
+    0x04  u32      version 0x22 (MH4U) or 0x20 (MH3U)
     0x08  u32      stream count n
     0x0C  u32      sequence count m
     0x10  u32      stream table offset (0x18)
@@ -31,7 +32,8 @@ from collections import Counter
 from dataclasses import dataclass
 
 MAGIC = b"STRQ"
-VERSION = 0x22
+VERSION = 0x22              # MH4U's; check S4 reads those
+VERSIONS = (0x20, 0x22)    # MH3U's and MH4U's: one layout (check SN6)
 HEADER = 0x18
 STREAM = 36
 SEQUENCE = 100
@@ -63,6 +65,7 @@ class Sequence:
 
 @dataclass(frozen=True)
 class Stq:
+    version: int
     streams: tuple[Stream, ...]
     sequences: tuple[Sequence, ...]
 
@@ -72,8 +75,8 @@ def read(data: bytes) -> Stq:
     if len(data) < HEADER or data[:4] != MAGIC:
         raise StqError("not a stream request (magic)")
     version, = struct.unpack_from("<I", data, 4)
-    if version != VERSION:
-        raise StqError(f"STRQ version {version:#x}, not MH4U's {VERSION:#x}")
+    if version not in VERSIONS:
+        raise StqError(f"STRQ version {version:#x}, not MH4U's {VERSION:#x} or MH3U's {VERSIONS[0]:#x}")
     nstreams, nsequences, stream_at, sequence_at = struct.unpack_from("<4I", data, 8)
     if stream_at != HEADER or sequence_at != stream_at + STREAM * nstreams:
         raise StqError(f"stream table at {stream_at:#x}, sequence table at {sequence_at:#x}: "
@@ -110,7 +113,7 @@ def read(data: bytes) -> Stq:
             raise StqError(f"sequence {request_id}: stream {stream} of {nstreams}")
         else:
             sequences.append(Sequence(request_id, level, stream))
-    return Stq(tuple(streams), tuple(sequences))
+    return Stq(version, tuple(streams), tuple(sequences))
 
 
 def check(data: bytes) -> Counter:

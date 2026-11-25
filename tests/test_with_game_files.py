@@ -10,7 +10,7 @@ import pytest
 from mhuc import monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
-from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, lmt, mod, romfs, stq
+from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, lmt, mod, romfs, sound, stq
 from mhuc.quests import mibwrite, quest
 
 pytestmark = pytest.mark.game_files
@@ -378,3 +378,63 @@ def test_mh4u_motion_tracks_address_bones_by_id(dump):
                 _version, anims = lmt.read(e.data)
                 seen |= {t.bone for an in anims if an for t in an.tracks}
         assert seen - {255} == human, (path, sorted(seen - {255} ^ human))
+
+
+def test_every_mh3u_sound_file_reads_and_its_stream_requests_match_their_waves(dump):
+    """specs/sound.md check SN6: every MH3U wave (MADP 4), bank (SNDB 10), request (SREQ 6) and stream request
+    (STRQ 0x20) closes, every request's bank names are the bank resources beside them, and every stream record
+    repeats the wave header it names"""
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    files = {f.path: f for f in image.files()}
+    counts: Counter = Counter()
+    failed: list[str] = []
+    banks: set[str] = set()
+    request_banks: list[str] = []
+
+    def one(data: bytes) -> None:
+        magic = data[:4]
+        try:
+            if magic == sound.WAVE_MAGIC:
+                sound.read_wave(data)
+                counts["wave"] += 1
+            elif magic == sound.BANK_MAGIC:
+                sound.read_bank(data)
+                counts["bank"] += 1
+            elif magic == sound.REQUEST_MAGIC:
+                request = sound.read_request(data)
+                request_banks.extend(request.banks)
+                counts["request"] += 1
+            elif magic == stq.MAGIC:
+                stq.read(data)
+                counts["stream request"] += 1
+        except (sound.SoundError, stq.StqError) as err:
+            failed.append(f"{magic!r}: {err}")
+
+    for path, f in files.items():
+        if path.endswith(".arc"):
+            for e in arc.read(image.read(f)).entries:
+                if e.data[:4] == sound.BANK_MAGIC:
+                    banks.add(e.path)
+                if e.data[:4] in (sound.WAVE_MAGIC, sound.BANK_MAGIC, sound.REQUEST_MAGIC, stq.MAGIC):
+                    one(e.data)
+        elif path.lower().endswith((".mca", ".stq")):
+            one(image.read(f))
+    assert not failed, f"{len(failed)} sound files not read, first: {failed[:3]}"
+    assert counts["wave"] == 10132 and counts["bank"] == 1225, counts
+    assert counts["request"] == 1004 and counts["stream request"] == 106, counts
+    missing = set(request_banks) - banks
+    assert not missing, f"{len(missing)} request bank names aren't a bank resource beside them: {sorted(missing)[:3]}"
+
+    streams = 0
+    for path, f in files.items():
+        if not path.lower().endswith(".stq"):
+            continue
+        for stream in stq.read(image.read(f)).streams:
+            wave_path = "/" + stream.name.replace("\\", "/") + ".mca"
+            assert wave_path in files, f"{path}: {stream.name} isn't in the RomFS"
+            w = sound.read_wave(image.read(files[wave_path]))
+            assert (stream.size, stream.samples, stream.channels, stream.rate, stream.loop_start, stream.loop_end) \
+                == (files[wave_path].size, w.samples, w.channels, w.rate, w.word_14, w.word_18), \
+                f"{path}: {stream.name}"
+            streams += 1
+    assert streams == 290, f"{streams} streams"

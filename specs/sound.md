@@ -56,7 +56,7 @@ Loose files, the rest being ARC entries: MH4U 571 waves, 13 banks, 16 requests a
 
 What the versions say about conversion:
 
-- **MH3U** has MH4U's classes but each file version is one older: wave 4 against 5, bank 10 against 11, request 6 against 8, stream request 0x20 against 0x22. 3U's sound needs readers for those versions or a conversion for all four kinds, not just new request ids; its RomFS holds no area emitter file at all.
+- **MH3U** has MH4U's classes but each file version is one older: wave 4 against 5, bank 10 against 11, request 6 against 8, stream request 0x20 against 0x22. `mhuc` now reads those four older layouts (SN6) and the tables below lay them out; converting them to MH4U's versions is still undone. 3U's sound needs that conversion for all four kinds, not just new request ids; its RomFS holds no area emitter file at all.
 - **MHXX**'s waves are `MADP` version 5, the version MH4U reads, but its banks and requests are the next generation's (`SBKR` 4, `SRQR` 5, the magics and versions of MHGU's in Definitive Edition's notes) and its stream requests are `STQR` version 4. Its waves may therefore convert as-is, while its banks and requests follow GU's layouts if S3 confirms them. Its area emitters are a different class on both sides (`rFestaSoundEmitter`, version 0x20160706, against `rMHSoundEmitter`, 0x20120623), and it has an EQ class where MH4U has none.
 
 ## Wave (`MADP`, version 5): header 0x60 bytes, then data
@@ -78,6 +78,28 @@ What the versions say about conversion:
 
 Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data offset), 20-byte entries from 0x30. After it come 0x30 bytes of coefficients and state per channel, and the data interleaves channels every 0x100 bytes (Definitive Edition snd_bgm.py, unverified).
 
+## Wave (`MADP`, version 4)
+
+MH3U's wave is one version older. Its header is 0x5C for a mono effect and 0x8C for a stereo music stream: a u32 at 0x28, then one 0x30-byte decoder block per channel, then the data. The decoder block is version 5's moved down by 4 bytes: the 16 coefficients at +0 and the four u16 at +0x20 that version 5 keeps at 0x50. Version 5's second u32 at 0x2C is gone; 0x28 packs a 0x3348 marker in its high half and the seek table's entry count in its low half. Unlike version 5, the seek table follows the data, 20 bytes per entry.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `MADP` | verified | every MH3U wave (SN6) |
+| 0x04 | u32 | version 4 | verified | every MH3U wave (SN6) |
+| 0x08 | u8[4] | channels (1 mono effect, 2 stereo music), then 00 00 01 | verified | SN6: 9,843 mono (01 00 00 01) and 289 stereo (02 00 00 01); the music streams' channel counts equal their stream record's |
+| 0x0C | u32 | sample count | verified | SN6: the length in seconds is samples / rate in every wave; a stream record repeats the count for the 290 music streams |
+| 0x10 | u32 | sample rate | verified | SN6: the same check |
+| 0x14 | u32 | loop flag (effects); loop start (music) | verified | SN6: 0 on all 9,843 mono effects; on a music wave it is the stream record's loop start (290 of 290) |
+| 0x18 | u32 | loop start (effects); loop end (music) | verified | SN6: 0 on all 9,843 mono effects; on a music wave it is the stream record's loop end (290 of 290) |
+| 0x1C | u32 | data offset: 0x2C + 0x30 × channels | verified | every MH3U wave (SN6) |
+| 0x20 | u32 | data size, a multiple of 0x100 (0 on one placeholder) | verified | every MH3U wave (SN6) |
+| 0x24 | f32 | length in seconds | verified | SN6: equals samples / rate |
+| 0x28 | u32 | high half 0x3348, low half seek table entry count | verified | SN6: the bytes after the data are 20 × the low half in every wave; 0 in 10,105 of the 10,132, 27 carry a seek table |
+| 0x2C + 0x30 × i, +0x00 | s16[16] | channel i's DSP-ADPCM coefficients | verified | SN6: channel 0's are byte-identical to version 5's at 0x30 in the 31 waves whose audio both games ship; every channel's block is 0x30 bytes, because the data offset is 0x2C + 0x30 × channels in every file |
+| 0x2C + 0x30 × i, +0x20 | u16 ×4 | channel i's gain, predictor/scale, history 1, history 2 | verified | SN6: channel 0's are the same 31 pairs (version 5's at 0x50); the block's size is the same check as the row above |
+| 0x2C + 0x30 × i, +0x28 | u8 ×8 | not traced; version 5's same bytes are junk | unverified | SN6 (histogram) |
+| 0x2C + 0x30 × channels | bytes | DSP-ADPCM frames, then the seek table | verified | SN6: data offset + size + 20 × count = the file's length in every wave |
+
 ## Bank (`SNDB`, version 11)
 
 | Offset | Type | Name | Status | Source |
@@ -86,9 +108,30 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 | 0x04 | u32 | version 11 | unverified | Definitive Edition snd4u2gu.py |
 | 0x08 | u32 | group record count | unverified | Definitive Edition snd4u2gu.py |
 | 0x0C | u32 | entry count | unverified | Definitive Edition snd4u2gu.py |
-| 0x10 | u32 | 3 or 4 | unverified | Definitive Edition snd4u2gu.py |
-| +0 (record) | u16, u16, u32, u32 | id; flags (0x8000, plus category shifted left by 11, plus 2 × count); first entry; x | unverified | Definitive Edition snd4u2gu.py |
-| +0 (entry) | char[], u32, 76 bytes | wave path (NUL-terminated); wave type id; parameters, a 4-byte key at +12 | unverified | Definitive Edition snd4u2gu.py |
+| 0x10 | u32 | tail record count x; the tail is 8 × x bytes after the entries | unverified | Definitive Edition snd4u2gu.py; the MH4U banks read in SN6 close with it |
+| 0x14 + 12 × i | u16, u16, u32, u32 | group i: id; flags (0x8000, plus category shifted left by 11, plus 2 × count); first entry; x | unverified | Definitive Edition snd4u2gu.py |
+| +0x00 (entry) | char[], u32, 76 bytes | wave path (NUL-terminated); wave type id; parameters, a 4-byte key at +12 | unverified | Definitive Edition snd4u2gu.py |
+| +0x00 (tail) | f32, u32 | one {value, index} record; the index's low byte is 0..x-1 | unverified | Definitive Edition snd4u2gu.py |
+
+## Bank (`SNDB`, version 10)
+
+MH3U's bank has the same container as version 11: a 0x14-byte header, 12-byte group records, one entry per wave (a NUL-terminated path, a u32 type id and 76 parameter bytes), then 8-byte tail records. In every MH3U bank read the counts and the sizes tile the file exactly (SN6).
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `SNDB` | verified | every MH3U bank (SN6) |
+| 0x04 | u32 | version 10 | verified | every MH3U bank (SN6) |
+| 0x08 | u32 | group record count | verified | SN6: the group records end where the entries begin |
+| 0x0C | u32 | entry count | verified | SN6: the entries close on the tail |
+| 0x10 | u32 | tail record count x; the tail is 8 × x bytes after the entries | verified | SN6: the tail ends the file |
+| 0x14 + 12 × i, +0x00 | u16 | group i's id | unverified | SN6 (histogram) |
+| 0x14 + 12 × i, +0x02 | u16 | group i's flags: 0x8000, a category in bits 11 to 14 and a count in the low bits; the low 15 bits are twice the group's 47 and 35 entries in Rathian's bank | unverified | SN6 (histogram) |
+| 0x14 + 12 × i, +0x04 | u32 | group i's first entry | verified | SN6: 0 ≤ first ≤ the entry count in every group |
+| 0x14 + 12 × i, +0x08 | u32 | not traced; 0 in every group read | unverified | SN6 (histogram) |
+| entry +0x00 | char[] | wave path, NUL-terminated | verified | SN6: the entries tile the file between the groups and the tail |
+| entry +len+1 | u32 | wave type id, `0x67195a2e` (`rLtSoundSourceADPCM`) | verified | SN6: every entry of every MH3U bank read |
+| entry +len+5 | u8[76] | parameters; byte 2 is 8 and the 4-byte key at +12 is {lo, hi, root, 0} with lo = hi = root | unverified | SN6 (histogram); the same 76 bytes carry the same values as version 11 for the 33 waves both games ship |
+| tail +0x00 | f32, u32 | one {value, index} record, 8 bytes; the index's low byte is the record's position in 2,258 of the 2,273 | unverified | SN6: x records close every bank read; 15 records name another position |
 
 ## Request (`SREQ`, version 8)
 
@@ -96,7 +139,25 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 |---|---|---|---|---|
 | 0x00 | char[4] | magic `SREQ` | unverified | Definitive Edition snd4u2gu.py |
 | 0x04 | u32 | version 8 | unverified | Definitive Edition snd4u2gu.py |
-| entries | 92 bytes each | one per request id: which bank key plays, with volume and parameters (field list in snd4u2gu.py) | unverified | Definitive Edition snd4u2gu.py |
+| 0x08 | u32 | record count n | unverified | Definitive Edition snd4u2gu.py |
+| 0x0C | u32 | string table offset: 0x10 + 92 n | unverified | Definitive Edition snd4u2gu.py |
+| 0x10 + 92 × i | 92 bytes | one record per request id: word 0's low half is the id, word 5 the per-monster category, words 9 and 10 the level in dB, word 21 the bank index and word 22 a build-time pointer slot | unverified | Definitive Edition snd4u2gu.py |
+
+## Request (`SREQ`, version 6)
+
+MH3U's request has the same container as version 8, verified on every MH3U request read (SN6): a 0x10-byte header, one 92-byte record per request, then one u32 offset per bank and the NUL-terminated bank paths in order, ending the file. The records' words are not version 8's: version 6 leaves words 8, 10, 17 and 18 at other values and packs word 5 differently, so only the request id and the bank index are laid out here.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `SREQ` | verified | every MH3U request (SN6) |
+| 0x04 | u32 | version 6 | verified | every MH3U request (SN6) |
+| 0x08 | u32 | record count n | verified | SN6: the string table starts at 0x10 + 92 n |
+| 0x0C | u32 | string table offset | verified | SN6: 0x10 + 92 n in every file |
+| 0x10 + 92 × i, +0x00 | u16 | the request id | verified | SN6: a small request number, distinct in 1,003 of the 1,004 files and ascending in 999; version 8 documents word 0 as its id too |
+| 0x10 + 92 × i, +0x02 | u16 | flags: 0x7f00 or 0x7f01 observed; meaning not traced | unverified | SN6 (histogram) |
+| 0x10 + 92 × i, +0x24 | f32 | level in dB: -2.08 on Rathian's requests and -3.0 on a stage's | unverified | SN6 (histogram); version 8's word 9 has that meaning |
+| 0x10 + 92 × i, +0x54 | u32 | bank index into the string table, 0xFFFFFFFF for none | verified | SN6: every value is a valid index or 0xFFFFFFFF, and the string table tiles the file |
+| 0x10 + 92 × i, other words | u32 | not traced; version 8's meanings don't hold | unverified | SN6 (histograms) |
 
 ## Area emitters (`SES\0`, version 0x20120623)
 
@@ -116,10 +177,12 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 
 The resource `rLtSoundStreamRequest` loads. A stream request names the waves one music context can play and maps a request id to one of them with a level. MH4U has 214: 50 loose `.stq` under `/sound/bgm` (`bgm_bat` for monster battle themes, `bgm_st_NN` for a stage, `str_mNN` for a locale's area streams, plus the common, download, event, lobby and system files) and 164 inside ARCs under `/data`, `/loc/data` and the other language data folders. Check S4 reads every one and checks the tables against all 50 loose files.
 
+MH3U ships the same layout one version older, 0x20 (check SN6): all 106 of its stream requests close exactly, and each of their 290 stream records repeats the header of the `.mca` it names (file size, sample count, channels, rate and loop start and end). The MH4U addresses in the rows below are MH4U's loader; MH3U's isn't traced.
+
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
 | 0x00 | char[4] | magic `STRQ` | verified | all 50 files (S4) |
-| 0x04 | u32 | version 0x22 (34) | verified | all 50 files (S4); ours, the loader compares it at 0x00404530 |
+| 0x04 | u32 | version 0x22 (34) on MH4U, 0x20 (32) on MH3U | verified | all 50 MH4U files (S4) and all 106 MH3U files (SN6); ours, the loader compares it at 0x00404530 |
 | 0x08 | u32 | stream count | verified | all 50 files (S4); ours, the loader reads it at 0x00404564 |
 | 0x0C | u32 | sequence count | verified | all 50 files (S4); ours, the loader reads it at 0x0040456C |
 | 0x10 | u32 | stream table offset (0x18 in all 50) | verified | all 50 files (S4); ours, the loader reads it at 0x004045F0 |
@@ -164,3 +227,4 @@ Stream records are 36 bytes and sequence records 100. The lookup compares the id
 - **S3:** MHXX's bank and request against Definitive Edition's GU layouts (`SBKR` v4, `SRQR` v5). SN1 already matches their magics and versions; if the layouts agree, the XX → 4U conversion is the 4U → GU rule run backwards. MHXX's wave is `MADP` version 5, MH4U's version and not GU's 2, so it needs no GU layout.
 - **S4 (done, 2026-11-25):** parse every `.stq` of MH4U USA v1.3.0's RomFS, loose and inside ARCs. `mhuc stq <file>` reads one stream request; `mhuc survey <romfs.bin> --workers 1` reports S4 read 214 files (50 loose, 164 in ARCs), 5,120 streams and 13,249 sequences, 5,410 of them with a stream and 7,839 without. Every file closed exactly: magic `STRQ`, version 0x22, stream table at 0x18, sequence table at 0x18 + 36 n, names in stream order from the end of the sequence table to the file's end, and every stream index in range (the reader refuses anything else). Each stream record's size, sample count, channels, rate and loop start and end equal the `MADP` header of the `.mca` it names, 497 of 497 in the loose files. The with-game-files test reads every loose `.stq` and checks that the request ids are unique and ascending and that every stream is used. Still open: the sequence record's words marked unverified above, the lookup's index at `+0x94`/`+0x98` of the loaded resource, and `sSoundControl`'s loader `0x3099c8` at run time.
 - **SN5 (done, 2026-11-25):** read the allocator setup in the MH4U USA v1.3.0 image instead of the files, to say where sound memory comes from. The heap table is at 0x00f2bb44: nine 0x18-byte records {name pointer, allocator index, type, size, flags, 0}, read by 0x0010612c; the alias table is at 0x00f2bc1c and holds seven {index, target index} pairs. The class-to-index table is built by the function at 0x00104904. Result: Resource (index 11) is 0x2F00000 = 47 MiB and receives every `cResource` subclass; SoundBuffer (21) is aliased to Resource; no heap is made for Sound (15), the index of `cMHSoundEmitter`, `cMHSoundSequence` and `nMHSoundSequence`, which therefore allocate from the default heap. The sound resource classes have no entry of their own and their parent is `cResource`. The shipped `/memory.ini` `[Allocators: CTR]` agrees: Resource 47MB, `SOUND_BUF = RESOURCE`, no SOUND. Unverified: that the index lookup follows a class's parent (the table has 128 rows for 992 classes); the sound resource classes are assumed to take `cResource`'s index, and nothing was run to watch an allocation. Sizes and the largest monster sets: [audio.md](../docs/audio.md#memory).
+- **SN6 (done, 2026-11-25):** the MH3U wave, bank, request and stream request layouts above are laid out and checked against the whole MH3U RomFS. Procedure: `mhuc survey <MH3U USA romfs.bin> --workers 1` reads every sound resource of the four kinds with `sound.read_wave`, `sound.read_bank`, `sound.read_request` and `stq.read`, and reports each kind's version (SN1) and how many it read; `MHUC_DUMPS=… pytest -m game_files -k mh3u_sound` (`test_every_mh3u_sound_file_reads_and_its_stream_requests_match_their_waves`) repeats the reads and checks them against each other. Result: all 10,132 waves (`MADP` 4: 9,843 mono, 289 stereo, 27 with a seek table, 1 empty placeholder), all 1,225 banks (`SNDB` 10: 13,695 group records, 24,985 entries, 2,273 tail records), all 1,004 requests (`SREQ` 6: 27,424 records, 1,225 bank names) and all 106 stream requests (`STRQ` 0x20: 290 streams, 4,926 sequences) read; none was refused. Every file closed exactly: a wave's offset, size and seek table end it, a bank's groups, entries and tail tile it, a request's records and bank table tile it, a stream request's tables and names tile it. Cross-checks: every request bank name names a bank resource in the RomFS (1,225 of 1,225); every stream record's file size, sample count, channels, rate and loop start and end are the `.mca`'s own (290 of 290). The wave decoder fields are version 5's moved down by four bytes: in the 31 waves of Rathian's arc that both games ship with byte-identical DSP data, MH3U's 0x08..0x24 fields equal MH4U's and its coefficients and state at 0x2C..0x53 are byte-identical to MH4U's at 0x30..0x57. Still open: MH4U's version 5 stereo music layout (only its mono effects are read), the meanings of version 6's request words beyond the id and the bank index, version 10's group flags and entry parameters, and its tail record's index (15 of 2,273 records don't name their own position).
