@@ -364,7 +364,7 @@ def moves_visible(files, game, em4, src):
     for anims in la:
         if anims:
             sig4 |= {sig for sig in anims if sig}
-    known, new, new_other, unresolved = [], [], [], []
+    known, new, new_other, unresolved, category7 = [], [], [], [], []
     for k in only_motion:
         f, slot = monster_motions.decode_motion(game, b[k]["motion"])
         sig = lb[f][slot] if f < len(lb) and lb[f] and slot < len(lb[f]) else None
@@ -375,7 +375,7 @@ def moves_visible(files, game, em4, src):
         elif k[0] == 7:
             # Category 7's shared handler can start more than one motion, so a source-only
             # action's first constant is not reliable enough to call the animation new.
-            unresolved.append(k)
+            category7.append(k)
         elif k in ai:
             new.append(k)
         else:
@@ -399,6 +399,9 @@ def moves_visible(files, game, em4, src):
     if new_other:
         detail += ("; new animations not named by the AI script: "
                    + monster_motions.fmt_ids(new_other).replace("\n", " "))
+    if category7:
+        detail += ("; category 7, animation not decided: "
+                   + monster_motions.fmt_ids(category7).replace("\n", " "))
     if unresolved:
         detail += ("; animation not in either game's own lists: "
                    + monster_motions.fmt_ids(unresolved).replace("\n", " "))
