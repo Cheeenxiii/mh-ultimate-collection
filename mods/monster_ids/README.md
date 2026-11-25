@@ -59,9 +59,10 @@ the effect lists at +0x24 and +0x28).
 The stand-in's record names `enemy\em001\...` paths. On its first frame the plugin builds,
 for each registered id, a record of its own from the stand-in's: the same fields and slots,
 each path copied to the game's heap. A port ships only some of the record's path kinds (its
-arc holds the model, motions, tail and command for 124, the model, the first three motion
-lists and the tail for 125); MH4U stops the load on a path that is not there, which is what
-hung a 3U session at "Now Loading" when the 125 record named 13 paths and `em125.arc` ships 6
+arc holds the model, motions, tail and command for both 124 and 125, and 125's command is her
+converted MH3U AI script, [specs/emc.md](../../specs/emc.md)); MH4U stops the load on a path
+that is not there, which is what hung a 3U session at "Now Loading" when the 125 record named
+13 paths and `em125.arc` ships 6
 ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)). So the registry's
 `files` column, generated into `src/ids.h` as `MHUC_FILES_*` bits, names the kinds a port
 ships, and the builder rewrites the monster-id token only in those kinds' paths

@@ -299,6 +299,40 @@ category-17 index and, for 8/0, one line naming its uncovered calls.
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
 
+### The ported AI's check (R3)
+
+| Check | What | Pass |
+|---|---|---|
+| R3 | play the ported 3U Rathian (id 125) without forcing, and read the actions her AI asks for | she asks for an action only MH3U's script picks, so `mods/monster_actions` logs `monster 125: action 7/64 -> 7/35`; MH4U's own script never asks for 7/64, so the line is only there if her converted EMC drives her |
+
+The 3U Rathian's EMC is converted at build time (version, 23 group rows, the 15 opcodes whose
+argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)). Cut by the
+game's tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and 7/85,
+are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so
+`mods/monster_actions` translates it to 7/35 and logs one line the first time it runs.
+
+1. Build 125's files with #49, including the converted EMC at `enemy\em125\data\em125_cmd`.
+   The registry names `cmd` for her, so the resource record loads it
+   ([data/ids](../data/ids/README.md)).
+2. Check the converted EMC first: 23 group rows, every script cuts cleanly with MH4U's table
+   (A2):
+
+   ```bash
+   game_files/work/venv/bin/python reference/monster_emc.py <cmd> \
+       --lens <the MH4U ELF or flat code image> 0x00ffe9f4 146 --check
+   ```
+
+3. Enable `mods/monster_ids` and `mods/monster_actions`, build the code library with them
+   (the fork's `tools/build_game.py`), and take a quest that names 125.
+4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the log has
+   `monster 125: action 7/64 -> 7/35`. The control is a build whose 125 row has no `cmd`, so
+   her record keeps the stand-in's script; that run never logs the line.
+5. Category-4 lines are expected too: action 4 has no MH4U handler and is not on the map
+   ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)), so the AI's
+   category-4 picks are recorded but are not this check's pass.
+
+Status: not done. It waits for #49's converted EMC and a quest that names 125.
+
 ### The plugin's check (R1p)
 
 | Check | What | Pass |
@@ -383,19 +417,21 @@ P1, headless:
    resource record at <address>, built from stand-in 1, names: ...` line per registered id,
    listing the paths read back from the record built in guest memory; one `self-test: id 124
    ships model, motions 0-4, tail, cmd; keeps stand-in 1's paths for motions above 4, camera,
-   mef, sound, efl` line and one for 125 (`ships model, motions 0-2, tail; keeps stand-in 1's
-   paths for motions above 2, camera, mef, sound, cmd, efl`); and, for each reader,
+   mef, sound, efl` line and one for 125 (`ships model, motions 0-2, tail, cmd; keeps stand-in
+   1's paths for motions above 2, camera, mef, sound, efl`); and, for each reader,
    `self-test: <reader> answers ...; ids 0..123 pass through`. In the 124 record the model,
    motion, tail and command paths name `em124`, and the camera, motion-effect, sound and
    effect-list paths still name `em001`. The 125 record names `em125` for the model, motion
-   slots 0 to 2 and the tail, and keeps the stand-in's `em001` for motion slots 3 and 4, the
-   camera, motion effects, sound, command and effect lists. No path may name a file the port's
-   arc does not ship: `enemy\em125\mot\em125_3`/`_4`, `e125_cam`, `effect\mef\em\em125_*`,
-   `sound\call\em\em125`, `enemy\em125\data\em125_cmd` and
-   `effect\efl\em\em125\em125_000` are the ones that hung the load. The factory's and data
-   path's lines name the path the stand-in's files are read from
-   (`enemy\em001\data\em001`), which the record does not change. MH4U's own monsters were not
-   loaded, so only the self-test's mapping shows here; a real spawn's reader lines are P2's.
+   slots 0 to 2, the tail and the command, and keeps the stand-in's `em001` for motion slots 3
+   and 4, the camera, motion effects, sound and effect lists. No path may name a file the
+   port's arc does not ship: `enemy\em125\mot\em125_3`/`_4`, `e125_cam`,
+   `effect\mef\em\em125_*`, `sound\call\em\em125` and `effect\efl\em\em125\em125_000` are the
+   ones that hung the load. The 125 command path is the port's converted EMC, which #49 ships;
+   a P1 run before that file exists still builds the record (the self-test does not load
+   files), but a quest with 125 would hang as in #143. The factory's and data path's lines
+   name the path the stand-in's files are read from (`enemy\em001\data\em001`), which the
+   record does not change. MH4U's own monsters were not loaded, so only the self-test's
+   mapping shows here; a real spawn's reader lines are P2's.
 
 P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 ([quests.md](quests.md)). Not done.
@@ -408,7 +444,10 @@ each port ships and keeps the stand-in's for, a self-test line for each reader w
 the stand-in's data path `enemy\em001\data\em001`. The records kept `enemy\em001\...` for the
 kinds and motion slots a port does not ship and named no missing `em124`/`em125` path: MH4U
 does not tolerate a missing entry ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
-P2 is not done, so a real spawn's load is unverified.
+P2 is not done, so a real spawn's load is unverified. After this run, 125's registry row
+gained `cmd` ([#159](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/159)), so the
+next P1 run's 125 record also names `enemy\em125\data\em125_cmd`, the converted EMC #49 ships;
+that run is not done yet.
 
 ## Calling the engine from a plugin (P3)
 

@@ -35,7 +35,7 @@ typedef struct MhucMonsterId {
 #define MHUC_MONSTER_COUNT 2
 static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {
     {124, 1, 5, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
-    {125, 1, 3, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL},
+    {125, 1, 3, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
 };
 
 /* Rathian, mhxx em001 */
