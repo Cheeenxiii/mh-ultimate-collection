@@ -1271,7 +1271,7 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
         before = source[entry.file_name]
         assert len(entry.data) == len(before), entry.file_name
         assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
-    assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == 5
+    assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == {0, 1, 2, 3, 4}
     assert sum(len(v) for v in report.left_out.values()) == 534
 
 def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump):
@@ -1388,3 +1388,49 @@ def test_convert_monster_builds_her_files_and_sounds_into_one_folder(dump, tmp_p
     for e in built.entries:
         if e.type_name == "rMotionList":
             assert lmt.read(e.data)[0] == 67
+
+
+def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, tmp_path):
+    from types import SimpleNamespace
+    image = romfs.open_image(dump("mhxx", "romfs.bin"))
+    source_file = next(f for f in image.files() if f.path == "/arc/enemy/em034_00.arc")
+    source_data = image.read(source_file)
+    out = tmp_path / "giadrome"
+    args = SimpleNamespace(id=126, romfs=dump("mhxx", "romfs.bin"), out=str(out), variant=0,
+                           registry=None, game="mhxx", report=str(tmp_path / "report.txt"))
+    assert cli._convert_monster_files(args) == 0
+    converted = arc.read((out / "romfs" / "data" / "em126.arc").read_bytes())
+    source = {e.file_name: e.data for e in arc.read(source_data).entries}
+    assert converted.version == 0x13
+    # Giadrome's motion lists are MHXX's em014's (Velocidrome), at slots 0, 2, 3 and 4; the
+    # converter renames them to the port's id but keeps the slot. Its AI script is left out:
+    # the row does not ship `cmd`, because MHXX's EMC is not MH4U's (specs/emc.md).
+    assert [e.file_name for e in converted.entries] == [
+        "enemy/em034/em034_00/mod/em034_00_01_BM.tex",
+        "enemy/em034/em034_00/mod/em034_00_01_NM_MQ_MIRROR.tex",
+        "enemy/em126/mod/em126.mrl",
+        "enemy/em126/mod/em126.mod",
+        "enemy/em126/mot/em126_0.lmt",
+        "enemy/em126/mot/em126_2.lmt",
+        "enemy/em126/mot/em126_3.lmt",
+        "enemy/em126/mot/em126_4.lmt",
+    ]
+    taken = {
+        "enemy/em126/mod/em126.mod": "enemy/em034/em034_00/mod/em034_00.mod",
+        "enemy/em126/mod/em126.mrl": "enemy/em034/em034_00/mod/em034_00.mrl",
+        "enemy/em126/mot/em126_0.lmt": "enemy/em014/em014_00/mot/em014_00_0.lmt",
+        "enemy/em126/mot/em126_2.lmt": "enemy/em014/em014_00/mot/em014_00_2.lmt",
+        "enemy/em126/mot/em126_3.lmt": "enemy/em014/em014_00/mot/em014_00_3.lmt",
+        "enemy/em126/mot/em126_4.lmt": "enemy/em014/em014_00/mot/em014_00_4.lmt",
+    }
+    for port_path, source_path in taken.items():
+        assert next(e for e in converted.entries if e.file_name == port_path).data == source[source_path], port_path
+    for entry in converted.entries:
+        if entry.type_name != "rTexture":
+            continue
+        before = source[entry.file_name]
+        assert len(entry.data) == len(before), entry.file_name
+        assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
+    assert not any(e.file_name.endswith("_cmd.emc") for e in converted.entries)
+    report = (tmp_path / "report.txt").read_text(encoding="utf-8")
+    assert "left out (not in the row's files: cmd): enemy/cmd_tbl/em034_00_cmdtbl.emc" in report
