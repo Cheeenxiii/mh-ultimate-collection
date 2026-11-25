@@ -75,10 +75,11 @@ def read(data: bytes) -> Stq:
     if version != VERSION:
         raise StqError(f"STRQ version {version:#x}, not MH4U's {VERSION:#x}")
     nstreams, nsequences, stream_at, sequence_at = struct.unpack_from("<4I", data, 8)
+    if stream_at != HEADER or sequence_at != stream_at + STREAM * nstreams:
+        raise StqError(f"stream table at {stream_at:#x}, sequence table at {sequence_at:#x}: "
+                       f"expected {HEADER:#x} and {HEADER + STREAM * nstreams:#x}")
     if stream_at + STREAM * nstreams > len(data) or sequence_at + SEQUENCE * nsequences > len(data):
         raise StqError("a table runs past the end of the file")
-    if sequence_at < stream_at + STREAM * nstreams:
-        raise StqError("the sequence table overlaps the stream table")
 
     streams = []
     names_at = sequence_at + SEQUENCE * nsequences

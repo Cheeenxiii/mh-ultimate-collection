@@ -188,3 +188,10 @@ def test_stq_refuses_names_that_do_not_fill_the_file():
     struct.pack_into("<I", d, 0x18, 0x18 + 36 + 100 + 1)     # name offset one past the first name
     with pytest.raises(stq.StqError, match="name at"):
         stq.read(bytes(d))
+
+
+def test_stq_refuses_a_sequence_table_that_does_not_follow_the_stream_table():
+    d = bytearray(stq_with_stream())
+    struct.pack_into("<I", d, 0x14, 0x18 + 36 + 1)
+    with pytest.raises(stq.StqError, match="sequence table at"):
+        stq.read(bytes(d))
