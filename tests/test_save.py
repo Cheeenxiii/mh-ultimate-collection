@@ -56,7 +56,8 @@ def character_save() -> bytearray:
     data[save.QUEST_COUNTS_AT:save.QUEST_COUNTS_AT + 2] = struct.pack("<H", 1)
     data[save.WEAPON_USAGE_AT[0]:save.WEAPON_USAGE_AT[0] + 2] = struct.pack("<H", 2)
     data[save.BRIGADE_POINTS_AT:save.BRIGADE_POINTS_AT + 4] = struct.pack("<I", 1234)
-    data[save.BITFIELD_AT] = 0x01
+    data[save.ITEM_FLAGS_AT] = 0x01                  # bit 0: item id 0 held
+    data[save.QUEST_FLAGS_AT + 1] = 0x04             # bit 10: a candidate quest flag
     return data
 
 
@@ -80,7 +81,9 @@ def test_character_save_slices_read_the_values_at_the_spec_offsets():
     assert card["quest_counts"]["village_low"] == 1
     assert card["weapon_usage"]["village"]["great_sword"] == 2
     assert card["brigade_points"] == 1234
-    assert card["bitfield_set_bits"] == 1
+    assert save.quest_lists(data)["candidate_clear_flags"]["indices"] == [10]
+    assert save.item_flags(data)["set_bits"] == 1
+    assert save.item_flags(data)["highest_set"] == 0
     assert save.character_problems(data) == []
 
 

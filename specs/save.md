@@ -23,7 +23,7 @@ equipment box, guild quests and Palicos; the MH4G save-editor wiki
 ([saveeditor_mh4g](https://w.atwiki.jp/saveeditor_mh4g/)) for the pouches, quest counts and weapon usage; the
 mhff wiki (svanheulen/mhff, GPL-3.0) and a community board post for the monster log's shape; mhef (GPL-3.0)
 for the cipher. All are credited in [README.md](README.md). The reader is `mhuc save dump|check`
-(`src/mhuc/save.py`); its checks are this page's S1 to S7.
+(`src/mhuc/save.py`); its checks are this page's S1 to S9.
 
 ## Files
 
@@ -68,8 +68,8 @@ The blocks tile the 81,400 bytes exactly:
 | 0xCB14 | 24 × 4 bytes | item pouch: three pages of eight (table below) | verified | the MH4G save-editor wiki; check S3 |
 | 0xCB74 | 0x1134 bytes | unknown | unknown | ours; non-zero in the maintainer's saves |
 | 0xDCA8 | 10 × 304 bytes | guild-quest slots (table below) | verified | mh4edit; check S4 |
-| 0xE888 | 0x998 bytes | unknown; brigade points at 0xE8A0 (table below) | unknown | ours; the wiki's `system`-side offsets don't place it |
-| 0xF220 | 280 bytes | 2,240 bits, meaning unknown (see "quest lists" below) | unknown | ours; all set in the completed save, partly set in the mid-game one |
+| 0xE888 | 0x998 bytes | records: UTF-16 names, floats and runs of set flags; brigade points at 0xE8A0 (table below) | unknown | ours; the wiki's `system`-side offsets don't place it |
+| 0xF220 | 280 bytes | 2,240 bits: 2,176 item-id flags at 0xF220 to 0xF32F, then 8 zero bytes (see "quest lists" below) | unverified | ours; check S8 |
 | 0xF338 | 55 × 232 bytes | the other Palicos (table below) | verified | mh4edit; check S5 |
 | 0x12510 | 0xF0 bytes | unknown; all zero in the maintainer's saves | unknown | ours |
 | 0x12600 | 0xBA4 bytes | the guild-card block (table below) | unknown | ours; offsets from the MH4G save-editor wiki, partly checked |
@@ -188,8 +188,8 @@ monster's new id therefore does not fit this log, and the entry a new monster wo
 
 ### Guild-card block (0x12600)
 
-The character save keeps the data the guild card shows. Some fields are checked; the rest of the block (awards,
-quest clear bits and other records) is not.
+The character save keeps the data the guild card shows. Some fields are checked; the rest of the block (awards
+and other records) is not.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
@@ -201,7 +201,6 @@ quest clear bits and other records) is not.
 | 0x127B6 | 14 × u16 + u16 | weapon usage, gathering hall, same shape | verified | same; check S7 |
 | 0x127D6 | 14 × u16 + u16 | weapon usage, arena, same shape | verified | same; check S7 |
 | 0xE8A0 | u32 | brigade points (the game caps them at 9,999,999) | unverified | the MH4G save-editor wiki; check S7 |
-| 0xF220 | 280 bytes | 2,240 bits; meaning unknown, candidate for the quest clear flags | unknown | ours; check S7 |
 
 The wiki gives the three weapon-usage tables at 0x12756, 0x12776 and 0x12796; in the maintainer's USA
 v1.3.0 saves the same three tables are 0x40 later, at the offsets above (the values there are the weapon
@@ -220,10 +219,37 @@ Quest counts, in field order:
 | 0x1262A | u16 | village, high rank | unverified | same |
 | 0x1262C | u16 | gathering hall, G rank | unverified | same |
 
-Quest lists: the character save must also record which quests a character has cleared, but no public layout
-was found. The 280-byte field at 0xF220 is the main candidate (2,240 bits: all set in the completed save,
-1,257 set in the mid-game one), and the block at 0xE888 is another. Mapping them is
-[#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153).
+### Quest clear lists
+
+The character save records how many quests it has completed (the seven counts above), but no check yet
+proves a per-quest clear list. The two candidates that [#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153)
+named are both ruled out:
+
+- **0xF220 is not the quest list.** The 280-byte block holds 2,176 bits (272 bytes) and eight trailing zero
+  bytes, and its bits follow the item ids: in all three character saves every item id held in the item box
+  or a pouch has its bit set, the mid-game save sets 1,257 bits and every one of them is below the item
+  list's last id (1,936), and both completed saves set all 2,176. A quest list has about 500 entries and the
+  mid-game save records 764 quest completions, so 1,257 set bits cannot be cleared quests either. The bits
+  are indexed by item id; what a set bit means (item obtained?) is unverified.
+- **The 0xE888 block is not a clear list.** It is a table of records, not one bit array: 24- and 39-byte
+  runs of set flags, IEEE floats such as 1.0, and UTF-16 hunter names. Its non-zero byte count is the same
+  in a completed save and the mid-game one (762 and 765 of 2,456), so the block as a whole does not move
+  with progress.
+
+The strongest remaining candidate is a 512-bit field at 0x11E (64 bytes, after a 12-byte header in the
+0x0112 block): both completed saves set all 512 bits and the mid-game save sets 51. If those bits were
+read as the village quest list in id order, the 51 would be low-rank village quests, advanced quests and
+a few event quests, which is the shape of a partly played village, but the game's quest table is not in
+the save and no check proves the order the bits index. The candidate is therefore **unknown**, and
+`mhuc save dump` reports its set bits as indices, not as quests.
+
+Searched, and no layout found: mh4edit's source (profile, boxes, guild quests and Palicos only), the MH4G
+save-editor wiki's pages, MHTrIDA's save notes (its MH3 save doc leaves "Quest Completed" as TODO), the
+MH4U save editors on GitHub (mh4u-toolbox, Dsya's editor), and the MH4G cheat-code pages, whose
+story-complete code patches functions rather than save flags. Those pages do give the running game's
+memory map, and it matches the save's known offsets (name at base+0x00, item box at +0x15E, equipment box
+at +0x173E, guild quests at +0xDCA8, all checked in S8), so a later session with a running game can look
+for the clear-list reader by its save offset.
 
 ## System save
 
@@ -300,8 +326,22 @@ repeatable on any player's saves.
   their sums are in the same order of magnitude as the quest counts; the brigade-points field is at or below
   9,999,999. The mid-game character's arena weapon-usage sum is 2 and its arena quest count is 2. The
   meanings of the tables and counts remain unverified.
-- **S8 (open):** the character save's quest clear lists.
-  [#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153).
+- **S8 (done for the quest-flag evidence; the clear list stays unknown):** on the maintainer's saves,
+  compare the flag runs with the other data the save holds. `mhuc save dump` prints the item box, the
+  pouches, the 0xF220 flag count and the 0x11E candidate's set bits. Pass:
+  1. every item id in the item box and the two pouches has its bit set in the 2,176-bit array at 0xF220,
+     and the two completed saves set all 2,176 bits (the block's last 8 bytes are zero);
+  2. the mid-game save's 0xF220 bits are a subset of a completed save's, and every set bit is below the
+     item list's last id (1,936);
+  3. the 0xE888 block's non-zero byte count is unchanged between a completed save and the mid-game one
+     (762 and 765 of 2,456), so it is not the clear list;
+  4. the 512 bits at 0x11E are all set in both completed saves, the mid-game save sets 51, and its 51 are
+     contained in a completed save's. Those 51 stay unproved as quests, so the clear list is marked
+     unknown rather than verified.
+  `tests/test_with_game_files.py` runs check 1 and the candidate's bit count. The memory map the MH4G
+  cheat pages give matches the
+  save's known offsets (name, item box, equipment box and guild quests are the save offsets plus one base
+  address), which is the lead a later session can follow to the reader that consumes 0x11E.
 - **S9 (done):** decrypt three saved states of `system`: the maintainer's current one, the other copy in
   the DLC Save Data folder, and one the game wrote on a fresh SD card. Pass: each is 504 bytes; the
   fresh one's non-zero bytes are only 0x38 (1) and 0x3C (0xFFFFFFFF); the two saves with characters differ
