@@ -63,6 +63,46 @@ def test_lmt_refuses_a_track_buffer_outside_the_file():
         lmt.read(lmt_with_track_buffer_at(len(d) - 8))
 
 
+def lmt_with_float_tracks() -> bytes:
+    """One animation whose +0x38 names a float-track block, laid out from RevilLib's float_track.inl and .hpp:
+    four FloatTrack records, then group 0's two FloatFrames. No game file carries this block (check L5)."""
+    floats_at = 0x10 + lmt.ANIM
+    keys_at = floats_at + lmt.FLOAT_TRACK * lmt.FLOAT_GROUPS
+    d = bytearray(keys_at + 2 * lmt.FLOAT_KEY)
+    d[:8] = b"LMT\0" + struct.pack("<HH", 67, 1)
+    struct.pack_into("<I", d, 8, 0x10)                                 # one animation at 0x10
+    struct.pack_into("<IIii", d, 0x10, 0, 0, 10, -1)                   # no tracks
+    struct.pack_into("<I", d, 0x10 + 0x30, 0x800000)                  # flags, as every animation has
+    struct.pack_into("<I", d, 0x10 + 0x38, floats_at)                 # float-track block
+    struct.pack_into("<4BII", d, floats_at, 0, 1, 2, 3, 2, keys_at)   # group 0: remaps, 2 keys, their offset
+    struct.pack_into("<4BII", d, floats_at + lmt.FLOAT_TRACK, 0, 0, 0, 0, 0, 0)        # groups 1 to 3 empty
+    struct.pack_into("<I", d, floats_at + 2 * lmt.FLOAT_TRACK, 0)
+    struct.pack_into("<I", d, floats_at + 3 * lmt.FLOAT_TRACK, 0)
+    struct.pack_into("<Ifff", d, keys_at, 0xCD000003, 1.5, -2.0, 0.25)   # 3 components, frame 0, pad 0xCD
+    struct.pack_into("<Ifff", d, keys_at + lmt.FLOAT_KEY, 0xCD000501, 0.0, 0.0, 1.0)   # 1 component, frame 5
+    return bytes(d)
+
+
+def test_lmt_reads_the_float_track_block():
+    """specs/lmt.md, "Float-track block": the animation's four groups and their keys, values computed by hand from
+    RevilLib's float_track.inl (remaps, key count, frames offset) and float_track.hpp (FloatFrame)."""
+    _version, (a,) = lmt.read(lmt_with_float_tracks())
+    assert a is not None and a.floats is not None
+    assert [t.remaps for t in a.floats] == [(0, 1, 2, 3), (0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 0)]
+    assert [t.frames for t in a.floats][0] != 0
+    assert all(t.frames == 0 for t in a.floats[1:])
+    assert a.floats[0].keys == [lmt.FloatKey(3, 0, (1.5, -2.0, 0.25)), lmt.FloatKey(1, 5, (0.0, 0.0, 1.0))]
+    assert all(t.keys == [] for t in a.floats[1:])
+    assert lmt.read(lmt_with_track_buffer_at(0x10))[1][0].floats is None   # +0x38 = 0: no block
+
+
+def test_lmt_refuses_a_float_track_block_outside_the_file():
+    d = bytearray(lmt_with_float_tracks())
+    struct.pack_into("<I", d, 0x10 + 0x38, len(d) - 0x10)
+    with pytest.raises(lmt.LmtError, match="outside the file"):
+        lmt.read(bytes(d))
+
+
 def key_track(buffer_type: int, buffer: bytes, bounds: int = 0) -> tuple[bytes, lmt.Track]:
     at = 0x10
     d = bytearray(at + len(buffer) + bounds)

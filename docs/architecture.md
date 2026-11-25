@@ -93,7 +93,7 @@ Underwater play comes from MH3U, which has it in full: the swim state, oxygen, t
 
 Known so far:
 
-- MH3U's 387 motion lists are LMT version 66. Version 66 and 67 share one layout, so `mhuc` reads all 387 ([lmt](../specs/lmt.md), check L3), and their keyframe buffers decode too ([lmt](../specs/lmt.md#keyframe-buffers), check L4): the one version difference is types 11 to 13, which version 66 stores signed and version 67 unsigned behind a bounds block, so a converter has to re-encode those tracks' keys.
+- MH3U's 387 motion lists are LMT version 66. Version 66 and 67 share one layout, so `mhuc` reads all 387 ([lmt](../specs/lmt.md), check L3), and their keyframe buffers decode too ([lmt](../specs/lmt.md#keyframe-buffers), check L4): the one version difference is types 11 to 13, which version 66 stores signed and version 67 unsigned behind a bounds block, so a converter has to re-encode those tracks' keys. The version word itself is a loader gate: MH4U's loader refuses any version but 67 ([lmt](../specs/lmt.md#versions)).
 - MH3U's and MH4U's hunter skeletons are the same rig with MH3U's empty root dropped and the pelvis renumbered 13 to 0, so 3U underwater motions need their bone ids rewritten, not a positional retarget ([underwater.md](underwater.md#hunter-skeletons)).
 - MH3U's stage collision uses MH4U's format ([specs/sbc.md](../specs/sbc.md)).
 - Cha-Cha (MH3U on Wii U) marks the swim state, the underwater camera and underwater carving. Its offsets must be re-found on 3DS.
