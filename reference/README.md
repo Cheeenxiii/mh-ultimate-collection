@@ -20,6 +20,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `trace_calls.py` | logs who calls chosen functions while the game runs in Azahar, through its GDB stub (standard library only; procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) |
 | `force_action.py` | forces the next action of the monster at the dispatcher in MHXX or MH3U through the same GDB stub; a debugging tool for a move, not check R1 |
 | `monster_motions.py` | lists the motion each of a monster's action handlers starts, and compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)) |
+| `action_map.py` | joins two games' action and motion inventories: the MH4U handler each shared action id reaches, the ids only one game has, and the ids where the two sides' start motions differ (check R2 in [docs/checks.md](../docs/checks.md#the-shared-action-map-r2)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:
 
@@ -103,6 +104,7 @@ Rathian's unmatched engine calls, seen through its pairs, are in the "Through MH
 
 - 273 of MHXX's action ids exist in MH4U. Of the shared actions that pass constants, 194 of 197 pass the same ones.
 - Each of the 80 MH4U handlers reached by a shared action meets exactly one MHXX handler.
+- For every shared id whose handler starts a constant motion in both games the index is the same (R2: 167 of 167), so MH4U's own handler starts MHXX's animation once the port's motion lists are MHXX's. 19 ids start a constant motion only in MH4U, 2 only in MHXX, and 18 are inline on one side; the 28 ids MH4U lacks reach 8 handler units, 15 of them projectile spawns ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112)).
 - `roEm001` imports 330 engine functions. 61 of those it calls have no MH4U counterpart. Through MHGU, 2 more resolve to MH4U and 28 are placed in GU only, mostly projectile code.
 
 ### Enemy class hierarchies
