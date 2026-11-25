@@ -220,6 +220,41 @@ next is forced again. Why the idle routine runs during a forced move is not trac
 with [reference/force_action.py](../reference/force_action.py) through Azahar's GDB stub; it
 is a debugging tool for later move investigations, not part of this check.
 
+## Ported monster ids
+
+`mods/monster_ids` answers MH4U's monster-id-indexed tables for the ids in
+[data/ids](../data/ids/README.md): a registered id is answered with the MH4U monster the
+registry names as its stand-in, and 0 to 123 fall through. The headless check needs no
+converted monster files, so it runs before #48 and #49.
+
+| Check | What | Pass |
+|---|---|---|
+| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the path the stand-in's data comes from, and ids 0 to 123 passing through |
+| P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
+
+P1, headless:
+
+1. Build the plugin (`make` in `mods/monster_ids`) and add it to a user folder's mod library
+   (`tools/mods.py add mods/monster_ids`). Set `selftest = 1` in the installed mod's
+   `config.ini`. Build the code library with the mod on:
+   `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`. The
+   build lists the mod's 13 hook points.
+2. Run the game headless:
+   `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
+3. Pass: the log has `ready: answering MH4U's monster tables for 2 ported id(s), 124 and up`
+   and, for each reader, `self-test: <reader> answers id 124 -> 1, id 125 -> 1; ids 0..123
+   pass through`; the factory's and data path's lines name the path the stand-in's files are
+   read from (`enemy\em001\data\em001`). MH4U's own monsters were not loaded, so only the
+   self-test's mapping shows here; a real spawn's reader lines are P2's.
+
+P2, in game: needs the ported files (#48, #49) and a quest that names id 124
+([quests.md](quests.md)). Not done.
+
+Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod, headless
+runner. Result: the plugin loaded, and the log showed the ready line and a self-test line
+for each reader it logs, with `id 124 -> 1` and `id 125 -> 1` and `ids 0..123 pass through`, and the
+stand-in's path `enemy\em001\data\em001`. P2 is not done.
+
 ## Tracing engine calls in MHXX
 
 Shows which code calls an engine function at run time, and with which arguments, when reading the code doesn't settle it (the open entries of [reference/README.md](../reference/README.md#the-62-imports-one-by-one)). The maintainer plays; the tracer and the recording run beside the game.
