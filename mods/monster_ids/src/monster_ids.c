@@ -25,10 +25,18 @@
  * sound (+0x1c), four extra paths (+0x20, the command/EMC at +0x20 slot 3), the effect lists
  * (+0x24) and a second effect list (+0x28). The stand-in's record names `enemy\em001\...`
  * paths; answering a ported id with it would load MH4U's own files. So on the first frame the
- * plugin builds, for every registered id, a record of its own from the stand-in's: every path
- * is copied and its monster-id token rewritten to the ported id (`em001` -> `em124`, and the
- * camera's `e001` -> `e124`), so the port's files live under its own id's paths. The record,
- * its slots and its strings are guest memory from the game's own heap (alloc, ABI 2).
+ * plugin builds, for every registered id, a record of its own from the stand-in's.
+ *
+ * A port ships only some of those path kinds (its arc holds the model, motions, tail and
+ * command for 124, the model, the first three motion lists and the tail for 125); MH4U stops
+ * the load on a path that is not there. The registry's `files` column, generated into
+ * src/ids.h, names the kinds a port ships, and `motions=N` says how many motion-list slots
+ * from slot 0 are the port's. For a kind it ships the path is copied and its monster-id token
+ * rewritten to the ported id (`em001` -> `em124`, and the camera's `e001` -> `e124`); for a
+ * kind it does not ship, and for a motion slot above its count, the stand-in's path is copied
+ * unchanged, so MH4U's camera, motion effects, sound, effect lists and the rest of the motion
+ * lists load until the port's game has them converted. The record, its slots and its strings
+ * are guest memory from the game's own heap (alloc, ABI 2).
  *
  * The three readers of the record are answered with the built one:
  *   - `enemyResource::get` (0x0068d8c8) returns one field of the record; the hook returns the
@@ -83,6 +91,51 @@
 
 static const uint8_t field_slots[RECORD_FIELDS] = {1, 6, 1, 6, 2, 2, 1, 1, 4, 1, 1};
 static const uint8_t field_ends_at_null[RECORD_FIELDS] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0};
+
+/* Which kind of file each slot holds. A path is rewritten to the ported id only when the
+ * port ships that kind (its registry `files`); otherwise the stand-in's path is copied as it
+ * is. The +0x20 slots 0 to 2 are empty in MH4U's own records and have no kind, so they can
+ * only keep the stand-in's path; the fourth is the command/EMC. */
+static const uint16_t field_kinds[RECORD_FIELDS][RECORD_SLOTS_MAX] = {
+    {MHUC_FILES_MODEL},                                             /* +0x00 model */
+    {MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS,     /* +0x04 six motion lists */
+     MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS},
+    {MHUC_FILES_CAMERA},                                            /* +0x08 camera */
+    {MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS,     /* +0x0c second motion list */
+     MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS, MHUC_FILES_MOTIONS},
+    {MHUC_FILES_TAIL, MHUC_FILES_TAIL},                             /* +0x10 tail model */
+    {MHUC_FILES_MEF, MHUC_FILES_MEF},                               /* +0x14 motion effects */
+    {0},                                                            /* +0x18 unused */
+    {MHUC_FILES_SOUND},                                             /* +0x1c sound */
+    {0, 0, 0, MHUC_FILES_CMD},                                      /* +0x20 extra: slot 3 EMC */
+    {MHUC_FILES_EFL},                                               /* +0x24 effect lists */
+    {MHUC_FILES_EFL},                                               /* +0x28 second effect list */
+};
+
+/* Whether a slot's path is the port's (rewrite the id) or the stand-in's (copy it as it is):
+ * its kind must be in the port's `files`, and a motion slot must be below its `motions`
+ * count, because a port ships the motion lists from slot 0 and keeps MH4U's for the rest. */
+static int slot_is_ours(const MhucMonsterId *row, unsigned f, unsigned k) {
+    const uint16_t kind = field_kinds[f][k];
+    if (!(kind & row->files)) {
+        return 0;
+    }
+    if (kind == MHUC_FILES_MOTIONS && k >= row->motions) {
+        return 0;
+    }
+    return 1;
+}
+
+/* The kinds' names, for the self-test's list of what a port ships and what it keeps. */
+static const struct {
+    uint16_t bit;
+    const char *name;
+} file_kind_names[] = {
+    {MHUC_FILES_MODEL, "model"}, {MHUC_FILES_MOTIONS, "motions"},
+    {MHUC_FILES_CAMERA, "camera"}, {MHUC_FILES_TAIL, "tail"},
+    {MHUC_FILES_MEF, "mef"}, {MHUC_FILES_SOUND, "sound"},
+    {MHUC_FILES_CMD, "cmd"}, {MHUC_FILES_EFL, "efl"},
+};
 
 typedef struct HookInfo {
     const char *name;   /* what the reader is, for the log */
@@ -241,10 +294,13 @@ static int is_digit(uint8_t c) {
     return c >= '0' && c <= '9';
 }
 
-/* A stand-in path with the ported id in it: every `emNNN` and camera `eNNN` token becomes the
- * ported id's (`em001` -> `em124`, `e001_cam` -> `e124_cam`); other numbers, like an effect
- * list's trailing `_000`, stay. Returns the length, or -1 when it doesn't fit. */
-static int rewrite_path(MH4UCall *call, uint32_t src, unsigned id, char *out, size_t size) {
+/* A stand-in path copied out; with `rewrite` set, every `emNNN` and camera `eNNN` token
+ * becomes the ported id's (`em001` -> `em124`, `e001_cam` -> `e124_cam`) and other numbers,
+ * like an effect list's trailing `_000`, stay. Without `rewrite` the path is the stand-in's
+ * and is copied as it is: MH4U loads that kind of file from its own monster. Returns the
+ * length, or -1 when it doesn't fit. */
+static int rewrite_path(MH4UCall *call, uint32_t src, unsigned id, int rewrite, char *out,
+                        size_t size) {
     size_t n = 0;
     for (uint32_t i = 0; i < 256; i++) {
         const uint8_t c = (uint8_t)host->read8(call, src + i);
@@ -252,7 +308,7 @@ static int rewrite_path(MH4UCall *call, uint32_t src, unsigned id, char *out, si
             break;
         }
         const uint8_t next = (uint8_t)host->read8(call, src + i + 1);
-        if (c == 'e' && next == 'm'
+        if (rewrite && c == 'e' && next == 'm'
             && is_digit((uint8_t)host->read8(call, src + i + 2))
             && is_digit((uint8_t)host->read8(call, src + i + 3))
             && is_digit((uint8_t)host->read8(call, src + i + 4))) {
@@ -261,7 +317,7 @@ static int rewrite_path(MH4UCall *call, uint32_t src, unsigned id, char *out, si
             }
             n += (size_t)snprintf(out + n, size - n, "em%03u", id);
             i += 4;
-        } else if (c == 'e'
+        } else if (rewrite && c == 'e'
                    && is_digit(next)
                    && is_digit((uint8_t)host->read8(call, src + i + 2))
                    && is_digit((uint8_t)host->read8(call, src + i + 3))) {
@@ -308,7 +364,8 @@ static uint32_t build_record(MH4UCall *call, int which) {
                 }
                 continue;
             }
-            if (rewrite_path(call, slot, row->id, staged[f][k], PATH_MAX) < 0) {
+            const int own = slot_is_ours(row, f, k);
+            if (rewrite_path(call, slot, row->id, own, staged[f][k], PATH_MAX) < 0) {
                 return 0;
             }
             text += strlen(staged[f][k]) + 1;
@@ -452,11 +509,51 @@ static void stand_in_path(MH4UCall *call, uint32_t stand_in, char *out, size_t s
     }
 }
 
+/* The kinds a port ships (shipped set) or keeps the stand-in's path for (shipped clear),
+ * joined for the self-test. A motion kind is logged with its slot range, because the port
+ * ships the first `motions` slots and keeps the stand-in's for the rest. */
+static void file_kind_list(uint16_t files, unsigned motions, int shipped, char *out, size_t size) {
+    size_t used = 0;
+    out[0] = '\0';
+    for (size_t i = 0; i < sizeof file_kind_names / sizeof file_kind_names[0]; i++) {
+        int n;
+        if (file_kind_names[i].bit == MHUC_FILES_MOTIONS) {
+            /* The motions are split by slot rather than by bit: the port's first `motions`
+             * slots, the stand-in's for the rest. */
+            if (!(files & MHUC_FILES_MOTIONS)) {
+                continue;
+            }
+            if (shipped) {
+                if (motions == 0) {
+                    continue;
+                }
+                n = snprintf(out + used, size - used, "%smotions 0-%u", used ? ", " : "",
+                             motions - 1);
+            } else {
+                if (motions >= RECORD_SLOTS_MAX) {
+                    continue;
+                }
+                n = snprintf(out + used, size - used, "%smotions above %u", used ? ", " : "",
+                             motions - 1);
+            }
+        } else if (((files & file_kind_names[i].bit) != 0) != shipped) {
+            continue;
+        } else {
+            n = snprintf(out + used, size - used, "%s%s", used ? ", " : "",
+                         file_kind_names[i].name);
+        }
+        if (n < 0 || (size_t)n >= size - used) {
+            return;
+        }
+        used += (size_t)n;
+    }
+}
+
 /* Log what the readers answer, without a monster to load: the mapping itself, the paths the
  * built resource records name, and the path the stand-in's data comes from. The hooks use the
  * same records, so this shows what they will do for 124 up and that 0 to 123 are left alone. */
 static void self_test(MH4UCall *call) {
-    char ids[96], path[160], line[640], texts[512];
+    char ids[96], path[160], line[640], texts[512], ships[160], keeps[160];
     size_t used = 0;
     ids[0] = '\0';
     for (int i = 0; i < MHUC_MONSTER_COUNT; i++) {
@@ -483,6 +580,14 @@ static void self_test(MH4UCall *call) {
         snprintf(line, sizeof line, "self-test: id %u resource record at 0x%08x, built from "
                  "stand-in %u, names: %s", (unsigned)mhuc_monster_ids[i].id,
                  (unsigned)records[i].address, (unsigned)mhuc_monster_ids[i].stand_in, texts);
+        say(MH4U_LOG_INFO, line);
+        file_kind_list(mhuc_monster_ids[i].files, mhuc_monster_ids[i].motions, 1, ships,
+                       sizeof ships);
+        file_kind_list(mhuc_monster_ids[i].files, mhuc_monster_ids[i].motions, 0, keeps,
+                       sizeof keeps);
+        snprintf(line, sizeof line, "self-test: id %u ships %s; keeps stand-in %u's paths for %s",
+                 (unsigned)mhuc_monster_ids[i].id, ships[0] ? ships : "no files",
+                 (unsigned)mhuc_monster_ids[i].stand_in, keeps[0] ? keeps : "nothing");
         say(MH4U_LOG_INFO, line);
     }
     for (size_t i = 0; i < sizeof readers / sizeof readers[0]; i++) {
@@ -583,7 +688,7 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
     }
     char line[200];
     snprintf(line, sizeof line, "ready: answering MH4U's monster tables for %d ported id(s), "
-             "%u and up, with their own resource record and the stand-in's other rows",
+             "%u and up, with the files each port ships and the stand-in's for the rest",
              MHUC_MONSTER_COUNT, (unsigned)MHUC_MONSTER_FIRST);
     say(MH4U_LOG_INFO, line);
     return 1;
