@@ -170,6 +170,31 @@ def test_emd_attack_records_end_at_the_terminator_not_at_an_unpointed_block():
     assert "E10 etd attack lists with no terminator" not in counts
 
 
+def test_etd_part_kinds_count_the_eighth_byte_of_each_part_record():
+    """specs/emd.md word 5, check E13: MH4U's 0x936904 reads each part record's kind at +8; the check counts 0..4"""
+    d = bytearray(0x100)
+    d[:4] = b"etd\0"
+    struct.pack_into("<I", d, 4 * 5, 0x80)                    # the part table at 0x80, 8 x 10 bytes
+    kinds = (0, 1, 2, 3, 4, 0, 1, 2)
+    for i, kind in enumerate(kinds):
+        struct.pack_into("<H", d, 0x80 + 10 * i + 8, kind)
+    assert emd.part_kinds(bytes(d)) == list(kinds)
+    counts = emd.check_etd(bytes(d))
+    assert counts["E13 etd parts"] == 8
+    assert counts["E13 etd part kind 0"] == 2
+    assert counts["E13 etd part kind 4"] == 1
+    assert "E13 etd part kind above 4" not in counts
+
+
+def test_etd_part_table_outside_the_file_is_counted_not_read():
+    """specs/emd.md word 5, check E13: a table word that leaves fewer than 80 bytes is missing, not read"""
+    d = bytearray(0x100)
+    d[:4] = b"etd\0"
+    struct.pack_into("<I", d, 4 * 5, 0xFC)
+    assert emd.part_kinds(bytes(d)) is None
+    assert emd.check_etd(bytes(d))["E13 etd part table missing or short"] == 1
+
+
 def test_emd_word_35_records_end_at_the_minus_one_record_and_count_the_sever_ones():
     """specs/emd.md word 35, check E11: the kind-0 records after the marker are the sever/detach ones"""
     d = bytearray(0x140)

@@ -11,7 +11,7 @@ import pytest
 from mhuc import monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
-from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, lmt, mod, romfs, sound, stq
+from mhuc.formats import arc, dtbase, dtbparts, dttune, emd, emstatus, hitdata, lmt, mod, romfs, sound, stq
 from mhuc.quests import mibwrite, quest
 
 pytestmark = pytest.mark.game_files
@@ -207,6 +207,26 @@ def test_rathian_part_record_rebuilds_from_mh3u(dump):
     second = sum(a[5] == b[5] for a, b in zip(got, want, strict=True))
     assert second == 7, f"MH3U's second-level HP agrees with MH4U's on {second} of 8 parts, expected 7"
     assert all(a[6] == 0 for a in got), "MH3U has no kind field, so the rebuilt kind must stay 0"
+
+
+def test_mh4u_part_kinds_count_what_the_insect_glaive_reader_returns(dump):
+    """specs/emd.md, check E13: MH4U's 0x936904 returns a part record's kind byte. Over all 110 .etd files the kind
+    is 0 on 236 of 880 parts, 1 on 189, 2 on 141, 3 on 256 and 4 on 58; em081 is the only file whose eight are 0."""
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    em_data = next(arc.read(image.read(f)).entries for f in image.files() if f.path.endswith("em_data.arc"))
+    counts = Counter()
+    all_zero = []
+    for e in em_data:
+        if e.type_id != 0x3D8BBBAC:
+            continue
+        counts.update(emd.check_etd(e.data))
+        if not any(emd.part_kinds(e.data) or []):
+            all_zero.append(e.path.replace("\\", "/").split("/")[-1])
+    assert counts["E13 etd parts"] == 880, counts["E13 etd parts"]
+    got = [counts[f"E13 etd part kind {k}"] for k in range(5)]
+    assert got == [236, 189, 141, 256, 58], got
+    assert "E13 etd part kind above 4" not in counts and "E13 etd part kind high byte nonzero" not in counts
+    assert all_zero == ["em081"], all_zero
 
 
 def test_only_four_mh3u_status_files_carry_the_second_level_hp_block(dump):

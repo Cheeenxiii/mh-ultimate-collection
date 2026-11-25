@@ -3,7 +3,7 @@ MHGU Definitive Edition's readers. Every function returns counts (a Counter), ne
 
   check_emd(data)       header offsets, body records (shape, part, hitzone row), visibility rows, and (check
                         E11) the word 35 joint records' kinds and its kind-0 sever records
-  check_etd(data)       header offsets, attack volumes, attack records
+  check_etd(data)       header offsets, attack volumes, attack records, and (check E13) the part table's kind
   check_pair(emd, etd)  body records' hitzone rows and parts against the .etd's tables; the hitzone row size
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ EMD_WORDS = {8: "body", 9: "camera body", 13: "w13", 16: "arena points", 20: "ma
 ETD_PTRS = range(5, 35)
 BODY, VIS, JOINT, HIT, ATTACK = 44, 16, 24, 40, 40
 HITZONE_ROWS, HITZONE_ROW = 8, 10
+PART, PART_KIND = 10, 8
 
 
 def _w(d: bytes, i: int) -> int:
@@ -170,6 +171,15 @@ def check_attack_records(d: bytes) -> Counter:
     return c
 
 
+def part_kinds(d: bytes) -> list[int] | None:
+    """Word 5's eight 10-byte part records' kind (the u16 at +8), in part order; None if word 5 or the 80 bytes it
+    points at are outside the file. MH4U's own 0x936904 returns a record's kind, as the byte at +8 (check E13)."""
+    p = _w(d, 5)
+    if not p or p + 8 * PART > len(d):
+        return None
+    return [struct.unpack_from("<H", d, p + PART * i + PART_KIND)[0] for i in range(8)]
+
+
 def check_etd(d: bytes) -> Counter:
     c = Counter()
     c["E1 etd magic etd\\0" if d[:4] == b"etd\0" else f"E1 etd magic other {d[:4]!r}"] += 1
@@ -205,6 +215,15 @@ def check_etd(d: bytes) -> Counter:
             c["E1 etd attack records NOT whole"] += 1
         c["E1 etd attack records"] += (end - b) // ATTACK
     c.update(check_attack_records(d))
+    kinds = part_kinds(d)
+    if kinds is None:
+        c["E13 etd part table missing or short"] += 1
+    else:
+        c["E13 etd parts"] += len(kinds)
+        for kind in kinds:
+            c[f"E13 etd part kind {kind}" if kind in range(5) else "E13 etd part kind above 4"] += 1
+            if kind > 0xFF:
+                c["E13 etd part kind high byte nonzero"] += 1
     return c
 
 
