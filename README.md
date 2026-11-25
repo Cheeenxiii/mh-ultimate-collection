@@ -15,6 +15,8 @@ Nothing is playable yet. The repository has:
 
 How it all fits together: [docs/architecture.md](docs/architecture.md).
 
+What comes next is planned in the open: [milestones](https://github.com/Cheeenxiii/mh-ultimate-collection/milestones) for the goals, [issues](https://github.com/Cheeenxiii/mh-ultimate-collection/issues) for the tasks, and the [project board](https://github.com/users/Cheeenxiii/projects/1) for where each one stands.
+
 ## No game data
 
 This repository contains no game data and nothing derived from it. Every tool works from dumps you made of games you own, on your machine. See [LEGAL.md](LEGAL.md).
