@@ -88,9 +88,11 @@ def read(data: bytes) -> Xfs:
     for off in offsets:
         o = HEADER + off
         dti_id = struct.unpack_from(e + "I", data, o)[0]
-        count_word = struct.unpack_from(e + "H", data, o + 4)[0]
-        # the same field as the count in a little-endian file and as twice the count in a big-endian one
-        count = count_word // 2 if e == ">" else count_word
+        # the field is the count itself in a little-endian file and twice the count in a big-endian one
+        if e == "<":
+            count = struct.unpack_from("<I", data, o + 4)[0]
+        else:
+            count = struct.unpack_from(">H", data, o + 4)[0] // 2
         cd = ClassDef(dti_id)
         for i in range(count):
             p = o + 8 + i * PROP_ENTRY
