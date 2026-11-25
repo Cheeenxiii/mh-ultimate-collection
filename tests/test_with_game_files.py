@@ -1356,3 +1356,35 @@ def test_every_mh3u_motion_list_converts_to_version_67(dump):
     assert (lists, animations, tracks) == (387, 8336, 270420), (lists, animations, tracks)
     assert reencoded == 38311, reencoded
     assert worst < 6.2e-5, worst
+
+
+def test_convert_monster_builds_her_files_and_sounds_into_one_folder(dump, tmp_path):
+    """docs/architecture.md#3u-rathians-files and specs/sound.md SN9: `mhuc convert monster` writes one folder,
+    `/data/em125.arc`, holding her models, materials, textures and motion lists and her converted sound set."""
+    from mhuc import cli
+
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    sources = {"/arc/enemy/em001.arc": None, "/arc/sound/se/em/em001/snd_em001.arc": None}
+    for f in image.files():
+        if f.path in sources:
+            sources[f.path] = tmp_path / os.path.basename(f.path)
+            sources[f.path].write_bytes(image.read(f))
+    out = tmp_path / "mod"
+    assert cli.main(["convert", "monster", "--id", "125", "--romfs", dump("mh3u", "romfs.bin"),
+                     "--out", str(out)]) == 0
+    assert cli.main(["convert", "monster", "--id", "125", "--arc", str(sources["/arc/enemy/em001.arc"]),
+                     "--sound-arc", str(sources["/arc/sound/se/em/em001/snd_em001.arc"]),
+                     "--out", str(out)]) == 0
+    built = arc.read((out / "romfs" / "data" / "em125.arc").read_bytes())
+    paths = {e.path for e in built.entries}
+    for path in ("enemy\\em125\\mod\\em125", "enemy\\em125\\mod\\em125_tail",
+                 "enemy\\em125\\mod\\em125_BM", "enemy\\em125\\mod\\em125_NM_MIRROR",
+                 "enemy\\em125\\mot\\em125_0", "enemy\\em125\\mot\\em125_1",
+                 "enemy\\em125\\mot\\em125_2", "sound\\call\\em\\em125",
+                 "sound\\se\\em\\em125\\snd_em125"):
+        assert path in paths, path
+    counts = Counter(e.type_name for e in built.entries)
+    assert counts["rMotionList"] == 3 and counts["rLtSoundSourceADPCM"] == 48, counts
+    for e in built.entries:
+        if e.type_name == "rMotionList":
+            assert lmt.read(e.data)[0] == 67
