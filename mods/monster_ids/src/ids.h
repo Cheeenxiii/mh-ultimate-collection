@@ -44,11 +44,12 @@ typedef struct MhucMonsterId {
 } MhucMonsterId;
 
 /* The permanent ids, consecutive from 124. */
-#define MHUC_MONSTER_COUNT 3
+#define MHUC_MONSTER_COUNT 4
 static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {
     {124, 1, 0x1fu, /* slots 0, 1, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
     {125, 1, 0x07u, /* slots 0, 1, 2 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_SOUND | MHUC_FILES_CMD},
     {126, 15, 0x1du, /* slots 0, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS},
+    {127, 15, 0x07u, /* slots 0, 1, 2 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS},
 };
 
 /* The pooled ids: each is lent one byte of 224 to 255 for a quest that names it. */
@@ -62,5 +63,7 @@ static const MhucMonsterId mhuc_pooled_monster_ids[1] = {{0, 0, 0, 0}};
 #define MHUC_MONSTER_ID_RATHIAN_3U 125
 /* Giadrome, mhxx em034 */
 #define MHUC_MONSTER_ID_GIADROME_GU 126
+/* Great Wroggi, mh3u em045 */
+#define MHUC_MONSTER_ID_GREAT_WROGGI_3U 127
 
 #endif

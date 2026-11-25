@@ -478,25 +478,34 @@ P1, headless:
    fixture, not a shipped monster.
 3. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
-4. Pass: the log has `ready: answering MH4U's monster tables for 2 permanent and 0 pooled
+4. Pass: the log has `ready: answering MH4U's monster tables for 4 permanent and 0 pooled
    id(s), 124 and up, lending 224..255 per quest, with the files each port ships and the
    stand-in's for the rest`; one `self-test: id 124 resource record at <address>, built from
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
-   record built in guest memory; one `self-test: id 124 ships model, motions 0-4, tail, cmd;
-   keeps stand-in 1's paths for motions above 4, camera, mef, sound, efl` line and one for 125
-   (`ships model, motions 0-2, tail, sound, cmd; keeps stand-in 1's paths for motions above 2,
-   camera, mef, efl`); and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass
-   through`. In the 124 record the model, motion, tail and command paths name `em124`, and the
-   camera, motion-effect, sound and effect-list paths still name `em001`. The 125 record names
-   `em125` for the model, motion slots 0 to 2, the tail, the sound and the command, and keeps
-   the stand-in's `em001` for motion slots 3 and 4, the camera, motion effects and effect
+   record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, tail,
+   cmd; keeps stand-in 1's paths for motions 5, camera, mef, sound, efl` line; one for 125
+   (`ships model, motions 0,1,2, tail, sound, cmd; keeps stand-in 1's paths for motions 3,4,
+   camera, mef, efl`); one for 126 (`ships model, motions 0,2,3,4; keeps stand-in 15's paths
+   for motions 1,5, camera, tail, mef, sound, cmd, efl`); one for 127 (`ships model, motions
+   0,1,2; keeps stand-in 15's paths for motions 3,4,5, camera, tail, mef, sound, cmd, efl`);
+   and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass through`. In the
+   124 record the model, motion, tail and command paths name `em124`, and the camera,
+   motion-effect, sound and effect-list paths and motion slot 5 still name `em001`. The 125
+   record names `em125` for the model, motion slots 0 to 2, the tail, the sound and the
+   command, and keeps the stand-in's `em001` for motion slots 3 and 4, the camera, motion
+   effects and effect lists. The 126 record names `em126` for the model and motion slots 0, 2,
+   3 and 4, and keeps stand-in 15's `em015` for motion slots 1 and 5, the tail, the camera,
+   motion effects, the sound, the command and the effect lists. The 127 record names `em127`
+   for the model and motion slots 0, 1 and 2, and keeps stand-in 15's `em015` for motion slots
+   3, 4 and 5, the tail, the camera, the motion effects, the sound, the command and the effect
    lists; no path may name a file the port's arc does not ship ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
    The 125 sound path is the converted call `mhuc convert monster` writes (#158), and the 125
    command path is the port's converted EMC, which #49 ships; a P1 run before that file exists
    still builds the record (the self-test does not load files), but a quest with 125 would hang
    as in #143.
    The factory's and data path's lines name the path the stand-in's files are read from
-   (`enemy\em001\data\em001`), which the record does not change. With the fixture the ready
+   (`enemy\em001\data\em001` for stand-in 1, `enemy\em015\data\em015` for the Great
+   Jaggi), which the record does not change. With the fixture the ready
    line is `1 permanent and 1 pooled`, its record is `enemy\em256\...` for the one kind the
    fixture's `files` names and the stand-in's for the rest, and the log also has `quest 60001:
    pooled id 256 -> lent 224`, `self-test: quest 60001 names pooled id 256; lent 224; the
@@ -533,10 +542,13 @@ files a port does not ship are tolerated as missing is unverified.
 
 After that run, 125's registry row gained `cmd`
 ([#159](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/159)) and `sound`
-([#158](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/158)), so the next P1
-run's 125 record also names `enemy\em125\data\em125_cmd`, the converted EMC #49 ships, and
-`sound\call\em\em125`, the converted sound call #158's `mhuc convert monster` writes; that
-run is not done yet.
+([#158](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/158)), and 126 and 127
+were registered for Giadrome ([#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161))
+and Great Wroggi ([#166](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/166)), so
+the next P1 run's 125 record also names `enemy\em125\data\em125_cmd`, the converted EMC #49
+ships, and `sound\call\em\em125`, the converted sound call #158's `mhuc convert monster`
+writes, and its 126 and 127 records name `em126`/`em127` for the model and the motion slots
+their rows list while keeping the stand-in's `em015` elsewhere; that run is not done yet.
 
 ## A ported camera's cut-in (C2)
 

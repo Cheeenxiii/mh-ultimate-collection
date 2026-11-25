@@ -2,3 +2,4 @@ kind,id,key,source_game,source_key,name,stand_in,files,notes
 monster,124,rathian-gu,mhxx,em001,Rathian,1,"model,motions=0-4,tail,cmd","GU Rathian: MHXX em001 (roEm001); ported onto uEnemy"
 monster,125,rathian-3u,mh3u,em001,Rathian,1,"model,motions=0-2,tail,cmd,sound","3U Rathian: MH3U em001 runs on uEm002; ported onto uEnemy"
 monster,126,giadrome-gu,mhxx,em034,Giadrome,15,"model,motions=0,2,3,4","GU Giadrome: MHXX em034; ported onto uEnemy; its motion lists are MHXX em014's; AI waits on #48's EMC conversion"
+monster,127,great-wroggi-3u,mh3u,em045,Great Wroggi,15,"model,motions=0-2","3U Great Wroggi: MH3U em045 runs on uEm012 (Great Jaggi's class); ported onto uEnemy"

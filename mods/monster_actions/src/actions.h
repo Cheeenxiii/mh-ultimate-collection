@@ -53,11 +53,15 @@ static const MhucAction mhuc_actions_125[] = {
 /* Giadrome, ported from mhxx em034 (giadrome-gu, id 126): no entry: no action-id map is recorded for it yet. */
 static const MhucAction *const mhuc_actions_126 = NULL;
 
-#define MHUC_PORTED_ACTIONS_COUNT 3
+/* Great Wroggi, ported from mh3u em045 (great-wroggi-3u, id 127): no entry: no action-id map is recorded for it yet. */
+static const MhucAction *const mhuc_actions_127 = NULL;
+
+#define MHUC_PORTED_ACTIONS_COUNT 4
 static const MhucPortedActions mhuc_ported_actions[MHUC_PORTED_ACTIONS_COUNT] = {
     {124, 0, mhuc_actions_124},
     {125, 16, mhuc_actions_125},
     {126, 0, mhuc_actions_126},
+    {127, 0, mhuc_actions_127},
 };
 
 #endif
