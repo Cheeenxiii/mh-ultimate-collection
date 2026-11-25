@@ -422,20 +422,17 @@ fork's ABI 3); the 19 calls of #55 whose MH4U counterpart is unknown belong to t
 `monster_actions.py pairs` finds 63 body pairs between the two classes; 58 of the 66 3U
 handlers have one, 8 have none.
 
-**Where the port's animations go.** `monster_motions.py place` writes the plan for a port:
-one row per target (file, slot), with the source slot and the action ids that ask for it, and
-a row for each id it cannot place. On Rathian's data it places 96 ids at 27 target slots
-(5 of them whose target slot MH4U's own lists leave empty), and has two kinds of row left
-over:
-
-- 19 ids whose animation has no unique match, which stay wherever the source's file keeps
-  them; the handler's computed index decides whether that is where it is asked for.
-- one target slot, asked by 13/5 and 13/6 with two different animations. No single placement
-  serves both; 13/6 wants the animation MH4U's 13/8 handler starts, so running 13/8's handler
-  for 13/6 is the one option to check, and it is not settled.
-
-The plan holds motion indices read from the games' code, so it is written to a file outside
-the repository, like R1's mapping. The 57 not-compared ids keep the source's own slot.
+**Where the port's animations go.** The converted animation file keeps the source game's
+grouping, and the port translates the motion number at run time: the ported monster's plugin
+hooks MH4U's motion-start wrapper (0x0094e318) and maps (current action, the number MH4U's
+handler asks) to the source game's motion number with a table `monster_motions.py` generates
+from this comparison — one checked generated header per ported monster, like `ids.h`, holding
+action and motion numbers only. An entry the table lacks passes the number through unchanged
+and logs once. So each action gets its own animation and no placement conflict exists: 13/5
+and 13/6 keep the animations their own handlers start, and 13/8 keeps its own. The 19
+category-7 ids whose computed index this comparison cannot resolve are listed as entries the
+table leaves out for now; the 57 not-compared ids pass through unchanged. The plan that
+`monster_motions.py place` used to write is retired (issue #125).
 
 ### Lessons from MHGU Definitive Edition's ports
 
