@@ -41,7 +41,7 @@ This page also records what has been established about the engines. Addresses ar
 | Game | Code | Recompile | Check against the original |
 |---|---|---|---|
 | MH3U (3DS, USA) | `code.bin` | every function | gametest: 33,275 of 33,283 agree, the other 8 are test limits (6 run over the instruction budget, 2 read an inline descriptor); none returns a different state |
-| MHXX (3DS, v1.4) | `code.bin` plus 109 CRO modules (every monster, weapon type, village…) | everything, modules at fixed bases in one library | module test: all 109 modules, no difference in state, memory or exit |
+| MHXX (3DS, v1.4) | `code.bin` plus 109 CRO modules (every monster, weapon type, village…) | everything, modules at fixed bases in one library | module test: all 109 modules loaded, 36,665 functions in 108 of them (`roPlayerQuest05` has none), one test limit; no difference in state, memory or exit |
 | MHGU (Switch, v1.4.0) | `main`, 32-bit ARM, monsters linked statically | not recompiled | used for matching functions only |
 
 ## Class registries
@@ -566,4 +566,4 @@ The checks reported in [The reference games](#the-reference-games) are run like 
 5. MHXX's modules: `python3 reference/recompile_module.py --game mhxx --exheader <work>/exheader.bin --code <work>/code.bin --crs <romfs>/modules_MasterRelease/static.crs -o <build> <romfs>/modules_MasterRelease/*.cro` recompiles them with the static code, then build the library as above and test it with `python3 reference/modtest.py --build <build> --exheader <work>/exheader.bin --code <work>/code.bin --crs <romfs>/modules_MasterRelease/static.crs <romfs>/modules_MasterRelease/*.cro --cases 4`.
 6. MHXX's `reference/games/mhxx/extra_entries.txt` lists the 4,256 static functions the modules branch to; `recompile_module.py --static-entries <out>` regenerates it, and it must stay identical. The static recompile reads it.
 
-MH3U gives 33,283 functions: 33,275 agree, 6 run over the budget and 2 read a descriptor, and none differs in state, memory or exit.
+MH3U gives 33,283 functions: 33,275 agree, 6 run over the budget and 2 read a descriptor, and none differs in state, memory or exit. MHXX gives 109 modules, 36,665 functions in 108 of them (`roPlayerQuest05` has none): 20,718 pass, 15,768 fault the same way in both, 178 run over the budget, one is a test limit in `roEm060` (an indirect call through a pointer taken from the random state), and none differs in state, memory or exit.
