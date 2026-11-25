@@ -2,11 +2,11 @@
  * rathian_actions.c: GU Rathian's MHXX-only actions, run on MH4U's uEnemy.
  *
  * GU Rathian (MHXX v1.4, roEm001) has 13 action ids MH4U has no action for:
- * 3/98, 4/27 to 4/32, 8/0, 12/0 to 12/3 and category 17. This plugin carries 3/98, the
- * 12/1 to 12/3 chain around it and category 17. 12/0 needs nothing: MH4U's own category-12
- * case checks index 0 and runs its own handler 0x006d524c, the handler its shared 3/2, 3/83
- * etc. use and the role pair of MHXX's 12/0. The other slices are 4/27-32 and 8/0 (separate
- * issues).
+ * 3/98, 4/27 to 4/32, 8/0, 12/0 to 12/3 and category 17. This plugin carries 3/98 with
+ * the 12/1 to 12/3 chain around it, the six 4/27 to 4/32 ids that share handler 0x0200e3b4,
+ * and category 17. 12/0 needs nothing: MH4U's own category-12 case checks index 0 and runs
+ * its own handler 0x006d524c, the handler its shared 3/2, 3/83 etc. use and the role pair of
+ * MHXX's 12/0. The other slice is 8/0 (a separate issue).
  *
  * Category 17 is a gate plus a base-class update, not a per-index handler. MHXX's case
  * (0x020098b8) jumps to 0x008d5bd4, which reads the index byte at this+0x6bf1: 0 to 2
@@ -38,6 +38,7 @@
  */
 #include <stddef.h>
 #include <stdint.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,13 +69,68 @@
 #define FN_HANDLER_3_12 0x006d791cu /* 0x0201041c, MH4U's shared 3/12 handler */
 /* MH4U's uEnemy vtable slot 89, the same routine as MHXX's slot 0x3d0 (0x008ae50c):
  * 0x008b1700->0x009167b4, 0x00add004->0x0092e960, 0x008ac5a0 (the action setter)
- * ->0x0090ef74, and the finish flag this+0x6b00->work+0x1dc (the plugin README). */
+ * ->0x0090ef74, and the finish flag this+0x6b00->work+0x1dc (the plugin README). It is
+ * category 17's base update and the 4/27-32 finish flag's end-of-action. */
 #define FN_BASE_UPDATE 0x00911b48u
 
 /* The motions 3/98 starts. 0x101 runs with s0 = 6.0, s1 = 0.0; 0x104 with s0 = 2.0 (the
  * source leaves s1 from the previous state, which is 0.0 while the move is current). */
 #define MOTION_A 0x101u
 #define MOTION_B 0x104u
+
+/* ── the 4/27 to 4/32 slice: handler 0x0200e3b4, three states ────────────────────────
+ * The six ids' case blocks (0x02018af8 to 0x02018bac) pass r1/r2 to the shared handler:
+ * 4/27 2/0, 4/28 1/0, 4/29 2/1, 4/30 1/1, 4/31 2/0, 4/32 1/0. r1 picks the pair of sides
+ * (mode 1 or 2) and r2 picks the ending: 0 waits for the finish flag and calls MHXX's
+ * end-of-action (vtable slot 244), 1 starts the last motion and requests action 7/246 or
+ * 7/247. Each case block also calls 0x00adb528 with 2, 2, 3, 3, 5, 5 (method 0x4c of the
+ * object at this+0x6dc4); MH4U has no counterpart for it, so that call is not translated. */
+
+/* MH4U's work block is *(this+0xe28), MHXX's is *(this+0x10a8). The fields this slice
+ * reads, MHXX -> MH4U, each confirmed by a paired function (see the README's table):
+ *   position x,y,z     +0x40/+0x44/+0x48 -> +0x198/+0x19c/+0x1a0
+ *   position w         +0x4c             -> +0x1a4
+ *   heading            +0x54             -> +0x1ac
+ *   target point x,z   +0x1d0/+0x1d8     -> +0x218/+0x220
+ *   heading saved      +0x200            -> +0x248
+ *   speed (this)       +0x298            -> +0x290
+ *   turn scale (this)  +0x1c             -> +0x14
+ * The target-line struct *(this+0x8d88) (MHXX *(this+0xb770)) keeps the same layout in
+ * both games: origin x,z at +0x30/+0x38, direction x,y,z,w at +0x40 to +0x4c. */
+#define ENEMY_TARGET_LINE 0x08d88u
+#define ENEMY_SPEED       0x0290u
+#define ENEMY_TURN_SCALE  0x0014u
+#define WORK_POS          0x0198u
+#define WORK_POS_W        0x01a4u
+#define WORK_HEADING      0x01acu
+#define WORK_SAVED_HEADING 0x0248u
+#define LINE_ORIGIN       0x0030u
+#define LINE_DIR          0x0040u
+
+/* The handler's engine calls, MH4U address <- MHXX address (the MHXX one in brackets). */
+#define FN_FLIGHT_SETUP 0x006e7be8u  /* [0x0201262c] the flight's setup, from the height data */
+#define FN_MODE         0x009167b4u  /* [0x008b1700] set the monster's mode (0, 1, 2, 3, 5, 6) */
+#define FN_TURN         0x00917570u  /* [0x008b2210] turn by an angle step, s0/s1 the speed range */
+#define FN_MODE_CLEAR   0x0091aae4u  /* [0x008a7360] the flag-clear wrapper around 0x00b06b4c */
+#define FN_TARGET_POINT 0x0092d09cu  /* [0x008c21f8] build a target point from an index */
+#define FN_TURN_TO      0x0091db4cu  /* [0x008b75d8] turn toward a target point, at a step in r3 */
+#define FN_LINE_POINT   0x006e5608u  /* [0x020063fc] a point on the target line at a fraction */
+#define FN_ROTATE       0x00aad55cu  /* [0x0201277c] rotate a direction by an angle */
+
+/* The motions the six start: r1 = 1 (mode 1) or 2 (mode 2) selects the side. */
+#define MOTION_TAKEOFF_1 0x417u  /* state 0, s0 = 6.0 */
+#define MOTION_TAKEOFF_2 0x418u  /* state 0, s0 = 6.0 */
+#define MOTION_FLY_1     0x909u  /* state 1, s0 = 0.0 */
+#define MOTION_FLY_2     0x90au  /* state 1, s0 = 0.0 */
+#define MOTION_END_1     0x90du  /* state 2, variant 1, s0 = 2.0 */
+#define MOTION_END_2     0x90bu  /* state 2, variant 1, s0 = 2.0 */
+#define PENDING_ACTION_1 0xf6u  /* the action 4/30 requests next: 7/246 */
+#define PENDING_ACTION_2 0xf7u  /* the action 4/29 requests next: 7/247 */
+
+/* The turn steps 0x008b75d8 takes in r1: the slow one when the mode-clear call succeeded,
+ * the fast one when it did not. */
+#define TURN_STEP_SLOW 0x1c7u
+#define TURN_STEP_FAST 0x00b6u
 
 static const MH4UPluginHost *host;
 static int any_monster, monster_id = 124;
@@ -89,6 +145,7 @@ static int any_monster, monster_id = 124;
 #define STUB_RET_S0    64u
 #define STUB_CALL_RET  72u
 #define STUB_READ      128u
+#define STUB_SCRATCH   192u   /* 16 bytes of guest memory for a point the engine fills */
 
 static uint32_t stub_block;
 static int stub_failed, stub_logged;
@@ -185,6 +242,31 @@ static uint32_t bits_of(float f) {
     uint32_t u;
     memcpy(&u, &f, sizeof u);
     return u;
+}
+
+static float f32_of(uint32_t u) {
+    float f;
+    memcpy(&f, &u, sizeof f);
+    return f;
+}
+
+static uint32_t read_f32(MH4UCall *call, uint32_t addr) {
+    return host->read32(call, addr);
+}
+
+static void write_f32(MH4UCall *call, uint32_t addr, float f) {
+    host->write32(call, addr, bits_of(f));
+}
+
+/* The source's `vcvt.u32.f32` saturates: a negative is 0, anything past 2^32 is all ones. */
+static uint32_t f32_to_u8(float f) {
+    if (!(f > 0.0f)) {
+        return 0;
+    }
+    if (f >= 4294967296.0f) {
+        return 0xffu;
+    }
+    return (uint32_t)f & 0xffu;
 }
 
 static int f32_gt(uint32_t a, uint32_t b) {
@@ -355,6 +437,157 @@ static void run_12_3(MH4UCall *call, uint32_t enemy, uint32_t work) {
     host->call(call, FN_HANDLER_3_9, enemy, 1, 0);
 }
 
+/* MHXX 4/27-32, handler 0x0200e3b4: three states, one state per frame.
+ *   mode is the case block's r1 (1 or 2), variant its r2 (0 or 1), and s20 the handler's
+ *   incoming s0.
+ *   state 0: the flight setup, mode 3, the target line built from the position and the target
+ *            point and rotated 90 degrees, motion 0x417/0x418 at 6.0, and the heading saved;
+ *   state 1: build target point 0, speed/88, the mode-clear call at 78.0 and a turn toward
+ *            the target at the slow or fast step, a point on the line at (s20 * 0.01) percent,
+ *            one step of 10 * (this+0x14) toward it, the mode-clear call at 2.0, then the
+ *            flight motion 0x909/0x90a at 0.0;
+ *   state 2: a turn by +-0x2000 at 2.0..10.0; variant 0 waits for the finish flag and then
+ *            calls MH4U's end-of-action, variant 1 makes the mode-clear call at 30.0, starts
+ *            motion 0x90b/0x90d at 2.0 and requests action 7/247 or 7/246.
+ *
+ * The source's case blocks call 0x00adb528 (the object at this+0x6dc4, method 0x4c) before
+ * the handler, and its state-2 request goes through 0x008ebab0. MH4U has neither object nor
+ * queue, so both are left out and logged once per action. */
+static int precall_logged, pending_logged;
+
+static void log_precall_once(int index) {
+    const unsigned bit = 1u << (unsigned)(index - 27);
+    if (precall_logged & (int)bit) {
+        return;
+    }
+    precall_logged |= (int)bit;
+    char line[160];
+    snprintf(line, sizeof line,
+             "4/%d: the source's case block calls 0x00adb528 (an object MH4U lacks) before the "
+             "handler; it is not translated", index);
+    host->log(host, MH4U_LOG_INFO, line);
+}
+
+static void log_pending_once(int index) {
+    if (pending_logged) {
+        return;
+    }
+    pending_logged = 1;
+    char line[160];
+    snprintf(line, sizeof line,
+             "4/%d: the source now requests action 7/%d through 0x008ebab0; that helper is not "
+             "translated", index, index == 30 ? (int)PENDING_ACTION_1 : (int)PENDING_ACTION_2);
+    host->log(host, MH4U_LOG_INFO, line);
+}
+
+static void run_4_27(MH4UCall *call, uint32_t enemy, uint32_t work, MonsterState *st,
+                     int index, int mode, int variant, uint32_t s0arg) {
+    switch (st->state) {
+    case 0: {
+        st->state = 1;
+        host->call(call, FN_FLIGHT_SETUP, enemy, 0, 0);
+        host->call(call, FN_MODE, enemy, 3, 0);
+        const uint32_t line = host->read32(call, enemy + ENEMY_TARGET_LINE);
+        if (line) {
+            const float px = f32_of(read_f32(call, work + WORK_POS));
+            const float pz = f32_of(read_f32(call, work + WORK_POS + 8u));
+            const float tx = f32_of(read_f32(call, work + WORK_TARGET));
+            const float tz = f32_of(read_f32(call, work + WORK_TARGET + 8u));
+            host->write32(call, line + LINE_ORIGIN, bits_of(px));
+            host->write32(call, line + LINE_ORIGIN + 8u, bits_of(pz));
+            float vx = tx - px;
+            float vy = f32_of(read_f32(call, line + LINE_DIR + 4u));
+            float vz = tz - pz;
+            const float len = sqrtf(vx * vx + vy * vy + vz * vz);
+            if (len >= 1.1920929e-07f) {
+                vx /= len;
+                vy /= len;
+                vz /= len;
+            }
+            host->write32(call, line + LINE_DIR, bits_of(vx));
+            host->write32(call, line + LINE_DIR + 4u, bits_of(vy));
+            host->write32(call, line + LINE_DIR + 8u, bits_of(vz));
+            host->write32(call, line + LINE_DIR + 0xcu, 0);
+            host->call(call, FN_ROTATE, line + LINE_DIR, mode == 1 ? 0x4000u : 0xc001u, 0);
+        }
+        call_s01(call, FN_MOTION, enemy, mode == 1 ? MOTION_TAKEOFF_1 : MOTION_TAKEOFF_2, 0,
+                 bits_of(6.0f), bits_of(0.0f));
+        host->write32(call, work + WORK_SAVED_HEADING, host->read32(call, work + WORK_HEADING));
+        break;
+    }
+    case 1: {
+        const uint32_t offset = mode == 1 ? 0x2000u : 0xe001u;
+        host->call(call, FN_FLIGHT_SETUP, enemy, 0, 0);
+        host->call(call, FN_TARGET_POINT, enemy, 0, 0);
+        const float speed = f32_of(read_f32(call, enemy + ENEMY_SPEED));
+        const uint32_t fraction = f32_to_u8(f32_of(s0arg) * 0.01f);
+        if (call_s01(call, FN_MODE_CLEAR, enemy, 2, 0, bits_of(78.0f), 0)) {
+            host->call(call, FN_TURN_TO, enemy, TURN_STEP_SLOW, offset);
+        } else {
+            host->call(call, FN_TURN_TO, enemy, TURN_STEP_FAST, offset);
+        }
+        const uint32_t scratch = stub_block + STUB_SCRATCH;
+        call_s0(call, FN_LINE_POINT, enemy, scratch, fraction, bits_of(speed / 88.0f));
+        const float ox = f32_of(read_f32(call, scratch));
+        const float oy = f32_of(read_f32(call, scratch + 4u));
+        const float oz = f32_of(read_f32(call, scratch + 8u));
+        const float px = f32_of(read_f32(call, work + WORK_POS));
+        const float py = f32_of(read_f32(call, work + WORK_POS + 4u));
+        const float pz = f32_of(read_f32(call, work + WORK_POS + 8u));
+        const float dx = ox - px;
+        const float dz = oz - pz;
+        const float dist = sqrtf(dx * dx + dz * dz);
+        const float scale = f32_of(read_f32(call, enemy + ENEMY_TURN_SCALE));
+        float nx = ox, ny = oy, nz = oz;
+        if (!(scale * 75.0f >= dist)) {
+            float mx = ox - px, my = oy - py, mz = oz - pz;
+            const float len = sqrtf(mx * mx + my * my + mz * mz);
+            if (len >= 1.1920929e-07f) {
+                mx /= len;
+                my /= len;
+                mz /= len;
+            }
+            nx = px + mx * 10.0f * scale;
+            ny = py + my * 10.0f * scale;
+            nz = pz + mz * 10.0f * scale;
+        }
+        write_f32(call, work + WORK_POS, nx);
+        write_f32(call, work + WORK_POS + 4u, ny);
+        write_f32(call, work + WORK_POS + 8u, nz);
+        host->write32(call, work + WORK_POS_W, 0);
+        if (!call_s01(call, FN_MODE_CLEAR, enemy, 1, 0, bits_of(2.0f), 0)) {
+            return;
+        }
+        st->state = 2;
+        host->call(call, FN_MODE, enemy, 0, 0);
+        call_s01(call, FN_MOTION, enemy, mode == 1 ? MOTION_FLY_1 : MOTION_FLY_2, 0,
+                 bits_of(0.0f), bits_of(0.0f));
+        break;
+    }
+    default: {
+        if (mode == 1) {
+            call_s01(call, FN_TURN, enemy, 0xffffe000u, 0, bits_of(2.0f), bits_of(10.0f));
+        } else {
+            call_s01(call, FN_TURN, enemy, 0x2000u, 0, bits_of(2.0f), bits_of(10.0f));
+        }
+        if (!variant) {
+            if (host->call(call, FN_FLAG, enemy, 0, 0)) {
+                host->call(call, FN_BASE_UPDATE, enemy, 0, 0);
+            }
+            break;
+        }
+        if (!call_s01(call, FN_MODE_CLEAR, enemy, 1, 0, bits_of(30.0f), 0)) {
+            return;
+        }
+        st->state = 3;
+        call_s01(call, FN_MOTION, enemy, mode == 1 ? MOTION_END_1 : MOTION_END_2, 0,
+                 bits_of(2.0f), bits_of(0.0f));
+        log_pending_once(index);
+        break;
+    }
+    }
+}
+
 /* ── the dispatcher hook ───────────────────────────────────────────────────────────── */
 static void dispatch_action(MH4UCall *call, void *user) {
     (void)user;
@@ -383,8 +616,10 @@ static void dispatch_action(MH4UCall *call, void *user) {
         host->skip_original(call);
         return;
     }
+    /* 4/27-32 land on 127-132 so that no other slice's id can take their place. */
     const int which = (category == 3 && index == 98) ? 98
                     : (category == 12 && index >= 1 && index <= 3) ? index
+                    : (category == 4 && index >= 27 && index <= 32) ? 100 + index
                     : -1;
     if (which < 0 || !ensure_stubs(call)) {
         host->call_original(call);
@@ -392,28 +627,37 @@ static void dispatch_action(MH4UCall *call, void *user) {
     }
     MonsterState *st = state_for(enemy, category, index);
     log_action_once(category, index);
-    switch (which) {
-    case 98: run_3_98(call, enemy, work, st); break;
-    case 1: run_12_1(call, enemy, work, st); break;
-    case 2: run_12_2(call, enemy, work, st); break;
-    default: run_12_3(call, enemy, work); break;
+    if (which >= 127) {
+        /* 4/27-32: r1 = 2 on the odd ids, 1 on the even ones; r2 = 1 on 4/29 and 4/30. */
+        const int mode = (index % 2 == 0) ? 1 : 2;
+        const int variant = (index == 29 || index == 30) ? 1 : 0;
+        log_precall_once(index);
+        run_4_27(call, enemy, work, st, index, mode, variant, read_s(call, 0));
+    } else {
+        switch (which) {
+        case 98: run_3_98(call, enemy, work, st); break;
+        case 1: run_12_1(call, enemy, work, st); break;
+        case 2: run_12_2(call, enemy, work, st); break;
+        default: run_12_3(call, enemy, work); break;
+        }
     }
     host->skip_original(call);
 }
 
 /* ── self-test (the headless check) ────────────────────────────────────────────────── */
 static void self_test(MH4UCall *call) {
-    char line[512];
+    char line[768];
     snprintf(line, sizeof line,
-             "selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and "
+             "selftest: 11 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and "
              "0x104), 12/1 <- 0x0201c1d0 + 0x020062d4, 12/2 <- 0x0201c228 + 0x0201041c->0x%08x, "
-             "12/3 <- 0x0201c27c + 0x02010aec->0x%08x, 17 <- the gate 0x008d5bd4 + MH4U's base "
-             "update 0x%08x (slot 89, MHXX's slot 244)",
+             "12/3 <- 0x0201c27c + 0x02010aec->0x%08x, 4/27-32 <- 0x0200e3b4 (3 states, motions "
+             "0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 17 <- the gate 0x008d5bd4 "
+             "+ MH4U's base update 0x%08x (slot 89, MHXX's slot 244)",
              (unsigned)FN_HANDLER_3_12, (unsigned)FN_HANDLER_3_9, (unsigned)FN_BASE_UPDATE);
     host->log(host, MH4U_LOG_INFO, line);
     snprintf(line, sizeof line,
              "selftest: category 17 does nothing for indexes 0 to 2; 12/0 is MH4U's own "
-             "category-12 handler 0x006d524c; pending: 4/27-32 (0x0200e3b4), 8/0 (0x0201b460)");
+             "category-12 handler 0x006d524c; pending: 8/0 (0x0201b460)");
     host->log(host, MH4U_LOG_INFO, line);
     if (stub_block) {
         snprintf(line, sizeof line, "selftest: float stubs at 0x%08x (%u bytes, the game's heap)",
@@ -470,10 +714,10 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
     char line[200];
     if (any_monster) {
         snprintf(line, sizeof line,
-                 "ready: translating 5 of GU Rathian's 13 MHXX-only actions on every monster");
+                 "ready: translating 11 of GU Rathian's 13 MHXX-only actions on every monster");
     } else {
         snprintf(line, sizeof line,
-                 "ready: translating 5 of GU Rathian's 13 MHXX-only actions on monster %d",
+                 "ready: translating 11 of GU Rathian's 13 MHXX-only actions on monster %d",
                  monster_id);
     }
     host->log(host, MH4U_LOG_INFO, line);

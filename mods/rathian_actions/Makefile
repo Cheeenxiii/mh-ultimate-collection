@@ -8,16 +8,17 @@
 FORK ?= ../../../MH4UltimateDC-fork
 CC ?= cc
 CFLAGS ?= -std=c99 -O2 -Wall -Wextra
+LDLIBS ?= -lm
 TARGET := $(if $(filter Darwin,$(shell uname -s)),rathian_actions.dylib,rathian_actions.so)
 
 all: $(TARGET)
 
 $(TARGET): src/rathian_actions.c
-	$(CC) $(CFLAGS) -fPIC -shared -I$(FORK)/include $< -o $@
+	$(CC) $(CFLAGS) -fPIC -shared -I$(FORK)/include $< -o $@ $(LDLIBS)
 
 # The translated actions' call sequences, with a fake host and no game (test/test_plugin.c).
 test: $(TARGET)
-	$(CC) $(CFLAGS) -I$(FORK)/include test/test_plugin.c -o test/test_plugin
+	$(CC) $(CFLAGS) -I$(FORK)/include test/test_plugin.c -o test/test_plugin $(LDLIBS)
 	./test/test_plugin
 
 clean:
