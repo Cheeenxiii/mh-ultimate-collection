@@ -144,7 +144,7 @@ A ported monster's first quest goes where its own game already puts it, on a loc
 
 ### The MHXX quests that field it
 
-The game's own 1,331 quest archives (MHXX JPN v1.0's RomFS; the v4.8.0 update patches none of them) hold 1,331 `.mib`, 3,474 `.sem` and 2,426 `.esl`, all read with the layouts of checks Q2, Q11 and Q15 without a failure. **21 of them carry Giadrome in the boss set**, and the `.sem` entries and the `.mib`'s five boss blocks give the same 21. Six hunt it; 15 field it as an extra large monster. MHXX's DLC quests are not in this dump and are not counted. The titles below are the dump's Japanese; the English ones wait for MHGU's text (rule 2).
+The game's own 1,331 quest archives (MHXX JPN v1.0's RomFS; the v4.8.0 update patches none of them) hold 1,331 `.mib`, 3,474 `.sem` and 2,426 `.esl`, all read with the layouts of checks Q2, Q11 and Q15 without a failure. **21 of them carry Giadrome in the boss set**, and the `.sem` entries and the `.mib`'s five boss blocks give the same 21. Six hunt it; 15 field it as an extra large monster. MHXX's DLC quests are not in this dump; the preservation save that holds them adds two more, neither on a map MH4U has (below). The titles below are the dump's Japanese; the English ones wait for MHGU's text (rule 2).
 
 | Map | Quest | Rank | Giadrome in | Hunt |
 |---|---|---|---|---|
@@ -172,11 +172,24 @@ The game's own 1,331 quest archives (MHXX JPN v1.0's RomFS; the v4.8.0 update pa
 
 The six hunts are q0000705, q0010434 and q0011105 (Arctic Ridge), q0100802 (night), and q0101004 and q0111402 (Frozen Seaway). Giaprey are MHXX's small monster id 15, which a slay quest names as `0x100F`; they stand in Giadrome's area in seven of the 21, and in all six hunts.
 
+### The DLC quests
+
+MHXX's DLC quests are not in the RomFS dump, but a preservation save holds them: the MH XX 3DS `system` in [FurkanM7's All-Event-Quests-and-Palicoes-MHXX-MHGenU](https://github.com/FurkanM7/All-Event-Quests-and-Palicoes-MHXX-MHGenU) holds **180 MHXX DLC quests**, the 133 on the DLC's event list and the 40 on its challenge list plus 7 the goshawk mirror lacks (36 of the 180 are Palico quests). Each is stored as its whole quest archive, not just its registration: all 173 quests of goshawk's MH XX JPN DLC folder read out of the save with the same entry paths and the same decompressed bytes as the decrypted server file, and the 7 others include the Sanrio, Macross and Garo collaborations. The save has 345 archive slots: 180 Japanese copies, all readable, and 165 seven-language copies (the MHGU text) of 64 of the quests, 163 of them readable — the two corrupt slots are both copies of 1010110. The layout is in [specs/quest.md](../specs/quest.md), check Q24.
+
+**Giadrome is in two of the 180:**
+
+| Map | Quest | Rank | Giadrome in | Hunt |
+|---|---|---|---|---|
+| Arctic Ridge | 1011017 雪山に咲け、恋の花 ("My Love is Like a Chill Wind...?") | G | area 7; a marathon with two other large monsters, Giaprey in areas 4 and 5 | no |
+| Arena | 1111004 逆転裁判・闘技場で法廷バトル ("Turnabout Takedown") | G | area 1, both of them; the objective slays 2, Giaprey in area 1 | yes, 2 |
+
+Neither is on a locale MH4U has — the Arctic Ridge (map 3) and the Arena (map 9) — so the DLC set adds no Giadrome quest to the Frozen Seaway and changes nothing above. No key is needed for the save: the file is plaintext as published, and MH4U's save cipher with the MH4U save key rejects it. The MH XX Switch save in the same archive is the same data behind a 0x24-byte header (4 bytes differ), and the MH GU Switch save reads too (330 archive slots, 165 quest ids).
+
 ### The MH4U map and areas
 
 Of the locales [overlap.md](../data/catalog/overlap.md) lists as MH4U's, the Frozen Seaway is the one MHXX fields Giadrome on: map 14 there (氷海, the name the quests' titles use), MH4U's map 4. Giadrome stands in area 2 in every MHXX Frozen Seaway quest, and in area 5 in the one with two of them.
 
-So the first quest uses the Frozen Seaway: **area 2**, one Giadrome; the two-Giadrome MHXX quest uses areas 2 and 5. The Arctic Ridge (map 3; 103 at night), where 13 of the 21 quests are, is one MH4U does not have ([overlap.md](../data/catalog/overlap.md): to add), so those quests wait for its port. The two Arena quests are arena quests (map 9, one area), not field quests, and the Polar Field has no MHXX Giadrome quest.
+So the first quest uses the Frozen Seaway: **area 2**, one Giadrome; the two-Giadrome MHXX quest uses areas 2 and 5. The Arctic Ridge (map 3; 103 at night), where 13 of the 21 quests are, is one MH4U does not have ([overlap.md](../data/catalog/overlap.md): to add), so those quests wait for its port. The Arena quests (two in the dump, one in the DLC) are arena quests (map 9, one area), not field quests, and the Polar Field has no MHXX Giadrome quest.
 
 ### The MH4U quest it is built from
 
