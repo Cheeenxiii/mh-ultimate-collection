@@ -22,6 +22,8 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `monster_motions.py` | lists the motion each of a monster's action handlers starts, compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)), and plans where a port writes the source's animations ([3U Rathian's moves](#a-3u-rathians-moves-on-mh4us-handlers)) |
 | `action_map.py` | joins two games' action and motion inventories: the MH4U handler each shared action id reaches, the ids only one game has, and the ids where the two sides' start motions differ (check R2 in [docs/checks.md](../docs/checks.md#the-shared-action-map-r2)) |
 | `monster_handlers.py` | the 3U Rathian's 17 ids MH4U has no action for: each handler's engine calls and MH4U counterpart (`worklist`), the shared action each missing id can run with the proof (`targets`), and the run time's generated action-id map (`table`; [The 17 ids MH4U has no action for](#the-17-ids-mh4u-has-no-action-for)) |
+| `monster_emc.py` | the native actions a monster's AI script starts (`00 cat num` in its rEnemyCmd), to tell an action the AI picks from one nothing reaches ([specs/emc.md](../specs/emc.md)) |
+| `monster_versions.py` | the player-visible comparison of every 3U and GU version MH4U shares, per axis, and the writer of [data/catalog/versions.csv](../data/catalog/versions.csv) ([how it is made](../data/catalog/versions.md)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:
 

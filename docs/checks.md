@@ -89,22 +89,24 @@ compared. The run covers MH4U USA v1.3.0, MHXX v1.4 `roEm001` and MH3U USA.
 
 The index says little about the motion: MH4U and MHXX pack a motion index as LMT file << 8 |
 slot, MH3U as file * 100 + slot, and the LMT files group the animations differently.
-Comparing the animation each handler starts (its frame count, loop frame and track count; the
-MH3U version-66 files use the same animation header and track table as version 67 for this
-comparison, while their keyframe encodings are still unlaid-out, specs/lmt.md) splits the
-differing ids:
+Comparing the animation each handler starts (its frame count and loop frame; a different
+track count is recorded but doesn't decide, because MH4U's animations carry more tracks for
+the same motion — every compared Zinogre id is 46 against MH3U's 37. The MH3U version-66
+files use the same animation header and track table as version 67 for this comparison, while
+their keyframe encodings are still unlaid-out, specs/lmt.md) splits the differing ids:
 
 | Pair | Differing ids | Same motion, another index | Different motion | Not resolved |
 |---|---|---|---|---|
 | MH4U / MH3U | 115 | 93 | 3 | 19 |
 | MHXX / MH3U | 84 | 67 | 3 | 14 |
 
-The same-motion class is 86 exact signatures in MH4U/MH3U (64 in MHXX/MH3U), 2 with one extra
-MH4U track (the skeleton, specs/mod.md), and 5 (3) whose handler's index decodes to an empty
-MH4U/MHXX slot but whose animation is found at another index by its signature. The 3 different
+The same-motion class is 86 exact signatures in MH4U/MH3U (64 in MHXX/MH3U), 2 with the same
+frames and loop but a different track count, and 5 (3) whose handler's index decodes to an
+empty MH4U/MHXX slot but whose animation is found at another index by its signature. The 3 different
 are 13/5, 13/6 and 13/8 in both pairs: their frame or loop frame counts differ. The not-resolved
-ids decode to an empty slot with no unique signature match; their handlers are category 7,
-whose code is shared and can start more than one motion, so the first constant is not enough.
+ids decode to an empty slot with no unique signature match, or match a different signature;
+their handlers are category 7, whose code is shared and can start more than one motion, so the
+first constant is not enough.
 
 Different motion (both pairs, 3):
 
