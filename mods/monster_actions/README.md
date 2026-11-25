@@ -16,7 +16,10 @@ setter then initializes the shared action, and MH4U's own handler runs.
 the per-id table `reference/monster_handlers.py targets -o` produces, one table per ported
 monster id in [data/ids/registry.csv](../../data/ids/registry.csv). It holds source and target
 action numbers only. Each entry says: when the source game's AI asks for this action (its
-category and index bytes), MH4U runs this action instead.
+category and index bytes), MH4U runs this action instead. The recorded map is the 3U Rathian's
+(`reference/monster_handlers.py`'s `MAP_KEY`); any other registered monster gets a NULL table
+and the reason its table is empty, so its actions fall through to MH4U's own handler until its
+own map is worked out.
 
 The 3U Rathian (id 125) has 16 translations. Where several shared actions reach the same source
 handler, the generator takes the lowest one whose MH4U action reaches a handler (an inline MH4U
@@ -26,9 +29,10 @@ Rathian (id 124) has no entries, because MH4U and MHXX share every action id her
 and each runs MH4U's own handler as it is (check R2).
 
 `tools/check_action_map.py` checks the header: one table per registered monster, sorted and
-unique entries, action numbers in range, the 16 ids of #115 and no action 4, and that it agrees
-with the map recorded in reference/README.md. Given the per-id table, it also requires the
-header to be exactly what the generator writes:
+unique entries, action numbers in range, the map's monster's table holding the 16 ids of #115
+and no action 4, every other monster's table empty, and that it agrees with the map recorded in
+reference/README.md. Given the per-id table, it also requires the header to be exactly what the
+generator writes:
 
 ```bash
 python3 reference/monster_handlers.py table --targets build/3u-targets.tsv

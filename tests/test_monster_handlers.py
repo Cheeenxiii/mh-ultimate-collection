@@ -6,6 +6,8 @@ import os
 import sys
 import tempfile
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reference"))
 import monster_handlers as mh  # noqa: E402
 
@@ -147,6 +149,26 @@ def test_the_header_holds_the_map_and_leaves_the_gu_monster_empty():
     assert "mhuc_actions_124 = NULL;" in text
     assert text.count("static const MhucAction mhuc_actions_125[]") == 1
     assert "{125, 2, mhuc_actions_125}," in text
+
+
+def registry_row(ident: int, key: str, source_game: str = "mh3u") -> dict[str, str]:
+    return dict(kind="monster", id=str(ident), key=key, source_game=source_game,
+                source_key="em001", name=key, stand_in="1", files="model", notes="")
+
+
+def test_a_second_ported_monster_gets_an_empty_table_not_the_recorded_map():
+    # The map is 3U Rathian's; another 3U monster must fall through to MH4U's handlers.
+    registry = [registry_row(124, "rathian-gu", "mhxx"), registry_row(125, "rathian-3u"),
+                registry_row(127, "great-wroggi-3u")]
+    text = mh.render_header([((0, 4), (0, 0))], registry)
+    assert "static const MhucAction *const mhuc_actions_127 = NULL;" in text
+    assert "id 127): no entry: no action-id map is recorded for it yet. */" in text
+    assert "{125, 1, mhuc_actions_125}," in text and "{127, 0, mhuc_actions_127}," in text
+
+
+def test_the_header_refuses_a_registry_without_the_monster_that_owns_the_map():
+    with pytest.raises(SystemExit, match="rathian-3u"):
+        mh.render_header([((0, 4), (0, 0))], [registry_row(124, "rathian-gu", "mhxx")])
 
 
 def test_a_category_only_action_uses_the_wildcard_index_in_the_header():
