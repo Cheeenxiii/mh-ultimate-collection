@@ -207,6 +207,19 @@ The 28 ids MH4U lacks reach 8 handler units: 15 are projectile spawns that tail-
 `0x008b4228` (category 10's 14 ids and 11/7), and the other 13 use six units, listed in
 [#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112).
 
+Two of those 28 are not missing. MH4U's category-8 and category-12 cases test the index with
+`cmp #0; bne default` rather than a switch, so the inventory and R2's map lose them:
+
+- **12/0 is MH4U's own action.** Its category-12 case runs `0x006d524c`, the handler MH4U's
+  shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0 (`0x0201177c`). The port needs no
+  code for it, and forcing it on the ported monster plays MH4U's handler.
+- **8/0 is a shared id with different handlers.** MH4U's category-8 case runs `0x006e9770`
+  for index 0, while MHXX's 8/0 is `0x0201b460`, which has no MH4U body pair. It stays in
+  [#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112)'s 8/0 slice.
+
+`reference/monster_actions.py`'s `find_switch` needs that `cmp #0; bne` case before R2's counts
+can include the two ids; the counts above were made without it.
+
 What this means for the port: a shared id runs MH4U's own handler, and because #48 ships
 MHXX's motion lists under the ported monster's name and the index is the same, that handler
 starts MHXX's animation. A GU shared id needs no index remap, unlike a 3U one. The ids above
@@ -258,6 +271,13 @@ Action 4 needs new C (#136) and is not on the map; it joins this table when it p
 
 Status: not done. The GU rows wait for #48 (the ported files) and #105 (the ported monster's own
 resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
+
+The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
+handlers for 3/98 and 12/1-3 and leaves shared ids and 12/0 alone (T1). It logs one line the
+first time each translated action runs.
+
+Status: not done. It waits for #48 (the ported files) and #105 (the ported monster's own
+resource paths); the ids themselves are in R2, and the translated ones are recorded above.
 
 ### The plugin's check (R1p)
 
@@ -378,7 +398,9 @@ result in r2).
    `host->size` covers `call`, then asks for `on_frame`. In a frame call after start-up it
    takes 8 bytes from `alloc`, calls
    `host->call(call, 0x0068877c, 1, 0x3f800000, out)` (id 1, scale 1.0f, out) and logs the
-   returned r0 and the byte at `out`. r1 is a float: the getter reads it as one.
+   returned r0 and the byte at `out`. r1 carries the scale as an unsigned integer: the
+getter does `vmov s0, r1; vcvt.f32.u32` at `0x006887a8`, so P3 proves r0-r2 and the r0
+return, not float arguments (T0 covers those).
 3. Put the plugin's line in the code library's `<program id>.plugins.tsv`
    (`plugin`, name, library path and mod folder, tab-separated) in a copy of a user folder. No
    code library rebuild is needed: `sMhMain::frame` is a hook point of every library the
@@ -400,6 +422,56 @@ A longer run (130 s of emulated time, menu input through the opening movie) load
 reached the character and the village, where no monster spawns; the probe also hooks
 `uEnemy::dispatchAction` to capture a live `this`, and it captured nothing. Calling the wrapper
 on a spawned monster still waits for a quest run.
+
+## The translated actions' check (T1)
+
+The port's translated handlers for MHXX-only actions have no in-game run yet (R2p), so they
+are checked without a monster: the source facts against MHXX's module, the state machines
+against a fake host, and the plugin's self-test in a headless run.
+
+| Check | What | Pass |
+|---|---|---|
+| T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) and MHXX v1.4's `roEm001.cro` | every row's case block, handler unit and first motion constant match the module's dispatcher; counts and ids only |
+| T1b | `make -C mods/rathian_actions test` | the plugin's call sequences and frame values match the source's order, and a changed value fails it |
+| T1c | a headless run of the code library built with the plugin | the log has the plugin's ready and self-test lines and the float stubs' address; the runner exits 0 |
+| T1d | the in-game per-move check | R2p |
+
+T1a: MHXX v1.4's `roEm001.cro` and its `static.crs` come from the player's own dump.
+
+```bash
+MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <static.crs>
+```
+
+Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (category 17 has
+none), first motions 9/13; translated 4, MH4U's own 1 (12/0), pending 8. Changing a ledger
+motion makes it exit 1 and name the id.
+
+T1b, last result (2026-11-25): pass, 13 engine calls checked across 3/98's three frames and
+the 12/1-3 blocks. Changing 3/98's `6.0` to `5.0` fails it with the motion line.
+
+T1c: waits on a code-library build with this mod's hook (a heavy job). Until then the plugin's
+first real run is R2p; the stubs it depends on are T0.
+
+## Floats through a guest stub (T0)
+
+ABI 3 `call` sets `r0`-`r2` and returns `r0`, but MH4U's motion start reads its speed in `s0`,
+and a source case block takes target points in `s0`-`s3`. A plugin can write a small ARM stub
+into a block from `alloc` (ABI 2) that loads `s0`/`s1` and branches to the engine function, and
+hand a float back by moving `s0` to `r0` after the call. The port interprets code that is not
+recompiled (`port/src/arm_recomp.cpp`, `Interpret`), so a block from `alloc` is executable and
+a stub's literals can be rewritten per call.
+
+| Check | What | Pass |
+|---|---|---|
+| T0 | a throwaway plugin allocates a block, writes a stub that sets `s0` to 6.0 and branches to a second stub doing `vmov r0, s0; bx lr`, and calls it | `call` returns `0x40c00000` (6.0f) and the runner exits 0 |
+
+Result (2026-11-25, MH4U USA v1.3.0, headless runner with an ABI 3 code library): pass. The log
+had the stub and target addresses, `call -> r0=0x40c00000`, and exit 0. A first attempt with a
+wrong literal offset jumped into the literal and the runner died with an illegal instruction,
+which is what a bad stub looks like; the layout is in
+[the plugin's README](../mods/rathian_actions/README.md#floats-the-guest-stubs). The fork's
+[#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134) adds float and `r3`
+arguments to the plugin ABI; when it lands, the stubs give way to that `call`.
 
 ## Tracing engine calls in MHXX
 
