@@ -8,6 +8,7 @@ import re
 import struct
 from collections import Counter
 
+import check_ids
 import pytest
 
 from mhuc import cli, monsterdata, monstersound, monstertext
@@ -1434,3 +1435,60 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
     assert not any(e.file_name.endswith("_cmd.emc") for e in converted.entries)
     report = (tmp_path / "report.txt").read_text(encoding="utf-8")
     assert "left out (not in the row's files: cmd): enemy/cmd_tbl/em034_00_cmdtbl.emc" in report
+def test_great_wroggis_conversion_ships_the_kinds_and_slots_its_row_names(dump, tmp_path):
+    """docs/architecture.md#a-ported-monsters-files, issue #166: `mhuc convert monster --from mh3u` turns
+    MH3U's `arc/enemy/em045.arc` into `/data/em127.arc` at the port's own id paths, and the archive holds
+    exactly the kinds and motion slots its registry row ships, so the record the plugin builds from the row
+    cannot name a missing file (#143)."""
+    from mhuc import cli, monsterassets
+
+    romfs_path = dump("mh3u", "romfs.bin")
+    image = romfs.open_image(romfs_path)
+    source_file = next(f for f in image.files() if f.path == "/arc/enemy/em045.arc")
+    source = arc.read(image.read(source_file))
+
+    out = tmp_path / "mod"
+    assert cli.main(["convert", "monster", "--from", "mh3u", "--id", "127",
+                     "--romfs", romfs_path, "--out", str(out)]) == 0
+    built = arc.read((out / "romfs" / "data" / "em127.arc").read_bytes())
+    assert built.version == 0x13
+    assert Counter(e.type_name for e in built.entries) == {
+        "rModel": 1, "rMaterial": 1, "rTexture": 1, "rMotionList": 3}
+    assert all(e.path.startswith("enemy\\em127\\") for e in built.entries)
+
+    # The registry's row and the built archive agree on the kinds and motion slots.
+    rows, problems = check_ids.read_registry(monstersound.REGISTRY)
+    assert problems == []
+    row = next(r for r in rows if r["id"] == "127")
+    assert row["source_key"] == "em045" and row["stand_in"] == "15"
+    ships = {kind for kind, _ in check_ids.files_tokens(row["files"])}
+    assert ships == {"model", "motions"}
+    assert check_ids.motion_slots(row["files"]) == sorted(
+        int(e.path.rsplit("_", 1)[1]) for e in built.entries if e.type_name == "rMotionList")
+
+    # The model and texture are the source's bytes; the materials name only textures the archive has.
+    kept = {e.path.rsplit("\\", 1)[1].replace("em045", "em127"): e.data
+            for e in source.entries if e.type_name in ("rModel", "rTexture")}
+    for e in built.entries:
+        if e.type_name in ("rModel", "rTexture"):
+            assert e.data == kept[e.path.rsplit("\\", 1)[1]], e.path
+        if e.type_name == "rMaterial":
+            assert b"enemy\\em045\\" not in e.data, e.path
+            for path in monsterassets.TEXTURE_PATH.findall(e.data):
+                assert path.decode() in {e.path for e in built.entries}, (e.path, path)
+
+    # The motion lists are version 67 and keep the source's animations, tracks and events.
+    source_motions = sorted((e for e in source.entries if e.type_name == "rMotionList"), key=lambda e: e.path)
+    built_motions = sorted((e for e in built.entries if e.type_name == "rMotionList"), key=lambda e: e.path)
+    assert [e.path for e in built_motions] == [f"enemy\\em127\\mot\\em127_{i}" for i in range(3)]
+    for old, new in zip(source_motions, built_motions, strict=True):
+        old_version, before = lmt.read(old.data)
+        new_version, after = lmt.read(new.data)
+        assert (old_version, new_version) == (66, 67)
+        assert len(before) == len(after)
+        for a, b in zip(before, after, strict=True):
+            if a is None:
+                assert b is None
+                continue
+            assert (a.frames, a.loop_frame, len(a.tracks), bool(a.events)) == \
+                   (b.frames, b.loop_frame, len(b.tracks), bool(b.events))
