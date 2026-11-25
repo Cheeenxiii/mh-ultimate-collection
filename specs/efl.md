@@ -61,22 +61,37 @@ rest is handed back by the reader but not laid out.
 | 0x04 | u32 | version, 15 in every file | verified | ours; EF2 |
 | 0x08 | bytes | the body; many files start with length-prefixed `effect\...` path strings after a few header words, but neither the boundary nor the fields is verified | unverified | ours; EF2 |
 
-## What a converter must produce
+## What a converter does
 
-For a port of a monster MH4U does not have, the converter must write an **EFL** with the game's
-version word (`0x30111104`), the `0x30 + block size` header, the fixed zeros at `+0x18` and `+0x1C`
-and a block that is a multiple of 16 bytes; and it must fill that block from the source game's EFL
-so the effects the port's motion effects name are the effects the monster actually has. Three things
-block that today:
+`src/mhuc/formats/efl.py` converts an EFL between the three versions: `convert(data, version)`,
+and `from_mh3u`, `from_mhxx`, `to_mh3u` and `to_mhxx` for the four named directions. The version
+word at `+0x04` is the only field that differs between the games' headers, so it is the only byte
+the converter rewrites.
 
-- the block's layout is unverified, so no source block field can be paired with an MH4U one;
-- MHXX's PEL body is unverified, so whether a GU monster needs PEL *and* EFL (and which one its
-  record names) is unknown;
-- the effect ids and resources a list names are each game's own: converting them needs the
-  source→MH4U effect-id map and the effect assets, exactly as `specs/mef.md` says.
+| Conversion | Carried | Skipped or refused |
+|---|---|---|
+| MH4U -> MH4U: `read_efl(...).to_bytes()` | every byte, including the header fields no table names | nothing |
+| MH3U -> MH4U: `from_mh3u(data)` | every byte except the version word; the block is copied unchanged | nothing (the block's *meaning* is unverified, not its bytes) |
+| MHXX -> MH4U: `from_mhxx(data)` | as above | nothing |
+| MH4U -> MH3U / MHXX: `to_mh3u`, `to_mhxx` | as above, the other way | nothing |
+
+What the conversion does **not** do, and cannot until the block is laid out:
+
+- it does not rewrite the effect ids inside the block: each game's ids are its own space. Those
+  go through `data/effectmap` ([README](../data/effectmap/README.md)) once the block's id fields
+  are placed; the table ships empty and `mhuc.effectmap.EffectMap.check` refuses a conversion
+  that meets an id it doesn't name.
+- it does not make the block *mean* what MH4U's reader would make of it: the block's layout is
+  unverified, so a converted file is only as right as the layout is shared. A port that ships it
+  must check the effects in game.
+- PEL (MHXX's `rProofEffectList`) has no converter: its body isn't laid out, and whether a monster
+  needs it beside an EFL is unverified. It round-trips byte for byte.
 
 MH4U's record has two effect-list slots (`+0x24`, `+0x28`); what the second one holds is
-unverified, so a converter that writes an EFL must say which slot it goes in. Until then a port keeps its stand-in's EFL paths ([data/ids/README.md](../data/ids/README.md)).
+unverified, so a converter that writes an EFL must say which slot it goes in. The effect assets an
+id names (the monster's `effect/base/...`) must be converted with the list; that is outside a
+container conversion. Until then a port keeps its stand-in's EFL paths
+([data/ids/README.md](../data/ids/README.md)).
 
 ## Checks
 
@@ -91,3 +106,9 @@ unverified, so a converter that writes an EFL must say which slot it goes in. Un
 - **EF2 (done, 2026-11-25).** Read every `rProofEffectList` entry of MHXX's monster archives:
   `MHUC_DUMPS=… python3 -m pytest -q -m game_files -k mhxx_motion_effect`. Result: 280 entries, all
   magic `PEL\0` and version 15. The body was not decoded.
+- **EF3 (done, 2026-11-25).** Every effect list of the three games' Rathian archives round-trips
+  byte for byte, and MH3U's and MHXX's lists convert to MH4U's version with their blocks
+  unchanged: `MHUC_DUMPS=… python3 -m pytest -q -m game_files -k effect_lists_convert` reads the
+  three em001 archives (MH4U 26 lists, MH3U 19, MHXX 43) and the unit test covers the four
+  directions and a wrong-game refusal. The conversion is checked at the byte level only; the
+  block's meaning is not.
