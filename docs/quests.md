@@ -116,6 +116,28 @@ In order:
 
 **The cheapest first quest** is an MHXX quest on a shared locale whose large monsters are among the 46 that MH4U also has. It needs no new monster and no new map: only the id tables for monsters, the map, items and objectives.
 
+## Where Great Wroggi can fight
+
+Great Wroggi is MH3U's, and none of the maps it fights on is MH4U's. From the 365 `QTDS` records of the MH3U RomFS's `/quest/us/` (check Q23), seven field it:
+
+| MH3U quest | Rank | Map | Great Wroggi | Other large monsters | Main small monsters |
+|---|---|---|---|---|---|
+| Toxic Troublemaker (1307) | ★3 | Flooded Forest | 1 | — | Wroggi, Ludroth |
+| Toxic Troublemaker (1616) | ★6 | Flooded Forest | 1 | — | Wroggi, Fish |
+| [Canteen] The Endless Hunt (1811) | ★8 | Flooded Forest | 1 | Gobul, Lagiacrus | Wroggi, Fish |
+| Supply Constraints (11317) | ★3 | Flooded Forest | 2 | — | Wroggi, Fish |
+| Supply Constraints (11608) | ★6 | Flooded Forest | 2 | — | Wroggi, Epioth |
+| [Advanced] Forest Fracas (11657) | ★6 | Flooded Forest | 1 | Gobul, Plesioth | Slagtoth, Altaroth |
+| Best of Enemies (11820) | ★8 | Land Arena | 1 | Volvidon, Purple Ludroth, Steel Uragaan | — |
+
+The six Flooded Forest quests share the ten-area locale ([maps.csv](../data/catalog/maps.csv)); the Land Arena is a special locale. Five quests field one Great Wroggi and two field two, and five pair it with the Wroggi. The 38 quests the player downloaded (Extra Data, check Q12) add none. A `QTDS` record holds the quest's map but no area or position for a monster, so the dump gives the map only.
+
+**The first quest.** Great Wroggi's first quest is a test on a shared map, as "What blocks a first converted quest" allows: it is MH3U's Toxic Troublemaker (1307), built with **MH4U quest 10110 "Field Trip"** as its template — a Hall ★1 hunt on Ancestral Steppe. The template hunts one Great Jaggi (id 15) in **area 6**, with Jaggi (id 56) in areas 3, 4, 6 and 8 and Jaggia (id 57) in areas 4 and 9, and a sub-objective (type 0x204) whose target is the Great Jaggi. Building Great Wroggi's quest from it changes the large-monster definition's monster id from 15 to Great Wroggi's own id from [data/ids/registry.csv](../data/ids/README.md) — the next free one after 124 and 125, with Great Jaggi as its stand-in (#166) — and the sub-objective's target from 15 to the same id. So the first quest uses **Ancestral Steppe, area 6 for Great Wroggi and areas 3, 4, 6, 8 and 9 for the pack**, and the template's positions: an MH3U `QTDS` record has none.
+
+Ancestral Steppe is chosen because it is the shared map whose Hall quest fields Great Jaggi, the MH4U monster of Great Wroggi's family and the port's stand-in, so the first quest's areas and pack are the game's own. Primal Forest has the closer habitat (forests, swamps, like the Flooded Forest) but no MH4U quest there fields Great Jaggi, so its pack's areas would be authored; the six MH3U quests wait for the Flooded Forest's own conversion.
+
+**The Wroggi.** Five of the seven MH3U quests pair Great Wroggi with the Wroggi, but the Wroggi has no MH4U id yet, so MH4U's Jaggi (56) and Jaggia (57) stand in for it in the template's five areas. The Ludroth that 1307 also fields has no MH4U counterpart either, so the first quest keeps the template's one pack. When the Wroggi is ported, its id replaces 56 and 57 in those definitions and the sub-quest's text becomes its own. That is left undone.
+
 ## The MHXX converter
 
 `mhuc convert quest --from mhxx` (`src/mhuc/quests/convert.py`) takes three inputs:
