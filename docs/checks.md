@@ -449,6 +449,29 @@ gained `cmd` ([#159](https://github.com/Cheeenxiii/mh-ultimate-collection/issues
 next P1 run's 125 record also names `enemy\em125\data\em125_cmd`, the converted EMC #49 ships;
 that run is not done yet.
 
+## A ported camera's cut-in (C2)
+
+MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an action posts by
+number; a ported monster brings its source game's list, converted to MH4U's version 4, in its
+arc at `enemy\emNNN\mot\eNNN_cam` (the `camera` kind in [data/ids](../data/ids/README.md)).
+This check needs the converted camera in the port's arc, the `camera` kind on the id, the
+plugin's record built with it (P1), and a quest that spawns the id (#144).
+
+1. Convert the source camera with `mhuc convert monster --from mhxx --id 124 --arc <MHXX
+   arc/enemy/em001_00.arc> --out <mod folder>`; the port's arc holds
+   `enemy\em124\mot\e124_cam`. Check that 124's `files` in `data/ids/registry.csv` lists
+   `camera`, regenerate `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
+2. Force an action whose handler posts a camera event: MH4U's camera event is `0x00934544`
+   (USA v1.3.0), and a handler's call to it names the event id it posts. `mods/force_action`
+   (R1p) plays the chosen action; the converted list keeps the source's event ids, and Rathian's
+   shared ids include 0, 1, 2, 4, 5 and 8, so an event MH4U's own Rathian posts is in it.
+3. Pass: the view cuts to the source game's framing of the monster (MHXX's cut-in camera), not
+   MH4U Rathian's, and the P1 log's line for 124 names `e124_cam` among the record's own paths.
+   Fail: the framing is MH4U Rathian's (the record kept the stand-in's `e001_cam`), or the load
+   stops at the camera path.
+
+Status: open; waits for #48's port files and #144's quest-load proof.
+
 ## Calling the engine from a plugin (P3)
 
 The plugin API's ABI 3 `call` runs a game function by address with r0-r2 as its arguments and

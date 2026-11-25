@@ -1,6 +1,7 @@
 """The real contract: our readers and writers against the game's own files."""
 from __future__ import annotations
 
+import hashlib
 import math
 import os
 import re
@@ -14,6 +15,7 @@ from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
 from mhuc.formats import (
     arc,
+    camera,
     classid,
     dtbase,
     dtbparts,
@@ -607,6 +609,52 @@ def test_mh4u_motion_tracks_address_bones_by_id(dump):
                 _version, anims = lmt.read(e.data)
                 seen |= {t.bone for an in anims if an for t in an.tracks}
         assert seen - {255} == human, (path, sorted(seen - {255} ^ human))
+
+
+def test_every_monster_camera_list_reads_and_converts(dump):
+    """specs/camera.md check C1: the camera lists of MH4U's and MHXX's monster arcs, and MH3U's none."""
+    def monster_cameras(game, pattern):
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        arcs, with_camera, blobs = 0, 0, {}
+        for f in image.files():
+            if not re.fullmatch(pattern, f.path):
+                continue
+            arcs += 1
+            a = arc.read(image.read(f))
+            found = False
+            for e in a.entries:
+                if e.type_name == "rCameraList":
+                    found = True
+                    blobs.setdefault(hashlib.sha1(e.data).hexdigest(), e.data)
+            with_camera += found
+        return arcs, with_camera, blobs
+
+    def bad(camera_data):
+        counters = camera.check(camera_data)
+        return {k: v for k, v in counters.items()
+                if "not read" in k or "don't" in k or "isn't" in k or "no decoder" in k
+                or "without a buffer" in k or "outside 0 and 1" in k}
+
+    mh4u_arcs, mh4u_with, mh4u = monster_cameras("mh4u", r"/data/em\d{3}\.arc")
+    assert (mh4u_arcs, mh4u_with, len(mh4u)) == (123, 86, 32), (mh4u_arcs, mh4u_with, len(mh4u))
+    for data in mh4u.values():
+        assert camera.read(data).version == camera.VERSION_MH4U
+        assert camera.convert(data, camera.VERSION_MH4U) == data
+        assert camera.from_mhxx(camera.to_mhxx(data)) == data
+        assert not bad(data), (bad(data), len(data))
+
+    mhxx_arcs, mhxx_with, mhxx = monster_cameras("mhxx", r"/arc/enemy/.*\.arc")
+    assert (mhxx_arcs, mhxx_with, len(mhxx)) == (137, 93, 57), (mhxx_arcs, mhxx_with, len(mhxx))
+    for data in mhxx.values():
+        assert camera.read(data).version == camera.VERSION_MHXX
+        v4 = camera.from_mhxx(data)
+        assert camera.read(v4).version == camera.VERSION_MH4U
+        assert camera.to_mhxx(v4) == data
+        assert not bad(v4), (bad(v4), len(v4))
+
+    # MH3U registers rCameraList but ships no file of it: the 3U port has no source camera.
+    mh3u_arcs, mh3u_with, mh3u = monster_cameras("mh3u", r"/arc/enemy/em\d{3}\.arc")
+    assert (mh3u_arcs, mh3u_with, mh3u) == (85, 0, {}), (mh3u_arcs, mh3u_with, mh3u)
 
 
 def test_every_mh3u_sound_file_reads_and_its_stream_requests_match_their_waves(dump):
