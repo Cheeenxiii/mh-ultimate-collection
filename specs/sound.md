@@ -2,7 +2,7 @@
 class: rLtSoundSourceADPCM, rLtSoundBank, rLtSoundRequest, rLtSoundStreamRequest, rMHSoundEmitter, rMHSoundSequence (MH4U, MH3U); rSoundSourceADPCM, rSoundBank, rSoundRequest, rSoundStreamRequest, rFestaSoundEmitter, rFestaSoundSequence, rSoundReverb, rSoundEQ (MHXX)
 extension: mca (waves and music streams), and sound entries inside ARCs (banks, requests, emitters)
 games: MH4U (from MHGU Definitive Edition's tools, EUR v1.1); MH3U and MHXX by class registry; every file's magic and version checked (SN1)
-status: unknown
+status: unverified
 ---
 
 # Sound: waves, banks, requests, emitters
@@ -114,37 +114,53 @@ Music streams (stereo) differ: a seek table at 0x28 (entry count) and 0x2C (data
 
 ## Stream request (`STRQ`): a stream table and a sequence table
 
-The resource `rLtSoundStreamRequest` loads. Checked on all 50 MH4U `.stq` files (procedure S4): the stream table starts at the offset in the header, the sequence table at the next offset, and every stream record's fields match the `.mca` it names.
+The resource `rLtSoundStreamRequest` loads. A stream request names the waves one music context can play and maps a request id to one of them with a level. MH4U has 214: 50 loose `.stq` under `/sound/bgm` (`bgm_bat` for monster battle themes, `bgm_st_NN` for a stage, `str_mNN` for a locale's area streams, plus the common, download, event, lobby and system files) and 164 inside ARCs under `/data`, `/loc/data` and the other language data folders. Check S4 reads every one and checks the tables against all 50 loose files.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | char[4] | magic `STRQ` | verified | all 50 files |
-| 0x04 | u32 | version 34 | verified | all 50 files |
-| 0x08 | u32 | stream count | verified | all 50 files |
-| 0x0C | u32 | sequence count | verified | all 50 files |
-| 0x10 | u32 | stream table offset (0x18 in all 50) | verified | all 50 files |
-| 0x14 | u32 | sequence table offset | verified | all 50 files |
-| +0x00 (stream) | u32 | name offset from the file start; a NUL-terminated ASCII path, `sound\bgm\...` | verified | all 497 stream records |
-| +0x04 | u32 | the `.mca`'s file size in bytes | verified | as above |
-| +0x08 | u32 | sample count | verified | as above |
-| +0x0C | u32 | channels (2 for every music stream) | verified | as above |
-| +0x10 | u32 | sample rate (32728 Hz for every music stream) | verified | as above |
-| +0x14 | u32 | loop start in samples | verified | as above |
-| +0x18 | u32 | loop end in samples | verified | as above |
-| +0x1C | u32 | source class id `0x67195a2e` (`rLtSoundSourceADPCM`) | verified | all 50 files |
-| +0x20 | u32 | 2, meaning not traced | unverified | all 50 files |
-| +0x00 (sequence) | u32 | sequence id | verified | all 1154 sequence records |
-| +0x24 | f32 | volume in dB (0 to -5 in the battle and stage themes; one control row holds 100.0, meaning unknown) | unverified | Definitive Edition snd_bgm.py; values checked on all 50 files, the two Dalamadur ids matching their stream names |
-| +0x5C | u32 | stream index into the stream table, `0xFFFFFFFF` for no stream | verified | all 1154 sequence records |
-| +0x04..+0x23, +0x28..+0x5B, +0x60.. | | not traced | unknown | not read |
+| 0x00 | char[4] | magic `STRQ` | verified | all 50 files (S4) |
+| 0x04 | u32 | version 0x22 (34) | verified | all 50 files (S4); ours, the loader compares it at 0x00404530 |
+| 0x08 | u32 | stream count | verified | all 50 files (S4); ours, the loader reads it at 0x00404564 |
+| 0x0C | u32 | sequence count | verified | all 50 files (S4); ours, the loader reads it at 0x0040456C |
+| 0x10 | u32 | stream table offset (0x18 in all 50) | verified | all 50 files (S4); ours, the loader reads it at 0x004045F0 |
+| 0x14 | u32 | sequence table offset (0x18 + 36 n) | verified | all 50 files (S4); ours, the loader reads it at 0x00404574 |
+| +0x00 (stream) | u32 | name offset from the file start; a NUL-terminated ASCII path, `sound\bgm\...`, without the `.mca` extension | verified | all 497 stream records (S4); ours, the loader uses it at 0x00404610 |
+| +0x04 | u32 | the `.mca`'s file size in bytes | verified | 497 of 497 (S4) |
+| +0x08 | u32 | sample count | verified | 497 of 497 (S4) |
+| +0x0C | u32 | channels (2 for every music stream) | verified | 497 of 497 (S4) |
+| +0x10 | u32 | sample rate (32728 Hz for every music stream) | verified | 497 of 497 (S4) |
+| +0x14 | u32 | loop start in samples | verified | 497 of 497 (S4) |
+| +0x18 | u32 | loop end in samples | verified | 497 of 497 (S4); 0 with a 0 loop start on the 268 loose streams that don't loop |
+| +0x1C | u32 | source class id `0x67195a2e` (`rLtSoundSourceADPCM`) | verified | all 50 files (S4); ours, the loader copies it to runtime +0x28 at 0x00404738 |
+| +0x20 | u32 | 2, meaning not traced | unverified | all 50 files (S4); ours, the loader copies it to runtime +0x2C at 0x00404730 |
+| +0x00 (sequence) | u32 | request id | verified | all 1,154 loose sequence records (S4); Definitive Edition snd_bgm.py (ids 32 and 33 of `bgm_bat.stq`) |
+| +0x04 | u32 | not traced; 0, 1, 2 or 4 in the loose files | unverified | S4 (histogram) |
+| +0x08 | u32 | not traced; 0, 1, 5, 6, 9, 10 or 11 in the loose files | unverified | S4 (histogram) |
+| +0x0C | u32 | not traced; 1 in every loose sequence | unverified | S4 (histogram) |
+| +0x10 | u16 ×2 | not traced; the low half 0 or 1, the high half 0, 1, 2 or 3 | unverified | S4 (histogram) |
+| +0x14 | u16 ×2 | not traced; the low half 0, 1 or 2, the high half 0, 1 or 2 | unverified | S4 (histogram) |
+| +0x18 | u16 ×2 | not traced; the low half is 0x0114 or 0x0100 in most loose sequences, 0x0014, 0x011E, 0x0048, 0x0032 or 0x0132 in others; the high half 0xFFFF in most, 0x0003 or 0 | unverified | S4 (histogram) |
+| +0x1C | u32 | not traced; 0 or 1 | unverified | S4 (histogram) |
+| +0x20 | u32 | not traced; 0xFFFFFFFF in every loose sequence | unverified | S4 (histogram) |
+| +0x24 (with a stream) | f32 | volume in dB: id 32 is 0.0 dB and id 33 is -0.9 dB in `bgm_bat.stq`; -16.0 to +1.5 dB across the 5,410 sequences with a stream | verified | Definitive Edition snd_bgm.py; S4 (range over every stream request) |
+| +0x24 (without a stream) | f32 | the same word on a sequence without a stream: 0 in most, 20, 50, 55, 70 or 100 on 196 of the 7,839; the unit of those positive values isn't established | unverified | S4 (histogram) |
+| +0x28 | f32 | not traced; -96.0 in every loose sequence | unverified | S4 (histogram) |
+| +0x2C | u32 | not traced; 0 in all but two loose sequences (400 and -200) | unverified | S4 (histogram) |
+| +0x30, 0x34 | u32 ×2 | not traced; 0 in every loose sequence | unverified | S4 (histogram) |
+| +0x38, 0x3C, 0x40 | u32 ×3 | not traced; 0xFFFFFFFF in every loose sequence | unverified | S4 (histogram) |
+| +0x44 | u32 | not traced; 0 in most loose sequences, 1,000 to 4,000 in 39 | unverified | S4 (histogram) |
+| +0x48 | u32 | not traced; 0, 100, 500, 1,000 or 1,500 | unverified | S4 (histogram) |
+| +0x4C | u32 | not traced; 0, 16 or 0x01000010 | unverified | S4 (histogram) |
+| +0x50, 0x54, 0x58 | u32 ×3 | not traced; 0 in every loose sequence | unverified | S4 (histogram) |
+| +0x5C | u32 | stream index into the stream table, `0xFFFFFFFF` for no stream | verified | all 1,154 loose sequence records (S4); Definitive Edition snd_bgm.py (ids 32 and 33 name streams 18 and 19); ours, the loader resolves it at 0x00404818 |
+| +0x60 | u32 | stream pointer slot: 0 exactly when +0x5C is 0xFFFFFFFF, otherwise a build-time pointer (0x127F0144 to 0x1281964C) that the loader overwrites with the runtime stream object | verified | ours, the loader writes it at 0x00404830; S4 (zero on the 7,839 sequences without a stream, non-zero on the 5,410 with one) |
 
-Stream records are 36 bytes and sequence records 100. The lookup compares the id at +0; the table is not sorted by id (`bgm_bat.stq` happens to hold 0 to 39 in order, the event files go up to 773). The music streams are stereo DSP-ADPCM at 32728 Hz, so a stream record's +0x04 size equals the `.mca` file size and +0x08, +0x0C, +0x10, +0x14 and +0x18 equal its header's sample count, channels, rate, loop start and loop end: that is the check.
-
+Stream records are 36 bytes and sequence records 100. The lookup compares the id at +0; the request ids are unique and ascending in every MH4U stream request, but sparse (the event files reach 773). The music streams are stereo DSP-ADPCM at 32728 Hz, so a stream record's +0x04 size equals the `.mca` file size and +0x08, +0x0C, +0x10, +0x14 and +0x18 equal its header's sample count, channels, rate, loop start and loop end: that is the check. What the ids select, and what a new monster theme has to add, is in [docs/audio.md](../docs/audio.md#how-mh4u-picks-a-monsters-theme).
 
 ## Checks (with game files)
 
 - **SN1 (done, 2026-11-25):** `mhuc survey <romfs.bin>` on MH4U USA (cartridge), MH3U USA and MHXX JPN v1.0 counts every sound resource in its report's `sound` section, by kind, magic and version, and by class id inside ARCs. Result: the versions and counts table above. Every sound file in every game matched one magic and one version of its kind, and every ARC entry's class id was that game's registry class for the kind. MH3U's versions are not MH4U's: each is one older (wave 4 against 5, bank 10 against 11, request 6 against 8, stream 0x20 against 0x22), so 3U's files need version-aware readers or a conversion. MHXX keeps MH4U's wave version (5) but has GU's banks and requests (`SBKR` 4, `SRQR` 5), so only its waves may convert unchanged; S3 checks whether the GU layouts really fit. MH3U ships no area emitter file; MHXX's emitters are `rFestaSoundEmitter`, version 0x20160706.
 - **SN2:** parse every MH4U `MADP`, `SNDB`, `SREQ` and `SES` with this layout. Count files whose sizes and offsets close exactly, and record the counts, never bytes. A field becomes verified when every file agrees.
 - **S3:** MHXX's bank and request against Definitive Edition's GU layouts (`SBKR` v4, `SRQR` v5). SN1 already matches their magics and versions; if the layouts agree, the XX → 4U conversion is the 4U → GU rule run backwards. MHXX's wave is `MADP` version 5, MH4U's version and not GU's 2, so it needs no GU layout.
-- **S4 (done for the tables above):** parse every `.stq` of MH4U USA v1.3.0's RomFS. 50 files, 497 streams and 1154 sequences parse with the layout above; each stream record's size, sample count, channels, rate and loop start and end equal the `MADP` header of the `.mca` it names, 497 of 497. Still open: the sequence record's remaining fields, the lookup's index at `+0x94`/`+0x98` of the loaded resource, and `sSoundControl`'s loader `0x3099c8` at run time.
+- **S4 (done, 2026-11-25):** parse every `.stq` of MH4U USA v1.3.0's RomFS, loose and inside ARCs. `mhuc stq <file>` reads one stream request; `mhuc survey <romfs.bin> --workers 1` reports S4 read 214 files (50 loose, 164 in ARCs), 5,120 streams and 13,249 sequences, 5,410 of them with a stream and 7,839 without. Every file closed exactly: magic `STRQ`, version 0x22, stream table at 0x18, sequence table at 0x18 + 36 n, names in stream order from the end of the sequence table to the file's end, and every stream index in range (the reader refuses anything else). Each stream record's size, sample count, channels, rate and loop start and end equal the `MADP` header of the `.mca` it names, 497 of 497 in the loose files. The with-game-files test reads every loose `.stq` and checks that the request ids are unique and ascending and that every stream is used. Still open: the sequence record's words marked unverified above, the lookup's index at `+0x94`/`+0x98` of the loaded resource, and `sSoundControl`'s loader `0x3099c8` at run time.
 - **SN5 (done, 2026-11-25):** read the allocator setup in the MH4U USA v1.3.0 image instead of the files, to say where sound memory comes from. The heap table is at 0x00f2bb44: nine 0x18-byte records {name pointer, allocator index, type, size, flags, 0}, read by 0x0010612c; the alias table is at 0x00f2bc1c and holds seven {index, target index} pairs. The class-to-index table is built by the function at 0x00104904. Result: Resource (index 11) is 0x2F00000 = 47 MiB and receives every `cResource` subclass; SoundBuffer (21) is aliased to Resource; no heap is made for Sound (15), the index of `cMHSoundEmitter`, `cMHSoundSequence` and `nMHSoundSequence`, which therefore allocate from the default heap. The sound resource classes have no entry of their own and their parent is `cResource`. The shipped `/memory.ini` `[Allocators: CTR]` agrees: Resource 47MB, `SOUND_BUF = RESOURCE`, no SOUND. Unverified: that the index lookup follows a class's parent (the table has 128 rows for 992 classes); the sound resource classes are assumed to take `cResource`'s index, and nothing was run to watch an allocation. Sizes and the largest monster sets: [audio.md](../docs/audio.md#memory).
