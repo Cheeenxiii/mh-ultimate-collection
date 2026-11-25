@@ -372,7 +372,8 @@ separate loaded archive) so the record's one path resolves:
 arc/sound/se/em/em001/snd_em001.arc> --out <mod folder>`; MHXX: `--from mhxx --arc <MHXX
 arc/enemy/em001_00.arc>`), creating or extending `<mod folder>/romfs/data/emNNN.arc`. It refuses
 a source it cannot place (a wave outside the known directories, a bank entry naming a wave the
-archive doesn't hold, MHGU's 132-byte request records).
+archive doesn't hold, MHGU's 132-byte request records). The 3U Rathian's registry row lists
+`sound` and her converted arc holds 48 waves, one bank, one request and one call (SN9).
 
 ## Area emitters (`SES\0`, version 0x20120623)
 
@@ -489,4 +490,5 @@ Stream records are 36 bytes and sequence records 100. The lookup compares the id
   their order and all name shipped waves; the request keeps MH3U's ids, entry indices and level,
   with one bank; the call keeps its keys and record bytes. MHXX's em001_00 converts the same way
   for id 124 (198 waves, 2 banks, 1 request with 155 ids, 1 call with 184 records); its request
-  words match MHXX's for 0 to 21 and the bank flags/parameters reverse MHGU's rules.
+  words match MHXX's for 0 to 21 and the bank flags/parameters reverse MHGU's rules. The in-game
+  listen is check A1 in [checks.md](../docs/checks.md#a-ported-monsters-own-voice-a1).

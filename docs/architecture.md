@@ -139,7 +139,7 @@ The first target is the Water Arena: enter water, swim, surface, oxygen, with Sw
 
 Sounds and music come from each piece of content's own game and play through MH4U's sound engine by request id. The port needs no audio change.
 
-- MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1); `mhuc` reads the older wave, bank, request and stream request layouts against the whole MH3U RomFS (SN6). A 3U monster's whole call set converts to MH4U's versions (`mhuc convert monster`, [specs/sound.md](../specs/sound.md), checks SN7 to SN9).
+- MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1); `mhuc` reads the older wave, bank, request and stream request layouts against the whole MH3U RomFS (SN6). A 3U monster's whole call set converts to MH4U's versions (`mhuc convert monster`, [specs/sound.md](../specs/sound.md), checks SN7 to SN9), and the 3U Rathian's registry row ships `sound`.
 - MHXX uses the next generation of classes, shared with MHGU on Switch: its banks are GU's (`SBKR` 4), but its requests are 100-byte records, not GU Switch's 132 (S3), and its waves are `MADP` 5 in a header MH4U doesn't read.
 - MH4U's wave, bank and emitter layouts come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files and every stream request in the image (214, loose and inside ARCs) is read (check S4), and the 100-byte sequence record's readers and the loader's id-to-row index are named from the game's code (check S7).
 - A monster's theme is a sequence id in a stream request, chosen by a hardcoded switch over its id, not by a table ([audio.md](audio.md#how-mh4u-picks-a-monsters-theme)).
