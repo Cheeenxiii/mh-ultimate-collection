@@ -22,18 +22,20 @@
 #define MHUC_FILES_EFL 0x0080u
 
 /* One ported monster: the id it takes, the MH4U monster id whose rows the reader
- * hooks answer with until the port ships this monster's own rows, and the kinds of
- * file it ships (MHUC_FILES_* bits). */
+ * hooks answer with until the port ships this monster's own rows, the number of
+ * motion-list slots it ships from slot 0, and the kinds of file it ships
+ * (MHUC_FILES_* bits). */
 typedef struct MhucMonsterId {
     unsigned char id;
     unsigned char stand_in;
+    unsigned char motions;
     unsigned short files;
 } MhucMonsterId;
 
 #define MHUC_MONSTER_COUNT 2
 static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {
-    {124, 1, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
-    {125, 1, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL},
+    {124, 1, 5, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
+    {125, 1, 3, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL},
 };
 
 /* Rathian, mhxx em001 */

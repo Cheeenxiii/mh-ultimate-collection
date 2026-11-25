@@ -14,7 +14,7 @@ rule: one registry, ids only ever grow, and the run time reads them from here.
 | `source_key` | the content's name in that game: a monster's `emNNN` |
 | `name` | the content's name, for review |
 | `stand_in` | the MH4U monster id whose table rows answer for this id until the port ships the content's own rows |
-| `files` | the kinds of file the port ships, comma-separated: `model`, `motions`, `camera`, `tail`, `mef`, `sound`, `cmd`, `efl` (the resource record's path kinds, below) |
+| `files` | the kinds of file the port ships, comma-separated: `model`, `motions`, `camera`, `tail`, `mef`, `sound`, `cmd`, `efl` (the resource record's path kinds, below). `motions` takes the number of motion-list slots shipped from slot 0, as `motions=3`; the slots above keep the stand-in's paths |
 | `notes` | where the content comes from, and anything the next reader needs |
 
 The rows a registered id answers with are the game's own, read by the plugin's hooks: the
@@ -46,7 +46,7 @@ group of paths in the record:
 | Kind | The record's paths | 124 ships | 125 ships |
 |---|---|---|---|
 | `model` | the model | yes | yes |
-| `motions` | the six motion lists and the second motion list | yes | yes |
+| `motions` | the six motion lists and the second motion list; `motions=N` is the first N slots from slot 0 | `motions=5` (0-4) | `motions=3` (0-2) |
 | `camera` | the camera | no | no |
 | `tail` | the tail model | yes | yes |
 | `mef` | the motion effects | no | no |
@@ -54,13 +54,14 @@ group of paths in the record:
 | `cmd` | the command/EMC | yes | no |
 | `efl` | the effect lists | no | no |
 
-124's `em124.arc` holds the model, motions, tail and command; 125's holds the model,
-motions and tail. Until a port's own camera, motion effects, sound and effect lists are
-converted, its monster loads MH4U's own from the stand-in's paths (`enemy\em001\...`). A new
-kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map together;
-the generated header's `MHUC_FILES_*` bits are what the plugin's record builder reads. A kind
-covers every path in its group: a port that lists `motions` ships every motion list the
-stand-in's record names (125 lists it, so its arc needs `em125_0` to `em125_4`).
+124's `em124.arc` holds the model, five motion lists, the tail and the command; 125's holds
+the model, three motion lists and the tail. Until a port's own camera, motion effects, sound
+and effect lists are converted, its monster loads MH4U's own from the stand-in's paths
+(`enemy\em001\...`); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4` for the
+two motion slots it does not ship, so its motion-number translation only targets slots 0 to
+2. A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map
+together; the generated header's `MHUC_FILES_*` bits and each row's `motions` count are what
+the plugin's record builder reads.
 
 ## Rules the tool checks
 
@@ -68,9 +69,9 @@ stand-in's record names (125 lists it, so its arc needs `em125_0` to `em125_4`).
 - monster ids are consecutive from 124, with no gap: every id up to the highest one used needs
   a row in each table indexed by id;
 - a key, a source game and a source key are valid, and every row has a name and a stand-in;
-- `files` is not empty, and every kind in it is one of the kinds above and appears once;
+- `files` is not empty, every kind in it appears once, and `motions` gives a count in 1..6;
 - `mods/monster_ids/src/ids.h` is exactly what this file generates, including each row's
-  `files` bits.
+  `files` bits and `motions` count.
 
 After editing the registry, write the header and check both:
 
@@ -99,8 +100,8 @@ free id, and a mistake is corrected by a migration, not by renumbering
 
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|
-| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions, tail, cmd |
-| 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions, tail |
+| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=5, tail, cmd |
+| 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=3, tail |
 
 The two ports are [#47](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/47)'s
 subject; their files come from [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48)

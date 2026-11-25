@@ -59,22 +59,25 @@ the effect lists at +0x24 and +0x28).
 The stand-in's record names `enemy\em001\...` paths. On its first frame the plugin builds,
 for each registered id, a record of its own from the stand-in's: the same fields and slots,
 each path copied to the game's heap. A port ships only some of the record's path kinds (its
-arc holds the model, motions, tail and command for 124, the first three for 125); MH4U stops
-the load on a path that is not there, which is what hung a 3U session at "Now Loading" when
-the 125 record named 13 paths and `em125.arc` ships 6
+arc holds the model, motions, tail and command for 124, the model, the first three motion
+lists and the tail for 125); MH4U stops the load on a path that is not there, which is what
+hung a 3U session at "Now Loading" when the 125 record named 13 paths and `em125.arc` ships 6
 ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)). So the registry's
 `files` column, generated into `src/ids.h` as `MHUC_FILES_*` bits, names the kinds a port
 ships, and the builder rewrites the monster-id token only in those kinds' paths
 (`em001` -> `em124`, and the camera's `e001` -> `e124`; an effect list's trailing `_000` is
-not an id and stays). For a kind it does not ship, the stand-in's path is copied unchanged,
-so the monster loads MH4U's own camera, motion effects, sound and effect lists until its
-game's are converted. The record, its slots and its strings are one block from the game's own
-heap (`alloc`, ABI 2), and it is kept for the run.
+not an id and stays). The motion lists take a count, `motions=N`: the port's first N slots
+from slot 0 are rewritten and the slots above keep the stand-in's paths, because the port's
+motion-number translation only targets the source slots it ships (125 keeps MH4U's
+`enemy\em001\mot\em001_3` and `_4`). For a kind it does not ship, the stand-in's path is
+copied unchanged, so the monster loads MH4U's own camera, motion effects, sound and effect
+lists until its game's are converted. The record, its slots and its strings are one block
+from the game's own heap (`alloc`, ABI 2), and it is kept for the run.
 
 | Kind in `files` | The record's paths |
 |---|---|
 | `model` | +0x00, the model |
-| `motions` | +0x04, the six motion lists, and +0x0c, the second motion list |
+| `motions=N` | +0x04, the six motion lists, and +0x0c, the second motion list; the first N slots from slot 0 are the port's |
 | `camera` | +0x08, the camera |
 | `tail` | +0x10, the tail model |
 | `mef` | +0x14, the motion effects |
@@ -84,7 +87,8 @@ heap (`alloc`, ABI 2), and it is kept for the run.
 
 The `+0x20` slots 0 to 2 are empty in MH4U's own records and have no kind, so they can only
 keep the stand-in's path. A new kind is added to `data/ids/registry.csv`'s checker
-(`tools/check_ids.py`) and to the plugin's path map together.
+(`tools/check_ids.py`) and to the plugin's path map together; the `motions` count is emitted
+into the header beside the bits.
 
 `enemyResource::get` is answered with the built record's +0x14 field. `enemyResource::load`
 and `enemyResource::effectLists` (0x00c0b830, called with the spawned monster's own id after
@@ -144,7 +148,7 @@ example `factory: id 124 -> stand-in 1`; the resource readers log
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds it ships and keeps the stand-in's for, the path the stand-in's data comes from, and that ids 0 to 123 pass through. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, and that ids 0 to 123 pass through. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
 
 ## The check
 
