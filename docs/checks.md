@@ -597,12 +597,10 @@ that, both outside the engine:
    with the stand-in's `data\em001`; ids 0..123 pass through. The error reporter and the engine
    mutex are not touched.
 
-Result (2026-11-25, USA v1.3.0 update, headless runner, the #144 route): the 125 quest starts,
-the log shows `data resource: id 125 -> stand-in 1`, `enemyResource::load: id 125 -> its own
-record` and `uEnemyFactory::create: id 125 -> stand-in 1`, and the player and the Palicoes are in
-the Ancestral Steppe at about 140 s — the map loads. The 125 load is slow (about 88 s from the
-departure) but it completes; the base quest with the original file is the control (map at about
-60 s). 124 (GU) uses the same fix; its route and load are P4's result below.
+Result (2026-11-25, USA v1.3.0 update, headless runner, the #144 route): the 125 quest starts and
+the map loads; the reader lines, the map and the timing are P4's result below. The load is slow
+(about 76 s from the departure) but it completes, and the base quest with the original file is
+the control (map at about 60 s). 124 (GU) uses the same two parts; P4 has its route and result.
 
 ## A ported camera's cut-in (C2)
 
@@ -660,60 +658,81 @@ Status: not done; waits for #48, #49 and #144.
 
 | Check | What | Pass |
 |---|---|---|
-| P4 | a headless run starts quest 10212 with a ported id (125 in the 3U profile, 124 in the GU one) and the quest loads past "Now Loading" | the log shows the quest's map loading with the player in it and no hang, and the ported id's factory and resource lines; the 3U profile uses the recorded script and the GU profile the route below |
+| P4 | a headless run starts quest 10212 with a ported id (125 in the 3U profile, 124 in the GU one) and the quest loads past "Now Loading" | the run draws the quest's "Royal Assassination" splash, then the quest's map with the player (and the two Palicoes) in it, no hang, and the log has the ported id's reader lines and its `factory` line; the model's render is not part of this check (#203) |
 
-The per-move checks (#113, #116) need a quest that names a ported id. This check starts one
-without a window: the runner's `--input` script plays from the title to the Gathering Hall's
-Low-rank quest counter, posts quest 10212, and leaves the quest to load.
+**What "loaded" means.** The departure is accepted and the quest's "Royal Assassination" splash is
+drawn; then the quest's map is drawn with the player in it (on these saves, the two Palicoes and
+the quest HUD as well), and nothing hangs. At that point the log has the ported id's reader lines
+— `data resource: id NNN -> stand-in N`, `resource load: id NNN -> its own record`, `effect
+lists: id NNN -> its own record` — and `factory: id NNN -> stand-in N`, the game creating the
+monster's entity from the record the plugin answers. Loaded is **not** visible: with #203 open the
+ported model does not render yet. The map shows the hunter and the Palicoes but no monster, and
+after the factory line the game logs the missing model as hundreds of thousands of unmapped reads
+(the record's path bytes read as pointers). The screenshot proves the map and the factory line
+proves the monster; the render, with `HW.Memory UnmappedAccess` at 0 during the load, is #203's
+pass, not this check's.
+
+The per-move checks (#113, #116) need this load. This check starts one without a window: the
+runner's `--input` script plays from the title to the Gathering Hall's Low-rank quest counter,
+posts quest 10212, and leaves the quest to load.
 
 1. Profiles: two user folders, each a copy of the maintainer's save. The 3U one has the wave of
    the deployed `loc/data/quest01.arc` naming monster 125 and `data/em125.arc` deployed; the GU
    one names 124 and deploys `data/em124.arc`. Both have the code library built with
-   `mods/monster_ids` on (`selftest = 1`) and the plugin as merged for #143.
-2. The input script stays outside the repository. It can be written from the route or converted
+   `mods/monster_ids` on (`selftest = 1`), and the quest written in place from MH4U's own `.mib`
+   (P2): only the wave's monster id changes; the layout and the texts stay.
+2. The 3U profile's route (125) is the maintainer's recorded `.ctm`: 7-15 s, A through the Circle
+   Pad Pro and break screens, the title, the save and the character select; 26-32 s, R held with
+   the circle pad up, running through Val Habar; 33-52 s, A through the World Map, the Gathering
+   Hall fast travel, the Hall's Low-rank quest counter, the 2★ list and "Royal Assassination";
+   the departure A is at 52.3 s. The run draws the "Royal Assassination" splash and the map at
+   about 128 s, so it needs at least 150 s emulated (the stock quest draws its map at about 60 s).
+3. The GU profile's route (124) keeps the recorded menu phase but re-anchors it after its own
+   boot; its steps are below. It departs at 54.3 s, draws the splash at 60 s and the map at about
+   65 s, so a 180 s run leaves room for the screenshot series and the load's tail.
+4. The input script stays outside the repository. It can be written from the route or converted
    from an Azahar `.ctm` recording of the same run: the movie holds the controller states in the
    order the HID service consumes them, and a pad record is one HID update, 234 per emulated
-   second, so a record's time is about (index + 1) * 1000 / 234 ms. The route the maintainer
-   recorded: 7-15 s, A through the Circle Pad Pro and break screens, the title, the save and the
-   character select; 26-32 s, R held with the circle pad up, running through Val Habar; 33-52 s,
-   A through the World Map, the Gathering Hall fast travel, the Hall's Low-rank quest counter,
-   the 2★ list and "Royal Assassination"; the departure confirmation is A at 52.3 s. The quest
-   loads at about 54 s and its "Royal Assassination" splash is drawn by 60 s.
-3. Run, from the workspace root, under the team's heavy-job lock:
+   second, so a record's time is about (index + 1) * 1000 / 234 ms. The screenshot schedule
+   matters: a drawn frame pauses the emulated clock before each screenshot, so a route timed
+   under one schedule drifts under another; keep the schedule the route was proved under.
+5. Run, from the workspace root, under the team's heavy-job lock:
    ```
    mh4u_runner "<MH4U USA .3ds>" --code <user>/recomp/0004000000126300.so --user <user> \
-       --ms 90000 --speed 0 --input "<script>" --draw-window 1 --log "*:Info"
+       --ms 150000 --speed 0 --input "<script>" --shots <dir> --shot-every 4000 \
+       --shots-from 56000 --draw-window 150 --log "*:Info"
    ```
-   Screenshots (`--shots`, `--shot-every`, `--shots-from`) show the route; `--draw-window` without
-   `--shots` draws nothing and is much faster.
-4. Pass: the log shows the quest loading past "Now Loading" (the player is in the quest's map, no
-   hang) and the ported id's factory and resource reader lines. A stock quest (MH4U's own id 1)
-   started with the same script is the control.
+   Screenshots show the route; `--draw-window` without `--shots` draws nothing and is much
+   faster.
+6. Pass: the map with the player in it and the factory line for the ported id, as defined above.
+   A stock quest (MH4U's own id 1) started with the same script is the control.
 
-Result (2026-11-25, USA v1.3.0 update, headless runner, the maintainer's `.ctm` replayed):
+Result (2026-11-25, USA v1.3.0 update, headless runner):
 
-- **Stock control: pass.** The same script posts quest 10212 with MH4U's own monster (id 1) on
-  the same save and the player is in the Ancestral Steppe at 60 s, quest HUD up, no hang.
-- **id 125: fail.** The script reaches the Hall's quest counter, departs at 52.3 s, and the
-  "Royal Assassination" splash is drawn by 60 s; it stays frozen and the quest never reaches the
-  monster spawn (no factory or resource reader line for 125). An `RC_CALL_COUNTS` comparison with
-  the stock run shows a wait, not a spin (14.5 M calls over 489 functions in 60-85 s against
-  37.3 M over 2172 in stock). An RSP thread dump of the frozen session (all 19 threads) shows
-  every thread blocked: 13 in `svcArbitrateAddress`, 4 in `svcSleepThread`, none running. The main
-  thread waits in libctru's pthread mutex (`0x0010f4cc`) inside the engine's error reporter
-  `0x00d82d00`, called from the per-frame checker `0x00bf6f20` when two fields of the rotating
-  state buffer at `this+0x6e08`/`this+0x6e10` differ. A throwaway probe hooked on the checker and
-  on the counter update shows that difference fires thousands of times in the healthy stock run
-  too (checker calls: 125 3087 differ / 490 equal; stock 3178 / 381), with the same advance/check
-  order in both: the assertion is benign in stock and the 125 load only turns it into a deadlock
-  by holding the mutex the error reporter takes. `Service.FS:Debug` shows no file request in
-  flight at the deadlock, so the holder waits on a guest lock, not on the files.
-- **id 124: pass.** The 3U route does not start a quest on the GU profile's save; the GU
-  profile's own route does (below).
+| Profile | id | Route | Departure | Splash | Map | From the title |
+|---|---|---|---|---|---|---|
+| 3U | 125 | recorded `.ctm` | 52.3 s | "Royal Assassination" | ~128 s, player and two Palicoes, HUD | ~130 s; give 150 s |
+| GU | 124 | the route below | 54.3 s | 60 s | ~65 s, player and two Palicoes, HUD | ~65 s; the 180 s run is for the series |
+| 3U | 1 (control) | recorded `.ctm` | 52.3 s | "Royal Assassination" | ~60 s, player in the Ancestral Steppe, HUD | ~60 s |
 
-The deadlock is the open problem: the quest cannot load until the 125 load path stops holding the
-engine mutex while the error reporter takes it. The harness above and the stock control are
-reusable for that. The input script and the `.ctm` stay outside the repository.
+- **125: pass.** The log has `data resource: id 125 -> stand-in 1`, `resource load: id 125 -> its
+  own record`, `effect lists: id 125 -> its own record` and `factory: id 125 -> stand-in 1`.
+- **124: pass.** The log has `data resource: id 124 -> stand-in 1`, `resource load: id 124 -> its
+  own record` and `factory: id 124 -> stand-in 1`.
+- **Stock control: pass.** The same script with MH4U's own id 1 puts the player in the Ancestral
+  Steppe at about 60 s, quest HUD up, no hang.
+- **The 125 wait is a load, not a hang.** The map comes about 76 s after the departure; the
+  plugin's lines each fire once, no FS request is in flight in the gap, and the wait is not a
+  round timeout. It is the game's own post-spawn load/processing of the ported monster (its model
+  and motions), which the stock quest does in about 8 s.
+- **Loaded is not visible (#203).** The ported model does not render yet: after the factory line
+  the game reads the record's `enemy\em125\...` / `enemy\em124\...` paths as pointers and logs
+  about 612,000 (125) and 792,000 (124) unmapped reads, and the map shows the hunter and the
+  Palicoes but no monster. The reads do not stop the map; the render is #203's.
+
+The harness is not specific to these two: any registered id can be written into the same quest in
+place and takes the same route. Giadrome (126) and Great Wroggi (127) have their records and
+stand-in 15; their load proof is #189's and has not been run.
 
 #### The GU profile's route
 
@@ -746,14 +765,10 @@ phase after the character is in town:
 5. Pass: the log shows the quest's map loading with the player in it and no hang, and the ported
    id's factory and resource reader lines.
 
-Result (2026-11-25, USA v1.3.0 update, headless runner, the #144 route, 124 in the GU profile):
-pass. The route departs at 54.3 s and the "Royal Assassination" splash is drawn at 60 s; the
-screenshots show the player and the two Palicoes in the Ancestral Steppe at 65 s, quest HUD up. The
-log has `data resource: id 124 -> stand-in 1`, `resource load: id 124 -> its own record` and
-`factory: id 124 -> stand-in 1`. The resource load still walks the record the plugin builds and
-logs about 792,000 unmapped reads before the factory line (the path bytes read as pointers, at
-`0x0092076c`, `0x00930880`, `0x00936a34` and others); they do not stop the map on this profile.
-The script and the screenshots stay outside the repository.
+Result: pass; P4's table above has the route's timings and the log lines. The resource load walks
+the record the plugin builds and logs about 792,000 unmapped reads (the path bytes read as
+pointers, at `0x0092076c`, `0x00930880`, `0x00936a34` and others); they do not stop the map. The
+script and the screenshots stay outside the repository.
 
 ## Calling the engine from a plugin (P3)
 
