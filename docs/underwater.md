@@ -15,12 +15,13 @@ Where a part is not marked as checked, "where it likely lives" is a hypothesis t
 | Underwater motions | idle, swim, attacks, reactions, per weapon class | motion lists (`.lmt`) for the player, per weapon | converted motion lists, with the 3U bone ids rewritten to 4U's |
 | Monster behaviour | swimming movement and attacks | monster AI scripts (`.emc`) and monster code | monsters bring their own data; water-aware movement translated from MH3U |
 | Effects and sound | bubbles, splashes, muffled audio, water fog | effect lists, sound requests, filters | converted assets; MH4U's own screen filters where they match |
-| HUD | oxygen gauge, depth cues | layout files | converted layout, or drawn by the plugin |
+| HUD | oxygen gauge, depth cues | MH4U's `rLayout` `.lyt` layouts ([lyt.md](../specs/lyt.md)) | gauge nodes added to a quest layout, or drawn by the plugin |
 
 ## What is known
 
 - MH3U's 387 motion lists are LMT version 66. Version 66 and 67 share one layout, so `mhuc` reads all 387 ([specs/lmt.md](../specs/lmt.md), check L3), underwater motions among them; their keyframe buffers decode too ([specs/lmt.md](../specs/lmt.md#keyframe-buffers), check L4), except that version 66 stores buffer types 11 to 13 signed where version 67 stores them unsigned behind a bounds block, so a converter has to re-encode those tracks' keys. MH4U's loader takes only version 67 and MH3U's only 66, so converting a 3U motion list means writing the number as well as re-encoding those keys ([specs/lmt.md](../specs/lmt.md#versions)).
 - MH3U's stage collision is MH4U's format ([specs/sbc.md](../specs/sbc.md)).
+- MH4U's HUD layouts are `rLayout` `.lyt` files: 165 per language in the ten `<lang>\data\core_*.arc` archives, all 825 read ([specs/lyt.md](../specs/lyt.md), check LY1). The quest HUD is `ui200` to `ui212` and `ui220` to `ui222` in `core_quest.arc` (`ui202` holds the health and stamina bars, `ui204` its gauge), and the bottom screen's panels are `ui601` to `ui604`, `ui610` and `ui250`. No pane name carries oxygen, breath or water, so a port adds the gauge's nodes to a quest layout or draws it from the plugin; MH4U has no gauge to reuse.
 - Cha-Cha (MH3U on Wii U) marks some of this. Its Wii U offsets must be re-found on 3DS:
   - swim state: the player's pad block (player + 0xE30 there) holds 3 at +0x3D under water;
   - camera: a mark at +0x12D of the camera block is 1 under water, the game handles pitch itself there, and the turn ramp is 10 frames instead of 5;
@@ -105,7 +106,7 @@ The gauge is drawn by `uIDCockpitMain` (`0x3f4318b3`, DTI `0xd461f8`), the quest
 
 The timer itself is player code. `0xa39c20(player, delta)` adds `delta` to the current air and clamps it to `[0, capacity]`; `0xa3a478(player, delta)` raises the capacity (cap 150) and sets the current to it. The player's update (`0x8d60c0`) calls `0xa39c20(player, -1)` at `0x8d6fe4` while `status+0x3d == 3` (underwater) and `0xa39c20(player, +150)` at `0x8d6ad8` otherwise; `0x8eccb8` calls `0xa3a478` at `0x8ecd70`.
 
-So the gauge is a display of the player's oxygen timer, not the oxygen system's HUD half. The drain, capacity and refill are player code, and the gauge is a few sprites in the quest cockpit layout `GUI\texlayout\quest\coc_main_eng` (in `/arc/ID/ID_cock_eng.arc`), whose 52 nodes include `ariA1` to `ari_eff` at indices 8 to 15. A port carries the timer with the swim state and redraws the gauge as a layout; there is no `uIDCockpitAir` behaviour to rebuild. MH4U's own HUD layouts are `rLayout` (`.lyt`) entries, not XFS: it ships no XFS texlayout at all ([specs/xfs.md](../specs/xfs.md#checks), check X1).
+So the gauge is a display of the player's oxygen timer, not the oxygen system's HUD half. The drain, capacity and refill are player code, and the gauge is a few sprites in the quest cockpit layout `GUI\texlayout\quest\coc_main_eng` (in `/arc/ID/ID_cock_eng.arc`), whose 52 nodes include `ariA1` to `ari_eff` at indices 8 to 15. A port carries the timer with the swim state and redraws the gauge as a layout; there is no `uIDCockpitAir` behaviour to rebuild. MH4U's own HUD layouts are `rLayout` (`.lyt`) entries, not XFS: it ships no XFS texlayout at all ([specs/xfs.md](../specs/xfs.md#checks), check X1; [specs/lyt.md](../specs/lyt.md)).
 
 **How the air gauge was read.** Addresses and names only.
 
