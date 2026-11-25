@@ -13,10 +13,11 @@ import pytest
 from mhuc import monsters
 from mhuc.formats import arc, camera, tex
 
+SLOTS = frozenset({0, 1, 2, 3, 4})
 ROW = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
-                   frozenset({"model", "motions", "camera", "tail", "cmd"}), 5)
+                   frozenset({"model", "motions", "camera", "tail", "cmd"}), SLOTS)
 SHIPPED_ROW = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
-                           frozenset({"model", "motions", "tail", "cmd"}), 5)
+                           frozenset({"model", "motions", "tail", "cmd"}), SLOTS)
 
 
 def entry(path: str, data: bytes) -> arc.Entry:
@@ -118,13 +119,38 @@ def test_sound_effects_shells_and_monster_data_are_left_out_with_a_reason():
     assert report.left_out[monsters.OPTION] == ["enemy/em_option/mot/em001_00_option.lmt"]
 
 
-def test_a_motion_slot_above_the_rows_count_is_left_out():
+def test_a_motion_slot_the_row_does_not_ship_is_left_out():
     row = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
-                       frozenset({"model", "motions"}), 1)
+                       frozenset({"model", "motions"}), frozenset({0}))
     out, report = convert(row)
     assert [e.file_name for e in out.entries if e.type_name == "rMotionList"] == [
         "enemy/em124/mot/em124_0.lmt"]
     assert any("motion slot 4" in reason for reason in report.left_out)
+
+
+def test_a_borrowed_motion_list_keeps_its_slot_under_the_ports_id():
+    # MHXX shares a family's motions: Giadrome's lists sit under em014 (Velocidrome).
+    row = monsters.Row(126, "giadrome-gu", "mhxx", "em034", "Giadrome", 15,
+                       frozenset({"model", "motions"}), frozenset({0, 2, 3, 4}))
+    entries = [
+        entry("enemy/em034/em034_00/mod/em034_00.mod", b"MOD\0" + bytes(8)),
+        entry("enemy/em014/em014_00/mot/em014_00_0.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
+        entry("enemy/em014/em014_00/mot/em014_00_2.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
+        entry("enemy/em014/em014_00/mot/em014_00_1.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
+    ]
+    out, report = convert(row, entries)
+    assert [e.file_name for e in out.entries if e.type_name == "rMotionList"] == [
+        "enemy/em126/mot/em126_0.lmt", "enemy/em126/mot/em126_2.lmt"]
+    assert any("motion slot 1" in reason for reason in report.left_out)
+
+
+def test_a_command_the_row_does_not_ship_is_left_out():
+    row = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
+                       frozenset({"model", "motions"}), SLOTS)
+    out, report = convert(row)
+    assert not any(e.type_name == "rEnemyCmd" for e in out.entries)
+    assert report.left_out[next(r for r in report.left_out if "cmd" in r)] == [
+        "enemy/cmd_tbl/em001_00_cmdtbl.emc"]
 
 
 def test_an_archive_with_no_file_of_a_shipped_kind_is_refused():
@@ -133,7 +159,7 @@ def test_an_archive_with_no_file_of_a_shipped_kind_is_refused():
         monsters.convert(data, ROW)
 
 
-def write_registry(tmp_path, files="model,motions=5,tail,cmd"):
+def write_registry(tmp_path, files="model,motions=0-4,tail,cmd"):
     path = tmp_path / "registry.csv"
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -147,7 +173,7 @@ def test_the_registry_row_reads_the_files_column(tmp_path):
     row = monsters.registry_row(124, write_registry(tmp_path))
     assert row.source_key == "em001"
     assert row.files == {"model", "motions", "tail", "cmd"}
-    assert row.motions == 5
+    assert row.motions == {0, 1, 2, 3, 4}
 
 
 def test_a_kind_this_converter_cannot_produce_is_refused(tmp_path):
@@ -157,7 +183,8 @@ def test_a_kind_this_converter_cannot_produce_is_refused(tmp_path):
 
 
 def test_the_files_column_is_checked(tmp_path):
-    for files in ("", "model,motions=9", "model,mystery", "model,motions=5,motions=2"):
+    for files in ("", "model,motions=9", "model,mystery", "model,motions=0-4,motions=2",
+                  "model,motions=4-2"):
         path = write_registry(tmp_path, files)
         with pytest.raises(monsters.ConvertError):
             monsters.registry_row(124, path)

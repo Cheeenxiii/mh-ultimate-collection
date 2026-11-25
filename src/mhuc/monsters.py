@@ -18,10 +18,16 @@ The kinds it produces, and how:
 
 - model, tail (rModel and their rMaterial files): taken as is (MOD 0xE6, MRL 0x20 in both
   games); the textures the materials name are converted and kept at MHXX's paths (below);
-- motions (rMotionList): the first `files`' `motions=N` slots, taken as is (LMT 67 in both);
+- motions (rMotionList): the slots the row's `motions=` names, taken as is (LMT 67 in both).
+  MHXX may store a monster's motion lists under another monster's folder because the family
+  shares them (Giadrome's are em014's); the converter renames them to the port's id and keeps
+  the slot number, so the source grouping survives;
 - camera (rCameraList): converted from MHXX's version 5 to MH4U's 4 (`camera.from_mhxx`,
   specs/camera.md);
-- cmd (rEnemyCmd): taken as is (EMC 0x20120804 in both).
+- cmd (rEnemyCmd): taken as is (EMC 0x20120804 in both) when the row lists it. MHXX's EMC still
+  has 21 group rows and MHGU's 167 opcodes against MH4U's 23 and 146 (specs/emc.md), so a port
+  whose row does not list `cmd` keeps the stand-in's AI script until an MHXX EMC converter
+  exists.
 
 What it converts besides the camera: the archive container (ARC 0x11 in MHXX to 0x13 in MH4U)
 and each texture (TEX 0xA6 in MHXX to 0xA5: the version field is the only byte that differs,
@@ -81,7 +87,7 @@ class Row:
     name: str
     stand_in: int
     files: frozenset[str] = frozenset()
-    motions: int = 0
+    motions: frozenset[int] = frozenset()
 
 
 @dataclass
@@ -95,30 +101,66 @@ class Report:
         self.left_out.setdefault(reason, []).append(path)
 
 
-def _parse_files(text: str, where: str) -> tuple[frozenset[str], int]:
-    """A row's `files` column as the kinds it ships and its motion-slot count."""
-    kinds: set[str] = set()
-    motions = 0
-    for token in text.split(","):
-        token = token.strip()
-        if not token:
+def _motion_slots(value: str, where: str) -> frozenset[int]:
+    """A motions value as the slots it names; a slot, a range, or a comma list of both."""
+    slots: set[int] = set()
+    for part in value.split(","):
+        part = part.strip()
+        span = re.fullmatch(r"(\d+)-(\d+)", part)
+        if span:
+            first, last = int(span.group(1)), int(span.group(2))
+            if first > last:
+                raise ConvertError(f"{where}: motions={value!r} has {part!r}, a range that runs "
+                                   "backwards")
+            slots.update(range(first, last + 1))
+        elif part.isdigit():
+            slots.add(int(part))
+        else:
+            raise ConvertError(f"{where}: motions={value!r} has {part!r}, not a slot or a range")
+    if not slots or any(not 0 <= slot < 6 for slot in slots):
+        raise ConvertError(f"{where}: motions={value!r} isn't a slot or a range in 0..5, as "
+                           "motions=0,2,3 or motions=0-4")
+    return frozenset(slots)
+
+
+def _parse_files(text: str, where: str) -> tuple[frozenset[str], frozenset[int]]:
+    """A row's `files` column as the kinds it ships and the motion slots it ships."""
+    tokens: list[list[str | None]] = []
+    for raw in text.split(","):
+        piece = raw.strip()
+        if not piece:
             continue
-        kind, _, count = token.partition("=")
+        kind, sep, value = piece.partition("=")
         kind = kind.strip()
+        if sep:
+            tokens.append([kind, value.strip()])
+        elif tokens and tokens[-1][0] == "motions" and re.fullmatch(r"\d+(?:-\d+)?", piece):
+            tokens[-1][1] = f"{tokens[-1][1]},{piece}"
+        else:
+            tokens.append([kind, None])
+    kinds: set[str] = set()
+    motions: frozenset[int] = frozenset()
+    for kind, value in tokens:
+        assert kind is not None
         if kind not in KINDS:
             raise ConvertError(f"{where}: files names {kind!r}, not one of {', '.join(KINDS)}")
         if kind in kinds:
             raise ConvertError(f"{where}: files names {kind} twice")
         if kind == "motions":
-            if not count.isdigit() or not 1 <= int(count) <= 6:
-                raise ConvertError(f"{where}: motions needs a slot count in 1..6, as motions=5")
-            motions = int(count)
-        elif count:
-            raise ConvertError(f"{where}: only motions takes a count, not {token!r}")
+            if value is None:
+                raise ConvertError(f"{where}: motions needs the slots the port ships, as "
+                                   "motions=0,2,3 or motions=0-4")
+            motions = _motion_slots(value, where)
+        elif value is not None:
+            raise ConvertError(f"{where}: only motions takes a value, not {kind}={value}")
         kinds.add(kind)
     if not kinds:
         raise ConvertError(f"{where}: files is empty; name the kinds the port ships")
     return frozenset(kinds), motions
+
+
+def _slots_text(slots: frozenset[int]) -> str:
+    return ",".join(map(str, sorted(slots))) or "none"
 
 
 def registry_row(monster_id: int, path: str | None = None) -> Row:
@@ -227,9 +269,9 @@ def convert(data: bytes, row: Row, variant: int = 0) -> tuple[bytes, Report]:
                 renamed = _rename_motion(stem, row.source_key, new_key, variant)
                 if renamed is None:
                     report.leave(OPTION, path)
-                elif renamed[1] >= row.motions:
-                    report.leave(f"motion slot {renamed[1]} is above the row's motions="
-                                 f"{row.motions}", path)
+                elif renamed[1] not in row.motions:
+                    report.leave(f"motion slot {renamed[1]} is not in the row's motions="
+                                 f"{_slots_text(row.motions)}", path)
                 else:
                     new_path = f"enemy/{new_key}/mot/{renamed[0]}"
                     kind = "motions"
@@ -256,6 +298,18 @@ def convert(data: bytes, row: Row, variant: int = 0) -> tuple[bytes, Report]:
                 report.leave(OTHER, path)
         elif path.startswith("enemy/em_option/"):
             report.leave(OPTION, path)
+        elif entry.type_name == "rMotionList" and path.startswith("enemy/"):
+            # MHXX shares a family's motion lists under one member's folder (Giadrome's are
+            # em014's). The port still ships them under its own id, at the source's slot.
+            slot = re.fullmatch(r".+_(\d+)", stem)
+            if slot is None:
+                report.leave(OTHER, path)
+            elif int(slot.group(1)) not in row.motions:
+                report.leave(f"motion slot {slot.group(1)} is not in the row's motions="
+                             f"{_slots_text(row.motions)}", path)
+            else:
+                new_path = f"enemy/{new_key}/mot/{new_key}_{slot.group(1)}"
+                kind = "motions"
         elif path.startswith("enemy/"):
             report.leave(MONSTER_DATA, path)
         else:

@@ -1271,7 +1271,7 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
         before = source[entry.file_name]
         assert len(entry.data) == len(before), entry.file_name
         assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
-    assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == 5
+    assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == {0, 1, 2, 3, 4}
     assert sum(len(v) for v in report.left_out.values()) == 534
 
 def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump):
@@ -1388,3 +1388,6 @@ def test_convert_monster_builds_her_files_and_sounds_into_one_folder(dump, tmp_p
     for e in built.entries:
         if e.type_name == "rMotionList":
             assert lmt.read(e.data)[0] == 67
+
+
+

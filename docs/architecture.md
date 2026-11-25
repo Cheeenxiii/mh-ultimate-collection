@@ -116,7 +116,7 @@ ships into MH4U's `/data/em124.arc` plus a `mod.json` the fork's mod manager ins
 column is what `mods/monster_ids` reads: it rewrites the resource record's path for each kind
 the port ships to the port's own names and keeps the stand-in's path for the rest, so the
 converter and the plugin agree on what is in the archive. For Rathian the row is
-`model,motions=5,tail,cmd`.
+`model,motions=0-4,tail,cmd`; Giadrome's is `model,motions=0,2,3,4`.
 
 The port's files take MH4U's names with the port's id: `enemy\em124\mod\em124` and
 `..._tail`, `enemy\em124\mot\em124_0` to `_4`, `enemy\em124\mot\e124_cam` and
@@ -128,9 +128,9 @@ from `data/em_data.arc` and the port ships no data yet (step 3).
 |---|---|---|---|
 | model and tail model (rModel) | MOD 0xE6 | MOD 0xE6 | taken as is, when the row ships `model` and `tail` |
 | material (rMaterial) | MRL 0x20 | MRL 0x20 | taken as is, the texture paths it names included |
-| motion lists (rMotionList) | LMT 67 | LMT 67 | taken as is, the first `motions=N` slots the row ships |
+| motion lists (rMotionList) | LMT 67 | LMT 67 | taken as is, at the slots the row's `motions=` names. MHXX may store them under another monster's folder (a family shares them: Giadrome's are em014's, at slots 0, 2, 3 and 4), so the converter takes a list from any `enemy/emNNN/.../mot/` and renames it to the port's id at its own slot |
 | camera list (rCameraList) | LCM 5 | LCM 4 | converted with `camera.from_mhxx` when the row ships `camera` ([camera](../specs/camera.md)); the shipped rows don't, so the record keeps the stand-in's camera |
-| AI script (rEnemyCmd) | EMC 0x20120804 | EMC 0x20120804 | taken as is, when the row ships `cmd` |
+| AI script (rEnemyCmd) | EMC 0x20120804, 21 group rows, MHGU's 167 opcodes | EMC 0x20120804, 23 rows, 146 opcodes | taken as is only when the row ships `cmd`, which is unverified to load: MHXX's rows and opcode table are not MH4U's ([emc](../specs/emc.md), checks A1 to A4), so a port that needs its own AI waits for that conversion. Giadrome's row ships no `cmd` and keeps the stand-in's script |
 | textures (rTexture) | TEX 0xA6 | TEX 0xA5 | converted: the version field 0xA6 → 0xA5, the one byte that differs, the PICA200 layout is the same ([tex](../specs/tex.md)); on Rathian's two textures the converted file differs from MHXX's in that byte alone. They stay at MHXX's paths (below) |
 | archive | ARC 0x11 | ARC 0x13 | converted: the kept entries are re-packed in MH4U's ARC version |
 | sound | MHXX's SBKR banks and SRQR requests | MH4U's SNDB banks and SREQ requests | not this mode: the same command's sound mode (`--arc`, `--sound-arc`) converts the set for a row that ships `sound` ([specs/sound.md](../specs/sound.md)) |
