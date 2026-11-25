@@ -8,7 +8,7 @@ rule: one registry, ids only ever grow, and the run time reads them from here.
 | Column | Meaning |
 |---|---|
 | `kind` | what kind of id: `monster` today; another kind needs its range and rules in `tools/check_ids.py` first |
-| `id` | the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123); 124 to 223 are permanent and 224 to 255 are the pool lent per quest ([0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)), so a permanent monster row stops at 223; `tools/check_ids.py` still allows 255 until [#101](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/101) |
+| `id` | the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123); 124 to 223 are permanent and 224 to 255 are the pool lent per quest ([0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)). A permanent row stops at 223; a monster ported after that range is full takes a row from 256 up, and 224 to 255 are never registry ids |
 | `key` | the content's name in the registry, lowercase words joined by hyphens, unique |
 | `source_game` | which game the content comes from: `mh4u`, `mh3u`, `mhxx` or `mhgu` |
 | `source_key` | the content's name in that game: a monster's `emNNN` |
@@ -34,13 +34,30 @@ offsets, and check P1 in [checks.md](../docs/checks.md#ported-monster-ids) shows
 record's paths. A port packages its files under those paths
 (`enemy\em124\mod\em124`, `enemy\em124\mot\em124_0`, ...).
 
+## The pool
+
+Ids 224 to 255 are not registry ids: they are the bytes `mods/monster_ids` lends to a quest's
+pooled monsters. A pooled row takes an id from 256 up, which is what the quest's u32 monster
+list and the mod's data in the save record. When a quest loads, the plugin finds its loaded
+`.mib` among the quest holder's quest-file resources and rewrites each pooled id in the
+large-monster waves to a free pool byte; the reader hooks answer that byte with the pooled
+monster's rows, exactly as they answer a permanent id, and the byte is freed when the quest
+ends. A quest names a few large monsters, so 32 bytes are enough. A pooled monster can't be on
+a guild quest card (its id field is one byte) and its hunt records go through the mod's data in
+the save, not MH4U's byte-indexed structures ([0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)).
+No pooled monster ships yet, so this file has no row from 256 up and the header's pooled array
+is empty; `tests/fixtures/registry-pooled.csv` is a fixture the checker and check P1 use.
+
 ## Rules the tool checks
 
 - every id is inside its kind's range and no two rows share one;
-- monster ids are consecutive from 124, with no gap: every id up to the highest one used needs
-  a row in each table indexed by id;
+- **permanent** monster ids are consecutive from 124, with no gap: every permanent id up to the
+  highest one used needs a row in each table indexed by id;
+- a pooled id starts at 256 and needs no gap: the pool lends it a byte, so it is not a table
+  index, and 224 to 255 are refused as registry ids;
 - a key, a source game and a source key are valid, and every row has a name and a stand-in;
-- `mods/monster_ids/src/ids.h` is exactly what this file generates.
+- `mods/monster_ids/src/ids.h` is exactly what this file generates: the permanent ids in one
+  array and the pooled ids in another.
 
 After editing the registry, write the header and check both:
 
@@ -60,10 +77,11 @@ free id, and a mistake is corrected by a migration, not by renumbering
 - **255** is the most one byte holds: the engine keeps a monster's id in one byte (`+0x1c0` of its data
   block, read with `ldrb`), and so does a guild quest card ([specs/extdata.md](../specs/extdata.md)).
   0003's amendment keeps 124 to 223 permanent and lends 224 to 255 per quest to monsters registered
-  from 256 up; the tool and the plugin implement the pool in
-  [#101](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/101);
-  the character save's monster log has 82 fixed entries and whether it is indexed by id is
-  unverified, so an id above 81 is already beyond what that structure can hold if it is.
+  from 256 up; the tool and the plugin implement that pool. **256** is the first registry id the
+  pool lends for; a quest's monster list ends at `0xffffffff` ([specs/quest.md](../specs/quest.md)),
+  so a registry id stops at `0xfffffffe`. The character save's monster log has 82 fixed entries
+  and whether it is indexed by id is unverified, so an id above 81 is already beyond what that
+  structure can hold if it is.
 - The name and notes texts are messages named by the id (`emName`, `emExp`): a ported id needs
   a message of its own in the mod's text, which is content work, not an id range.
 
@@ -71,6 +89,8 @@ free id, and a mistake is corrected by a migration, not by renumbering
 |---|---|---|---|
 | 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) |
 | 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) |
+
+No pooled row ships yet; the first would be 256, with a `stand_in` like any other.
 
 The two ports are [#47](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/47)'s
 subject; their files come from [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48)

@@ -8,8 +8,10 @@ The registry is the one file that records every id a ported content takes
 
 - `kind`      what kind of id it is. Monster ids are checked today; another kind needs its
               range and rules added here first.
-- `id`        the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123) and go up to 255,
-              the largest id a guild quest card's one-byte field can hold.
+- `id`        the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123). 124 to 223 are
+              permanent; a monster ported after that range is full takes an id from 256 up,
+              which the plugin lends a byte of 224 to 255 to for each quest that names it.
+              224 to 255 are therefore not registry ids.
 - `key`       the content's name in the registry, lowercase with hyphens, unique.
 - `source_game`, `source_key`  where the content comes from: mh4u, mh3u, mhxx or mhgu and its
               own name there (a monster's `emNNN`).
@@ -18,10 +20,10 @@ The registry is the one file that records every id a ported content takes
               ships this content's own rows (0 to 123).
 - `notes`     free text.
 
-Rules checked: each id is inside its kind's range and unique, monster ids are consecutive
-from 124 (every id up to the highest one used needs a row in each table), each key, source
-game and source key is valid, and every line of the plugin's header is the one this file
-generates.
+Rules checked: each id is inside its range and unique, permanent monster ids are consecutive
+from 124 (every id up to the highest permanent one needs a row in each table; pooled ids may
+skip), each key, source game and source key is valid, and every line of the plugin's header is
+the one this file generates.
 
 `--write` writes the header. The header is checked in, so a wrong or stale one fails the
 check: run `check_ids.py --write` after editing the registry, never edit the header.
@@ -42,10 +44,17 @@ HEADER = os.path.join(ROOT, "mods", "monster_ids", "src", "ids.h")
 
 COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "notes")
 SOURCE_GAMES = ("mh4u", "mh3u", "mhxx", "mhgu")
-# MH4U's own monster ids are 0 to 123 (reference/README.md#mh4u-monster-tables); 255 is what
-# a guild quest card's one-byte monster id can hold (docs/decisions.md#0003).
+# MH4U's own monster ids are 0 to 123 (reference/README.md#mh4u-monster-tables). 124 to 223
+# are the permanent ids; 224 to 255 are the bytes a quest lends from the pool, whose monsters
+# take ids from 256 up (docs/decisions.md#0003). 255 is what a guild quest card's one-byte
+# monster id can hold. 0xffffffff ends a quest's monster list (specs/quest.md), so a registry
+# id stops before it.
 MONSTER_FIRST = 124
-MONSTER_LAST = 255
+PERMANENT_LAST = 223
+POOL_FIRST = 224
+POOL_LAST = 255
+REGISTRY_POOL_FIRST = 256
+REGISTRY_POOL_LAST = 0xFFFFFFFE
 MH4U_MONSTER_LAST = 123
 KEY = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
 MONSTER_KEY = re.compile(r"em\d{3}\Z")
@@ -84,7 +93,7 @@ def check_rows(rows: list[dict[str, str]]) -> list[str]:
     problems: list[str] = []
     seen: dict[tuple[str, int], str] = {}
     keys: dict[str, str] = {}
-    monster_ids: list[int] = []
+    permanent_ids: list[int] = []
     for n, row in enumerate(rows, start=2):
         where = f"row {n} ({row.get('key') or 'no key'})"
         kind = row["kind"]
@@ -95,13 +104,21 @@ def check_rows(rows: list[dict[str, str]]) -> list[str]:
         if ident is None:
             problems.append(f"{where}: id {row['id']!r} isn't a number")
             continue
-        if not MONSTER_FIRST <= ident <= MONSTER_LAST:
-            problems.append(f"{where}: monster id {ident} isn't in {MONSTER_FIRST}..{MONSTER_LAST}")
+        if not MONSTER_FIRST <= ident <= REGISTRY_POOL_LAST:
+            problems.append(
+                f"{where}: monster id {ident} isn't in {MONSTER_FIRST}..{PERMANENT_LAST} "
+                f"(permanent) or {REGISTRY_POOL_FIRST}..{REGISTRY_POOL_LAST:#x} (pooled)")
+        elif POOL_FIRST <= ident <= POOL_LAST:
+            problems.append(
+                f"{where}: monster id {ident} is a byte the plugin lends from the pool "
+                f"({POOL_FIRST}..{POOL_LAST}); a monster ported after the permanent range "
+                f"takes a registry id from {REGISTRY_POOL_FIRST} up")
         elif (kind, ident) in seen:
             problems.append(f"{where}: id {ident} is already {seen[(kind, ident)]}'s")
         else:
             seen[(kind, ident)] = row["key"]
-            monster_ids.append(ident)
+            if ident <= PERMANENT_LAST:
+                permanent_ids.append(ident)
         if not KEY.match(row["key"]):
             problems.append(f"{where}: key {row['key']!r} isn't lowercase words joined by hyphens")
         elif row["key"] in keys:
@@ -117,11 +134,11 @@ def check_rows(rows: list[dict[str, str]]) -> list[str]:
         stand_in = parse_int(row["stand_in"])
         if stand_in is None or not 0 <= stand_in <= MH4U_MONSTER_LAST:
             problems.append(f"{where}: stand_in {row['stand_in']!r} isn't an MH4U monster id (0..{MH4U_MONSTER_LAST})")
-    if monster_ids:
-        wanted = list(range(MONSTER_FIRST, MONSTER_FIRST + len(monster_ids)))
-        if sorted(monster_ids) != wanted:
-            missing = sorted(set(wanted) - set(monster_ids))
-            problems.append(f"monster ids must be consecutive from {MONSTER_FIRST}; missing {missing}")
+    if permanent_ids:
+        wanted = list(range(MONSTER_FIRST, MONSTER_FIRST + len(permanent_ids)))
+        if sorted(permanent_ids) != wanted:
+            missing = sorted(set(wanted) - set(permanent_ids))
+            problems.append(f"permanent monster ids must be consecutive from {MONSTER_FIRST}; missing {missing}")
     return problems
 
 
@@ -130,34 +147,65 @@ def c_identifier(key: str) -> str:
 
 
 def render_header(rows: list[dict[str, str]]) -> str:
-    """The plugin's header for the registry's monster ids."""
-    monsters = sorted((r for r in rows if r["kind"] == "monster"), key=lambda r: int(r["id"], 0))
+    """The plugin's header for the registry's permanent and pooled monster ids."""
+    monsters = [r for r in rows if r["kind"] == "monster"]
+    permanent = sorted((r for r in monsters if int(r["id"], 0) <= PERMANENT_LAST),
+                       key=lambda r: int(r["id"], 0))
+    pooled = sorted((r for r in monsters if int(r["id"], 0) > PERMANENT_LAST),
+                    key=lambda r: int(r["id"], 0))
     lines = [
         "/* Generated from data/ids/registry.csv by tools/check_ids.py --write.",
         " * Do not edit: edit the registry and run the tool. Licence: GPL-3.0-or-later. */",
         "#ifndef MHUC_IDS_H",
         "#define MHUC_IDS_H",
         "",
-        f"/* MH4U's own monster ids are 0 to {MH4U_MONSTER_LAST}; a ported monster takes",
-        f" * {MONSTER_FIRST} and up. {MONSTER_LAST} is the most a guild quest card's",
-        " * one-byte id can hold (docs/decisions.md#0003-id-allocation-and-mod-saves). */",
+        "#include <stdint.h>",
+        "",
+        f"/* MH4U's own monster ids are 0 to {MH4U_MONSTER_LAST}. A ported monster takes",
+        f" * {MONSTER_FIRST} and up: {MONSTER_FIRST} to {PERMANENT_LAST} are permanent, and a",
+        f" * monster registered from {REGISTRY_POOL_FIRST} up is lent a free byte from",
+        f" * {POOL_FIRST} to {POOL_LAST} for each quest that names it",
+        " * (docs/decisions.md#0003-id-allocation-and-mod-saves). */",
         f"#define MHUC_MONSTER_FIRST {MONSTER_FIRST}",
-        f"#define MHUC_MONSTER_LAST {MONSTER_LAST}",
+        f"#define MHUC_MONSTER_LAST {PERMANENT_LAST}",
+        f"#define MHUC_MONSTER_POOL_FIRST {POOL_FIRST}",
+        f"#define MHUC_MONSTER_POOL_LAST {POOL_LAST}",
+        f"#define MHUC_MONSTER_POOL_SIZE {POOL_LAST - POOL_FIRST + 1}",
+        f"#define MHUC_REGISTRY_POOL_FIRST {REGISTRY_POOL_FIRST}",
         "",
         "/* One ported monster: the id it takes, and the MH4U monster id whose rows the",
         " * reader hooks answer with until the port ships this monster's own rows. */",
         "typedef struct MhucMonsterId {",
-        "    unsigned char id;",
+        "    uint32_t id;",
         "    unsigned char stand_in;",
         "} MhucMonsterId;",
         "",
-        f"#define MHUC_MONSTER_COUNT {len(monsters)}",
-        "static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {",
+        "/* The permanent ids, consecutive from 124. */",
+        f"#define MHUC_MONSTER_COUNT {len(permanent)}",
     ]
-    for row in monsters:
-        lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}}},")
-    lines += ["};", ""]
-    for row in monsters:
+    if permanent:
+        lines.append("static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {")
+        for row in permanent:
+            lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}}},")
+        lines.append("};")
+    else:
+        lines.append("/* Empty: a dummy entry keeps the array valid C. */")
+        lines.append("static const MhucMonsterId mhuc_monster_ids[1] = {{0, 0}};")
+    lines += [
+        "",
+        "/* The pooled ids: each is lent one byte of 224 to 255 for a quest that names it. */",
+        f"#define MHUC_POOLED_MONSTER_COUNT {len(pooled)}",
+    ]
+    if pooled:
+        lines.append("static const MhucMonsterId mhuc_pooled_monster_ids[MHUC_POOLED_MONSTER_COUNT] = {")
+        for row in pooled:
+            lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}}},")
+        lines.append("};")
+    else:
+        lines.append("/* Empty: a dummy entry keeps the array valid C. */")
+        lines.append("static const MhucMonsterId mhuc_pooled_monster_ids[1] = {{0, 0}};")
+    lines.append("")
+    for row in permanent + pooled:
         lines.append(f"/* {row['name']}, {row['source_game']} {row['source_key']} */")
         lines.append(f"#define {c_identifier(row['key'])} {int(row['id'], 0)}")
     lines += ["", "#endif", ""]
@@ -194,8 +242,10 @@ def main(argv: list[str] | None = None) -> int:
               "run tools/check_ids.py --write")
         return 1
     monsters = [r for r in rows if r["kind"] == "monster"]
-    first, last = (int(monsters[0]["id"], 0), int(monsters[-1]["id"], 0)) if monsters else (0, -1)
-    print(f"ids ok ({os.path.relpath(args.registry, ROOT)}: {len(monsters)} monsters, ids {first}..{last})")
+    permanent = [int(r["id"], 0) for r in monsters if int(r["id"], 0) <= PERMANENT_LAST]
+    pooled = [int(r["id"], 0) for r in monsters if int(r["id"], 0) > PERMANENT_LAST]
+    print(f"ids ok ({os.path.relpath(args.registry, ROOT)}: {len(permanent)} permanent monsters, "
+          f"ids {min(permanent, default=0)}..{max(permanent, default=0)}; {len(pooled)} pooled)")
     return 0
 
 
