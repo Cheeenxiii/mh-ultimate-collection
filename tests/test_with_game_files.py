@@ -1139,3 +1139,52 @@ def test_every_mh4u_layout_reads(dump):
     assert set(per) == {"eng", "fre", "ger", "ita", "spa"}, sorted(per)
     for language, counts in sorted(per.items()):
         assert counts == expected, f"{language}: {counts - expected} over, {expected - counts} short"
+
+
+def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump):
+    from mhuc import monsters
+
+    image = romfs.open_image(dump("mhxx", "romfs.bin"))
+    source_file = next(f for f in image.files() if f.path == "/arc/enemy/em001_00.arc")
+    source_data = image.read(source_file)
+    row = monsters.registry_row(124)
+    converted_data, report = monsters.convert(source_data, row)
+    converted = arc.read(converted_data)
+    source = {e.file_name: e.data for e in arc.read(source_data).entries}
+    assert converted.version == 0x13
+    assert [e.file_name for e in converted.entries] == [
+        "enemy/em001/em001_00/mod/em001_00_BM.tex",
+        "enemy/em001/em001_00/mod/em001_00_NM_MIRROR.tex",
+        "enemy/em124/mod/em124.mrl",
+        "enemy/em124/mod/em124.mod",
+        "enemy/em124/mod/em124_tail.mrl",
+        "enemy/em124/mod/em124_tail.mod",
+        "enemy/em124/mot/em124_0.lmt",
+        "enemy/em124/mot/em124_1.lmt",
+        "enemy/em124/mot/em124_2.lmt",
+        "enemy/em124/mot/em124_3.lmt",
+        "enemy/em124/mot/em124_4.lmt",
+        "enemy/em124/data/em124_cmd.emc",
+    ]
+    taken = {
+        "enemy/em124/mod/em124.mod": "enemy/em001/em001_00/mod/em001_00.mod",
+        "enemy/em124/mod/em124.mrl": "enemy/em001/em001_00/mod/em001_00.mrl",
+        "enemy/em124/mod/em124_tail.mod": "enemy/em001/em001_00/mod/em001_00_tail.mod",
+        "enemy/em124/mod/em124_tail.mrl": "enemy/em001/em001_00/mod/em001_00_tail.mrl",
+        "enemy/em124/mot/em124_0.lmt": "enemy/em001/em001_00/mot/em001_00_0.lmt",
+        "enemy/em124/mot/em124_1.lmt": "enemy/em001/em001_00/mot/em001_00_1.lmt",
+        "enemy/em124/mot/em124_2.lmt": "enemy/em001/em001_00/mot/em001_00_2.lmt",
+        "enemy/em124/mot/em124_3.lmt": "enemy/em001/em001_00/mot/em001_00_3.lmt",
+        "enemy/em124/mot/em124_4.lmt": "enemy/em001/em001_00/mot/em001_00_4.lmt",
+        "enemy/em124/data/em124_cmd.emc": "enemy/cmd_tbl/em001_00_cmdtbl.emc",
+    }
+    for port_path, source_path in taken.items():
+        assert next(e for e in converted.entries if e.file_name == port_path).data == source[source_path], port_path
+    for entry in converted.entries:
+        if entry.type_name != "rTexture":
+            continue
+        before = source[entry.file_name]
+        assert len(entry.data) == len(before), entry.file_name
+        assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
+    assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == 5
+    assert sum(len(v) for v in report.left_out.values()) == 534
