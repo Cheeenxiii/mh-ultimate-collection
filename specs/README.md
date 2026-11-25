@@ -52,4 +52,4 @@ One spec per file type: a Markdown note (`<type>.md`) and, once the layout is kn
 | [hitdata](hitdata.md) | rBodyData, rHitSize, rHitDataEnemy, rHitData | MH3U and MHXX hurt volumes, attack volumes, attack records: record sizes tile every file (E4); MHXX's match MH4U's (E5) and MH3U's attack records are placed and match on the fields MH4U kept (E8); MH4U's own record is laid out in specs/emd.md (E10) |
 | [emc](emc.md) | rEnemyCmd | header verified in all three games (A1); bytecode from MHGU Definitive Edition |
 | [sbc](sbc.md) | rCollision | magic and inner class verified (S1); layout from MHGU Definitive Edition |
-| [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, … | from Cha-Cha (Wii U); 3DS magic verified, the rest open (X1) |
+| [xfs](xfs.md) | rSuppItem, rQuestList, rPopData, rTexLayout, rSoundAttributeSe, … | from Cha-Cha (Wii U); the little-endian layout read on all 853 XFS files of MH3U's and MH4U's RomFS (X1): 845 in MH3U, 8 in MH4U, which ships no rTexLayout |
