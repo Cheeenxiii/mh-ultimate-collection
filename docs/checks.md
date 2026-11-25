@@ -89,22 +89,24 @@ compared. The run covers MH4U USA v1.3.0, MHXX v1.4 `roEm001` and MH3U USA.
 
 The index says little about the motion: MH4U and MHXX pack a motion index as LMT file << 8 |
 slot, MH3U as file * 100 + slot, and the LMT files group the animations differently.
-Comparing the animation each handler starts (its frame count, loop frame and track count; the
-MH3U version-66 files use the same animation header and track table as version 67 for this
-comparison, while their keyframe encodings are still unlaid-out, specs/lmt.md) splits the
-differing ids:
+Comparing the animation each handler starts (its frame count and loop frame; a different
+track count is recorded but doesn't decide, because MH4U's animations carry more tracks for
+the same motion — every compared Zinogre id is 46 against MH3U's 37. The MH3U version-66
+files use the same animation header and track table as version 67 for this comparison, while
+their keyframe encodings are still unlaid-out, specs/lmt.md) splits the differing ids:
 
 | Pair | Differing ids | Same motion, another index | Different motion | Not resolved |
 |---|---|---|---|---|
 | MH4U / MH3U | 115 | 93 | 3 | 19 |
 | MHXX / MH3U | 84 | 67 | 3 | 14 |
 
-The same-motion class is 86 exact signatures in MH4U/MH3U (64 in MHXX/MH3U), 2 with one extra
-MH4U track (the skeleton, specs/mod.md), and 5 (3) whose handler's index decodes to an empty
-MH4U/MHXX slot but whose animation is found at another index by its signature. The 3 different
+The same-motion class is 86 exact signatures in MH4U/MH3U (64 in MHXX/MH3U), 2 with the same
+frames and loop but a different track count, and 5 (3) whose handler's index decodes to an
+empty MH4U/MHXX slot but whose animation is found at another index by its signature. The 3 different
 are 13/5, 13/6 and 13/8 in both pairs: their frame or loop frame counts differ. The not-resolved
-ids decode to an empty slot with no unique signature match; their handlers are category 7,
-whose code is shared and can start more than one motion, so the first constant is not enough.
+ids decode to an empty slot with no unique signature match, or match a different signature;
+their handlers are category 7, whose code is shared and can start more than one motion, so the
+first constant is not enough.
 
 Different motion (both pairs, 3):
 
@@ -205,6 +207,23 @@ The 28 ids MH4U lacks reach 8 handler units: 15 are projectile spawns that tail-
 `0x008b4228` (category 10's 14 ids and 11/7), and the other 13 use six units, listed in
 [#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112).
 
+Two of those 28 are not missing. MH4U's category-8 and category-12 cases test the index with
+`cmp #0; bne default` rather than a switch, so the inventory and R2's map lose them:
+
+- **12/0 is MH4U's own action.** Its category-12 case runs `0x006d524c`, the handler MH4U's
+  shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0 (`0x0201177c`). The port needs no
+  code for it, and forcing it on the ported monster plays MH4U's handler.
+- **8/0 is a shared id with the same action.** MH4U's category-8 case runs `0x006e9770`
+  for index 0, which uses the same frame values as MHXX's `0x0201b460` (300.0/38.0,
+  12.0/50.0, the 180.0 timer, motion 0x403 at 4.0, 300.0/0.0/150.0) and the same tail
+  (9/1 or 2/6). The two bodies differ, so the port translates MHXX's handler onto MH4U's
+  calls and layout (`mods/rathian_actions`); its leaf `0x008c4184` is MH4U's
+  `0x0092f6e8`, whose table is not carried yet. Both 8/0 and 12/0 are missing from the
+  inventory because their cases are `cmp #0; bne`, not switches.
+
+`reference/monster_actions.py`'s `find_switch` needs that `cmp #0; bne` case before R2's counts
+can include the two ids; the counts above were made without it.
+
 What this means for the port: a shared id runs MH4U's own handler, and because #48 ships
 MHXX's motion lists under the ported monster's name and the index is the same, that handler
 starts MHXX's animation. A GU shared id needs no index remap, unlike a 3U one. The ids above
@@ -214,16 +233,105 @@ where only one side starts a motion are what R2p looks at first.
 
 | Check | What | Pass |
 |---|---|---|
-| R2p | force each action id the port ships on the ported GU Rathian and compare the move with MHXX's | every shipped id is recorded below, and the ids that do not play like MHXX are named with what differs |
+| R2p | force each action id the port ships on the ported Rathian and compare the move with its source game | every shipped id has a row below, and the ids that do not play like the source game are named with what differs |
 
-For each id in R2's map, set it in `mods/force_action`'s `config.ini` (`action = <cat>/<idx>`,
-`monster = 124`, `hold = 1`), take a quest that names id 124, and watch the move. R2's map says
-what to expect: a shared id starts MHXX's motion at the same index, and the ids R2 lists as
-one-sided may start no motion or another one. Record pass or fail per id and what differs: no
-motion, another motion, a different timing, a missing effect or projectile.
+For each id in R2's map (the GU port, id 124), set it in `mods/force_action`'s `config.ini`
+(`action = <cat>/<idx>`, `monster = 124`, `hold = 1`), take a quest that names id 124, and watch
+the move. R2's map says what to expect: a shared id starts MHXX's motion at the same index, and
+the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
+what differs: no motion, another motion, a different timing, a missing effect or projectile.
+The translated ids on the GU port are 3/98, 12/1, 12/2, 12/3 and 8/0; 8/0 should play motion
+0x403 at 4.0 and then ask for 9/1 (or 2/6), and its leaf effect is the one part not carried.
 
-Status: not done. It waits for #48 (the ported files) and #105 (the ported monster's own
+Category 17 has no motion to watch. MHXX's case jumps to the gate `0x008d5bd4`, which returns
+for indexes 0 to 2 and otherwise tail-calls the base update `0x008ae50c`; the port maps that
+routine to MH4U's `0x00911b48` (the step mapping is in the plugin's
+[README](../mods/rathian_actions/README.md#category-17-the-gate-and-the-base-update)). Force
+each row:
+
+| Forced | What MHXX does | What to watch |
+|---|---|---|
+| 17/0, 17/1, 17/2 | the gate returns | no move and no action change; the log has `17/N: nothing (the gate returns for 0 to 2)` |
+| 17/3 and up | the base update returns the monster to an idle action | the log has `17/N: running MH4U's base action update 0x00911b48`, and the action pair goes back to category 0 |
+
+Status: not done. The category-17 rows wait with the rest of R2p for #48 and #105.
+
+The 3U port (id 125) has the rows below (#116's). They are the 16 ids MH4U's `uEm001` lacks that
+reach a handler a shared action also reaches, so `mods/monster_actions` sends each to the MH4U
+action the map names and MH4U's own handler runs
+([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each row, enable
+both plugins, put `force_action` after `monster_actions` in the mod order (the last mod's hook
+runs first, so `force_action` writes the forced pair and the map translates it), set
+`action = <3U id>`, `monster = 125` and `hold = 1`, take a quest that names id 125, and watch
+the move. The plugin's log shows its ready line and one `monster 125: action <source> -> <target>`
+line per id. Record pass or fail and what differs; if the move is another variant, the actions
+in the page's "other MH4U actions with the same body" column are what to try next.
+
+| 3U id | the map runs | status |
+|---|---|---|
+| 0/4 | 0/0 | not done |
+| 7/64 | 7/35 | not done |
+| 7/87 | 7/92 | not done |
+| 7/93 | 7/92 | not done |
+| 10/0 | 10/7 | not done |
+| 10/1 | 10/7 | not done |
+| 10/2 | 10/7 | not done |
+| 10/3 | 10/7 | not done |
+| 10/4 | 10/7 | not done |
+| 10/5 | 10/7 | not done |
+| 10/6 | 10/7 | not done |
+| 11/5 | 11/0 | not done |
+| 11/15 | 11/0 | not done |
+| 11/26 | 11/0 | not done |
+| 11/28 | 11/0 | not done |
+| 13/9 | 0/3 | not done |
+
+Action 4 needs new C (#136) and is not on the map; it joins this table when it plays.
+
+Status: not done. The GU rows wait for #48 (the ported files) and #105 (the ported monster's own
+resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
+
+The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
+handlers for 3/98, 12/1-3, 4/27-32, 8/0 and category 17, and leaves shared ids and
+12/0 alone (T1). It logs one line the first time each translated action runs, one line per
+category-17 index and, for 8/0, one line naming its uncovered calls.
+
+Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
+
+### The ported AI's check (R3)
+
+| Check | What | Pass |
+|---|---|---|
+| R3 | play the ported 3U Rathian (id 125) without forcing, and read the actions her AI asks for | she asks for an action only MH3U's script picks, so `mods/monster_actions` logs `monster 125: action 7/64 -> 7/35`; MH4U's own script never asks for 7/64, so the line is only there if her converted EMC drives her |
+
+The 3U Rathian's EMC is converted at build time (version, 23 group rows, the 15 opcodes whose
+argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)). Cut by the
+game's tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and 7/85,
+are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so
+`mods/monster_actions` translates it to 7/35 and logs one line the first time it runs.
+
+1. Build 125's files with #49, including the converted EMC at `enemy\em125\data\em125_cmd`.
+   The registry names `cmd` for her, so the resource record loads it
+   ([data/ids](../data/ids/README.md)).
+2. Check the converted EMC first: 23 group rows, every script cuts cleanly with MH4U's table
+   (A2):
+
+   ```bash
+   game_files/work/venv/bin/python reference/monster_emc.py <cmd> \
+       --lens <the MH4U ELF or flat code image> 0x00ffe9f4 146 --check
+   ```
+
+3. Enable `mods/monster_ids` and `mods/monster_actions`, build the code library with them
+   (the fork's `tools/build_game.py`), and take a quest that names 125.
+4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the log has
+   `monster 125: action 7/64 -> 7/35`. The control is a build whose 125 row has no `cmd`, so
+   her record keeps the stand-in's script; that run never logs the line.
+5. Category-4 lines are expected too: action 4 has no MH4U handler and is not on the map
+   ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)), so the AI's
+   category-4 picks are recorded but are not this check's pass.
+
+Status: not done. It waits for #49's converted EMC and a quest that names 125.
 
 ### The plugin's check (R1p)
 
@@ -286,8 +394,9 @@ is a debugging tool for later move investigations, not part of this check.
 `mods/monster_ids` answers MH4U's monster-id-indexed tables for the ids in
 [data/ids](../data/ids/README.md): a registered id is answered with the MH4U monster the
 registry names as its stand-in, except its resource record, which the plugin builds for the
-ported id so the game loads the port's files from its own paths; 0 to 123 fall through. The
-headless check needs no converted monster files, so it runs before #48 and #49.
+ported id with its own paths for the kinds of file the port ships and the stand-in's for the
+rest; 0 to 123 fall through. The headless check needs no converted monster files, so it runs
+before #48 and #49.
 
 Ids 124 to 223 are permanent. A monster ported after that range is full takes a registry id
 from 256 up, and the plugin lends it a free byte of 224 to 255 for each quest that names it: at
@@ -299,7 +408,7 @@ registry has no row from 256 up and the pool is exercised through a registry fix
 
 | Check | What | Pass |
 |---|---|---|
-| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built and the paths it names under its own id, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
+| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
 | P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
 
 P1, headless:
@@ -316,19 +425,29 @@ P1, headless:
    fixture, not a shipped monster.
 3. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
-4. Pass: the log has `ready: answering MH4U's monster tables for 1 permanent and 1 pooled
-   id(s), 124 and up, lending 224..255 per quest` (the shipped registry gives `2 permanent and
-   0 pooled`), and one `self-test: id <id> resource record at <address>, built from stand-in 1,
-   names: ...` line per registered id, listing the paths read back from the record built in
-   guest memory; and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass
-   through`. The factory's and data path's lines name the path the stand-in's files are read
-   from (`enemy\em001\data\em001`), which the record does not change. With the fixture the log
-   also has `quest 60001: pooled id 256 -> lent 224`, `self-test: quest 60001 names pooled id
-   256; lent 224; the readers answer 224 -> pooled id 256, stand-in 1, its own record`, `quest
-   60001 ends: freed the pool byte(s) 224` and `self-test: the quest ended, so byte 224 is free
-   again`; with the shipped registry its place is `self-test: the pool 224..255 is unused: no
-   pooled monster id is registered`. MH4U's own monsters were not loaded, so only the
-   self-test's mapping shows here; a real spawn's reader lines are P2's.
+4. Pass: the log has `ready: answering MH4U's monster tables for 2 permanent and 0 pooled
+   id(s), 124 and up, lending 224..255 per quest, with the files each port ships and the
+   stand-in's for the rest`; one `self-test: id 124 resource record at <address>, built from
+   stand-in 1, names: ...` line per registered id, listing the paths read back from the
+   record built in guest memory; one `self-test: id 124 ships model, motions 0-4, tail, cmd;
+   keeps stand-in 1's paths for motions above 4, camera, mef, sound, efl` line and one for 125
+   (`ships model, motions 0-2, tail, cmd; keeps stand-in 1's paths for motions above 2, camera,
+   mef, sound, efl`); and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass
+   through`. In the 124 record the model, motion, tail and command paths name `em124`, and the
+   camera, motion-effect, sound and effect-list paths still name `em001`. The 125 record names
+   `em125` for the model, motion slots 0 to 2, the tail and the command, and keeps the
+   stand-in's `em001` for motion slots 3 and 4, the camera, motion effects, sound and effect
+   lists; no path may name a file the port's arc does not ship ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
+   The factory's and data path's lines name the path the stand-in's files are read from
+   (`enemy\em001\data\em001`), which the record does not change. With the fixture the ready
+   line is `1 permanent and 1 pooled`, its record is `enemy\em256\...` for the one kind the
+   fixture's `files` names and the stand-in's for the rest, and the log also has `quest 60001:
+   pooled id 256 -> lent 224`, `self-test: quest 60001 names pooled id 256; lent 224; the
+   readers answer 224 -> pooled id 256, stand-in 1, its own record`, `quest 60001 ends: freed
+   the pool byte(s) 224` and `self-test: the quest ended, so byte 224 is free again`; with the
+   shipped registry the pool's line is `self-test: the pool 224..255 is unused: no pooled
+   monster id is registered`. MH4U's own monsters were not loaded, so only the self-test's
+   mapping shows here; a real spawn's reader lines are P2's.
 
 P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 ([quests.md](quests.md)), and for the pool a pooled monster's row, files and a quest that names
@@ -338,18 +457,45 @@ Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the
 points (the two quest hooks among them), headless runner. Both passes:
 
 - **Shipped registry (2 permanent, 0 pooled):** pass. The log had `ready: answering MH4U's
-  monster tables for 2 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest`,
-  the `enemy\em124\...` and `enemy\em125\...` record lines, every reader line with `ids 0..123
-  pass through`, and `self-test: the pool 224..255 is unused: no pooled monster id is
-  registered`.
-- **Pooled fixture (1 permanent, 1 pooled):** pass. The log had the fixture's ready line, the
-  `enemy\em256\...` record line, and `quest 60001: pooled id 256 -> lent 224`, `self-test:
-  quest 60001 names pooled id 256; lent 224; the readers answer 224 -> pooled id 256, stand-in
-  1, its own record`, `quest 60001 ends: freed the pool byte(s) 224` and `self-test: the quest
-  ended, so byte 224 is free again`.
+  monster tables for 2 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest,
+  with the files each port ships and the stand-in's for the rest`; the 124 and 125 records
+  named `em124`/`em125` for the model, their motion slots, the tail and the command and kept
+  `em001` for the camera, motion effects, sound and effect lists; the ships/keeps lines; every
+  reader line with `ids 0..123 pass through`; and `self-test: the pool 224..255 is unused: no
+  pooled monster id is registered`. No path named a missing `em124`/`em125` file
+  ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
+- **Pooled fixture (1 permanent, 1 pooled):** pass. The log had the fixture's ready line; its
+  124 and 256 records named only `enemy\em124\mod\em124` and `enemy\em256\mod\em256`
+  (the fixture's `files` is `model`) and kept the stand-in's `em001` elsewhere; `quest 60001:
+  pooled id 256 -> lent 224`; `self-test: quest 60001 names pooled id 256; lent 224; the
+  readers answer 224 -> pooled id 256, stand-in 1, its own record`; `quest 60001 ends: freed
+  the pool byte(s) 224`; and `self-test: the quest ended, so byte 224 is free again`.
 
 No `isn't a hook point` line appeared in either run. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.
+
+## A ported camera's cut-in (C2)
+
+MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an action posts by
+number; a ported monster brings its source game's list, converted to MH4U's version 4, in its
+arc at `enemy\emNNN\mot\eNNN_cam` (the `camera` kind in [data/ids](../data/ids/README.md)).
+This check needs the converted camera in the port's arc, the `camera` kind on the id, the
+plugin's record built with it (P1), and a quest that spawns the id (#144).
+
+1. Convert the source camera with `mhuc convert monster --from mhxx --id 124 --arc <MHXX
+   arc/enemy/em001_00.arc> --out <mod folder>`; the port's arc holds
+   `enemy\em124\mot\e124_cam`. Check that 124's `files` in `data/ids/registry.csv` lists
+   `camera`, regenerate `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
+2. Force an action whose handler posts a camera event: MH4U's camera event is `0x00934544`
+   (USA v1.3.0), and a handler's call to it names the event id it posts. `mods/force_action`
+   (R1p) plays the chosen action; the converted list keeps the source's event ids, and Rathian's
+   shared ids include 0, 1, 2, 4, 5 and 8, so an event MH4U's own Rathian posts is in it.
+3. Pass: the view cuts to the source game's framing of the monster (MHXX's cut-in camera), not
+   MH4U Rathian's, and the P1 log's line for 124 names `e124_cam` among the record's own paths.
+   Fail: the framing is MH4U Rathian's (the record kept the stand-in's `e001_cam`), or the load
+   stops at the camera path.
+
+Status: open; waits for #48's port files and #144's quest-load proof.
 
 ## Calling the engine from a plugin (P3)
 
@@ -372,7 +518,9 @@ result in r2).
    `host->size` covers `call`, then asks for `on_frame`. In a frame call after start-up it
    takes 8 bytes from `alloc`, calls
    `host->call(call, 0x0068877c, 1, 0x3f800000, out)` (id 1, scale 1.0f, out) and logs the
-   returned r0 and the byte at `out`. r1 is a float: the getter reads it as one.
+   returned r0 and the byte at `out`. r1 carries the scale as an unsigned integer: the
+getter does `vmov s0, r1; vcvt.f32.u32` at `0x006887a8`, so P3 proves r0-r2 and the r0
+return, not float arguments (T0 covers those).
 3. Put the plugin's line in the code library's `<program id>.plugins.tsv`
    (`plugin`, name, library path and mod folder, tab-separated) in a copy of a user folder. No
    code library rebuild is needed: `sMhMain::frame` is a hook point of every library the
@@ -394,6 +542,117 @@ A longer run (130 s of emulated time, menu input through the opening movie) load
 reached the character and the village, where no monster spawns; the probe also hooks
 `uEnemy::dispatchAction` to capture a live `this`, and it captured nothing. Calling the wrapper
 on a spawned monster still waits for a quest run.
+
+## The translated actions' check (T1)
+
+The port's translated handlers for MHXX-only actions have no in-game run yet (R2p), so they
+are checked without a monster: the source facts against MHXX's module, the state machines
+against a fake host, and the plugin's self-test in a headless run.
+
+| Check | What | Pass |
+|---|---|---|
+| T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) and MHXX v1.4's `roEm001.cro` | every row's case block, handler unit and first motion constant match the module's dispatcher; counts and ids only |
+| T1b | `make -C mods/rathian_actions test` | the plugin's call sequences and frame values match the source's order, and a changed value fails it |
+| T1c | a headless run of the code library built with the plugin | the log has the plugin's ready and self-test lines and the float stubs' address; the runner exits 0 |
+| T1d | the in-game per-move check | R2p |
+
+T1a: MHXX v1.4's `roEm001.cro` and its `static.crs` come from the player's own dump.
+
+```bash
+MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <static.crs>
+```
+
+Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (category 17 has
+none), first motions 9/13; translated 12 (3/98, 12/1-3, 4/27-32, 8/0 and category
+17), MH4U's own 1 (12/0), pending 0. Changing a ledger motion makes it exit 1 and name the
+id.
+
+T1b, last result (2026-11-25): pass, the call sequences checked across 3/98's three frames,
+the 12/1-3 blocks, 4/27-32's states, 8/0's three states and category 17's no-op and
+base-update paths. Changing 3/98's `6.0` to `5.0` fails it with the motion line; making
+17/3 a no-op (`index > 3`) fails it with 17/3's line; giving 4/27 the fast turn step fails
+it with the turn line; changing 8/0's motion speed `4.0` to `5.0` fails it with 8/0's line.
+
+T1c, last result (2026-11-25, MH4U USA v1.3.0, the #139 code library built with the mod's
+`uEnemy::dispatchAction` hook, headless runner): pass, when only the 3/98 and 12/1-3 slices
+were in the build. The log had the plugin's ready line,
+`ready: translating 5 of GU Rathian's 13 MHXX-only actions on monster 124`, then
+`selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...`,
+the line naming 12/0 as MH4U's own `0x006d524c` and the pending slices, and
+`selftest: float stubs at 0x08e44670 (256 bytes, the game's heap)`; the runner exited 0. No
+monster spawned, so no translated action ran: the in-game side is R2p.
+
+The 4/27-32 and 8/0 slices change that line to `selftest: 12 of the 13 actions: ... 4/27-32
+<- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0
+<- 0x0201b460 (3 states, motion 0x403 at 4.0, ...), 17 <- the gate 0x008d5bd4 + MH4U's base
+update 0x00911b48`, and the last line names 8/0's leaf and no pending slice. No headless run
+has shown that line yet: it needs a code library rebuilt with the plugin, and the build
+machine's one heavy job is the quest-load proof
+([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)).
+
+## Floats through a guest stub (T0)
+
+ABI 3 `call` sets `r0`-`r2` and returns `r0`, but MH4U's motion start reads its speed in `s0`,
+and a source case block takes target points in `s0`-`s3`. A plugin can write a small ARM stub
+into a block from `alloc` (ABI 2) that loads `s0`/`s1` and branches to the engine function, and
+hand a float back by moving `s0` to `r0` after the call. The port interprets code that is not
+recompiled (`port/src/arm_recomp.cpp`, `Interpret`), so a block from `alloc` is executable and
+a stub's literals can be rewritten per call.
+
+| Check | What | Pass |
+|---|---|---|
+| T0 | a throwaway plugin allocates a block, writes a stub that sets `s0` to 6.0 and branches to a second stub doing `vmov r0, s0; bx lr`, and calls it | `call` returns `0x40c00000` (6.0f) and the runner exits 0 |
+
+Result (2026-11-25, MH4U USA v1.3.0, headless runner with an ABI 3 code library): pass. The log
+had the stub and target addresses, `call -> r0=0x40c00000`, and exit 0. A first attempt with a
+wrong literal offset jumped into the literal and the runner died with an illegal instruction,
+which is what a bad stub looks like; the layout is in
+[the plugin's README](../mods/rathian_actions/README.md#floats-the-guest-stubs). The fork's
+[#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134) adds float and `r3`
+arguments to the plugin ABI; when it lands, the stubs give way to that `call`.
+
+## Calling the engine with r3 and floats from a plugin (P4)
+
+ABI 3's `call` sets r0-r2 and returns r0. ABI 4 adds
+`call2(call, addr, r0_r3, s0_s1, s0_out)`, which sets r0-r3 and the float arguments s0 and
+s1, returns r0 and, through `s0_out`, the function's s0 (a float return). This check calls a
+game function that stores the arguments it receives, so the log shows they arrived: MH4U USA
+v1.3.0 `0x0022e43c` stores r3 at `+0` and r2 at `+2` of the block in r0, s0 at `+8`, and the
+remainder of s1 divided by a count from r1 at `+0xc`; with r1 = 0 the count is 1, so s0 comes
+back as 10.0f and the remainder is 0. It reads and writes only that block, so it needs no
+monster and no quest.
+
+| Check | What | Pass |
+|---|---|---|
+| P4 | a plugin calls `0x0022e43c` through ABI 4 `call2` in a headless run | the log shows the host's ABI 4 and `call2 ... -> r0=<block>, out=10; block +0: r3=0xbeef r2=7, +8: s0=1.5, +0xc: remainder=0`; the runner exits 0 |
+
+1. Build the headless runner after the ABI 4 change, in its existing CMake tree:
+   `cmake --build <build> --target mh4u_runner`. The Qt frontend compiles the same header and
+   needs the same rebuild before it carries `call2`.
+2. Build a throwaway plugin (not in either repository) against the fork's
+   `include/mh4u_plugin.h`: in `mh4u_plugin_init` it checks `host->abi >= 4` and that
+   `host->size` covers `call2`, then asks for `on_frame`. In a frame call after start-up it
+   takes 0x20 bytes from `alloc`, calls
+   `host->call2(call, 0x0022e43c, args, floats, &out)` with `args = {block, 0, 7, 0xbeef}`
+   and `floats = {1.5f, 10.0f}`, and logs r0, the out float and the words at `block + 0`,
+   `+8` and `+0xc`.
+3. Put the plugin's line in the code library's `<program id>.plugins.tsv` (`plugin`, name,
+   library path and mod folder, tab-separated) in a copy of a user folder. No code library
+   rebuild is needed: `sMhMain::frame` is a hook point of every library the fork's
+   `tools/build_game.py` builds.
+4. Run
+   `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 12000 --speed 0 --log "*:Info"`.
+
+Result (2026-11-25, MH4U USA v1.3.0, headless runner rebuilt with ABI 4): pass. The log had
+`plugin <name>: ready: host ABI 4, size 0xb8, call2 present` when the plugin loaded, then
+`plugin <name>: frame 30: call2 0x0022e43c(block=0x08e44668, r1=0, r2=7, r3=0xbeef, s0=1.5f, s1=10.0f) -> r0=0x08e44668, out=10; block +0: r3=0xbeef r2=7, +8: s0=1.5, +0xc: remainder=0`,
+and the runner exited 0. The block holds r3 and r2 exactly as the call set them, and its `+8`
+is s0 as 1.5f, so the function received the r3 and the VFP arguments. `out=10` is the
+function's own s0 (s1 divided by its count of 1), so the float return came back through
+`s0_out`. The run continued to its end, so the guest's registers, VFP registers and flags were
+put back. The function only reads and writes the block the plugin allocates, so this proves
+the call mechanism at boot; the translated 3U handler ([#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115))
+calls the engine's motion and effect functions the same way on a live monster.
 
 ## Tracing engine calls in MHXX
 

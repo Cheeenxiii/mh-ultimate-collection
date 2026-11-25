@@ -1,0 +1,41 @@
+name: Task
+description: One session's work towards a milestone
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One issue is one session's work. Title: imperative, the outcome in plain words ("Port Rathian's moves to MH4U"), no check codes or file names. Structural questions go in docs/decisions.md, not in an issue.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: One paragraph a newcomer can follow. Check codes and file paths may appear as references to the docs.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: A concrete, checkable end, naming the doc where the result will be recorded.
+    validations:
+      required: true
+  - type: textarea
+    id: waits
+    attributes:
+      label: Waits for
+      description: Issue links (#14), also set as "blocked by" relationships; "nothing" if none.
+    validations:
+      required: true
+  - type: dropdown
+    id: needs
+    attributes:
+      label: Needs
+      description: Also set as a `needs:` label.
+      options:
+        - nothing beyond the repository
+        - the maintainer's game files (dumps)
+        - a game session (someone has to play)
+        - files the maintainer doesn't have yet
+    validations:
+      required: true

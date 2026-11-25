@@ -8,12 +8,14 @@ It is a content mod for [MH4UltimateDC](https://github.com/CompaLarios18/MH4Ulti
 
 Nothing is playable yet. The repository has:
 
-- `mhuc`, a toolkit that reads, writes and converts the three games' files: archives, textures, text, quests and save data;
+- `mhuc`, a toolkit that reads, writes and converts the three games' files: archives, textures, text, camera lists, quests and save data;
 - specs of those file formats;
 - the reference recompiles of MH3U and MHXX, used to study the code that monsters are ported from;
-- the mod's native plugins: `mods/force_action`, which makes a monster perform a chosen action so a ported move can be watched (the plugin's check, R1p), and `mods/monster_ids`, which gives the ported monsters their own ids and answers MH4U's monster-id-indexed tables for them, lending a quest a free byte of the last 32 ids to a monster ported past the permanent range ([data/ids](data/ids/README.md)).
+- the mod's native plugins: `mods/force_action`, which makes a monster perform a chosen action so a ported move can be watched (the plugin's check, R1p); `mods/monster_ids`, which gives the ported monsters their own ids, answers MH4U's monster-id-indexed tables for them and lends a quest a free byte of the last 32 ids to a monster ported past the permanent range ([data/ids](data/ids/README.md)); `mods/monster_actions`, which sends a source action MH4U's monster class lacks to the shared MH4U action whose handler has the same body ([reference](reference/README.md#the-17-ids-mh4u-has-no-action-for)); and `mods/rathian_actions`, which runs GU Rathian's MHXX-only actions (3/98, 12/1-3, 4/27-32, 8/0 and category 17) on MH4U's `uEnemy` (checks T1 and T0, [data/actions](data/actions/README.md)).
 
 How it all fits together: [docs/architecture.md](docs/architecture.md).
+
+What comes next is planned in the open: [milestones](https://github.com/Cheeenxiii/mh-ultimate-collection/milestones) for the goals, [issues](https://github.com/Cheeenxiii/mh-ultimate-collection/issues) for the tasks, and the [project board](https://github.com/users/Cheeenxiii/projects/1) for where each one stands.
 
 ## No game data
 

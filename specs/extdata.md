@@ -9,7 +9,7 @@ status: unknown
 
 Downloaded quests (`quest1`..`quest5`) are in specs/quest.md. This page covers the other Extra Data files: the guild-card files `card1`..`card3`, `cardbox` and the DLC Palicos' `otomo1`. All are encrypted with mhef's `SavedataCipher` (quest.md check Q4): mode `card` for `card*`, `normal` for the rest. Offsets below are in the **decrypted** file, as `mhuc decrypt mh4u-save` writes it: the cipher's seed word and checksum are gone, so a `card*` file's 24-byte clear header becomes 16 bytes.
 
-The Blowfish key `SavedataCipher` uses is a NUL-terminated string in the game's own code: MHGU Definitive Edition reads it from the European v1.1 code at 0xE05E04 (`tools/extdata4u.py`), so a player can take it from their own dump rather than from mhef. Its address in USA v1.3.0 isn't known yet.
+The Blowfish key `SavedataCipher` uses is a NUL-terminated string in the game's own code: MHGU Definitive Edition reads it from the European v1.1 code at 0xE05E04 (`tools/extdata4u.py`), so a player can take it from their own dump rather than from mhef. USA v1.3.0 keeps it at the same address, 0xE05E04, the only copy in its code; taken there, it decrypts the maintainer's `system`, character saves and every Extra Data file (`card*` in mode `card`, `quest*` in mode `quest`, `cardbox` and `otomo1` in mode `normal`), each checksum matching.
 
 Sources: the mhff wiki (svanheulen/mhff, GPL-3.0) pages "MH4U card1 Format", "MH4U Guild Quest Structure", "MH4U Equipment Structure" and "MH4U DLC Palico Format", credited in specs/README.md. Reader: `mhuc extdata dump|check card|otomo FILE` (`src/mhuc/extdata.py`).
 

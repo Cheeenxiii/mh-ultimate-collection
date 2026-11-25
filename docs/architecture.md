@@ -14,7 +14,7 @@ The mod reaches the engine only through the fork's plugin API. Its reference is 
 - a mod folder holds a `mod.json`, RomFS files and a native library;
 - `mod.json` names the game functions the library hooks;
 - the fork's `tools/build_game.py` builds those hooks into the recompiled game;
-- at start-up the port loads the library, which can read and write game memory, allocate from the game's heap, and call a game function by address, with r0-r2 as its arguments and its r0 back (ABI 3, `call`; the headless check P3 in [checks.md](checks.md#calling-the-engine-from-a-plugin-p3)).
+- at start-up the port loads the library, which can read and write game memory, allocate from the game's heap, and call a game function by address, with r0-r3 and the floats s0 and s1 as its arguments, and its r0 and float return back (ABI 4, `call` and `call2`; the headless checks [P3](checks.md#calling-the-engine-from-a-plugin-p3) and [P4](checks.md#calling-the-engine-with-r3-and-floats-from-a-plugin-p4)).
 
 A hook can also run instead of the game's function, so the mod may replace any part of MH4U with its own C code, written from the decompiled original, while the fork stays a minimal diff on upstream ([decision 0012](decisions.md#0012-how-much-of-mh4u-the-mod-may-replace)).
 
@@ -24,20 +24,37 @@ with the forced pair, so the game's own setter initializes the chosen action and
 plugin's check, R1p). The dispatcher (`0x006e9cac`) is a fallback hook only. The library is
 built into the code library by the fork's `tools/build_game.py`, like any other plugin.
 
+The third plugin is `mods/rathian_actions`. It wraps `uEnemy`'s action dispatcher (USA
+v1.3.0 address `0x006e9cac`) and, for the ported Rathian, runs the translated handlers for
+her MHXX-only actions (3/98, 12/1-3, 4/27-32, 8/0 and category 17, whose gate runs
+MH4U's base action update); every other id, and every other monster, goes to the game's own
+dispatcher unchanged. Its engine calls go through the ABI 3 `call`, with guest stubs for the
+floats and `r3` that `call` cannot pass (checks T0, T1). Its ledger is
+[data/actions](../data/actions/README.md).
+
 The second plugin is `mods/monster_ids`. It gives the ported monsters their own ids and
 answers MH4U's monster-id-indexed tables for them: the readers of the factory, data path,
 enemy data, crowns, list order, icon, resource index and drop tables are hooked, and a
 registered id is answered with the MH4U monster the registry names as its stand-in — except
-its resource record, which the plugin builds for the ported id so the game loads the port's
-files from the id's own paths — while ids 0 to 123 fall through to the game's functions.
-Ids 124 to 223 are permanent. A monster ported after that range is full takes a registry id
-from 256 up, which a quest's u32 monster list records; at quest start the plugin finds the
-loaded `.mib` and lends each pooled monster it names a free byte of 224 to 255, answers that
-byte with the monster's rows, and frees it when the quest ends ([the
-pool](../data/ids/README.md#the-pool)). No pooled monster ships yet.
+its resource record, which the plugin builds for the ported id with its own paths for the
+kinds of file and motion slots the port ships and the stand-in's for the rest — while ids 0
+to 123 fall through to the game's functions. Ids 124 to 223 are permanent. A monster ported
+after that range is full takes a registry id from 256 up, which a quest's u32 monster list
+records; at quest start the plugin finds the loaded `.mib` and lends each pooled monster it
+names a free byte of 224 to 255, answers that byte with the monster's rows, and frees it when
+the quest ends ([the pool](../data/ids/README.md#the-pool)). No pooled monster ships yet.
 Which reader each table is, and what is not answered yet, are in
 [reference/](../reference/README.md#mh4u-monster-tables) and the plugin's
 [README](../mods/monster_ids/README.md).
+
+The third plugin is `mods/monster_actions`. 16 of the 17 action ids MH3U's Rathian has and
+MH4U's `uEm001` lacks reach the same handler as a shared action, so the port does not carry
+them as new C: the plugin wraps `uEnemy`'s action setter (`0x0090ef74`) and, for a ported
+id, replaces the requested pair with the shared MH4U action recorded for it in a generated
+table (`src/actions.h`, [reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)),
+so MH4U's own setter initializes the shared action and MH4U's handler runs. The table holds
+action numbers only and `tools/check_action_map.py` checks it; action 4 is the one id that
+needs new C ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)).
 
 ## From dumps to a mod
 
@@ -53,32 +70,38 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 
 | Module | Does |
 |---|---|
-| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), serialised objects (XFS), RomFS images, class ids |
+| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), camera lists (LCM), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), motion effects and effect lists (MEF/ESQ/PSL, EFL/PEL), serialised objects (XFS), RomFS images, class ids |
 | `crypto/` | Blowfish and the save, Extra Data and DLC ciphers of the three games |
 | `quests/` | quest readers for the three games, the MH4U `.mib` writer, conversion from MHXX, monster ids by name |
 | `extdata.py` | MH4U Extra Data records: guild quest cards, DLC Palicos, the in-game test kit |
+| `save.py` | MH4U's character saves (`user1` to `user3`) and `system`: profile, item and equipment boxes, pouches, guild quests, Palicos, monster log and guild card ([save](save.md)) |
 | `survey.py` | runs the specs' checks over a whole RomFS and prints counts only |
 | `catalog.py` | what MH4U already has of 3U's and GU's monsters and maps, from `data/catalog/` |
 | `monsterdata.py` | rebuilds an MH4U monster's `.etd`/`.emd` values from MHXX's or MH3U's files and compares, counts only |
 
 Each format follows its spec in [specs/](../specs/README.md). A field is marked verified only once it has been checked against real files, with the procedure written down.
 
+## Saves
+
+MH4U's character saves are read by `mhuc save dump` (specs/save.md): the profile, item and equipment boxes, the seven worn pieces and their box indices, the item and gunner pouches, ten guild quests, 56 Palicos, the 82 fixed monster-log entries and the guild card's quest counts, weapon usage and brigade points. Checks S1 to S7 fix those offsets against the maintainer's saves. Two things a converter still needs are open: the character save's quest clear lists ([#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153)) and the `system` save's fields ([#154](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/154)). The monster log is not indexed by monster id: its order is the guild card's, so a ported id does not fit it, which decision [0003](decisions.md#0003-id-allocation-and-mod-saves) asked.
+
 ## Monsters
 
-A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source game's code is the reference to translate, handler by handler, and never runs in the mod ([decision 0002](decisions.md#0002-monsters-are-ported-onto-mh4us-engine)). Before a version gets an id, [data/catalog/versions.csv](../data/catalog/versions.csv) records whether it differs from MH4U's version ([decision 0004](decisions.md#0004-monster-versions)'s amendment): every large monster MH4U shares with MH3U or MHXX has a verdict, per axis (monster data, moves, model), with the comparison's counts ([how it is made](../data/catalog/versions.md)).
+A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source game's code is the reference to translate, handler by handler, and never runs in the mod ([decision 0002](decisions.md#0002-monsters-are-ported-onto-mh4us-engine)). Before a version gets an id, [data/catalog/versions.csv](../data/catalog/versions.csv) records whether a player would notice it differ from MH4U's version ([decision 0004](decisions.md#0004-monster-versions)'s amendment): every large monster MH4U shares with MH3U or MHXX has a verdict, per axis (monster data, moves, model), with the evidence — the source's AI script and the wiki's attack lists for moves, the thresholds and counts for data ([how it is made](../data/catalog/versions.md)).
 
 | Step | What | State |
 |---|---|---|
 | 1. Study the source | class, vtable, action dispatcher, engine calls | done for Rathian in all three games |
-| 2. Assets | models, textures, motions, AI scripts, collision, sounds | MOD is the same version in all three games; MHXX's LMT and EMC match MH4U's, MH3U's LMT is version 66, which reads with MH4U's layout ([lmt](../specs/lmt.md), check L3) and whose keyframe buffers decode too, except types 11 to 13, which version 66 encodes differently (check L4), and its EMC is older |
+| 2. Assets | models, textures, motions, AI scripts, collision, sounds | MOD is the same version in all three games; MHXX's LMT matches MH4U's, MH3U's LMT is version 66, which reads with MH4U's layout ([lmt](../specs/lmt.md), check L3) and whose keyframe buffers decode too, except types 11 to 13, which version 66 encodes differently (check L4); the AI scripts share their file shape but not their bytecode: MH3U's EMC is version `0x20110601` with 13 group rows and 113 opcodes, MH4U's `0x20120804` with 23 rows and 146, and MHXX's has MH4U's version word but 21 rows and MHGU's 167 opcodes ([emc](../specs/emc.md), checks A1 to A4), so a 3U script is converted to MH4U's version and a MHXX one needs the same for the ports that use it. The motion-effect and effect-list containers are laid out and read on the three games' monster archives ([mef](../specs/mef.md), [efl](../specs/efl.md), checks FX1, FX2, EF1, EF2), but their records, sections and blocks are not understood, so no port ships its own effects yet |
 | 3. Monster data | hitzones, parts, breaks, severing, attacks, stats | known in all three games ([emd](../specs/emd.md), [dttune](../specs/dttune.md), [dtbase](../specs/dtbase.md), [dtbparts](../specs/dtbparts.md), [emstatus](../specs/emstatus.md), [hitdata](../specs/hitdata.md)); `mhuc monsterdata` rebuilds MH4U Rathian's HP, parts, hitzones, break parts and joint records from MHXX, and her HP, most hitzone rows, her attack records' shared fields and her part records from MH3U, whose fields are mapped one by one ([part record mapping](../specs/emstatus.md#part-record-mapping)) and whose break blocks' meanings stay unverified; her part kind is MH4U's Insect Glaive extract kind, which 3U never had and MH4U's own Rathian supplies by part index ([specs/emd.md](../specs/emd.md), check E13); MH4U's own 40-byte attack record is placed from its reader, its two flag words' consumers in the hit check and the slot update are named, and its values are checked against both games' records ([specs/emd.md](../specs/emd.md), check E10); MH4U's sever records have no counterpart in MHXX's or MH3U's data: both sever a part by swapping in a `_tail.mod`, the joint coming from the monster class's code, and MH4U's sever records' kind, index and b are read by its own loader and cut-object spawner while limit and a have no reader ([emd](../specs/emd.md#joint-and-sever-record-24-bytes), checks E11, E12) |
-| 4. Register | a new monster id and the tables it indexes | MH4U's tables are found ([reference/](../reference/README.md#mh4u-monster-tables)), and MH3U's ids are paired with MH4U's: 32 of the 85 have an MH4U monster, 44 are monsters MH4U does not have, and 9 are props ([reference/](../reference/README.md#mh3u-ids-to-mh4us)); ids 124 and 125 are in `data/ids/registry.csv`, checked by `tools/check_ids.py` and generated into `mods/monster_ids/src/ids.h`; `mods/monster_ids` answers the readers of the factory, data path, enemy data, crowns, list order, icon, resource index and drop tables, with a resource record built for the ported id (its own paths) and the stand-in's rows elsewhere, and MH4U's 0 to 123 fall through. Once the permanent range (124 to 223) is full, a ported monster takes a registry id from 256 up and is lent a byte of 224 to 255 per quest; no pooled row ships yet. The data path stays the stand-in's until the ports ship `.emd`/`.etd`; the name and notes text and the notes-list walk are not answered yet |
-| 5. Behaviour | each action handler, translated onto `uEnemy` | shared action ids run MH4U's own handlers ([R2](checks.md#the-shared-action-map-r2): 273 of MHXX's 301 and 174 of MH3U's 191, 167 of 167 GU-comparable ids at the same motion index); the 45 ids MH4U lacks (28 GU, 17 3U) are translated handlers ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112), [#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115)), which now have the plugin host's ABI 3 guest call to run MH4U's engine functions ([#110](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/110), check P3); the per-move in-game checks wait for #48/#49 and #105 ([#113](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/113), [#116](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/116)) |
+| 4. Register | a new monster id and the tables it indexes | MH4U's tables are found ([reference/](../reference/README.md#mh4u-monster-tables)), and MH3U's ids are paired with MH4U's: 32 of the 85 have an MH4U monster, 44 are monsters MH4U does not have, and 9 are props ([reference/](../reference/README.md#mh3u-ids-to-mh4us)); ids 124 and 125 are in `data/ids/registry.csv`, checked by `tools/check_ids.py` and generated into `mods/monster_ids/src/ids.h`; `mods/monster_ids` answers the readers of the factory, data path, enemy data, crowns, list order, icon, resource index and drop tables, with a resource record built for the ported id that keeps its own paths for the kinds of file and motion slots it ships and the stand-in's for the rest, and the stand-in's rows elsewhere; MH4U's 0 to 123 fall through. Once the permanent range (124 to 223) is full, a ported monster takes a registry id from 256 up and is lent a byte of 224 to 255 per quest; no pooled row ships yet. The data path stays the stand-in's until the ports ship `.emd`/`.etd`; the name and notes text and the notes-list walk are not answered yet |
+| 5. Behaviour | each action handler, translated onto `uEnemy` | shared action ids run MH4U's own handlers ([R2](checks.md#the-shared-action-map-r2): 273 of MHXX's 301 and 174 of MH3U's 191, 167 of 167 GU-comparable ids at the same motion index); of the 45 ids MH4U lacks (28 GU, 17 3U), the GU ones are translated handlers and `mods/rathian_actions` carries 3/98, 12/1-3, 4/27-32, 8/0 and category 17 (checks T0/T1), leaving shared ids and 12/0 to the game, while of the 3U ones 16 run the shared MH4U action through `mods/monster_actions`'s generated action-id map and action 4 is new C that waits on #55; the action-start record action 4 passes is converted from MH3U's and checked against the 3/5 pair both games have ([actiondata](../specs/actiondata.md), checks N1/N2), its value curves are carried because both games' evaluators are the same body (N4), and the command lists the mapped ids pass need no conversion because the map runs MH4U's own handler and lists ([actiondata](../specs/actiondata.md#command-list-8-byte-commands), N3) ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112), [#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115), [#137](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/137)); the plugin host's ABI 4 `call2` runs MH4U's engine functions with r0-r3 and s0/s1 ([#110](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/110), [#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134), checks P3 and P4); the per-move in-game checks wait for #48/#49 and #143 ([#113](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/113), [#116](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/116)) |
 | 6. Quests, arena | the monster's quests and map | quest conversion exists for MHXX |
 
 What makes this tractable:
 
-- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most 3U ids, so a 3U port maps the indices instead of reusing them; 13/5, 13/6 and 13/8 are the ids whose motion itself differs. For GU the index agrees on every comparable id (R2) and #48 ships MHXX's motion lists, so a shared GU id needs no index remap. The converted animation files keep the source game's grouping and the ported monster's plugin translates the motion number at run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)): each action keeps its own animation, so 13/5, 13/6 and 13/8 each play theirs.
+- **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most 3U ids, so a 3U port maps the indices instead of reusing them; 13/5, 13/6 and 13/8 are the ids whose motion itself differs. For GU the index agrees on every comparable id (R2) and #48 ships MHXX's motion lists, so a shared GU id needs no index remap. The converted animation files keep the source game's grouping and the ported monster's plugin translates the motion number at run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)): each action keeps its own animation, so 13/5, 13/6 and 13/8 each play theirs. A 3U id MH4U lacks whose source handler matches a shared action's is sent to that shared action at run time by `mods/monster_actions` ([#137](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/137)).
+- **The AI script's action ids and group order survive a conversion.** An EMC names native actions by the same category/index pair the handlers use, and `14 nn` indexes group 1, so a 3U script keeps both: no action id and no motion number is remapped in the script. Only the version, the group rows and 15 opcodes' argument counts change ([emc](../specs/emc.md#what-a-converter-must-do)), and the ported monster's `cmd` path loads the result (`files` in [data/ids](../data/ids/README.md)).
 - **A GU monster's code assumes MHXX's enemy layer.** Rathian's MHXX module calls 330 engine functions, and MH4U lacks 262 of them. That is why handlers are rewritten instead of linked.
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.

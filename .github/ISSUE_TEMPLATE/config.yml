@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Structural decisions
+    url: https://github.com/Cheeenxiii/mh-ultimate-collection/blob/main/docs/decisions.md
+    about: Settled and open structural choices; the maintainer settles them.

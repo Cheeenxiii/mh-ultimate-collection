@@ -7,7 +7,7 @@ import zlib
 import pytest
 
 from mhuc import monsterdata
-from mhuc.formats import classid, emd, hitdata, lmt, pica, sound, stq, xfs
+from mhuc.formats import camera, classid, emd, hitdata, lmt, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -185,6 +185,52 @@ def test_lmt_bounds_block_is_scale_then_offset():
     struct.pack_into("<4f", d, 0x14, 2.0, 2.0, 2.0, 2.0)      # scale
     struct.pack_into("<4f", d, 0x24, -1.0, -1.0, -1.0, -1.0)  # offset
     assert lmt.bounds(bytes(d), t) == ((2.0, 2.0, 2.0, 2.0), (-1.0, -1.0, -1.0, -1.0))
+
+
+def camera_v4_with_one_track() -> bytes:
+    """A hand-built MH4U camera list: one camera whose first track is one type 4 key."""
+    data_start = camera.FIRST_RECORD + camera.RECORD_SIZE[camera.VERSION_MH4U]
+    d = bytearray(camera.MAGIC + struct.pack("<HH", camera.VERSION_MH4U, 256) + bytes(4 * 256))
+    d += bytes(camera.RECORD_SIZE[camera.VERSION_MH4U])
+    d += bytes(8 + camera.BOUNDS_SIZE)                                   # keys and bounds
+    struct.pack_into("<I", d, camera.TABLE, camera.FIRST_RECORD)
+    struct.pack_into("<I", d, camera.FIRST_RECORD + 0x10, 1)              # frame count
+    track = camera.FIRST_RECORD + camera.TRACK_OFFSETS[0]
+    d[track:track + 4] = bytes((4, 1, 0, 0))                             # type 4, local position
+    struct.pack_into("<fII", d, track + 4, 0.0, 8, data_start)           # weight, key size, key offset
+    struct.pack_into("<4f", d, track + 0x10, 1.0, 2.0, 3.0, 0.0)        # reference
+    struct.pack_into("<I", d, track + camera.TRACK_BOUNDS, data_start + 8)
+    struct.pack_into("<8f", d, data_start + 8, 1.0, 2.0, 3.0, 0.0, 4.0, 5.0, 6.0, 0.0)
+    struct.pack_into("<4H", d, data_start, 0, 0x8000, 0xFFFF, 0)        # one key, no gap: frames-1 = 0
+    return bytes(d)
+
+
+def test_a_camera_list_converts_to_version_5_and_back_with_its_offsets():
+    v4 = camera_v4_with_one_track()
+    v5 = camera.to_mhxx(v4)
+    data_start5 = camera.FIRST_RECORD + camera.RECORD_SIZE[camera.VERSION_MHXX]
+    assert v5[:8] == camera.MAGIC + struct.pack("<HH", camera.VERSION_MHXX, 256)
+    assert struct.unpack_from("<I", v5, camera.TABLE)[0] == camera.FIRST_RECORD
+    assert v5[camera.FIRST_RECORD:camera.FIRST_RECORD + 16] == bytes(16)
+    track5 = camera.FIRST_RECORD + 16 + camera.TRACK_OFFSETS[0]
+    assert struct.unpack_from("<I", v5, track5 + camera.TRACK_KEY)[0] == data_start5
+    assert struct.unpack_from("<I", v5, track5 + camera.TRACK_BOUNDS)[0] == data_start5 + 8
+    assert len(v5) == data_start5 + 8 + camera.BOUNDS_SIZE
+    assert camera.from_mhxx(v5) == v4
+
+
+def test_camera_read_refuses_a_record_that_is_not_contiguous():
+    v4 = bytearray(camera_v4_with_one_track())
+    struct.pack_into("<I", v4, camera.TABLE, camera.FIRST_RECORD + 4)
+    with pytest.raises(camera.CameraError, match="contiguous"):
+        camera.read(bytes(v4))
+
+
+def test_camera_read_refuses_an_mhxx_prefix_that_is_not_zero():
+    v5 = bytearray(camera.to_mhxx(camera_v4_with_one_track()))
+    v5[camera.FIRST_RECORD] = 1
+    with pytest.raises(camera.CameraError, match="prefix"):
+        camera.read(bytes(v5))
 
 
 def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():

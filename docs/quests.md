@@ -116,6 +116,96 @@ In order:
 
 **The cheapest first quest** is an MHXX quest on a shared locale whose large monsters are among the 46 that MH4U also has. It needs no new monster and no new map: only the id tables for monsters, the map, items and objectives.
 
+## Where Great Wroggi can fight
+
+Great Wroggi is MH3U's, and none of the maps it fights on is MH4U's. From the 365 `QTDS` records of the MH3U RomFS's `/quest/us/` (check Q23), seven field it:
+
+| MH3U quest | Rank | Map | Great Wroggi | Other large monsters | Main small monsters |
+|---|---|---|---|---|---|
+| Toxic Troublemaker (1307) | ★3 | Flooded Forest | 1 | — | Wroggi, Ludroth |
+| Toxic Troublemaker (1616) | ★6 | Flooded Forest | 1 | — | Wroggi, Fish |
+| [Canteen] The Endless Hunt (1811) | ★8 | Flooded Forest | 1 | Gobul, Lagiacrus | Wroggi, Fish |
+| Supply Constraints (11317) | ★3 | Flooded Forest | 2 | — | Wroggi, Fish |
+| Supply Constraints (11608) | ★6 | Flooded Forest | 2 | — | Wroggi, Epioth |
+| [Advanced] Forest Fracas (11657) | ★6 | Flooded Forest | 1 | Gobul, Plesioth | Slagtoth, Altaroth |
+| Best of Enemies (11820) | ★8 | Land Arena | 1 | Volvidon, Purple Ludroth, Steel Uragaan | — |
+
+The six Flooded Forest quests share the ten-area locale ([maps.csv](../data/catalog/maps.csv)); the Land Arena is a special locale. Five quests field one Great Wroggi and two field two, and five pair it with the Wroggi. The 38 quests the player downloaded (Extra Data, check Q12) add none. A `QTDS` record holds the quest's map but no area or position for a monster, so the dump gives the map only.
+
+**The first quest.** Great Wroggi's first quest is a test on a shared map, as "What blocks a first converted quest" allows: it is MH3U's Toxic Troublemaker (1307), built with **MH4U quest 10110 "Field Trip"** as its template — a Hall ★1 hunt on Ancestral Steppe. The template hunts one Great Jaggi (id 15) in **area 6**, with Jaggi (id 56) in areas 3, 4, 6 and 8 and Jaggia (id 57) in areas 4 and 9, and a sub-objective (type 0x204) whose target is the Great Jaggi. Building Great Wroggi's quest from it changes the large-monster definition's monster id from 15 to Great Wroggi's own id from [data/ids/registry.csv](../data/ids/README.md) — the next free one after 124 and 125, with Great Jaggi as its stand-in (#166) — and the sub-objective's target from 15 to the same id. So the first quest uses **Ancestral Steppe, area 6 for Great Wroggi and areas 3, 4, 6, 8 and 9 for the pack**, and the template's positions: an MH3U `QTDS` record has none.
+
+Ancestral Steppe is chosen because it is the shared map whose Hall quest fields Great Jaggi, the MH4U monster of Great Wroggi's family and the port's stand-in, so the first quest's areas and pack are the game's own. Primal Forest has the closer habitat (forests, swamps, like the Flooded Forest) but no MH4U quest there fields Great Jaggi, so its pack's areas would be authored; the six MH3U quests wait for the Flooded Forest's own conversion.
+
+**The Wroggi.** Five of the seven MH3U quests pair Great Wroggi with the Wroggi, but the Wroggi has no MH4U id yet, so MH4U's Jaggi (56) and Jaggia (57) stand in for it in the template's five areas. The Ludroth that 1307 also fields has no MH4U counterpart either, so the first quest keeps the template's one pack. When the Wroggi is ported, its id replaces 56 and 57 in those definitions and the sub-quest's text becomes its own. That is left undone.
+
+## Where a ported monster fights: Giadrome
+
+A ported monster's first quest goes where its own game already puts it, on a locale MH4U has. GU's Giadrome is MHXX's `em034`. The locale names are in [maps.csv](../data/catalog/maps.csv), and which of them MH4U has in [overlap.md](../data/catalog/overlap.md).
+
+### The MHXX quests that field it
+
+The game's own 1,331 quest archives (MHXX JPN v1.0's RomFS; the v4.8.0 update patches none of them) hold 1,331 `.mib`, 3,474 `.sem` and 2,426 `.esl`, all read with the layouts of checks Q2, Q11 and Q15 without a failure. **21 of them carry Giadrome in the boss set**, and the `.sem` entries and the `.mib`'s five boss blocks give the same 21. Six hunt it; 15 field it as an extra large monster. MHXX's DLC quests are not in this dump; the preservation save that holds them adds two more, neither on a map MH4U has (below). The titles below are the dump's Japanese; the English ones wait for MHGU's text (rule 2).
+
+| Map | Quest | Rank | Giadrome in | Hunt |
+|---|---|---|---|---|
+| Arctic Ridge | q0000705 商売ガタキのドスギアノス | High | area 7, with Giaprey | yes |
+| Arctic Ridge | q0000934 ベリオロスを捕獲せよ！ | High | area 7 | extra |
+| Arctic Ridge | q0010434 強敵、ドスギアノス現る！ | High | area 7, with Giaprey | yes |
+| Arctic Ridge | q0011105 ドスの威信を賭けた戦い | G | area 7, with Giaprey | yes |
+| Arctic Ridge | q0011122 雪山の採集ツアー | G | area 7, with Giaprey | extra |
+| Arctic Ridge | q0011213 ……欲するならば資格を示して | G | area 7 | extra |
+| Arctic Ridge, night | q0000708 氷雪に舞う白うさぎ | High | area 7 | extra |
+| Arctic Ridge, night | q0000726 雪山の採集ツアー | High | area 7 | extra |
+| Arctic Ridge, night | q0000805 フルフルのまごころ診療所 | High | area 7 | extra |
+| Arctic Ridge, night | q0000810 ホワイトアウト | High | area 7 | extra |
+| Arctic Ridge, night | q0011108 氷雪に舞う白うさぎ | G | area 7 | extra |
+| Arctic Ridge, night | q0011208 身体の芯までビッリビッリ | G | area 7 | extra |
+| Arctic Ridge, night | q0100802 冷血なるドスギアノス！ | High | areas 7 and 6, with Giaprey | yes, 2 |
+| Frozen Seaway | q0000831 狩人のための舞台～氷海～ | High | area 2 | extra |
+| Frozen Seaway | q0000928 ガムートの強さは世界一 | High | area 2 | extra |
+| Frozen Seaway | q0011207 閃きへの１ピースを求めて | G | area 2 | extra |
+| Frozen Seaway | q0011304 氷牙竜・ベリオロス！ | G | area 2 | extra |
+| Frozen Seaway | q0101004 スノーフェスティバル | High | area 2, with Giaprey | yes |
+| Frozen Seaway | q0111402 雪に紛れしドスギアノス | G | areas 2 and 5, with Giaprey | yes, 2 |
+| Arena | q0011241 子分の自覚が足りないっチャ！ | G | area 1 | extra |
+| Arena | q0101005 怒濤のドスラッシュ！ | High | area 1 | extra |
+
+The six hunts are q0000705, q0010434 and q0011105 (Arctic Ridge), q0100802 (night), and q0101004 and q0111402 (Frozen Seaway). Giaprey are MHXX's small monster id 15, which a slay quest names as `0x100F`; they stand in Giadrome's area in seven of the 21, and in all six hunts.
+
+### The DLC quests
+
+MHXX's DLC quests are not in the RomFS dump, but a preservation save holds them: the MH XX 3DS `system` in [FurkanM7's All-Event-Quests-and-Palicoes-MHXX-MHGenU](https://github.com/FurkanM7/All-Event-Quests-and-Palicoes-MHXX-MHGenU) holds **180 MHXX DLC quests**, the 133 on the DLC's event list and the 40 on its challenge list plus 7 the goshawk mirror lacks (36 of the 180 are Palico quests). Each is stored as its whole quest archive, not just its registration: all 173 quests of goshawk's MH XX JPN DLC folder read out of the save with the same entry paths and the same decompressed bytes as the decrypted server file, and the 7 others include the Sanrio, Macross and Garo collaborations. The save has 345 archive slots: 180 Japanese copies, all readable, and 165 seven-language copies (the MHGU text) of 64 of the quests, 163 of them readable — the two corrupt slots are both copies of 1010110. The layout is in [specs/quest.md](../specs/quest.md), check Q24.
+
+**Giadrome is in two of the 180:**
+
+| Map | Quest | Rank | Giadrome in | Hunt |
+|---|---|---|---|---|
+| Arctic Ridge | 1011017 雪山に咲け、恋の花 ("My Love is Like a Chill Wind...?") | G | area 7; a marathon with two other large monsters, Giaprey in areas 4 and 5 | no |
+| Arena | 1111004 逆転裁判・闘技場で法廷バトル ("Turnabout Takedown") | G | area 1, both of them; the objective slays 2, Giaprey in area 1 | yes, 2 |
+
+Neither is on a locale MH4U has — the Arctic Ridge (map 3) and the Arena (map 9) — so the DLC set adds no Giadrome quest to the Frozen Seaway and changes nothing above. No key is needed for the save: the file is plaintext as published, and MH4U's save cipher with the MH4U save key rejects it. The MH XX Switch save in the same archive is the same data behind a 0x24-byte header (4 bytes differ), and the MH GU Switch save reads too (330 archive slots, 165 quest ids).
+
+### The MH4U map and areas
+
+Of the locales [overlap.md](../data/catalog/overlap.md) lists as MH4U's, the Frozen Seaway is the one MHXX fields Giadrome on: map 14 there (氷海, the name the quests' titles use), MH4U's map 4. Giadrome stands in area 2 in every MHXX Frozen Seaway quest, and in area 5 in the one with two of them.
+
+So the first quest uses the Frozen Seaway: **area 2**, one Giadrome; the two-Giadrome MHXX quest uses areas 2 and 5. The Arctic Ridge (map 3; 103 at night), where 13 of the 21 quests are, is one MH4U does not have ([overlap.md](../data/catalog/overlap.md): to add), so those quests wait for its port. The Arena quests (two in the dump, one in the DLC) are arena quests (map 9, one area), not field quests, and the Polar Field has no MHXX Giadrome quest.
+
+### The MH4U quest it is built from
+
+**10210, "Snow with Occasional Lagombi"** (Hall, Low Rank ★2, `quest01.arc`): the Frozen Seaway (map 4), one Lagombi (id 47) in area 2, a hunt objective targeting 47, and two Felyne groups (id 65) in area 2's small-monster list. It is the same Hall Low Rank ★2 list as 10212, the quest [#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)'s headless proof starts, and it is the same map the converted Giadrome quests will use.
+
+To make it the first Giadrome quest, the large-monster definition's id 47 and the first objective's target 47 become Giadrome's id, the next free one in `data/ids/registry.csv` from 124 up that [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161) gives it (126 while Great Wroggi's row is not in). `mhuc mib export` and `mhuc mib import` make that one-field edit on the `.mib`, and the patched quest is what the headless proof runs. 10212's Rathian is changed to id 125 the same way.
+
+For a converted MHXX quest the id changes on the source side: Giadrome's `em034` row in [monster.csv](../data/idmap/mhxx-mh4u/monster.csv) points at the registry id, with [map.csv](../data/idmap/mhxx-mh4u/map.csv) `14`→`4` and [area.csv](../data/idmap/mhxx-mh4u/area.csv) `14:2`→`4:2` (and `14:5`→`4:5`). The two-Giadrome q0111402 then needs no new map or stage.
+
+### The pack, and what stands in
+
+Giaprey are a small monster MH4U does not have ([overlap.md](../data/catalog/overlap.md): "Small monsters to add"), and this milestone ports the large monster only. So **MH4U's Jaggi (id 56) stand in for the pack**: the two area-2 Felyne groups become Jaggi groups. Porting Giaprey is left to a task of its own.
+
+While Giadrome's own files are incomplete, its registry row's stand-in does the work: **MH4U's Great Jaggi (id 15)**, as [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161) records. Every kind of file the port does not ship yet — sound, effects, camera, `.emd`/`.etd` data and the motion slots it keeps — comes from Great Jaggi, and each kind it ships from its own folder ([monster_ids](../mods/monster_ids/README.md)). The first quest's rank, stat rows and texts stay 10210's as placeholders; it is not shipped, and the first shipped quest is a converted MHXX one.
+
+
 ## The MHXX converter
 
 `mhuc convert quest --from mhxx` (`src/mhuc/quests/convert.py`) takes three inputs:

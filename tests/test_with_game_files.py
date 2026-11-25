@@ -1,8 +1,10 @@
 """The real contract: our readers and writers against the game's own files."""
 from __future__ import annotations
 
+import hashlib
 import math
 import os
+import re
 import struct
 from collections import Counter
 
@@ -13,14 +15,17 @@ from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
 from mhuc.formats import (
     arc,
+    camera,
     classid,
     dtbase,
     dtbparts,
     dttune,
+    efl,
     emd,
     emstatus,
     hitdata,
     lmt,
+    mef,
     mod,
     romfs,
     sound,
@@ -63,7 +68,8 @@ def test_every_mh4u_quest_rebuilds_with_the_same_fields(dump):
     assert not failed, f"{len(failed)} of {checked} quests change, first: {failed[:3]}"
 
 
-MODES = {"quest": "quest", "card": "card", "otomo": "normal"}
+# names match by prefix, so cardbox comes before card
+MODES = {"quest": "quest", "cardbox": "normal", "card": "card", "otomo": "normal"}
 
 
 def test_extra_data_files_reencrypt_byte_for_byte(dump):
@@ -83,6 +89,38 @@ def test_extra_data_files_reencrypt_byte_for_byte(dump):
         assert dlccrypt.mh4u_save_encrypt(plain, key, mode, seed) == original, name
         checked += 1
     assert checked, "no Extra Data file found"
+
+
+def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
+    """specs/save.md checks S1 and S3 to S7: each file re-encrypts byte for byte, and the structures tile."""
+    from mhuc import save
+
+    folder = dump("mh4u", "saves")
+    with open(dump("mh4u", "save.key"), "rb") as f:
+        key = f.read().strip()
+    names = [n for n in ("system", "user1", "user2", "user3") if os.path.exists(os.path.join(folder, n))]
+    assert names, "no save file found"
+    characters = 0
+    for name in names:
+        with open(os.path.join(folder, name), "rb") as f:
+            original = f.read()
+        first = Blowfish(key).ecb_decrypt(original[:8], "<")
+        seed = struct.unpack_from("<I", first)[0] >> 16
+        plain = dlccrypt.mh4u_save_decrypt(original, key)
+        assert dlccrypt.mh4u_save_encrypt(plain, key, "normal", seed) == original, name
+        if len(plain) == save.CHARACTER_SIZE:
+            problems = save.character_problems(plain)
+            assert not problems, f"{name}: {problems[:3]}"
+            data = save.dump_character(plain)
+            assert data["profile"]["name"], f"{name}: the character has no name"
+            assert len(data["monster_log"]) == 82, name
+            assert len(data["guild_quests"]) == 10, name
+            assert len(data["palicos"]) >= 1, name
+            assert data["profile"]["hunter_rank"] <= 999, name
+            characters += 1
+        else:
+            assert not save.system_problems(plain), name
+    assert characters >= 1, "no character save found"
 
 
 def test_every_mh4u_stream_request_reads_and_matches_the_wave_it_names(dump):
@@ -573,6 +611,52 @@ def test_mh4u_motion_tracks_address_bones_by_id(dump):
         assert seen - {255} == human, (path, sorted(seen - {255} ^ human))
 
 
+def test_every_monster_camera_list_reads_and_converts(dump):
+    """specs/camera.md check C1: the camera lists of MH4U's and MHXX's monster arcs, and MH3U's none."""
+    def monster_cameras(game, pattern):
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        arcs, with_camera, blobs = 0, 0, {}
+        for f in image.files():
+            if not re.fullmatch(pattern, f.path):
+                continue
+            arcs += 1
+            a = arc.read(image.read(f))
+            found = False
+            for e in a.entries:
+                if e.type_name == "rCameraList":
+                    found = True
+                    blobs.setdefault(hashlib.sha1(e.data).hexdigest(), e.data)
+            with_camera += found
+        return arcs, with_camera, blobs
+
+    def bad(camera_data):
+        counters = camera.check(camera_data)
+        return {k: v for k, v in counters.items()
+                if "not read" in k or "don't" in k or "isn't" in k or "no decoder" in k
+                or "without a buffer" in k or "outside 0 and 1" in k}
+
+    mh4u_arcs, mh4u_with, mh4u = monster_cameras("mh4u", r"/data/em\d{3}\.arc")
+    assert (mh4u_arcs, mh4u_with, len(mh4u)) == (123, 86, 32), (mh4u_arcs, mh4u_with, len(mh4u))
+    for data in mh4u.values():
+        assert camera.read(data).version == camera.VERSION_MH4U
+        assert camera.convert(data, camera.VERSION_MH4U) == data
+        assert camera.from_mhxx(camera.to_mhxx(data)) == data
+        assert not bad(data), (bad(data), len(data))
+
+    mhxx_arcs, mhxx_with, mhxx = monster_cameras("mhxx", r"/arc/enemy/.*\.arc")
+    assert (mhxx_arcs, mhxx_with, len(mhxx)) == (137, 93, 57), (mhxx_arcs, mhxx_with, len(mhxx))
+    for data in mhxx.values():
+        assert camera.read(data).version == camera.VERSION_MHXX
+        v4 = camera.from_mhxx(data)
+        assert camera.read(v4).version == camera.VERSION_MH4U
+        assert camera.to_mhxx(v4) == data
+        assert not bad(v4), (bad(v4), len(v4))
+
+    # MH3U registers rCameraList but ships no file of it: the 3U port has no source camera.
+    mh3u_arcs, mh3u_with, mh3u = monster_cameras("mh3u", r"/arc/enemy/em\d{3}\.arc")
+    assert (mh3u_arcs, mh3u_with, mh3u) == (85, 0, {}), (mh3u_arcs, mh3u_with, mh3u)
+
+
 def test_every_mh3u_sound_file_reads_and_its_stream_requests_match_their_waves(dump):
     """specs/sound.md check SN6: every MH3U wave (MADP 4), bank (SNDB 10), request (SREQ 6) and stream request
     (STRQ 0x20) closes, every request's bank names are the bank resources beside them, and every stream record
@@ -687,3 +771,110 @@ def test_mh4u_ships_no_texlayout_and_its_xfs_files_read(dump):
             failures.append(f"{label}: {x.endian}-endian")
     assert not failures, f"{len(failures)} XFS files not read, first: {failures[:3]}"
     assert counts == Counter({classid.class_id("rSoundAttributeSe"): 8}), counts
+
+
+# The monster archives of each game. A port's effects live in its monster's archive, so these,
+# not the whole RomFS, are where the effect specs are checked.
+MONSTER_ARCHIVES = {
+    "mh4u": re.compile(r"/data/em\d{3}\.arc$"),
+    "mh3u": re.compile(r"/arc/enemy/em\d{3}\.arc$"),
+    "mhxx": re.compile(r"/arc/enemy/ems?\d{3}_\d{2}\.arc$"),
+}
+
+
+def _effect_entries(dump, game: str, classes: tuple[str, ...]):
+    """Every entry of the named resource classes in `game`'s monster archives."""
+    ids = {classid.class_id(name): name for name in classes}
+    image = romfs.open_image(dump(game, "romfs.bin"))
+    wanted = MONSTER_ARCHIVES[game]
+    for f in image.files():
+        if not wanted.search(f.path):
+            continue
+        for e in arc.read(image.read(f)).entries:
+            if e.type_id in ids:
+                yield ids[e.type_id], f"{f.path}:{e.path}", e.data
+
+
+def test_every_mh4u_motion_effect_record_is_laid_out(dump):
+    """check FX1: MH4U's MEF header and 0x48-byte records tile every file, and the fields the spec
+    calls fixed are fixed."""
+    entries, records, paths, failures = 0, 0, set(), []
+    for _name, label, data in _effect_entries(dump, "mh4u", ("rMhMotionEffect",)):
+        entries += 1
+        paths.add(label.split(":", 1)[1])
+        try:
+            parsed = mef.read_mef(data)
+        except mef.MefError as e:
+            failures.append(f"{label}: {e}")
+            continue
+        records += len(parsed)
+        for i, record in enumerate(parsed.records):
+            zero = (record.u8(0x07), record.u8(0x09), record.u8(0x0F),
+                    record.u32(0x24), record.u32(0x34), record.u32(0x44))
+            if any(zero):
+                failures.append(f"{label} record {i}: {zero} aren't the zeros the spec has")
+            if not all(math.isfinite(record.f32(o)) for o in (0x38, 0x3C, 0x40)):
+                failures.append(f"{label} record {i}: the three +0x38 floats aren't finite")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (entries, records, len(paths)) == (150, 6216, 96)
+
+
+def test_every_mh3u_effect_sequence_header_is_laid_out(dump):
+    """check FX2: MH3U's ESQ header holds six non-decreasing section offsets inside every file."""
+    entries, failures = 0, []
+    for _name, label, data in _effect_entries(dump, "mh3u", ("rEffectSequence",)):
+        entries += 1
+        try:
+            mef.read_esq(data)
+        except mef.MefError as e:
+            failures.append(f"{label}: {e}")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert entries == 44
+
+
+def test_every_mhxx_motion_effect_and_proof_effect_list_is_laid_out(dump):
+    """check FX2 and EF2: MHXX's PSL slot tables and descriptors, and its PEL magic and version."""
+    motion, slots, proofs, failures = 0, 0, 0, []
+    for name, label, data in _effect_entries(dump, "mhxx", ("rProofEffectMotSequenceList", "rProofEffectList")):
+        if name == "rProofEffectList":
+            proofs += 1
+            try:
+                efl.read_pel(data)
+            except efl.EflError as e:
+                failures.append(f"{label}: {e}")
+            continue
+        motion += 1
+        try:
+            parsed = mef.read_psl(data)
+        except mef.MefError as e:
+            failures.append(f"{label}: {e}")
+            continue
+        slots += len(parsed.slots)
+        if parsed.slots and parsed.slots[0] != 0:
+            failures.append(f"{label}: slot 0's offset is {parsed.slots[0]:#x}, not 0")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (motion, slots, proofs) == (507, 18831, 280)
+
+
+def test_every_effect_list_header_is_laid_out(dump):
+    """check EF1: every EFL in the three games' monster archives fills its block-size field and
+    carries its game's version; the 60.0 at +0x0C is in all but one MH3U file."""
+    expected = {"mh4u": (1937, 1937, 1937), "mh3u": (1496, 1495, 1478), "mhxx": (4042, 4042, 4042)}
+    for game, (files, sixty, tail_zero) in expected.items():
+        entries, sixties, tails, failures = 0, 0, 0, []
+        for _name, label, data in _effect_entries(dump, game, ("rEffectList",)):
+            entries += 1
+            try:
+                parsed = efl.read_efl(data)
+            except efl.EflError as e:
+                failures.append(f"{label}: {e}")
+                continue
+            if parsed.block_size % 16:
+                failures.append(f"{label}: block size {parsed.block_size:#x} isn't a multiple of 16")
+            if data[0x18:0x1C] != bytes(4) or data[0x1C:0x20] != bytes(4):
+                failures.append(f"{label}: +0x18 or +0x1C isn't 0")
+            tails += data[0x20:0x2C] == bytes(0xC)
+            sixties += parsed.field_0c == 60.0
+        assert not failures, f"{game}: {len(failures)} problems, first: {failures[:3]}"
+        assert (entries, sixties, tails) == (files, sixty, tail_zero), \
+            f"{game}: {entries} files, {sixties} with 60.0, {tails} with a zero 0x20 to 0x2C"

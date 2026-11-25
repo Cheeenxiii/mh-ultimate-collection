@@ -113,3 +113,17 @@ def test_survey_counts_the_xfs_files_it_reads_and_refuses():
     st = {}
     survey.survey_entry(None, empty_xfs()[:-1], st)
     assert st["xfs"]["X1 not read"] == 1
+
+
+def test_survey_counts_a_camera_list_by_version():
+    """specs/camera.md check C1 runs on every rCameraList the image holds."""
+    data = arc.write(arc.Archive(version=0x13, entries=[
+        arc.Entry(path="enemy\\em001\\mot\\e001_cam", type_id=classid.class_id("rCameraList"),
+                  data=b"LCM\0" + struct.pack("<HH", 4, 0)),
+    ]))
+    st: dict = {}
+    survey.survey_arc(data, st)
+    counts = st["camera"]
+    assert counts["C1 read"] == 1
+    assert counts["version 4"] == 1
+    assert counts["0 table entries"] == 1

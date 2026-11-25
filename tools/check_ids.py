@@ -4,7 +4,7 @@
 The registry is the one file that records every id a ported content takes
 (docs/decisions.md#0003-id-allocation-and-mod-saves). It is a CSV with one row per id:
 
-    kind,id,key,source_game,source_key,name,stand_in,notes
+    kind,id,key,source_game,source_key,name,stand_in,files,notes
 
 - `kind`      what kind of id it is. Monster ids are checked today; another kind needs its
               range and rules added here first.
@@ -18,12 +18,20 @@ The registry is the one file that records every id a ported content takes
 - `name`      the content's name, for review.
 - `stand_in`  the MH4U monster id whose rows the reader hooks answer with until the port
               ships this content's own rows (0 to 123).
+- `files`     the kinds of file the port ships, comma-separated: model, motions, camera,
+              tail, mef, sound, cmd, efl (the resource record's path kinds). The record the
+              plugin builds rewrites the id token only in these kinds' paths; the rest keep
+              the stand-in's path, because the game does not tolerate a missing file. A kind
+              covers every path in its group, except motions, which takes the number of
+              motion-list slots shipped from slot 0 (`motions=3`): the slots above keep the
+              stand-in's paths.
 - `notes`     free text.
 
-Rules checked: each id is inside its range and unique, permanent monster ids are consecutive
-from 124 (every id up to the highest permanent one needs a row in each table; pooled ids may
-skip), each key, source game and source key is valid, and every line of the plugin's header is
-the one this file generates.
+Rules checked: each id is inside its kind's range and unique, permanent monster ids are
+consecutive from 124 (every permanent id up to the highest one used needs a row in each table;
+pooled ids may skip), each key, source game and source key is valid, `files` names known kinds
+once each and gives `motions` a count in 1..6, and every line of the plugin's header is the one
+this file generates.
 
 `--write` writes the header. The header is checked in, so a wrong or stale one fails the
 check: run `check_ids.py --write` after editing the registry, never edit the header.
@@ -42,13 +50,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(ROOT, "data", "ids", "registry.csv")
 HEADER = os.path.join(ROOT, "mods", "monster_ids", "src", "ids.h")
 
-COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "notes")
+COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "files", "notes")
 SOURCE_GAMES = ("mh4u", "mh3u", "mhxx", "mhgu")
+# The resource record's path kinds, in the record's field order (mods/monster_ids/README.md):
+# MH4U loads one path per kind, and a port ships some of them. A kind it does not ship keeps
+# the stand-in's path, because a missing file stops the load (#143).
+FILE_KINDS = ("model", "motions", "camera", "tail", "mef", "sound", "cmd", "efl")
+# The motion-list fields hold this many slots (record +0x04, reference/README.md#mh4u-monster-tables);
+# `motions=N` says the first N are the port's, and the slots above keep the stand-in's path.
+MOTION_SLOTS = 6
 # MH4U's own monster ids are 0 to 123 (reference/README.md#mh4u-monster-tables). 124 to 223
 # are the permanent ids; 224 to 255 are the bytes a quest lends from the pool, whose monsters
 # take ids from 256 up (docs/decisions.md#0003). 255 is what a guild quest card's one-byte
-# monster id can hold. 0xffffffff ends a quest's monster list (specs/quest.md), so a registry
-# id stops before it.
+# monster id can hold, and 0xffffffff ends a quest's monster list (specs/quest.md), so a
+# registry id stops before it.
 MONSTER_FIRST = 124
 PERMANENT_LAST = 223
 POOL_FIRST = 224
@@ -86,6 +101,53 @@ def read_registry(path: str) -> tuple[list[dict[str, str]], list[str]]:
             continue
         out.append(dict(zip(COLUMNS, cells, strict=True)))
     return out, problems
+
+
+def files_tokens(text: str) -> list[tuple[str, str | None]]:
+    """One row's `files` as (kind, count or None) tokens."""
+    tokens = []
+    for raw in text.split(","):
+        kind, sep, count = raw.strip().partition("=")
+        tokens.append((kind.strip(), count.strip() if sep else None))
+    return tokens
+
+
+def check_files(where: str, text: str) -> list[str]:
+    """What is wrong with one row's `files`: empty, unknown, twice, or a bad motions count."""
+    if not text.strip():
+        return [f"{where}: files is empty; name the kinds the port ships, or it has no files"]
+    problems: list[str] = []
+    seen: set[str] = set()
+    for kind, count in files_tokens(text):
+        if not kind:
+            problems.append(f"{where}: files has an empty kind")
+            continue
+        if kind not in FILE_KINDS:
+            problems.append(f"{where}: file kind {kind!r} isn't one of {', '.join(FILE_KINDS)}")
+            continue
+        if kind in seen:
+            problems.append(f"{where}: file kind {kind!r} is listed twice")
+            continue
+        seen.add(kind)
+        if kind == "motions":
+            if count is None:
+                problems.append(f"{where}: motions needs the number of slots the port ships, as motions=3")
+                continue
+            slots = parse_int(count)
+            if slots is None or not 1 <= slots <= MOTION_SLOTS:
+                problems.append(f"{where}: motions={count!r} isn't a slot count in 1..{MOTION_SLOTS}")
+        elif count is not None:
+            problems.append(f"{where}: only motions takes a count, not {kind!r}")
+    return problems
+
+
+def motions_count(row: dict[str, str]) -> int:
+    """The number of motion-list slots a row ships, 0 when it ships none."""
+    for kind, count in files_tokens(row["files"]):
+        if kind == "motions" and count is not None:
+            slots = parse_int(count)
+            return slots if slots is not None else 0
+    return 0
 
 
 def check_rows(rows: list[dict[str, str]]) -> list[str]:
@@ -134,6 +196,7 @@ def check_rows(rows: list[dict[str, str]]) -> list[str]:
         stand_in = parse_int(row["stand_in"])
         if stand_in is None or not 0 <= stand_in <= MH4U_MONSTER_LAST:
             problems.append(f"{where}: stand_in {row['stand_in']!r} isn't an MH4U monster id (0..{MH4U_MONSTER_LAST})")
+        problems += check_files(where, row["files"])
     if permanent_ids:
         wanted = list(range(MONSTER_FIRST, MONSTER_FIRST + len(permanent_ids)))
         if sorted(permanent_ids) != wanted:
@@ -144,6 +207,12 @@ def check_rows(rows: list[dict[str, str]]) -> list[str]:
 
 def c_identifier(key: str) -> str:
     return "MHUC_MONSTER_ID_" + key.upper().replace("-", "_")
+
+
+def file_mask(row: dict[str, str]) -> str:
+    """One row's `files` as the C expression of its kind bits."""
+    kinds = {kind for kind, _count in files_tokens(row["files"])}
+    return " | ".join(f"MHUC_FILES_{kind.upper()}" for kind in FILE_KINDS if kind in kinds)
 
 
 def render_header(rows: list[dict[str, str]]) -> str:
@@ -173,11 +242,23 @@ def render_header(rows: list[dict[str, str]]) -> str:
         f"#define MHUC_MONSTER_POOL_SIZE {POOL_LAST - POOL_FIRST + 1}",
         f"#define MHUC_REGISTRY_POOL_FIRST {REGISTRY_POOL_FIRST}",
         "",
-        "/* One ported monster: the id it takes, and the MH4U monster id whose rows the",
-        " * reader hooks answer with until the port ships this monster's own rows. */",
+        "/* The kinds of file a ported id's resource record names. The record the plugin builds",
+        " * rewrites the id token only in the paths of the kinds a port ships; the rest keep the",
+        " * stand-in's path, because MH4U does not tolerate a missing file. */",
+    ]
+    for n, kind in enumerate(FILE_KINDS):
+        lines.append(f"#define MHUC_FILES_{kind.upper()} 0x{1 << n:04x}u")
+    lines += [
+        "",
+        "/* One ported monster: the id it takes, the MH4U monster id whose rows the reader",
+        " * hooks answer with until the port ships this monster's own rows, the number of",
+        " * motion-list slots it ships from slot 0, and the kinds of file it ships",
+        " * (MHUC_FILES_* bits). */",
         "typedef struct MhucMonsterId {",
         "    uint32_t id;",
         "    unsigned char stand_in;",
+        "    unsigned char motions;",
+        "    unsigned short files;",
         "} MhucMonsterId;",
         "",
         "/* The permanent ids, consecutive from 124. */",
@@ -186,11 +267,12 @@ def render_header(rows: list[dict[str, str]]) -> str:
     if permanent:
         lines.append("static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {")
         for row in permanent:
-            lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}}},")
+            lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}, "
+                         f"{motions_count(row)}, {file_mask(row)}}},")
         lines.append("};")
     else:
         lines.append("/* Empty: a dummy entry keeps the array valid C. */")
-        lines.append("static const MhucMonsterId mhuc_monster_ids[1] = {{0, 0}};")
+        lines.append("static const MhucMonsterId mhuc_monster_ids[1] = {{0, 0, 0, 0}};")
     lines += [
         "",
         "/* The pooled ids: each is lent one byte of 224 to 255 for a quest that names it. */",
@@ -199,11 +281,12 @@ def render_header(rows: list[dict[str, str]]) -> str:
     if pooled:
         lines.append("static const MhucMonsterId mhuc_pooled_monster_ids[MHUC_POOLED_MONSTER_COUNT] = {")
         for row in pooled:
-            lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}}},")
+            lines.append(f"    {{{int(row['id'], 0)}, {int(row['stand_in'], 0)}, "
+                         f"{motions_count(row)}, {file_mask(row)}}},")
         lines.append("};")
     else:
         lines.append("/* Empty: a dummy entry keeps the array valid C. */")
-        lines.append("static const MhucMonsterId mhuc_pooled_monster_ids[1] = {{0, 0}};")
+        lines.append("static const MhucMonsterId mhuc_pooled_monster_ids[1] = {{0, 0, 0, 0}};")
     lines.append("")
     for row in permanent + pooled:
         lines.append(f"/* {row['name']}, {row['source_game']} {row['source_key']} */")

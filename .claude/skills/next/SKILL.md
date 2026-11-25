@@ -8,7 +8,7 @@ description: Start the next task of MH Ultimate Collection - pick an open GitHub
 1. Read `CLAUDE.md`, `README.md` and `docs/architecture.md`.
 2. Pick the issue:
    - if the user named one, take it;
-   - otherwise, in `Cheeenxiii/mh-ultimate-collection`, take the open milestone with the earliest due date (or the lowest number), and in it the lowest-numbered open issue that isn't blocked by another open issue.
+   - otherwise, in `Cheeenxiii/mh-ultimate-collection`, take the open milestone with the earliest due date (or the lowest number), and in it the lowest-numbered open issue that isn't blocked by another open issue: its "blocked by" relationships (`gh api repos/Cheeenxiii/mh-ultimate-collection/issues/<N>/dependencies/blocked_by`) list no open issue, and it has no `needs: game session` or `needs: missing files` label. A parent with sub-issues is worked through its sub-issues.
 
    If no issue fits (all blocked, or each needs game files this machine doesn't have), say so and stop.
 3. Say in two lines which issue you take and what its "Done when" asks. Then start without waiting.

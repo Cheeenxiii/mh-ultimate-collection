@@ -8,9 +8,8 @@ A ported monster's id starts at 124 and comes from the mod's registry,
 registry id from 256 up, and the plugin lends it a free byte of 224 to 255 for each quest that
 names it (the [id pool](#the-id-pool) below). The plugin wraps the readers of those tables and
 answers a registered id with the MH4U monster's rows the registry names as its stand-in, except
-its resource record, which it builds for the ported id so the game loads the port's files from
-their own paths; ids 0 to 123 go to the game's function unchanged, so MH4U's own monsters are
-untouched.
+its resource record, which it builds for the ported id from the kinds of file the port ships;
+ids 0 to 123 go to the game's function unchanged, so MH4U's own monsters are untouched.
 
 ## What it hooks
 
@@ -99,10 +98,38 @@ the effect lists at +0x24 and +0x28).
 
 The stand-in's record names `enemy\em001\...` paths. On its first frame the plugin builds,
 for each registered id, a record of its own from the stand-in's: the same fields and slots,
-each path copied to the game's heap and its monster-id token rewritten to the ported id
+each path copied to the game's heap. A port ships only some of the record's path kinds (its
+arc holds the model, motions, tail and command for both 124 and 125, and 125's command is her
+converted MH3U AI script, [specs/emc.md](../../specs/emc.md)); MH4U stops the load on a path
+that is not there, which is what hung a 3U session at "Now Loading" when the 125 record named
+13 paths and `em125.arc` ships 6
+([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)). So the registry's
+`files` column, generated into `src/ids.h` as `MHUC_FILES_*` bits, names the kinds a port
+ships, and the builder rewrites the monster-id token only in those kinds' paths
 (`em001` -> `em124`, and the camera's `e001` -> `e124`; an effect list's trailing `_000` is
-not an id and stays). The record, its slots and its strings are one block from the game's own
-heap (`alloc`, ABI 2), and it is kept for the run.
+not an id and stays). The motion lists take a count, `motions=N`: the port's first N slots
+from slot 0 are rewritten and the slots above keep the stand-in's paths, because the port's
+motion-number translation only targets the source slots it ships (125 keeps MH4U's
+`enemy\em001\mot\em001_3` and `_4`). For a kind it does not ship, the stand-in's path is
+copied unchanged, so the monster loads MH4U's own camera, motion effects, sound and effect
+lists until its game's are converted. The record, its slots and its strings are one block
+from the game's own heap (`alloc`, ABI 2), and it is kept for the run.
+
+| Kind in `files` | The record's paths |
+|---|---|
+| `model` | +0x00, the model |
+| `motions=N` | +0x04, the six motion lists, and +0x0c, the second motion list; the first N slots from slot 0 are the port's |
+| `camera` | +0x08, the camera |
+| `tail` | +0x10, the tail model |
+| `mef` | +0x14, the motion effects |
+| `sound` | +0x1c, the sound |
+| `cmd` | +0x20 slot 3, the command/EMC |
+| `efl` | +0x24 and +0x28, the effect lists |
+
+The `+0x20` slots 0 to 2 are empty in MH4U's own records and have no kind, so they can only
+keep the stand-in's path. A new kind is added to `data/ids/registry.csv`'s checker
+(`tools/check_ids.py`) and to the plugin's path map together; the `motions` count is emitted
+into the header beside the bits.
 
 `enemyResource::get` is answered with the built record's +0x14 field. `enemyResource::load`
 and `enemyResource::effectLists` (0x00c0b830, called with the spawned monster's own id after
@@ -125,6 +152,9 @@ MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
   a pooled monster is check P2 and is not done, and whether the post-quest screens still read
   the tables after the end sequence is unverified. A quest that never reaches its end sequence
   keeps its bytes until the next quest starts.
+- **The port's camera, motion effects, sound and effect lists.** A port ships only its model,
+  motions, tail and command so far, so the record keeps the stand-in's paths for those kinds
+  and their files are MH4U's until the port's game has them converted.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
   stand-in, and the monster's data block still holds the stand-in's own id byte, so a spawned
   monster is MH4U's monster. The port's own rows replace the stand-in when
@@ -151,12 +181,13 @@ python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Az
 ```
 
 A run logs `ready: answering MH4U's monster tables for 2 permanent and 0 pooled id(s), 124 and
-up, lending 224..255 per quest`, then one line per reader the first time it answers a
-registered id and one the first time it passes an MH4U id through, for example `factory: id 124
--> stand-in 1`; the resource readers log `resource index: id 124 -> its own record`, `resource
-load: id 124 -> its own record` and `effect lists: id 124 -> its own record`. A quest that names
-a pooled monster logs `quest 60012: pooled id 256 -> lent 224`, and its end logs `quest 60012
-ends: freed the pool byte(s) 224`.
+up, lending 224..255 per quest, with the files each port ships and the stand-in's for the
+rest`, then one line per reader the first time it answers a registered id and one the first
+time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource
+readers log `resource index: id 124 -> its own record`, `resource load: id 124 -> its own
+record` and `effect lists: id 124 -> its own record`. A quest that names a pooled monster logs
+`quest 60012: pooled id 256 -> lent 224`, and its end logs `quest 60012 ends: freed the pool
+byte(s) 224`.
 
 ## Settings
 
@@ -165,7 +196,7 @@ ends: freed the pool byte(s) 224`.
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it, the path the stand-in's data comes from, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
 
 ## The check
 

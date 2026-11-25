@@ -1,0 +1,222 @@
+# GU Rathian's MHXX-only actions
+
+The plugin that runs the actions GU Rathian has and MH4U does not. MH4U's action dispatcher
+(`uEnemy` vtable slot 44, USA v1.3.0 `0x006e9cac`) runs nothing for the 13 action ids MHXX's
+Rathian has and MH4U's lacks ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112)).
+This plugin wraps the dispatcher and, for the ported monster, runs a translated handler for
+the ids these slices carry; every other id, and every other monster, goes to the game's own
+dispatcher unchanged.
+
+The 13 ids split into four slices (the issues are in the same milestone):
+
+| Slice | Ids | State |
+|---|---|---|
+| 3/98 and the 12/1-3 chain | 3/98, 12/1, 12/2, 12/3 | this plugin |
+| 4/27 to 4/32 | six ids on one handler | this plugin |
+| 8/0 | one handler, with its combo tail | this plugin |
+| category 17 | a gate plus a base-class routine | this plugin |
+
+12/0 needs no code. MH4U's category-12 case checks index 0 and runs its own handler
+`0x006d524c`, the handler MH4U's shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0
+(`0x0201177c`). R2's map misses it because the case is a `cmp`/`bne`, not a switch; the note
+is in [checks.md](../../docs/checks.md#the-shared-action-map-r2).
+
+## What it translates
+
+| Action | MHXX | What the port runs |
+|---|---|---|
+| 3/98 | block `0x020089a8`, handler `0x020062d4`, 3 states, motions `0x101` and `0x104` | a C state machine in `src/rathian_actions.c`: data float, fall advance, motion, fall snap; then the rate, speed `2.0`, motion; then the finish flag and `0x0094dc84` (idle) |
+| 12/1 | block `0x0201c1d0` | fixed target points, then the 3/98 handler |
+| 12/2 | block `0x0201c228` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/12 handler `0x006d791c` |
+| 12/3 | block `0x0201c27c` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/9 handler `0x006d5e98` (r1=1, r2=0) |
+| 17 | case `0x020098b8` -> gate `0x008d5bd4`; 0-2 return, others the base update `0x008ae50c` (vtable slot `0x3d0`) | indexes 0-2 nothing; others MH4U's base action update `0x00911b48` (`uEnemy` vtable slot 89) |
+| 4/27-32 | handler `0x0200e3b4`, blocks `0x02018af8`, `0x02018b1c`, `0x02018b40`, `0x02018b64`, `0x02018b88`, `0x02018bac`, r1/r2 2/0, 1/0, 2/1, 1/1, 2/0, 1/0 | one C state machine in `src/rathian_actions.c`, three states: line setup and motion `0x418`/`0x417` at 6.0; a turn, a line point and a step, motion `0x90a`/`0x909` at 0.0; a turn at +-0x2000, then the finish flag and MH4U's base update `0x00911b48`, or motion `0x90b`/`0x90d` at 2.0 and the source's next-action request |
+| 8/0 | block `0x020097a4`, handler `0x0201b460`, 3 states, motion `0x403` | a C state machine in `src/rathian_actions.c`: copy the data entry and aim at the target at 300.0/38.0; the per-mode check at 12.0/50.0 and the position advance; the finish flag, motion `0x403` at 4.0 and the 180.0 timer; then the timer, the two hit checks at 300.0/0.0/150.0 and the request for `9/1`, or `2/6` when they fail or the timer is spent |
+
+8/0 is the same action as MH4U's own 8/0: MH4U's category-8 case runs `0x006e9770`,
+which uses the same frame values (300.0/38.0, 12.0/50.0, 180.0, 4.0, 300.0/0.0/150.0) and
+the same tail (`9/1` or `2/6`). So its calls map onto MH4U functions at the same points,
+and its work offsets are MH4U's: the state is kept by the plugin, the timer is work+0x1d4,
+the pending-action mode work+0x1d9, the two hit-check bytes work+0x278/+0x27c and the
+velocity work+0x160. The entry stores are MH4U's work+0x7738/+0x7739 cleared and
+work+0x7a3c set to 2, and the tail flag is work+0x7993.
+
+Each engine call maps to the MH4U function of the same steps, from the reference's call
+mapping (the MHXX address in brackets): motion start `0x0094e318` [`0x008eb108`], data float
+`0x0093d870` [`0x008d21ac`], fall advance `0x0092e99c` [`0x008b1698`], fall snap `0x0094a45c`
+[`0x008e192c`], rate `0x0093ce60` [`0x008d1a0c`], speed `0x00941d84` [`0x008d73e8`], finish
+flag `0x00b05da4` [`0x00aed11c`], idle `0x0094dc84` [`0x008eb050`]. The work block is
+MH4U's `*(this+0xe28)`; MHXX's `+0x44` and `+0x1d0` are MH4U's `+0x19c` and `+0x218`.
+
+### Category 17: the gate and the base update
+
+MH4U's dispatcher has no category 17: its category table compares the category byte with 14
+and returns for anything above. MHXX's dispatcher case for 17 (`0x020098b8`) is a veneer to
+`0x008d5bd4`, a gate shared by every monster: it reads the index byte (MHXX's `this+0x6bf1`,
+the port's `work+0x1cb`), returns for indexes 0 to 2, and otherwise tail-calls `uEnemy`'s
+vtable slot `0x3d0` (`0x008ae50c`). That slot is a base-class action update, and MH4U's
+`uEnemy` vtable stops at slot 94, so the number does not exist there. MH4U's own `uEnemy`
+slot 89 (`0x00911b48`) is the same routine on MH4U's layout, so the port calls it with the
+monster in `r0` instead of reimplementing the steps.
+
+`0x008ae50c` and `0x00911b48` do the same work at translated offsets:
+
+| Step | MHXX `0x008ae50c` | MH4U `0x00911b48` |
+|---|---|---|
+| reset the action from the monster's data entry, mode 0 | `0x8b1700(this, 0)` | `0x9167b4(this, 0)` |
+| is the monster in state 2 or 3 | `0xadd004`: `work+0x4dd` is 2 or 3 | `0x92e960`: `work+0x51c` is 2 or 3, and `work+0x7e80` bit 0x20 is clear |
+| the action-active flag | `work+0x1a8` bit 0x40 | `work+0x1b4` bit 0x40 |
+| the current category | `this+0x6bf0` | `work+0x1ca` |
+| category 11 skips the update | `#0xb` | `#0xb` |
+| the setter's extra argument | `0x8a1d88(this)`, a signed byte from a table | a signed byte at `*(0x00fb6b7c)+0x2f` |
+| the action setter | `0x8ac5a0(this, 0, r2, 2, arg)` | `0x0090ef74(this, 0, r2, 2, arg)` |
+| the other state | `work+0x2c0` is 1 | `work+0x34c` is 1 |
+| the finish flag | `0x8bf728(this, 0)` sets `this+0x6b00` to 1 | stores 1 at `work+0x1dc` |
+
+`r2` is 2 when the first two conditions hold, otherwise 1 when the other state is 1, otherwise
+0. The index the gate tests is MH4U's `work+0x1cb`, the byte its dispatcher reads. The
+category-17 path needs no float stubs; the setter's call is the same one `0x00911b48` makes
+for MH4U's own actions, so MH4U's handler runs the ported action's data.
+
+### 4/27-32: one handler, three states
+
+The 4/27-32 handler's calls, and the fields and the target-line struct they use:
+
+| MHXX | MH4U | What |
+|---|---|---|
+| `0x0201262c` | `0x006e7be8` | the flight's setup, from the monster's height data |
+| `0x008b1700` | `0x009167b4` | set the monster's mode |
+| `0x008b2210` | `0x00917570` | turn by an angle step, s0/s1 the speed range |
+| `0x008a7360` | `0x0091aae4` | the mode call's flag-clear wrapper (r3 = r2, r2 = 0) |
+| `0x008c21f8` | `0x0092d09c` | build a target point from an index |
+| `0x008b75d8` | `0x0091db4c` | turn toward a target point at a step in r3 |
+| `0x020063fc` | `0x006e5608` | a point on the target line at a fraction |
+| `0x0201277c` | `0x00aad55c` | rotate a direction by an angle |
+| `0x008eb108` | `0x0094e318` | start a motion |
+| `0x00aed11c` | `0x00b05da4` | the action's finish flag |
+| vtable slot 244, `0x008ae50c` | `0x00911b48` | the finish flag's end-of-action, the same routine as category 17's base update (MH4U's vtable slot 89) |
+
+The work-block fields, MHXX -> MH4U, each read from a paired function (the MHXX and MH4U
+functions that step through the same fields): position x,y,z `+0x40/+0x44/+0x48` ->
+`+0x198/+0x19c/+0x1a0`, position w `+0x4c` -> `+0x1a4`, heading `+0x54` -> `+0x1ac`, target
+point x,z `+0x1d0/+0x1d8` -> `+0x218/+0x220`, heading saved `+0x200` -> `+0x248`. The speed
+getter `0x008bb4e4` reads the float at `this+0x298`, which MH4U's same handler reads at
+`this+0x290`; the turn step `this+0x1c` is MH4U's `this+0x14`. The target-line struct
+`*(this+0xb770)` is MH4U's `*(this+0x8d88)` and keeps its layout: origin x,z at `+0x30`,
+direction x,y,z,w at `+0x40` to `+0x4c`.
+
+8/0's calls, each the MH4U function MH4U's own 8/0 handler calls at the same point: data
+entry `0x009167b4` [`0x008b1700`], aim at a point `0x00948674` [`0x008df28c`], per-mode
+speed/distance `0x0091aae4` [`0x008a7360`], position advance `0x00955440` [`0x008f1f30`],
+countdown `0x00b0704c` [`0x008a78ec`'s worker; MHXX's worker multiplies the frame delta by
+the call's `s0`, which is 1.0 here, and both clamp at 0], hit check `0x009122fc`
+[`0x008ae8ec`], hit check with its mode in r3 `0x0092b2b0` [`0x008c024c`], request next
+action `0x0094ef64` [`0x008ebab0`].
+
+**What it does not translate yet.** The 12/1 and 12/2 blocks end through MHXX's
+request-next-action helper `0x008ebab0`. Its MH4U counterpart is `0x0094ef64` — the same
+steps: refuse category 0x0b, otherwise take the immediate path through the action setter
+when work+0x1d9 is 1, else store the pending pair at work+0x1d0/+0x1d1 with the flag at
+work+0x1cf. The 8/0 slice uses it, but the 12/1-3 slice still returns to idle instead of
+following on to 12/2 or 12/3; wiring those two is a follow-up (the chain is visible in
+R2p).
+
+8/0 has four gaps, recorded here and in the plugin's log:
+
+- **The leaf `0x008c4184` is MH4U's `0x0092f6e8`.** Both take `(this, table)` with the mode
+  in r2: 0x008c4184 clears r2 and falls into `0x008c418c`, which picks one of the table's
+  entries by work+0x331, adds this+0x2a4 times the frame delta to the float at work+0x334,
+  and sets flags at work+0x32e. MH4U's own handler calls it with `0x00e094d8` where MHXX
+  uses `0x20220ac`. The MHXX table is the port's data and is not carried yet, so the
+  handler does not call it; when it does, the table goes with it.
+- **`0x008ae5e4` (MH4U `0x00911c0c`) takes its 4th and 5th arguments in r3 and on the
+  stack**, which the ABI 3 `call` cannot set. It is the data setup for this action and waits
+  on #134.
+- **`0x008d0528` has no confirmed MH4U counterpart.** It reads this+0x6dd0, calls
+  0x00add004 and then 0x008da42c or 0x008b58c0, and ends in 0x008d057c(this, 0), which
+  adjusts a float at work+0x59d4 and the work+0x5800 area. MH4U's own 8/0 handler has no
+  call at that point. The port skips it.
+- The source's `[this+0xa304] == 2 && [this+0xa305] == 4` branch sets the tail flag to 1
+  instead of 3. The MH4U handler has no such branch and the two bytes have no MH4U
+  counterpart, so the port takes the source's other path.
+
+Both slices leave one small detail: 3/98's second motion gets `s1 = 0.0` (the source leaves
+`s1` from the previous state, which is `0.0` while the move is current), and 8/0's state 1
+calls the per-mode check every frame as the source does.
+
+The 4/27-32 slice has two more gaps:
+
+- **The case blocks' call to `0x00adb528`, before the handler.** It forwards `(this, mode)` to
+  method `0x4c` of the object `*(this+0x6dc4)` (the mode is 2, 2, 3, 3, 5, 5 per id). MH4U
+  has no object at a matching field and no counterpart for the call was found, so it is left
+  out and logged once per action. The handler's incoming `s0` (the percent it puts the line
+  point at) is the dispatcher caller's; without the call's return the source may have had
+  another value, which R2p will show.
+- **The state-2 request for 7/246 or 7/247**, through the same `0x008ebab0` helper as 12/1 and
+  12/2. It is left out and logged once; the move plays and the action ends without it.
+
+## Floats: the guest stubs
+
+The host's ABI 3 `call` runs a game function with `r0`-`r2` and returns its `r0`. MH4U's
+engine functions take motion speeds and points in VFP registers (`s0`, `s1`), which `call`
+does not set, and a source case block receives target points in `s0`-`s3`, which a hook
+cannot read. So the plugin builds tiny ARM stubs in a 384-byte block from the game's own heap
+(`alloc`, ABI 2):
+
+- `vldr s0/s1` from a literal, then branch to the engine function;
+- `vldr s0/s1/s2` for the 8/0 hit check, which takes three floats;
+- `ldr r3` for the 8/0 mode hit check, which takes its mode in `r3`;
+- for a function that hands a float back, set `lr` to a continuation that moves `s0` to `r0`;
+- `vmov r0, sN; bx lr` to read the caller's `s0`-`s3`.
+
+The port runs code that is not recompiled in Azahar's interpreter (`port/src/arm_recomp.cpp`,
+`Interpret`), which reads the bytes each time, so a block from `alloc` is executable and a
+stub's literals can be rewritten per call. P3 proves the guest call; T0 in
+[checks.md](../../docs/checks.md#floats-through-a-guest-stub-t0) proves the stub in a headless
+run. If the engine ever refuses executable heap memory, the stubs are the one part to redo.
+The fork's issue [#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134) adds
+float and `r3` arguments to the plugin ABI; when it lands, the stubs are replaced by the new
+`call` and the handlers keep their code otherwise.
+
+## Build
+
+```bash
+make        # rathian_actions.so next to mod.json
+make test   # the translated actions' call sequences, with a fake host and no game
+```
+
+It builds against the engine fork's `include/mh4u_plugin.h`; `make FORK=/path/to/fork` uses
+another checkout. Licence: GPL-3.0-or-later, like the rest of the mod.
+
+## Install
+
+```bash
+python3 <fork>/tools/mods.py add mods/rathian_actions
+python3 <fork>/tools/mods.py enable "GU Rathian's MHXX-only actions"
+python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Azahar user directory>
+```
+
+A run logs the ready line, then `running the translated action 3/98` (or 12/1, 12/2, 12/3,
+4/27 to 4/32, 8/0) the first time one runs; 8/0 logs its uncovered calls once; category 17
+logs one line per index, either `17/N: nothing (the gate returns for 0 to 2)` or `17/N:
+running MH4U's base action update 0x00911b48`. The dispatcher must be a hook point, so the
+code library needs the mod's hooks (the build above).
+
+## Settings
+
+`mod.json` holds the defaults; a `config.ini` in the installed mod's folder overrides them
+(`key = value` lines).
+
+| Key | Default | Means |
+|---|---|---|
+| `monster` | `124` | the id to translate the actions for (the registry's GU Rathian), `any` for every monster, or an MH4U id such as `1` for MH4U's own Rathian |
+| `selftest` | `0` | `1`: on the first frame, log what this build translates, what is pending, and where the float stubs are; check T1 uses it |
+
+## The checks
+
+The static check (`tools/check_actions.py`) verifies the ledger in
+[data/actions](../../data/actions/rathian-gu.csv) against MHXX's module; `make test` runs the
+state machines with a fake host; T1 and T0 are in
+[checks.md](../../docs/checks.md#the-translated-actions-check-t1). The per-move in-game check
+is R2p and waits for [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48) and
+[#105](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/105).

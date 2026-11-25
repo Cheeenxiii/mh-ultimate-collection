@@ -305,6 +305,42 @@ def cmd_extdata(args) -> int:
     return 0
 
 
+def cmd_save(args) -> int:
+    from . import save
+    data = _read(args.file)
+    if args.key:
+        key = _read(args.key).rstrip(b"\r\n")
+        try:
+            data = dlccrypt.mh4u_save_decrypt(data, key)
+        except dlccrypt.CryptoError as e:
+            print(f"mhuc save: {e}", file=sys.stderr)
+            return 1
+    if len(data) == save.CHARACTER_SIZE:
+        problems = save.character_problems(data)
+        out = save.dump_character(data)
+    elif len(data) == save.SYSTEM_SIZE:
+        problems = save.system_problems(data)
+        out = save.system_summary(data)
+    else:
+        print(f"mhuc save: {len(data)} bytes is neither a decrypted character save "
+              f"({save.CHARACTER_SIZE}) nor a system save ({save.SYSTEM_SIZE})", file=sys.stderr)
+        return 2
+    if args.action == "check":
+        if problems:
+            print("\n".join(problems))
+            return 1
+        print(f"{out['kind']} save ok ({len(data)} bytes)")
+        return 0
+    text = json.dumps(out, ensure_ascii=False, indent=1) + "\n"
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"{len(text.splitlines())} lines to {args.out}")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def cmd_catalog(args) -> int:
     from . import catalog
     text = catalog.render(args.dir)
@@ -542,6 +578,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--last-byte", type=lambda v: int(v, 0))
     p.add_argument("--out")
     p.set_defaults(func=cmd_extdata)
+
+    p = sub.add_parser("save", help="MH4U saves: a character file (user1..user3) or system, decrypted here "
+                                    "when --key is given (specs/save.md)")
+    p.add_argument("action", choices=["dump", "check"],
+                   help="dump lists the structures as JSON; check lists structural problems only")
+    p.add_argument("file", help="an encrypted or decrypted save file")
+    p.add_argument("--key", help="a file holding the save cipher's key; without it the file must be decrypted")
+    p.add_argument("--out", help="write the JSON here instead of printing it")
+    p.set_defaults(func=cmd_save)
 
     p = sub.add_parser("catalog", help="what MH4U already has of 3U's and GU's monsters and maps (data/catalog)")
     p.add_argument("action", choices=["overlap"])
