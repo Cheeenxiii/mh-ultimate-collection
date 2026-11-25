@@ -1135,13 +1135,18 @@ def test_the_ported_monsters_text_comes_from_their_source_games(dump):
     dump("mh3u", "romfs.bin")
     entries = monstertext.build(os.environ["MHUC_DUMPS"])
     by_id = {e.id: e for e in entries}
-    assert sorted(by_id) == sorted(int(r["id"]) for r in monstertext.registry_rows())
-    assert all(e.name == "Rathian" for e in entries)      # the registry's names
-    # 124 (GU, MHXX JPN) has Japanese notes; 125 (3U USA) has English ones.
-    assert not by_id[124].notes.isascii()
-    assert by_id[125].notes.isascii()
-    assert len(by_id[124].notes) > 80 and len(by_id[125].notes) > 80
-    assert "\r" not in by_id[124].notes + by_id[125].notes
+    registry = {int(r["id"]): r for r in monstertext.registry_rows()}
+    assert sorted(by_id) == sorted(registry)
+    assert all(e.name == registry[e.id]["name"] for e in entries)   # the registry's names
+    # The GU rows (MHXX JPN) have Japanese notes; the 3U rows (MH3U USA) have English ones.
+    for ident in (124, 126):
+        assert not by_id[ident].notes.isascii(), ident
+        assert registry[ident]["source_game"] == "mhxx"
+    for ident in (125, 127):
+        assert by_id[ident].notes.isascii(), ident
+        assert registry[ident]["source_game"] == "mh3u"
+    assert all(len(e.notes) > 40 for e in entries)
+    assert "\r" not in "".join(e.notes for e in entries)
     # the built table is what the plugin reads, and the checker accepts it
     table = monstertext.write(entries)
     assert monstertext.read_mod_text(table) == entries

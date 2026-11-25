@@ -214,13 +214,13 @@ another checkout. `src/ids.h` is generated, not edited: run `python3 tools/check
 python3 <fork>/tools/mods.py add mods/monster_ids
 python3 <fork>/tools/mods.py enable "Ported monster ids"
 MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> \
-    --out <user directory>/mods/<the mod's folder>/text/monster_text.bin
+    --out "<Azahar user directory>/mh4u-mods/Ported monster ids/text/monster_text.bin"
 python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Azahar user directory>
 ```
 
 A run logs `ready: answering MH4U's monster tables and name/notes message getters for 4
 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files each port
-ships and the stand-in's for the rest`, then `text: 2 of 2 entry(ies) from
+ships and the stand-in's for the rest`, then `text: 4 of 4 entry(ies) from
 text/monster_text.bin; every registered id has a name and notes`, then one line per reader the first time it answers a registered id and one the first
 time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource
 readers log `resource index: id 124 -> its own record`, `resource load: id 124 -> its own

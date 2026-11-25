@@ -485,7 +485,7 @@ P1, headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
 4. Pass: the log has `ready: answering MH4U's monster tables and name/notes message getters
    for 4 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files
-   each port ships and the stand-in's for the rest`; `text: 2 of 2 entry(ies) from
+   each port ships and the stand-in's for the rest`; `text: 4 of 4 entry(ies) from
    text/monster_text.bin; every registered id has a name and notes`; a `self-test: message name
    id 124 -> "Rathian", N UTF-16 unit(s)` line and a notes line per registered id, one
    `self-test: id 124's getters answer its own record; ids 0..123 pass through` per id (the
