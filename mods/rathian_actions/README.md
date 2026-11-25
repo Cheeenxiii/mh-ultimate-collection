@@ -14,7 +14,7 @@ The 13 ids split into four slices (the issues are in the same milestone):
 | 3/98 and the 12/1-3 chain | 3/98, 12/1, 12/2, 12/3 | this plugin |
 | 4/27 to 4/32 | six ids on one handler | pending |
 | 8/0 | one handler, with its combo tail | pending |
-| category 17 | a gate plus a base-class routine | pending |
+| category 17 | a gate plus a base-class routine | this plugin |
 
 12/0 needs no code. MH4U's category-12 case checks index 0 and runs its own handler
 `0x006d524c`, the handler MH4U's shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0
@@ -29,6 +29,7 @@ is in [checks.md](../../docs/checks.md#the-shared-action-map-r2).
 | 12/1 | block `0x0201c1d0` | fixed target points, then the 3/98 handler |
 | 12/2 | block `0x0201c228` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/12 handler `0x006d791c` |
 | 12/3 | block `0x0201c27c` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/9 handler `0x006d5e98` (r1=1, r2=0) |
+| 17 | case `0x020098b8` -> gate `0x008d5bd4`; 0-2 return, others the base update `0x008ae50c` (vtable slot `0x3d0`) | indexes 0-2 nothing; others MH4U's base action update `0x00911b48` (`uEnemy` vtable slot 89) |
 
 Each engine call maps to the MH4U function of the same steps, from the reference's call
 mapping (the MHXX address in brackets): motion start `0x0094e318` [`0x008eb108`], data float
@@ -36,6 +37,36 @@ mapping (the MHXX address in brackets): motion start `0x0094e318` [`0x008eb108`]
 [`0x008e192c`], rate `0x0093ce60` [`0x008d1a0c`], speed `0x00941d84` [`0x008d73e8`], finish
 flag `0x00b05da4` [`0x00aed11c`], idle `0x0094dc84` [`0x008eb050`]. The work block is
 MH4U's `*(this+0xe28)`; MHXX's `+0x44` and `+0x1d0` are MH4U's `+0x19c` and `+0x218`.
+
+### Category 17: the gate and the base update
+
+MH4U's dispatcher has no category 17: its category table compares the category byte with 14
+and returns for anything above. MHXX's dispatcher case for 17 (`0x020098b8`) is a veneer to
+`0x008d5bd4`, a gate shared by every monster: it reads the index byte (MHXX's `this+0x6bf1`,
+the port's `work+0x1cb`), returns for indexes 0 to 2, and otherwise tail-calls `uEnemy`'s
+vtable slot `0x3d0` (`0x008ae50c`). That slot is a base-class action update, and MH4U's
+`uEnemy` vtable stops at slot 94, so the number does not exist there. MH4U's own `uEnemy`
+slot 89 (`0x00911b48`) is the same routine on MH4U's layout, so the port calls it with the
+monster in `r0` instead of reimplementing the steps.
+
+`0x008ae50c` and `0x00911b48` do the same work at translated offsets:
+
+| Step | MHXX `0x008ae50c` | MH4U `0x00911b48` |
+|---|---|---|
+| reset the action from the monster's data entry, mode 0 | `0x8b1700(this, 0)` | `0x9167b4(this, 0)` |
+| is the monster in state 2 or 3 | `0xadd004`: `work+0x4dd` is 2 or 3 | `0x92e960`: `work+0x51c` is 2 or 3, and `work+0x7e80` bit 0x20 is clear |
+| the action-active flag | `work+0x1a8` bit 0x40 | `work+0x1b4` bit 0x40 |
+| the current category | `this+0x6bf0` | `work+0x1ca` |
+| category 11 skips the update | `#0xb` | `#0xb` |
+| the setter's extra argument | `0x8a1d88(this)`, a signed byte from a table | a signed byte at `*(0x00fb6b7c)+0x2f` |
+| the action setter | `0x8ac5a0(this, 0, r2, 2, arg)` | `0x0090ef74(this, 0, r2, 2, arg)` |
+| the other state | `work+0x2c0` is 1 | `work+0x34c` is 1 |
+| the finish flag | `0x8bf728(this, 0)` sets `this+0x6b00` to 1 | stores 1 at `work+0x1dc` |
+
+`r2` is 2 when the first two conditions hold, otherwise 1 when the other state is 1, otherwise
+0. The index the gate tests is MH4U's `work+0x1cb`, the byte its dispatcher reads. The
+category-17 path needs no float stubs; the setter's call is the same one `0x00911b48` makes
+for MH4U's own actions, so MH4U's handler runs the ported action's data.
 
 **What it does not translate yet.** The 12/1 and 12/2 blocks end through MHXX's
 request-next-action helper `0x008ebab0` (also 13/4's tail). MH4U has neither the helper's
@@ -84,8 +115,9 @@ python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Az
 ```
 
 A run logs the ready line, then `running the translated action 3/98` (or 12/1, 12/2, 12/3)
-the first time one runs. The dispatcher must be a hook point, so the code library needs the
-mod's hooks (the build above).
+the first time one runs; category 17 logs one line per index, either `17/N: nothing (the gate
+returns for 0 to 2)` or `17/N: running MH4U's base action update 0x00911b48`. The dispatcher
+must be a hook point, so the code library needs the mod's hooks (the build above).
 
 ## Settings
 
