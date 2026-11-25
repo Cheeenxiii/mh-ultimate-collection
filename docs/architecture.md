@@ -97,7 +97,7 @@ Known so far:
 - MH3U's and MH4U's hunter skeletons are the same rig with MH3U's empty root dropped and the pelvis renumbered 13 to 0, so 3U underwater motions need their bone ids rewritten, not a positional retarget ([underwater.md](underwater.md#hunter-skeletons)).
 - MH3U's stage collision uses MH4U's format ([specs/sbc.md](../specs/sbc.md)).
 - Cha-Cha (MH3U on Wii U) marks the swim state, the underwater camera and underwater carving. Its offsets must be re-found on 3DS.
-- MH4U kept the water-surface class `uOcean` whole (same class id, parent, size and vtable, its functions paired in the MH4U↔MH3U map) and none of the underwater systems: MH3U's oxygen-gauge class and in-game camera classes are gone, and its player class survives only as a name on a rewritten layer ([underwater.md](underwater.md#what-mh4u-kept)).
+- MH4U kept the water-surface class `uOcean` whole (same class id, parent, size and vtable, its functions paired in the MH4U↔MH3U map) and none of the underwater systems: MH3U's air-gauge class (which draws nothing of its own), its in-game camera classes and its guest player are gone, and its player class survives only as a name on a rewritten layer. The air gauge is a display of the player's oxygen timer, drawn by MH3U's quest cockpit, not a system of its own ([underwater.md](underwater.md#what-mh4u-kept)).
 
 The first target is the Water Arena: enter water, swim, surface, oxygen, with Sword and Shield motions, then Lagiacrus. Charge Blade and Insect Glaive never had underwater movesets, so theirs would be authored. What comes from MH3U, the leads and the unknowns: [underwater.md](underwater.md).
 
