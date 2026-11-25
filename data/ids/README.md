@@ -59,7 +59,12 @@ the model, three motion lists, the tail and the command. Until a port's own came
 effects, sound and effect lists are converted, its monster loads MH4U's own from the stand-in's
 paths (`enemy\em001\...`); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
-0 to 2. A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map
+0 to 2. The motion-effect and effect-list formats the `mef` and `efl` kinds carry are laid out
+and checked on the three games' monster archives ([mef](../../specs/mef.md),
+[efl](../../specs/efl.md), checks FX1, FX2, EF1 and EF2); their records and blocks are not
+understood yet, so a port still ships neither kind.
+
+A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map
 together; the generated header's `MHUC_FILES_*` bits and each row's `motions` count are what
 the plugin's record builder reads.
 
