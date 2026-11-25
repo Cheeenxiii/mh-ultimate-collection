@@ -304,7 +304,7 @@ is a debugging tool for later move investigations, not part of this check.
 
 | Check | What | Pass |
 |---|---|---|
-| M1 | force 13/5, 13/6 and 13/8 on the ported 3U Rathian with `mods/force_action`, the code library built with `mods/monster_motions` | the log shows the plugin ready and each action translated to her own motion number (13/5 -> 0x013, 13/6 -> 0x01a, 13/8 -> 0x01a), each of the three plays a different animation, a motion the table lacks passes through and is logged once, and MH4U's own Rathian is unchanged |
+| M1 | force 13/5, 13/6 and 13/8 on the ported 3U Rathian with `mods/force_action`, the code library built with `mods/monster_motions` | the log shows the plugin ready and each action translated to the animation her own handler starts (13/5 -> 0x013, 13/6 -> 0x01a, 13/8 -> 0x01a; 13/5 and 13/6 no longer share MH4U's number 2), a motion the table lacks passes through and is logged once, and MH4U's own Rathian is unchanged |
 
 `mods/monster_motions` ([README](../mods/monster_motions/README.md)) wraps MH4U's motion-start
 wrapper (0x0094e318, R1's) and translates the number in r1 through `src/motions.h`, which
@@ -330,8 +330,10 @@ until the port's own rows load).
    motion 0x41c; passing it through` once and plays the MH4U index.
 4. MH4U's own Rathian, in another quest, plays as before: the plugin leaves ids below 124 alone.
 
-Status: not done. The headless part waits for one code-library rebuild; the in-game part waits
-for #48, #49 and #105.
+Status: the headless part passed on 2026-11-25 (USA v1.3.0 update, the code library built
+with the mod): the boot logs `ready: translating motion numbers for 2 ported monster id(s), 96
+entries; MH4U's own ids pass through` and loads the plugin. The in-game part is not done; it
+waits for #48, #49 and #105.
 
 ## Ported monster ids
 
