@@ -32,7 +32,7 @@ Both files start with a header of u32 words, most of them offsets of blocks insi
 | word 32 (0x80) | offset | part break table: 32-byte records (u8 part, u8 break count, u8, u8, u8 group, u32 joint at +8, f32 at +0xC, u8 0xFF, RGB at +0x1D) until a part of 0xFF; its breakable parts equal MHXX's `dtbparts` break records on the three pairs | unverified | MHGU-DE `dala_break.c`; specs/dtbparts.md; check E5 |
 | word 33 (0x84) | offset | break list: (s32 group, u32 param) pairs until group −1; no counterpart found in MHXX's `dtbase` or `dtbparts` | unverified | MHGU-DE notes/data.md; specs/dtbparts.md; check E5 |
 | word 34 (0x88) | offset | part visibility rows, 16 bytes each until a group of −1 (table "Visibility row"); 0 in 6 of 110, every list ends | verified | MHGU-DE `emdata4u.part_rows`; check E1 |
-| word 35 (0x8C) | offset | joint and sever records: 24-byte records (s32 joint, u32 kind, u32 index, u32 limit, u32 a, u32 b) until a joint of −1; set in 56 of the 110 files. The records whose kind isn't 0 are MHXX's `dtbparts` joint records (`a` 255, `b` 0); a (255, 0, 0, −1) marker in 34 files separates them from the kind-0 sever/detach records (`a` 0; the meanings of `index`, `limit` and `b` are unknown). No `dtbase` or `dtbparts` block holds one: MHXX keeps the joint in the monster class's code ([dtbparts](dtbparts.md#sever-and-detach-records-not-in-these-files)) | verified | MHGU-DE notes/data.md; ours, `mhuc monsterdata`; check E11 |
+| word 35 (0x8C) | offset | joint and sever records: 24-byte records (table "Joint and sever record") until a joint of −1; set in 56 of the 110 files. A record of kind 0, 3 or 5 is a sever/detach record for cut type 1, 2 or 3 (MH4U's cut-object code 0xc2d314; kinds 0 and 5 occur, 95 records), and of kind 1 or 4 is one of MHXX's `dtbparts` joint records (`a` 255, `b` 0; 130 records including the one of kind 255). A (255, kind, 0, −1) marker in 34 files (35 records) separates the two groups. No `dtbase` or `dtbparts` block holds a sever record: MHXX keeps the joint in the monster class's code ([dtbparts](dtbparts.md#sever-and-detach-records-not-in-these-files)) | verified | MHGU-DE notes/data.md; ours, loader 0x1618a4 and 0xc2d314; checks E11, E12 |
 | word 38 (0x98) | offset | a 64-byte block: MHXX's `dtbase` +0x70; equal on Rathian, 54 and 55 of 64 bytes on Kushala Daora and Teostra (MHGU retunes it) | verified | MHGU-DE `dt_convert.py`; specs/dtbase.md; check E5 |
 | word 39 (0x9C) | offset | a 12-byte block: MHXX's `dtbase` +0x74; equal on Rathian, absent on both sides for Kushala Daora and Teostra | verified | specs/dtbase.md; check E5 |
 | word 40 (0xA0) | offset | slope fit: records, a u8 shift, 3 floats, then 44-byte joint records | unverified | MHGU-DE `dt_convert.py` |
@@ -62,6 +62,25 @@ Both files start with a header of u32 words, most of them offsets of blocks insi
 | +0x06 | u16 | mode: 0 hidden while the condition holds, 1 hidden while it doesn't (only 0 and 1 seen) | unverified | MHGU-DE `emdata4u.part_rows` |
 | +0x08 | u32 | param | unverified | MHGU-DE `emdata4u.part_rows` |
 | +0x0C | u32 | threshold | unverified | MHGU-DE `emdata4u.part_rows` |
+
+### Joint and sever record (24 bytes)
+
+Word 35's records. MH4U reads them three ways:
+
+- **At load.** The `rEnemyData` loader (0x1618a4; the word-35 walk is 0x163824–0x163a5c) walks the list to the joint −1 terminator and, for every record whose `b` isn't 0, adds the loaded file's base address to `b` and then to each of the six u32 at the block `b` points at. `joint` and `b` are the only fields it reads.
+- **Through a getter.** 0x94c558 returns word 35's relocated pointer, read at `[header + 0x84]` of the loaded `.emd` (header = data + 8, at `getEnemyData` 0x68882c).
+- **By its consumers.** Five functions call that getter: 0xc2d314 (the cut-object sever spawner, which reads `kind`, `index` and `joint`), 0x934280, 0x93be24, 0x919144 and 0x910480 (which read kind-1 records only).
+
+The kind is a byte (the u32's low byte). 0xc2d314 maps the cut object's type byte (this+0xe2e) to a pair of detached bit and kind: type 1 → 1/0, type 2 → 2/3, type 3 → 8/5, and then takes the first record whose kind matches and whose `index` is 1. The records' kinds are 1 (109), 4 (20), 0 (128: 94 severs and 34 markers), 5 (2: 1 sever and em089's marker) and 255 (1); no file holds kind 3.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| +0x00 | s32 | joint: the bone the record names; −1 ends the list. A 255 joint with `limit` −1 is a marker that precedes a sever group (35 records: 34 of kind 0, 1 of kind 5, the second one in em089); no reader tests it | verified | ours, loader (terminator check), 0xc2d314; check E11 |
+| +0x04 | u8 | kind: 0, 3 or 5 a sever/detach record for cut type 1, 2 or 3 (0 and 5 in the files); 1 or 4 one of MHXX's `dtbparts` joint records; 255 once. The three bytes after it are 0 | verified | ours, 0xc2d314 (type → kind, reads the byte); MHGU-DE `dala_break.c` for kinds 1 and 4; checks E11, E12 |
+| +0x08 | u32 | index: of a sever group, the record whose index is 1 is the one 0xc2d314 acts on (the other records are skipped: 49 with 2, 2 with 0). On a kind-1 record 0x919144 uses it as an index below 6 | verified | ours, 0xc2d314, 0x919144; check E12 |
+| +0x0C | u32 | limit: on a kind-1 record 0x934280 adds it into a 16-bit value; no reader reads it on a sever record (kind 0/3/5), where it is the joint on 81 of 95, the joint −1 on 5 and the joint −2 on 9 | unknown | ours, 0x934280; check E12 |
+| +0x10 | u32 | a: 0 in all 95 sever records, 255 in all 130 others; no reader reads it | unknown | ours, loader and the five word-35 consumers; check E12 |
+| +0x14 | u32 | b: an offset into the `.emd`, 0 on 37 sever records and inside the file on 58. The loader relocates it and the six u32 at the block it points at; all 58 blocks are inside the file and have exactly three nonzero words. No consumer of the list reads `b`, so what the block drives is unknown | verified | ours, loader 0x163824–0x163a5c; check E12 |
 
 ## .etd header
 
@@ -153,9 +172,16 @@ Rathian's row 7 is 100 in all ten bytes and no body record uses it.
 
 - **E10 (done, MH4U USA v1.3.0 RomFS):** `mhuc emd check data/em_data.arc` bounds every `.etd`'s attack records at their 0xFFFF terminator and counts them. Results: 110 lists, 4,806 records before the terminator; the all-zero record 0 in 110 lists and the terminator in 110; +0x15..+0x17, +0x1e, +0x21, +0x23 and +0x24..+0x27 are zero in all 4,806; +0x13 is 0, 0x08 or 0x40, +0x14 is 0, 2 or 4, +0x1f is 0 or 10, and +0x20 is 0, 1, 5 or 6 in every record; the +0x19 group is below the word-27 group count in 4,793 of 4,806 (the 13 outside are em026's records 56 to 68, indices 25 to 30 against its 25 groups). E1's stride count is 5,204: for the 29 files whose word 29 is 0 it walks from word 28 to the next referenced offset, which includes the data after the terminator.
 - **E11 (done, MH4U USA v1.3.0 `data/em_data.arc`):** `mhuc emd check <data/em_data.arc>` counts word 35's records
-  (the same walk the survey runs). Result, all 110 pairs: word 35 is set in 56 files and 0 in 54; 43 files hold 94
-  kind-0 sever records, 1 to 3 each; the (255, 0, 0, −1) marker is in 34 of them; their joints are 141 (6), 142 (11),
-  143 (34), 144 (25), 145 (16) and 157 (2); `index` is 1 on 43 records, 2 on 49 and 0 on 2; `limit` is the joint on 80
-  and 1 or 2 less on 14; `a` is 0 everywhere, `b` 0 on 36 and nonzero on 58; every list ends at a −1 joint. MHXX's
-  side of the check is in [dtbparts](dtbparts.md#checks).
+  (the same walk the survey runs). Result, all 110 pairs: word 35 is set in 56 files and 0 in 54; its records are of
+  kind 1 (109), 4 (20), 0 (128, the 34 markers included), 5 (2, the em089 marker included) and 255 (1), and none of
+  kind 3. The sever/detach records (kind 0, 3 or 5 and a joint that isn't 255 or −1) are 95 over 43 files: 94 of
+  kind 0, whose joints are 141 (6), 142 (11), 143 (34), 144 (25), 145 (16) and 157 (2), and 1 of kind 5 (em089,
+  joint 200). The (255, kind, 0, −1) marker is in 34 files (35 records: 34 of kind 0, 1 of kind 5); every list ends
+  at a −1 joint. MHXX's side of the check is in [dtbparts](dtbparts.md#checks).
+- **E12 (done, MH4U USA v1.3.0 `data/em_data.arc`):** `mhuc emd check <data/em_data.arc>` counts the word-35
+  records' fields (the same walk). Result, the 95 sever records: `index` is 1 on 44, 2 on 49 and 0 on 2; `limit` is
+  the joint on 81, the joint −1 on 5 and the joint −2 on 9; `a` is 0 on all 95; `b` is 0 on 37 and inside the file
+  on 58, and each of those 58 blocks is inside the file and has exactly three nonzero words. The 130 other records
+  all have `a` 255 and `b` 0. The code that reads them is the loader and the five getter callers named under
+  "Joint and sever record"; the loader's `b` relocation is what E12's block counts follow.
 - **E13 (done, MH4U USA v1.3.0 `data/em_data.arc`):** `mhuc emd check <data/em_data.arc>` counts the kind at +8 of word 5's eight 10-byte part records. Result, all 110 pairs: 880 records; kind 0 on 236, 1 on 189, 2 on 141, 3 on 256 and 4 on 58; no record above 4 and no high byte set; em081 is the only file whose eight kinds are all 0. The reader is 0x936904 `(monster, part)`, above. The extract names are checked part by part against two public charts: mh4info's [MHXX Rathian](https://x.mh4info.com/m/d/3) (head, neck and tail red; torso orange; legs white; wings green) and the [MH4 Insect Glaive wiki's list](https://w.atwiki.jp/mushimh4/pages/36.html) (Rathalos: head, neck and legs red; wings white; torso and tail orange). `tests/test_with_game_files.py::test_mh4u_part_kinds_count_what_the_insect_glaive_reader_returns` checks the counts and `tests/test_formats.py` the +8 placement.

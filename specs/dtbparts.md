@@ -45,7 +45,7 @@ In loader order; "Object" is where the loader puts the block. c_i is the byte at
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
 | +4·c0 | 4-byte records | break records (object +0x60): u8 part, u8 LR count, u8 HR count, s8 group. MH4U's part break table (`.emd` word 32) and break list (word 33); not byte-equal: MHXX splits the count into ranks and stores one record per part | verified | ours, loader; MHGU-DE `dala_break.c`; check E5 |
-| +13·c1 | 13-byte records | joint records (object +0x64): s32 joint, u8 kind, u32 index, u32 limit. MH4U `.emd` word 35's records whose kind isn't 0, packed (MH4U keeps each in 24 bytes). 31 files have the block (103 records): kinds 1 (75), 3 (1), 4 (21), 255 (6, all in one file) | verified | ours, loader; check E5 |
+| +13·c1 | 13-byte records | joint records (object +0x64): s32 joint, u8 kind, u32 index, u32 limit. MH4U `.emd` word 35's records of kind 1 and 4 (and one of kind 255), packed; MH4U keeps each in 24 bytes and adds `a` 255 and `b` 0. MHXX's kind-3 record has no MH4U counterpart. 31 files have the block (103 records): kinds 1 (75), 3 (1), 4 (21), 255 (6, all in one file) | verified | ours, loader; check E5 |
 | +12·c2 | 12-byte records | part break HP records (object +0x68): u8 part, u8, u16, f32 HP, u8 ×4 | unverified | ours, loader; MHGU-DE notes/data.md names it (part break HP) |
 | +16·c3 | 16-byte records | block (object +0x6C): u32, u32, u8, u8, u16, u8, u8, u16; no counterpart found | unknown | ours, loader |
 | +15·c4 | 15-byte records | block (object +0x70): u16 ×5, u8 ×5; no counterpart found | unknown | ours, loader |
@@ -60,10 +60,10 @@ the kind and two of the four following words into 13.
 
 ## Sever and detach records: not in these files
 
-MH4U's `.emd` word 35 keeps, after a (255, 0, 0, −1) marker in most files, one kind-0 record per bone a part
-detaches or severs at (check E11; [emd](emd.md)). Neither MHXX file has one, and MHXX does not keep them as data:
-the joint is a constant in the monster class's own code, and the cut part is a model beside the body model in the
-monster's archive.
+MH4U's `.emd` word 35 keeps, after a (255, kind, 0, −1) marker in most files, one sever/detach record per bone a
+part detaches or severs at: kind 0, 3 or 5, for cut type 1, 2 or 3 (checks E11, E12; [emd](emd.md)). Neither MHXX
+file has one, and MHXX does not keep them as data: the joint is a constant in the monster class's own code, and the
+cut part is a model beside the body model in the monster's archive.
 
 **The search.** Three places could hold such a record, and none does:
 
@@ -72,6 +72,9 @@ monster's archive.
 | `dtbparts` joint records, every file | 31 of the 140 entries have the block, 103 records: kinds 1 (75), 3 (1), 4 (21) and 255 (6, all six in one file, joints 200 to 205). Not one kind 0, and no (255, 0, 0, −1) marker (E11) |
 | `dtbase`, the three pairs | no block matches the `.emd` word 35 records (E5) |
 | every entry of `em001_00.arc` (546) | no u32 143 outside one texture's pixels: no data block spells out a joint (E11) |
+
+The block's one kind-3 record is not copied into MH4U's word 35 (no MH4U file has kind 3), and the three
+paired monsters' joint records are of kinds 1 and 4 (E5), so it is not evidence of a stored sever record.
 
 **The cut part is a model.** Each of the three paired monsters' MHXX archive holds a `_tail.mod` beside its body
 model (`enemy/em001/em001_00/mod/em001_00_tail.mod`, likewise em024_00 and em027_00), and MH4U and MH3U ship the
@@ -98,14 +101,17 @@ The function's name is MHGU Definitive Edition's: their GU code calls `spawnCutP
 id (their `monsters/gogmazios/notes/port-checklist.md`). What our check adds is the same call in MHXX's own module
 and the joint it passes; the name stays theirs.
 
-**What a port authors.** The kind-0 records themselves, laid out as MH4U's are: the (255, 0, 0, −1) marker where
+**What a port authors.** The sever records themselves, laid out as MH4U's are: the (255, kind, 0, −1) marker where
 MH4U has one, then one record per bone, then the −1 terminator. The joints are the one the source class passes and
 the bones that hang off it in the source model's chain: MH4U's own are 143, 144 and 145 on Rathian and 143 and 144
 on Kushala Daora and Teostra, and both games' Rathian body models carry the same 43 bone ids with the same parents
-([mod](mod.md), check M2). The record's `kind` is 0, its `a` is 0, its `index` is 1 on the first bone and 2 on the
-ones after it in most files, its `limit` is usually the bone id, and its `b` is 0 or a number that steps by 24 across
-a file's records (meaning unknown): MH4U's 94 records over 43 files are the only source for those four fields, so
-a port copies the shape, not a known value.
+([mod](mod.md), check M2). The record that spawns the cut object has `index` 1 and the cut object's kind: 0 for a
+tail, and 0, 3 or 5 for cut types 1, 2 and 3 (0xc2d314 reads the byte at +4 and the word at +8). The records for the
+other bones in the chain carry `index` 2 or 0, which 0xc2d314 skips. `a` is 0. `b` is 0 or an offset to a 24-byte
+block of six offsets, which the `.emd` loader relocates; all 58 nonzero ones point at in-file blocks with three
+nonzero words, and no MH4U reader uses the block, so what it drives is unknown. `limit` is the joint on 81 of the 95
+records and one or two less on the rest; no MH4U reader reads it on a sever record. A port copies MH4U's shape; the
+values of `limit`, `a` and `b` are not known to matter ([emd](emd.md), checks E11, E12).
 
 ## What this means for the mod
 
@@ -113,10 +119,13 @@ a port copies the shape, not a known value.
   and the joint records into MH4U's layout and compares them: the break parts are equal on the three monster pairs, and
   the joint records are 6 of 6 on Rathian and absent on both sides for Kushala Daora and Teostra.
 - **MH4U's sever records have no counterpart in `dtbparts` or `dtbase`; they are code on MHXX's side.** MH4U's
-  `.emd` word 35 stores, after a (255, 0, 0, −1) marker, the kind-0 records that sever or detach a bone (3 on
-  Rathian, 2 each on Kushala Daora and Teostra). No block of either file holds a kind-0 record, and the pairs' sever
-  joints are not stored as records: the monster class passes the joint to the engine's cut-part spawner, and the cut
-  part is a separate `_tail.mod`. A port therefore authors the records ("Sever and detach records").
+  `.emd` word 35 stores, after a (255, kind, 0, −1) marker, the sever/detach records that name a bone (3 on Rathian,
+  2 each on Kushala Daora and Teostra). Their kind is 0, 3 or 5, for a cut type 1, 2 or 3; MH4U's cut-object
+  spawner 0xc2d314 reads the kind, the `index` (1 on the record it acts on) and the joint, and no reader reads
+  `limit`, `a` or `b` on a sever record ([emd](emd.md#joint-and-sever-record-24-bytes)). No block of either file
+  holds a sever record, and the pairs' sever joints are not stored as records: the monster class passes the joint to
+  the engine's cut-part spawner, and the cut part is a separate `_tail.mod`. A port therefore authors the records
+  ("Sever and detach records").
 - The part break HP records and the visibility state records are named from MHGU Definitive Edition's `dtbparts`
   work and stay unverified here; the blocks with no counterpart are the mod's to author or to leave alone.
 
