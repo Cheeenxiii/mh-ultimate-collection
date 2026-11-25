@@ -142,6 +142,23 @@ writing one would carry guesses into a port. What has to be read to lift it:
 - **the source fields.** MH3U's ESQ six sections and 0x3C-byte entries and MHXX's PSL descriptors
   and lists need the same treatment: the loaders (`0x3b30cc` MH3U, `0x6eb318` MHXX v1.4) only
   relocate their offsets, and the fields they point at are not placed.
+- **the source fields' readers.** A linear code pass found where the source resources are loaded but
+  not where their fields are read. MH3U loads the ESQ with `0x8475fc` (15 per-class setup callers
+  between `0x69a930` and `0x821d88`), stores it at the monster's `+0x1a68`, and `0x8fca78` puts it
+  in the class resource array at `+0x24d8`; the factory is `0xa1a544`. MHXX's PSL loader is
+  `0x6eb318`, its factory `0xabf6b4`, and the per-monster setups `0x2ddcf8`, `0x2ddfc0`,
+  `0x3248d0`, `0x4037ac` and `0x8aa090` load it beside `cMhEffectSequence` (`0xd740e0`). No
+  instruction reads `[x+0x1a68]` or a `0x24d8` displacement directly, and the PSL factory has no
+  direct caller. A pointer-table pass then placed the class methods: MH3U's `rEffectSequence`
+  vtable is `0xb6e9a8`, the factory `0xa1a544` sits at slot `0xb6f3e0` and the loader `0x3b30cc` at
+  slot `0xb58044`, and the factory's objects use vtable `0xb575e8`. MHXX's resource vtable is
+  `0xd0d5e8` (the factory `0xabf6b4` in its slot 2, `0xd0d5f0`) and the objects it makes use vtable
+  `0xcf64c0`, whose slot 11 is the loader `0x6eb318` (`0xcf64ec`). All of those methods are
+  lifecycle, serializer and helper code; none reads the slot table, the descriptors or the
+  0x3C-byte ESQ entries. The field readers are therefore not class methods: the next targets are
+  the manager the path loader calls (MH3U global `0xca8980`, MHXX `0xd3b0d0`) and the class
+  resource-array setup `0x8fca78` on MH3U's side, then whatever reads those array entries - the
+  array base is computed, so that needs a data-flow pass or an in-game trace.
 - **the effect-id map.** Each record's effect id is a game's own id space. `data/effectmap` holds
   the source-to-MH4U rows (empty until the maintainer's dumps and a check fill them), and
   `mhuc.effectmap.EffectMap.check` refuses a conversion that meets an id they don't name. The
