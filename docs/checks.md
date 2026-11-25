@@ -604,6 +604,43 @@ the Ancestral Steppe at about 140 s — the map loads. The 125 load is slow (abo
 departure) but it completes; the base quest with the original file is the control (map at about
 60 s). 124 (GU) uses the same fix; its route and load are P4's result below.
 
+## A converted material loads (M3)
+
+MH4U's rMaterial load (`0x00be7000`) accepts only its own MRL signature at +0x10: it compares it
+with the value the engine holds and refuses the file otherwise ([specs/mrl.md](../specs/mrl.md)).
+MH3U's material files carry `0x3810b2e2` where MH4U's own carry `0xcec1aa61`, so the archive that
+shipped the source material as-is never completed its load (the area init stayed in state 1 with
+the resource's `+0x50` at `0x200`/`0x210`; #182). `mhuc convert monster` now writes MH4U's
+signature and keeps every other byte of the material.
+
+| Check | What | Pass |
+|---|---|---|
+| M3 | a converted MH3U material loads in MH4U's archive loader | the archive resource's `+0x50` reaches the done bit, the resource load and the factory run for 125, and `HW.Memory UnmappedAccess` is 0 through the load |
+
+Procedure:
+
+1. Convert MH3U Rathian for id 125 with the self-sufficient archive of #182 (`--mh4u-romfs`,
+   the stand-in's kept entries appended). The material's two files in it are byte for byte what
+   this branch's converter writes: the run above was made on the #182 working tree, which carries
+   the material change only on top of it. Deploy the archive as the port's `data/em125.arc` in
+   the P4 profile.
+2. Run the P4 route headless for 150 s with the mgr probe on the manager's load request
+   (`0x00c16370`) and on the area init (`0x00bc31d4`), and count `HW.Memory UnmappedAccess`.
+3. Read the probe's status: `0x200` while the archive loads, bit 0 set when it is done.
+
+Result (2026-11-25, USA v1.3.0 update, headless runner, the P4 route): **the material side
+passes.** The manager is asked for `data\em125` at 51.54 s and returns the archive object; the
+area init polls its `+0x50` at `0x00000200` in state 1, then reads `0x00928a01` at 52.64 s with
+the init back in state 0. `resource load: id 125 -> its own record` and `factory: id 125 ->
+stand-in 1` follow at 52.97 s, and `HW.Memory UnmappedAccess` is 0 up to that point. The same
+archive with the source signature stalls exactly as #182 recorded.
+
+The map itself loads: the screenshot at 148 s shows the player and the two Palicoes in the
+Ancestral Steppe. **The Rathian is still not drawn**: from the factory line the model-missing
+read storm starts (519,678 unmapped reads by 150 s, at the same PCs as #182: `0x0092076c`,
+`0x00936a34`, `0x00944e60`, `0x00920578`, `0x0091518c`). The material loads; the model binding to
+it is the remaining cause, and it is #203's model-side half.
+
 ## A ported camera's cut-in (C2)
 
 MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an action posts by

@@ -11,7 +11,7 @@ import struct
 import pytest
 
 from mhuc import monsters
-from mhuc.formats import arc, camera, tex
+from mhuc.formats import arc, camera, mrl, tex
 
 SLOTS = frozenset({0, 1, 2, 3, 4})
 ROW = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
@@ -31,14 +31,24 @@ def camera_mhxx() -> bytes:
     return b"LCM\0" + struct.pack("<HH", 5, 256) + struct.pack("<256I", *offsets) + bytes(0xAC)
 
 
+def material_mhxx() -> bytes:
+    """A synthetic MHXX MRL 0x20: one texture reference and one material record."""
+    refs = (struct.pack("<III", mrl.TEXTURE_CLASS, 0, 0)
+            + b"enemy\\em001_00\\mod\\em001_00_BM".ljust(64, b"\0"))
+    records = struct.pack("<II", 0, 0x12345678) + bytes(0x3C - 4)
+    header = mrl.HEADER.pack(b"MRL\0", 0x20, 1, 1, mrl.SIGNATURES["mhxx"], 0x1C,
+                             0x1C + len(refs))
+    return header + refs + records
+
+
 def source_entries() -> list[arc.Entry]:
     image = tex.from_rgba("RGBA8", 8, 8, bytes([1, 2, 3, 4]) * 64)
     image.version = 0xA6
     return [
         entry("enemy/em001/em001_00/mod/em001_00.mod", b"MOD\0" + bytes(8)),
-        entry("enemy/em001/em001_00/mod/em001_00.mrl", b"MRL\0" + bytes(8)),
+        entry("enemy/em001/em001_00/mod/em001_00.mrl", material_mhxx()),
         entry("enemy/em001/em001_00/mod/em001_00_tail.mod", b"MOD\0" + bytes(4)),
-        entry("enemy/em001/em001_00/mod/em001_00_tail.mrl", b"MRL\0" + bytes(4)),
+        entry("enemy/em001/em001_00/mod/em001_00_tail.mrl", material_mhxx()),
         entry("enemy/em001/em001_00/mod/em001_00_BM.tex", tex.write(image)),
         entry("enemy/em001/em001_00/mot/em001_00_0.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
         entry("enemy/em001/em001_00/mot/em001_00_4.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
@@ -74,7 +84,7 @@ def test_the_port_gets_its_own_paths_and_mh4us_archive_version():
     ]
 
 
-def test_the_model_motions_materials_and_ai_script_are_taken_as_is():
+def test_the_model_motions_and_ai_script_are_taken_as_is_and_the_material_only_changes_its_signature():
     out, _ = convert()
     source = {e.file_name: e.data for e in source_entries()}
     pairs = {
@@ -86,7 +96,14 @@ def test_the_model_motions_materials_and_ai_script_are_taken_as_is():
         "enemy/em124/data/em124_cmd.emc": "enemy/cmd_tbl/em001_00_cmdtbl.emc",
     }
     for port_path, source_path in pairs.items():
-        assert next(e for e in out.entries if e.file_name == port_path).data == source[source_path]
+        got, want = next(e for e in out.entries if e.file_name == port_path).data, source[source_path]
+        if port_path.endswith(".mrl"):
+            # specs/mrl.md check MR1: MH4U's loader accepts only its own signature at 0x10.
+            assert struct.unpack_from("<I", got, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
+            assert [i for i in range(len(want)) if want[i] != got[i]] == \
+                list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4))
+        else:
+            assert got == want
 
 
 def test_a_texture_is_mh4us_version_and_otherwise_byte_identical():

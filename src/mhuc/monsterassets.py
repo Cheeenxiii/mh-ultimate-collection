@@ -4,10 +4,14 @@ MH4U loads a monster's model, materials, textures and motion lists from one arch
 the paths the monster's resource table names. This module turns the source game's own monster archive into
 that archive for a ported id:
 
-- **models, materials and textures are taken as they are.** MOD is version 0xE6, MRL 0x20 and TEX 0xA5 in
-  MH3U and MH4U ([mod.md](../specs/mod.md), checks M1 to M3; [tex.md](../specs/tex.md), check T1), so only
-  their paths change. The material files' texture paths are absolute, so those are rewritten in place; the
-  material and mesh names, which the model hashes, stay the source's.
+- **models and textures are taken as they are.** MOD is version 0xE6 and TEX 0xA5 in MH3U and MH4U
+  ([mod.md](../specs/mod.md), checks M1 to M3; [tex.md](../specs/tex.md), check T1), so only their paths
+  change.
+- **materials keep their bytes except two fields.** MH3U and MH4U share MRL 0x20's layout, but each game's
+  loader only accepts the signature its own files carry at 0x10: MH4U's rMaterial load checks it and rejects
+  a foreign one, which leaves the archive it came in unloaded ([mrl.md](../specs/mrl.md)). The converter
+  writes MH4U's signature and moves the absolute texture paths in place; the material names, which hash to
+  the file's material records, stay the source's.
 - **motion lists are converted** from LMT version 66 to version 67, the version MH4U reads
   ([lmt.md](../specs/lmt.md), `lmt.convert`).
 - **the rest is left out** and why is in docs/architecture.md: the monster's data files become MH4U's `.emd`
@@ -23,10 +27,10 @@ import os
 import re
 from dataclasses import dataclass
 
-from .formats import arc, lmt
+from .formats import arc, lmt, mrl
 
 MODEL, MATERIAL, TEXTURE, MOTION = "rModel", "rMaterial", "rTexture", "rMotionList"
-TAKEN = (MODEL, MATERIAL, TEXTURE)          # same format in MH3U and MH4U; only the path changes
+TAKEN = (MODEL, MATERIAL, TEXTURE)          # same versions in MH3U and MH4U; paths and the material's signature change
 MODEL_FLAGS = 0xA0000000                   # MH4U's own model entries carry this (specs/arc.md, size word flags)
 TEXTURE_PATH = re.compile(rb"enemy\\[^\x00]{1,62}")
 
@@ -75,13 +79,17 @@ def _rename(name: str, stem: str, target: str) -> str:
 
 
 def _material(data: bytes, stem: str, target: str) -> bytes:
-    """A material file with its absolute texture paths moved to the target's folder and names.
+    """A material file MH4U's loader accepts, naming the target's textures.
 
     The paths look like `enemy\\em001\\mod\\em001_BM`; the source and target file names are both three digits,
-    so the substitution keeps every string's length and the file's other offsets."""
+    so the substitution keeps every string's length and the file's other offsets. The signature at 0x10 is
+    MH4U's, the value its rMaterial load checks; every other byte stays the source's."""
     old = f"enemy\\{stem}\\mod\\{stem}".encode("ascii")
     new = f"enemy\\{target}\\mod\\{target}".encode("ascii")
-    return data.replace(old, new)
+    try:
+        return mrl.for_mh4u(data.replace(old, new))
+    except mrl.MrlError as e:
+        raise ConvertError(f"the material is not an MRL 0x20 file: {e}") from None
 
 
 def convert(src: bytes, monster_id: int) -> Mod:

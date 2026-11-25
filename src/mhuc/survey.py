@@ -6,7 +6,7 @@ a spec or a report (CLAUDE.md, rule 1). Checks covered: C2, C3 (arc), T1, T3 (te
 G1, G2 (gmd), M1, M3 (mod), Q1, Q2, Q6, Q13, Q18 (quest), E1 (emd), E2 (MHXX dttune), E3 (MH3U
 em_status), E4 (body, attack volume and attack record files), E7 (MHXX dtbase and dtbparts), E8 (MH3U attack
 records against their hit volumes), E9 (MH3U em_status break blocks), E11 (MHXX dtbparts joint record kinds),
-L1 (lmt), C1 (rCameraList), LY1 (MH4U layouts), A1 (rEnemyCmd), S1 (rCollision), X1 (XFS files in either
+L1 (lmt), MR1 (mrl), C1 (rCameraList), LY1 (MH4U layouts), A1 (rEnemyCmd), S1 (rCollision), X1 (XFS files in either
 byte order), SN1 (sound
 resources by kind, version and class id), SN6 (the MH3U wave, bank, request and stream request layouts), S4 (MH4U
 stream requests), U1 (whether a stage resource references the water-surface class uOcean).
@@ -34,6 +34,7 @@ from .formats import (
     lmd,
     lmt,
     lyt,
+    mrl,
     pica,
     romfs,
     sound,
@@ -188,6 +189,13 @@ def survey_entry(type_name: str | None, data: bytes, st: dict, type_id: int | No
             c[f"{x.endian}-endian"] += 1
             c[f"{len(x.classes)} class definitions"] += 1
             c["loose" if type_id is None else f"type 0x{type_id:08x}"] += 1
+    if type_name == "rMaterial" or data[:4] == b"MRL\0":
+        c = st.setdefault("mrl", Counter())
+        if data[:4] != b"MRL\0":
+            c[f"MR1 other magic {data[:4]!r}"] += 1
+            return
+        c.update(mrl.check(data))
+        return
     kind = SOUND_MAGIC.get(data[:4])
     if kind is None and type_id is not None:
         kind = SOUND_CLASSES.get(type_id)
@@ -442,7 +450,7 @@ def report(total: dict) -> str:
     if "max_entry_size" in total:
         lines.append(f"largest ARC entry: 0x{total['max_entry_size']:x} bytes")
     for key in ("arc", "arc flags", "tex", "gmd", "mod", "quest", "emd", "monster data", "lmt", "camera",
-                "emc", "sbc", "xfs", "lyt", "lmd", "stage", "sound"):
+                "emc", "sbc", "xfs", "lyt", "lmd", "stage", "sound", "mrl"):
         if key in total:
             lines.append(f"{key}:")
             lines += [f"  {k}: {v}" for k, v in sorted(total[key].items())]

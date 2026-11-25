@@ -9,7 +9,7 @@ import zlib
 import pytest
 
 from mhuc import cli, monsterassets, monsterdata
-from mhuc.formats import arc, camera, classid, emd, hitdata, lmd, lmt, lyt, pica, sound, stq, xfs
+from mhuc.formats import arc, camera, classid, emd, hitdata, lmd, lmt, lyt, mrl, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -327,10 +327,19 @@ def test_lmt_convert_refuses_a_float_track_block_it_does_not_move():
         lmt.convert(bytes(d))
 
 
+def material_file(signature: int = mrl.SIGNATURES["mh3u"],
+                  texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
+    """A synthetic MRL 0x20 with one texture reference and one material record."""
+    refs = struct.pack("<III", mrl.TEXTURE_CLASS, 0, 0) + texture.ljust(64, b"\0")
+    records = struct.pack("<I", 0x6b5d0d0e) + struct.pack("<I", 0x12345678) + bytes(0x3C - 4)
+    header = mrl.HEADER.pack(b"MRL\0", 0x20, 1, 1, signature, 0x1C, 0x1C + len(refs))
+    return header + refs + records
+
+
 def source_archive(texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
     """A small MH3U-style monster archive: one model, its material naming one texture, and a motion list."""
     model = struct.pack("<4sHHHHII", b"MOD\0", 0xE6, 0, 0, 0, 0, 0)
-    material = (b"MRL\0" + struct.pack("<HH", 0x20, 0) + texture + b"\0" + b"\0" * 4)
+    material = material_file(texture=texture)
     entries = [
         arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rModel"), model),
         arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rMaterial"), material),
@@ -357,6 +366,12 @@ def test_monsterassets_moves_the_source_files_to_the_ported_ids_paths():
     material = paths["rMaterial", "enemy\\em125\\mod\\em125"]
     assert b"enemy\\em125\\mod\\em125_BM" in material.data
     assert b"em001" not in material.data
+    assert struct.unpack_from("<I", material.data, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
+    # the signature is the material's only change besides the moved texture path
+    restored = material.data.replace(b"em125", b"em001")
+    source_material = material_file()
+    assert [i for i in range(len(source_material)) if source_material[i] != restored[i]] == \
+        list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4))
     assert mod.archive_path == "data/em125.arc"
 
 
@@ -938,3 +953,38 @@ def test_lmd_refuses_a_version_it_does_not_lay_out():
     struct.pack_into("<I", data, 4, 0x00010201)
     with pytest.raises(lmd.LmdError, match="version"):
         lmd.read(bytes(data))
+
+
+def test_mrl_reads_the_header_and_the_material_name_hashes():
+    data = material_file()
+    h = mrl.read(data)
+    assert (h["version"], h["materials"], h["references"]) == (0x20, 1, 1)
+    assert (h["references_at"], h["records_at"]) == (0x1C, 0x1C + mrl.REFERENCE)
+    assert mrl.material_hashes(data) == [0x12345678]
+
+
+def test_mrl_for_mh4u_rewrites_only_the_signature():
+    data = material_file(mrl.SIGNATURES["mh3u"])
+    out = mrl.for_mh4u(data)
+    assert len(out) == len(data)
+    assert [i for i in range(len(data)) if data[i] != out[i]] == \
+        list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4))
+    assert struct.unpack_from("<I", out, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
+    assert mrl.for_mh4u(out) == out                       # already MH4U's: unchanged
+
+
+def test_mrl_for_mh4u_refuses_a_file_whose_layout_it_does_not_know():
+    with pytest.raises(mrl.MrlError, match="signature"):
+        mrl.for_mh4u(material_file(0x12345678))
+    with pytest.raises(mrl.MrlError, match="version"):
+        mrl.for_mh4u(material_file()[:4] + struct.pack("<I", 0x21) + material_file()[8:])
+
+
+def test_the_survey_counts_a_material_header():
+    from mhuc import survey
+    counts: dict = {}
+    survey.survey_entry("rMaterial", material_file(), counts)
+    assert counts["mrl"]["MR1 readable"] == 1
+    assert counts["mrl"]["MR1 signature 0x3810b2e2"] == 1
+    assert counts["mrl"]["MR1 texture reference with a path"] == 1
+    assert counts["mrl"]["MR1 material records with unique name hashes"] == 1
