@@ -15,7 +15,8 @@ monster of that game; `--motion` overrides it. The action ids being the same, th
 can be compared: the same action should start the same animation.
 
     list    --game mh4u|mh3u|mhxx ... --dispatcher ADDR [--motion ADDR] [--functions TSV] -o x.tsv
-    compare A.tsv B.tsv [--values]
+    compare A.tsv B.tsv [--values] [--game-a/--lmt-a, --game-b/--lmt-b] [--mapping FILE]
+    place   A.tsv B.tsv --game-a/--lmt-a --game-b/--lmt-b -o placement.tsv
 
 `list` takes the same code arguments as monster_actions.py: --exheader/--code/--range for
 MH4U and MH3U, --module/--crs/--base for a MHXX CRO module. It writes one row per action
@@ -29,6 +30,15 @@ animation's frame count, loop frame and track count are its signature. The outpu
 differing ids into same motion at another index (equal signature, or the signature found
 elsewhere in the other game), different motion, and no animation at the decoded index;
 `--mapping` writes the per-id mapping.
+
+`place` turns the comparison into a port's plan for a monster that runs the target game's
+handlers (reference/README.md, "A 3U Rathian's moves on MH4U's handlers"): for every action
+id both games have whose handler starts a constant animation, one row says which animation
+of the source game goes at which (file, slot) of the target game's motion lists, and which
+action ids ask for it. Actions it cannot place are written as rows of their own: the ones
+whose two handlers' animation has no unique match (`unresolved`), and a target slot two
+actions want with different source animations (`conflict`; running another target handler
+that starts the same animation is then the choice to check, not something the tool decides).
 
 The output holds motion indices read from the games' code: keep the TSVs outside the
 repository (reference/README.md; CLAUDE.md rule 1).
@@ -48,6 +58,7 @@ MOTION = {"mh4u": 0x0094E318, "mhxx": 0x008EB108, "mh3u": 0x00828828}
 SCAN_CAP = 0x600              # a handler block's extent, when no function table bounds it
 MAX_MOTION = 0x2000           # indices above this are a register we didn't follow, not a motion
 HEADER = "# cat\tidx\thandler\tmotion\thow\n"
+PLACEMENT_HEADER = "# target_file\ttarget_slot\tsource_file\tsource_slot\thow\tactions\n"
 
 
 def functions_table(path: str) -> dict[int, int]:
@@ -235,17 +246,23 @@ def same_motion(a: tuple[int, int, int], b: tuple[int, int, int]) -> bool:
 
 
 def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) -> dict:
-    """How the differing ids' motions compare, with their animation signatures."""
+    """How the common ids' motions compare, with their animation signatures.
+
+    `same_index` holds the ids whose two handlers start the same index; the rest split by
+    content (`same`, `same_track`, `elsewhere`, `different`, `unresolved`, `ambiguous`). An
+    `elsewhere` item also carries where in the source game's lists its signature was found."""
     index_a = {}
     for fi, anims in enumerate(lmts_a):
         for slot, sig in enumerate(anims):
             if sig:
                 index_a.setdefault(sig, []).append((fi, slot))
-    same, same_track, elsewhere, different, unresolved, ambiguous = [], [], [], [], [], []
+    same, same_track, elsewhere, different, unresolved, ambiguous, same_index = (
+        [], [], [], [], [], [], [])
     for key in sorted(set(a) & set(b)):
         if a[key]["how"] != "constant" or b[key]["how"] != "constant":
             continue
         if a[key]["motion"] == b[key]["motion"]:
+            same_index.append((key, a[key]["motion"]))
             continue
         fa, sa = decode_motion(game_a, a[key]["motion"])
         fb, sb = decode_motion(game_b, b[key]["motion"])
@@ -254,7 +271,7 @@ def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) ->
         if xa is None or xb is None:
             hits = index_a.get(xb, []) if xb is not None else []
             if len(hits) == 1:
-                elsewhere.append((key, a[key]["motion"], b[key]["motion"], xb))
+                elsewhere.append((key, a[key]["motion"], b[key]["motion"], xb, hits[0]))
             elif len(hits) > 1:
                 ambiguous.append((key, a[key]["motion"], b[key]["motion"], xb))
             else:
@@ -266,7 +283,50 @@ def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) ->
         else:
             different.append((key, a[key]["motion"], b[key]["motion"], xa, xb))
     return dict(same=same, same_track=same_track, elsewhere=elsewhere, different=different,
-                unresolved=unresolved + ambiguous, ambiguous=ambiguous)
+                unresolved=unresolved + ambiguous, ambiguous=ambiguous, same_index=same_index)
+
+
+def placement(s: dict, game_a: str, game_b: str):
+    """Where a ported monster's source animations go in the target game's motion lists.
+
+    The port runs the target game's handler for an action id both games have, so that handler
+    asks for the target's motion index: the source's animation must be written at that index
+    (reference/README.md, "A 3U Rathian's moves on MH4U's handlers"). Returns one row per
+    (target file, slot) and source slot -- `conflict` when those actions want two different
+    source animations -- plus the ids whose animation is unknown."""
+    placed = collections.defaultdict(list)      # (target file, slot) -> [(action, source, how)]
+    for how, items in (("same", s["same"]), ("same-track", s["same_track"]),
+                       ("different", s["different"])):
+        for item in items:
+            key, ma, mb = item[:3]
+            placed[decode_motion(game_a, ma)].append((key, decode_motion(game_b, mb), how))
+    for key, ma, _mb, _sig, found in s["elsewhere"]:
+        placed[decode_motion(game_a, ma)].append((key, found, "elsewhere"))
+    for key, motion in s["same_index"]:
+        placed[decode_motion(game_a, motion)].append(
+            (key, decode_motion(game_b, motion), "same-index"))
+    rows = []
+    for target in sorted(placed):
+        by_source = collections.defaultdict(list)
+        for key, source, how in placed[target]:
+            by_source[source].append((key, how))
+        if len(by_source) > 1:
+            for source in sorted(by_source):
+                rows.append(dict(target=target, source=source, how="conflict",
+                                 actions=sorted((k for k, _ in by_source[source]),
+                                                key=action_key)))
+            continue
+        source, hits = next(iter(by_source.items()))
+        rows.append(dict(target=target, source=source,
+                         how="+".join(sorted({h for _, h in hits})),
+                         actions=sorted((k for k, _ in hits), key=action_key)))
+    unresolved = [(item[0], decode_motion(game_a, item[1])) for item in s["unresolved"]]
+    return rows, unresolved
+
+
+def action_key(key: tuple[int, int | None]) -> tuple[int, int]:
+    """Sort an action id with a category-only action before its indexed ones."""
+    return (key[0], -1 if key[1] is None else key[1])
 
 
 def read_rows(path: str) -> dict[tuple[int, int | None], dict]:
@@ -344,13 +404,45 @@ def cmd_compare(args) -> int:
                 row(key, ma, mb, "same", sig, sig)
             for key, ma, mb, sa, sb in s["same_track"]:
                 row(key, ma, mb, "same-track", sa, sb)
-            for key, ma, mb, sig in s["elsewhere"]:
+            for key, ma, mb, sig, _found in s["elsewhere"]:
                 row(key, ma, mb, "same-elsewhere", sig, sig)
             for key, ma, mb, sa, sb in s["different"]:
                 row(key, ma, mb, "different", sa, sb)
             for item in s["unresolved"]:
                 key, ma, mb = item[:3]
                 row(key, ma, mb, "unresolved")
+    return 0
+
+
+def cmd_place(args) -> int:
+    a, b = read_rows(args.a), read_rows(args.b)
+    lmts_a = [read_lmt(open(path, "rb").read()) for path in args.lmt_a]
+    lmts_b = [read_lmt(open(path, "rb").read()) for path in args.lmt_b]
+    s = content_split(a, b, args.game_a, lmts_a, args.game_b, lmts_b)
+    rows, unresolved = placement(s, args.game_a, args.game_b)
+    with open(args.output, "w") as f:
+        f.write(PLACEMENT_HEADER)
+        for r in rows:
+            (tf, ts), (sf, ss) = r["target"], r["source"]
+            f.write(f"{tf}\t{ts}\t{sf}\t{ss}\t{r['how']}\t"
+                    f"{' '.join(fmt_id(k) for k in r['actions'])}\n")
+        for key, (tf, ts) in unresolved:
+            f.write(f"{tf}\t{ts}\t\t\tunresolved\t{fmt_id(key)}\n")
+    placed = sum(len(r["actions"]) for r in rows if r["how"] != "conflict")
+    slots = sum(1 for r in rows if r["how"] != "conflict")
+    conflicts = [r for r in rows if r["how"] == "conflict"]
+    print(f"placement: {slots} target slots for {placed} actions; "
+          f"conflict on {len({r['target'] for r in conflicts})} slot "
+          f"({sum(len(r['actions']) for r in conflicts)} actions), "
+          f"unresolved {len(unresolved)}, "
+          f"not compared {sum(compare(a, b)['skipped'].values())}")
+    for r in conflicts:
+        print(f"conflict: target {r['target'][0]}/{r['target'][1]} from source "
+              f"{r['source'][0]}/{r['source'][1]}: "
+              f"{' '.join(fmt_id(k) for k in r['actions'])}")
+    if unresolved:
+        print("unresolved ids:")
+        print(fmt_ids([k for k, _ in unresolved]))
     return 0
 
 
@@ -380,6 +472,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lmt-b", nargs="+", help="game B's LMT files, in file order")
     p.add_argument("--mapping", help="write the per-id motion mapping to this TSV")
     p.set_defaults(fn=cmd_compare)
+    p = sub.add_parser("place", help="where a ported monster's source animations go")
+    p.add_argument("a")
+    p.add_argument("b")
+    p.add_argument("--game-a", required=True, choices=tuple(MOTION))
+    p.add_argument("--lmt-a", nargs="+", required=True, help="game A's LMT files, in file order")
+    p.add_argument("--game-b", required=True, choices=tuple(MOTION))
+    p.add_argument("--lmt-b", nargs="+", required=True, help="game B's LMT files, in file order")
+    p.add_argument("-o", "--output", required=True)
+    p.set_defaults(fn=cmd_place)
     a = ap.parse_args(argv)
     return a.fn(a)
 
