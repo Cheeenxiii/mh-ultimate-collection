@@ -10,7 +10,7 @@ import check_ids
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "notes")
+COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "files", "notes")
 
 
 def write_registry(path, rows):
@@ -20,8 +20,8 @@ def write_registry(path, rows):
         writer.writerows(rows)
 
 
-def row(ident, key="rathian-gu", stand_in="1", kind="monster"):
-    return [kind, str(ident), key, "mhxx", "em001", "Rathian", stand_in, ""]
+def row(ident, key="rathian-gu", stand_in="1", kind="monster", files="model,motions,tail,cmd"):
+    return [kind, str(ident), key, "mhxx", "em001", "Rathian", stand_in, files, ""]
 
 
 def as_dict(fields):
@@ -56,6 +56,35 @@ def test_a_stand_in_is_an_mh4u_id():
 def test_an_unknown_kind_has_no_range_yet():
     rows = [as_dict(row(124, kind="map"))]
     assert any("no id range" in p for p in check_ids.check_rows(rows))
+
+
+def test_a_file_kind_the_record_does_not_have_is_refused():
+    problems = check_ids.check_rows([as_dict(row(124, files="model,wings"))])
+    assert any("wings" in p and "isn't one of" in p for p in problems), problems
+
+
+def test_a_file_kind_may_not_be_listed_twice():
+    problems = check_ids.check_rows([as_dict(row(124, files="model,motions,model"))])
+    assert any("'model' is listed twice" in p for p in problems), problems
+
+
+def test_a_port_that_ships_no_files_is_refused():
+    problems = check_ids.check_rows([as_dict(row(124, files=""))])
+    assert any("files is empty" in p for p in problems), problems
+
+
+def test_the_header_carries_the_kinds_each_port_ships(tmp_path):
+    registry = tmp_path / "registry.csv"
+    header = tmp_path / "ids.h"
+    write_registry(registry, [row(124), row(125, key="rathian-3u", files="model,motions,tail")])
+    args = ["--registry", str(registry), "--header", str(header)]
+    assert check_ids.main(args + ["--write"]) == 0
+    text = header.read_text()
+    assert "#define MHUC_FILES_MODEL 0x0001u" in text
+    assert "#define MHUC_FILES_CMD 0x0040u" in text
+    assert ("{124, 1, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | "
+            "MHUC_FILES_CMD},") in text
+    assert "{125, 1, MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL}," in text
 
 
 def test_the_header_the_registry_generates_is_what_the_check_compares(tmp_path, capsys):
