@@ -478,14 +478,14 @@ writes.
 **Action 4 is the one that needs new C.** Its handler 0x0083cc24 is shared engine code (0x3cc
 bytes) that dispatches on the order state. It makes 25 calls with an MH4U counterpart and
 calls 7 of the class's own sub-handlers (0x00691930, 0x00691b38, 0x00691c74, 0x00691de0,
-0x00691fac, 0x006921b4, 0x00692290), which have to be translated with it. What blocks it:
+0x00691fac, 0x006921b4, 0x00692290), which have to be translated with it. What it still needs:
 
 - **#55:** 0x00161798 and 0x0016052c, both reached through 0x00691fac. These are two of the
   19 calls whose MH4U counterpart is unknown, so action 4 waits on #55.
 - **The plugin API's arguments:** ABI 3's `call` sets r0-r2 only. r3 can be set before the call
   with `set_reg`, but the guest's VFP registers cannot, so a call that passes a float in s0 or
-  s1 (0x00833b2c, 0x008437f4 and 0x00839514 here) cannot be made as MH3U makes it. That needs
-  an ABI that also takes the float and r3 arguments, which is engine work (the fork).
+  s1 (0x00833b2c, 0x008437f4 and 0x00839514 here) cannot be made as MH3U makes it. ABI 4's
+  `call2` adds r3 and the floats s0/s1 ([#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134), check P4); the s2/s3 arguments are still not carried.
 - **MH3U's data:** 0x0084704c and 0x00847134 take 0x00b0b194, a 44-byte action-start record
   in MH3U's image ([specs/actiondata.md](../specs/actiondata.md)). Its MH4U counterpart is
   built from the dumps by `reference/monster_attack_records.py`, checked against the shared
@@ -495,6 +495,11 @@ calls 7 of the class's own sub-handlers (0x00691930, 0x00691b38, 0x00691c74, 0x0
   is the C and the calls above.
 - **One shared branch:** the handler falls back to 0x00858b6c, the shared 0/3 handler, so that
   branch can call MH4U's 0x0094dc84 by the same map as 13/9.
+
+The arguments are answered: ABI 4's `call2` sets r0-r3 and s0/s1 and returns s0, so the calls
+that pass those floats can be made as MH3U makes them ([#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134),
+check P4). A call that needs s2 is not covered yet: the sub-handler at 0x00692078 calls
+0x0083336c with s2 = 80.
 
 `reference/monster_handlers.py` builds both results from the two inventories and the motion
 list. `targets` prints the per-id candidates; `table` writes the mapped header; `worklist`
