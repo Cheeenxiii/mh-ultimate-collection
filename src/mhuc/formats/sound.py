@@ -181,3 +181,82 @@ def check_bank(data: bytes) -> dict:
     return {"SN6 bank entries": len(bank.entries), "SN6 bank groups": len(bank.groups),
             "SN6 bank tail records": len(bank.tail)}
 
+
+# ---------------------------------------------------------------- requests
+
+REQUEST_MAGIC = b"SREQ"
+REQUEST_VERSIONS = (6, 8)
+REQUEST_HEADER = 0x10
+REQUEST_RECORD = 92
+REQUEST_WORDS = 23
+NO_BANK = 0xFFFFFFFF
+
+
+@dataclass(frozen=True)
+class RequestRecord:
+    """One 92-byte record, kept as its 23 u32 words; the fields that are known are the properties."""
+    words: tuple[int, ...]
+
+    @property
+    def id(self) -> int:
+        """The request id code asks for, the low half of word 0."""
+        return self.words[0] & 0xFFFF
+
+    @property
+    def bank(self) -> int | None:
+        """Which of the request's banks to load (word 0x54's index), or None when there is none."""
+        return None if self.words[21] == NO_BANK else self.words[21]
+
+
+@dataclass(frozen=True)
+class Request:
+    version: int
+    records: tuple[RequestRecord, ...]
+    banks: tuple[str, ...]   # the bank resources' paths, in the order a record's index names them
+
+
+def read_request(data: bytes) -> Request:
+    """Parse one request. Raises SoundError unless its records and its string table tile the file."""
+    if len(data) < REQUEST_HEADER or data[:4] != REQUEST_MAGIC:
+        raise SoundError("not a request (magic)")
+    version, count, strings_at = struct.unpack_from("<3I", data, 4)
+    if version not in REQUEST_VERSIONS:
+        raise SoundError(f"SREQ version {version}, not MH4U's 8 or MH3U's 6")
+    if strings_at != REQUEST_HEADER + REQUEST_RECORD * count:
+        raise SoundError(f"string table at {strings_at:#x}, expected "
+                         f"{REQUEST_HEADER + REQUEST_RECORD * count:#x} for {count} records")
+    if strings_at + 4 > len(data):
+        raise SoundError("no room for the string table")
+    first, = struct.unpack_from("<I", data, strings_at)
+    if first < strings_at or (first - strings_at) % 4:
+        raise SoundError(f"first bank name at {first:#x}, not a whole number of offsets after {strings_at:#x}")
+    names_n = (first - strings_at) // 4
+    if strings_at + names_n * 4 > len(data):
+        raise SoundError("string offsets run past the end of the file")
+    banks, at = [], first
+    for i in range(names_n):
+        offset, = struct.unpack_from("<I", data, strings_at + 4 * i)
+        if offset != at:
+            raise SoundError(f"bank {i}: name at {offset:#x}, expected {at:#x}")
+        end = data.find(b"\0", offset)
+        if end < 0:
+            raise SoundError(f"bank {i}: name at {offset:#x} isn't NUL-terminated")
+        banks.append(data[offset:end].decode("latin-1"))
+        at = end + 1
+    if at != len(data):
+        raise SoundError(f"bank names end at {at:#x}, the file at {len(data):#x}")
+    records = tuple(RequestRecord(struct.unpack_from(f"<{REQUEST_WORDS}I", data,
+                                                     REQUEST_HEADER + REQUEST_RECORD * i))
+                    for i in range(count))
+    for i, record in enumerate(records):
+        if record.bank is not None and record.bank >= names_n:
+            raise SoundError(f"record {i}: bank {record.bank} of {names_n}")
+    return Request(version, records, tuple(banks))
+
+
+def check_request(data: bytes) -> dict:
+    """The counts check SN6 keeps for one request; read_request has already validated it."""
+    request = read_request(data)
+    return {"SN6 request records": len(request.records), "SN6 request banks": len(request.banks)}
+
+

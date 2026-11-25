@@ -282,3 +282,40 @@ def test_sound_refuses_a_bank_group_whose_first_entry_is_past_the_entries():
     with pytest.raises(sound.SoundError, match="first entry 3 of 2"):
         sound.read_bank(bytes(d))
 
+
+def request(version: int = 6, records: int = 2) -> bytes:
+    """A hand-built SREQ: request ids 0 and 1, both naming bank 0, then the one bank's path."""
+    banks = ["sound\\se\\em\\em001\\snd_em001"]
+    strings_at = sound.REQUEST_HEADER + sound.REQUEST_RECORD * records
+    names_at = strings_at + 4 * len(banks)
+    d = bytearray(names_at + len(banks[0]) + 1)
+    struct.pack_into("<4s3I", d, 0, b"SREQ", version, records, strings_at)
+    for i in range(records):
+        words = [0] * sound.REQUEST_WORDS
+        words[0], words[21] = 0x7F010000 | i, 0
+        struct.pack_into(f"<{sound.REQUEST_WORDS}I", d, sound.REQUEST_HEADER + sound.REQUEST_RECORD * i, *words)
+    struct.pack_into("<I", d, strings_at, names_at)
+    d[names_at:names_at + len(banks[0])] = banks[0].encode()
+    return bytes(d)
+
+
+def test_sound_reads_mh3us_sreq_version_6():
+    """specs/sound.md request version 6: header 0x10, 92-byte records, then one offset per bank and the
+    NUL-terminated bank paths; word 0's low half is the request id and word 0x54 the bank index"""
+    r = sound.read_request(request())
+    assert (r.version, len(r.records), r.banks) == (6, 2, ("sound\\se\\em\\em001\\snd_em001",))
+    assert [(x.id, x.bank) for x in r.records] == [(0, 0), (1, 0)]
+
+
+def test_sound_refuses_a_request_record_naming_a_bank_past_the_string_table():
+    d = bytearray(request())
+    struct.pack_into("<I", d, sound.REQUEST_HEADER + sound.REQUEST_RECORD + 0x54, 1)
+    with pytest.raises(sound.SoundError, match="record 1: bank 1 of 1"):
+        sound.read_request(bytes(d))
+
+
+def test_sound_refuses_a_request_string_table_that_does_not_follow_the_records():
+    d = bytearray(request())
+    struct.pack_into("<I", d, 0x0C, sound.REQUEST_HEADER + sound.REQUEST_RECORD + 4)
+    with pytest.raises(sound.SoundError, match="string table at"):
+        sound.read_request(bytes(d))

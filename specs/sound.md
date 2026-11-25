@@ -139,7 +139,25 @@ MH3U's bank has the same container as version 11: a 0x14-byte header, 12-byte gr
 |---|---|---|---|---|
 | 0x00 | char[4] | magic `SREQ` | unverified | Definitive Edition snd4u2gu.py |
 | 0x04 | u32 | version 8 | unverified | Definitive Edition snd4u2gu.py |
-| entries | 92 bytes each | one per request id: which bank key plays, with volume and parameters (field list in snd4u2gu.py) | unverified | Definitive Edition snd4u2gu.py |
+| 0x08 | u32 | record count n | unverified | Definitive Edition snd4u2gu.py |
+| 0x0C | u32 | string table offset: 0x10 + 92 n | unverified | Definitive Edition snd4u2gu.py |
+| 0x10 + 92 × i | 92 bytes | one record per request id: word 0's low half is the id, word 5 the per-monster category, words 9 and 10 the level in dB, word 21 the bank index and word 22 a build-time pointer slot | unverified | Definitive Edition snd4u2gu.py |
+
+## Request (`SREQ`, version 6)
+
+MH3U's request has the same container as version 8, verified on every MH3U request read (SN6): a 0x10-byte header, one 92-byte record per request, then one u32 offset per bank and the NUL-terminated bank paths in order, ending the file. The records' words are not version 8's: version 6 leaves words 8, 10, 17 and 18 at other values and packs word 5 differently, so only the request id and the bank index are laid out here.
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `SREQ` | verified | every MH3U request (SN6) |
+| 0x04 | u32 | version 6 | verified | every MH3U request (SN6) |
+| 0x08 | u32 | record count n | verified | SN6: the string table starts at 0x10 + 92 n |
+| 0x0C | u32 | string table offset | verified | SN6: 0x10 + 92 n in every file |
+| 0x10 + 92 × i, +0x00 | u16 | the request id | verified | SN6: the ids are unique and ascending in every file |
+| 0x10 + 92 × i, +0x02 | u16 | flags: 0x7f00 or 0x7f01 observed; meaning not traced | unverified | SN6 (histogram) |
+| 0x10 + 92 × i, +0x24 | f32 | level in dB: -2.08 on Rathian's requests and -3.0 on a stage's | unverified | SN6 (histogram); version 8's word 9 has that meaning |
+| 0x10 + 92 × i, +0x54 | u32 | bank index into the string table, 0xFFFFFFFF for none | verified | SN6: every value is a valid index or 0xFFFFFFFF, and the string table tiles the file |
+| 0x10 + 92 × i, other words | u32 | not traced; version 8's meanings don't hold | unverified | SN6 (histograms) |
 
 ## Area emitters (`SES\0`, version 0x20120623)
 
