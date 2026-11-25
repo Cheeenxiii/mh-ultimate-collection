@@ -96,12 +96,13 @@ the effect lists at +0x24 and +0x28).
 | `+0x24` | effect lists | 1 |
 | `+0x28` | a second effect list | 1 |
 
-The stand-in's record names `enemy\em001\...` paths. On its first frame the plugin builds,
+The stand-in's record names paths under the stand-in's own id (`enemy\em001\...` for 124
+and 125, `enemy\em015\...` for 126 and 127). On its first frame the plugin builds,
 for each registered id, a record of its own from the stand-in's: the same fields and slots,
 each path copied to the game's heap. A port ships only some of the record's path kinds (its
 arc holds the model, motions, tail and command for 124 and 125, 125's command is her converted
-MH3U AI script, and 126's holds the model and its four borrowed motion lists,
-[specs/emc.md](../../specs/emc.md)); MH4U stops the load on a path
+MH3U AI script, 126's holds the model and its four borrowed motion lists, and 127's the model
+and its three motion lists ([specs/emc.md](../../specs/emc.md)); MH4U stops the load on a path
 that is not there, which is what hung a 3U session at "Now Loading" when the 125 record named
 13 paths and `em125.arc` ships 6
 ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)). So the registry's
@@ -112,7 +113,8 @@ not an id and stays). The motion slots are named, `motions=0-4` or `motions=0,2,
 those slots are rewritten and the other slots keep the stand-in's paths, because the port's
 motion-number translation only targets the source slots it ships (125 keeps MH4U's
 `enemy\em001\mot\em001_3` and `_4`; 126 ships MHXX's slots 0, 2, 3 and 4 and keeps the
-stand-in's 1 and 5). For a kind it does not ship, the stand-in's path is
+stand-in's 1 and 5; 127 ships slots 0, 1 and 2 and keeps 3, 4 and 5). For a kind it does not
+ship, the stand-in's path is
 copied unchanged, so the monster loads MH4U's own camera, motion effects and effect lists
 until its game's are converted; 125 ships her own sound (`mhuc convert monster`, issue
 #158). The record, its slots and its strings are one block from the game's own heap (`alloc`,
@@ -156,7 +158,8 @@ MH4U-format `.emd`/`.etd` yet, so their monster data loads from the stand-in's.
   the tables after the end sequence is unverified. A quest that never reaches its end sequence
   keeps its bytes until the next quest starts.
 - **The port's camera, motion effects and effect lists.** A port ships its model, motions,
-  tail and command, and 125 her sound (126 ships only its model and motions); the record keeps
+  tail and command, and 125 her sound (126 and 127 ship only their models and motions); the
+  record keeps
   the stand-in's paths for the camera, motion effects and effect lists, and their files are
   MH4U's until the port's game has them converted.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
@@ -184,7 +187,7 @@ python3 <fork>/tools/mods.py enable "Ported monster ids"
 python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Azahar user directory>
 ```
 
-A run logs `ready: answering MH4U's monster tables for 3 permanent and 0 pooled id(s), 124 and
+A run logs `ready: answering MH4U's monster tables for 4 permanent and 0 pooled id(s), 124 and
 up, lending 224..255 per quest, with the files each port ships and the stand-in's for the
 rest`, then one line per reader the first time it answers a registered id and one the first
 time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource

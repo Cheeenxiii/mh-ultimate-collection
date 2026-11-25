@@ -190,5 +190,5 @@ def test_the_repository_registry_and_its_header_agree():
     res = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_ids.py")], cwd=ROOT,
                          capture_output=True, text=True)
     assert res.returncode == 0, res.stdout + res.stderr
-    assert "3 permanent monsters" in res.stdout
+    assert "4 permanent monsters" in res.stdout
     assert "0 pooled" in res.stdout

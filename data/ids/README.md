@@ -57,24 +57,27 @@ ships 6 ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)
 ships only some kinds and the record keeps the stand-in's path for the rest. A kind is one
 group of paths in the record:
 
-| Kind | The record's paths | 124 ships | 125 ships | 126 ships |
-|---|---|---|---|---|
-| `model` | the model | yes | yes | yes |
-| `motions` | the six motion lists and the second motion list; `motions` names the slots the port ships | `motions=0-4` | `motions=0-2` | `motions=0,2,3,4` |
-| `camera` | the camera | no | no | no |
-| `tail` | the tail model | yes | yes | no |
-| `mef` | the motion effects | no | no | no |
-| `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no |
-| `cmd` | the command/EMC | yes | yes | no |
-| `efl` | the effect lists | no | no | no |
+| Kind | The record's paths | 124 ships | 125 ships | 126 ships | 127 ships |
+|---|---|---|---|---|---|
+| `model` | the model | yes | yes | yes | yes |
+| `motions` | the six motion lists and the second motion list; `motions` names the slots the port ships | `motions=0-4` | `motions=0-2` | `motions=0,2,3,4` | `motions=0-2` |
+| `camera` | the camera | no | no | no | no |
+| `tail` | the tail model | yes | yes | no | no |
+| `mef` | the motion effects | no | no | no | no |
+| `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no | no |
+| `cmd` | the command/EMC | yes | yes | no | no |
+| `efl` | the effect lists | no | no | no | no |
 
 124's `em124.arc` holds the model, five motion lists, the tail and the command; 125's holds
 the model, three motion lists, the tail, the command and its converted sound set; 126's holds
 the model and four motion lists, borrowed from MHXX's em014 (Velocidrome) and shipped at the
 same slots 0, 2, 3 and 4 the source groups them in, so its record keeps the stand-in's paths
-for slots 1 and 5. Until a port's
-own camera, motion effects and effect lists are converted, its monster loads MH4U's own from the
-stand-in's paths (`enemy\em001\...`); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
+for slots 1 and 5; 127's holds the model and three motion lists, its own MH3U lists at slots
+0, 1 and 2, and no tail, because MH3U's `em045.arc` has none (its tail is part of the body
+model). Until a port's
+own camera, motion effects and effect lists are converted, its monster loads MH4U's own from
+the stand-in's paths (`enemy\em001\...` for 124 and 125, `enemy\em015\...` for 126 and
+127); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
 0 to 2. The motion-effect and effect-list formats the `mef` and `efl` kinds carry are laid out
 and checked on the three games' monster archives ([mef](../../specs/mef.md),
@@ -143,6 +146,7 @@ free id, and a mistake is corrected by a migration, not by renumbering
 | 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=0-4, tail, cmd |
 | 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=0-2, tail, cmd, sound |
 | 126 | `giadrome-gu` | Giadrome, ported from MHXX (GU) | MH4U Great Jaggi (15) | model, motions=0,2,3,4 |
+| 127 | `great-wroggi-3u` | Great Wroggi, ported from MH3U | MH4U Great Jaggi (15) | model, motions=0-2 |
 
 No pooled row ships yet; the first would be 256, with a `stand_in` like any other.
 
@@ -151,4 +155,5 @@ their files come from [#48](https://github.com/Cheeenxiii/mh-ultimate-collection
 [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49). 126 is
 [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161)'s, and its AI is the
 stand-in's until [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48) converts
-an MHXX EMC ([specs/emc.md](../specs/emc.md#what-a-converter-must-do)).
+an MHXX EMC ([specs/emc.md](../specs/emc.md#what-a-converter-must-do)). 127 is
+[#166](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/166)'s.
