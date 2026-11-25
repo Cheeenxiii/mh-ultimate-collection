@@ -355,6 +355,10 @@ motion-start wrapper `0x0094e318` reads the enemy at `this+0xe28`, so it needs a
 and is called from a quest, not from this boot-only check: P3 proves the call mechanism, and
 the translated handlers ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112),
 [#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115)) call it on a monster.
+A longer run (130 s of emulated time, menu input through the opening movie) loaded a save and
+reached the character and the village, where no monster spawns; the probe also hooks
+`uEnemy::dispatchAction` to capture a live `this`, and it captured nothing. Calling the wrapper
+on a spawned monster still waits for a quest run.
 
 ## Tracing engine calls in MHXX
 
