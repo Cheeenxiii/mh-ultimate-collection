@@ -23,6 +23,17 @@ Settled by the maintainer on 2026-11-24.
 
 A GU monster's code depends on MHXX's enemy layer, most of which MH4U lacks. Linking that layer beside MH4U's would put two enemy engines in one game, and MH4U's status, parts, AI sensors and multiplayer sync would not see the monster. So each handler is reimplemented on MH4U's `uEnemy`, from the source's recompiled code, keeping its frame values and call order. MHGU Definitive Edition does the same in the other direction.
 
+**Amended by the maintainer on 2026-11-26: every handler is the source's, shared actions included.** A ported monster runs its own source game's behaviour code for every action, 3U and GU alike. An action id MH4U also has does not reuse MH4U's handler: the source's handler is reimplemented like the others. So the monster asks for its own animation numbers and its own actions, and nothing translates between the two games at run time.
+
+This replaces the practice that grew after 0002: shared action ids ran MH4U's handlers, and run-time tables bridged the difference. Those tables were the motion-number translation (`mods/monster_motions`, [#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)) and the action map onto shared MH4U actions (`mods/monster_actions`). `mods/rathian_actions` already runs translated MHXX handlers for the actions MH4U lacks, which is the kind of code this asks for every action. In game, the 3U Rathian looped a limp and flew sideways: the translation table only covered the action/motion pairs a code comparison could resolve. Patching each gap with a heuristic would not end.
+
+What stays: the ids and resource records (`mods/monster_ids`, [0003](#0003-id-allocation-and-mod-saves)), the converted assets (models, materials moved to MH4U's shader package, motion lists, textures), and the quest loading. They don't depend on whose handlers run.
+
+| Alternative | Why not |
+|---|---|
+| MH4U's handlers for shared ids, with a generated motion table and an action map | every gap between the two games' handlers needs its own patch (computed motion indices, second motions, one-sided ids); the 3U port showed it in game |
+| The same, with a heuristic fallback that matches animations by signature | a second source of truth beside the code; it guesses where the code is unread |
+
 ### 0003. Id allocation and mod saves
 
 Settled by the maintainer on 2026-11-25.

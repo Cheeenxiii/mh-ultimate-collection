@@ -1,5 +1,7 @@
 # Ported monsters' action ids
 
+**Superseded** by [decision 0002](../../docs/decisions.md#0002-monsters-are-ported-onto-mh4us-engine)'s 2026-11-26 amendment: a ported monster runs its own source game's handler for every action, so no action is mapped onto a shared MH4U one. This plugin is kept until the source handlers replace it, and is not extended.
+
 The plugin that runs the MH4U action whose handler has the same body as a source game action
 MH4U's monster class lacks. A ported monster runs MH4U's own handler for every action id the
 two games share ([decision 0002](../../docs/decisions.md#0002-monsters-are-ported-onto-mh4us-engine)).
