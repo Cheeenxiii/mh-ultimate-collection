@@ -40,11 +40,12 @@ not agree on the hitzone table and the part table.
 
 **The verdict rule**, following the amendment's reading agreed for this issue:
 
-- `data` **differs** when the source version has a block, field, part or record count MH4U's
-  version does not have (a field `absent in MH4U`, more attack-volume groups, more attack
-  records, or a breakable part MH4U does not list). A different value in a field both games
-  have (HP, a hitzone byte, a record's value) is **not** a difference: it is a same-field retune,
-  and MH4U's version already has that field.
+- `data` **differs** when the source version has a block, field or part MH4U's version does not
+  have (a field `absent in MH4U`, or a breakable part MH4U does not list). A different value in
+  a field both games have (HP, a hitzone byte, a record's value), or a different number of
+  records or attack-volume groups in a block both games have, is **not** a difference: it is a
+  same-field retune, and MH4U's version already has that field. Those counts are still in
+  `data_detail`, so a stricter threshold can be read off them.
 - `moves` **differs** when the source has an action id MH4U lacks whose handler starts a
   motion, or a shared action id starts a different animation (frames/loop/track count). The
   same animation at another index is not a difference (the two games pack and group indices
