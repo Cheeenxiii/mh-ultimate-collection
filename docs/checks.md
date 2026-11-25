@@ -533,7 +533,7 @@ P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 its registry id (256), and its headless prerequisite is P4. Not done.
 
 Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod's 16 hook
-points (the two quest hooks among them), headless runner. Both passes:
+points (the two quest hooks among them), headless runner. The passes:
 
 - **Shipped registry (2 permanent, 0 pooled):** pass. The log had `ready: answering MH4U's
   monster tables for 2 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest,
@@ -549,6 +549,17 @@ points (the two quest hooks among them), headless runner. Both passes:
   pooled id 256 -> lent 224`; `self-test: quest 60001 names pooled id 256; lent 224; the
   readers answer 224 -> pooled id 256, stand-in 1, its own record`; `quest 60001 ends: freed
   the pool byte(s) 224`; and `self-test: the quest ended, so byte 224 is free again`.
+- **Four registered ids, Giadrome and Great Wroggi in (4 permanent, 0 pooled):** pass for the
+  records. The log had `ready: answering MH4U's monster tables and name/notes message getters
+  for 4 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files
+  each port ships and the stand-in's for the rest`; the 126 record named
+  `enemy\em126\mod\em126` and motion slots 0, 2, 3 and 4, after the builder started naming
+  a port's motion slot the stand-in's record leaves empty (Great Jaggi has no slot 4); the 127
+  record named `em127` for slots 0 to 2; each record's ships/keeps line and the reader lines
+  with `ids 0..123 pass through` were as above; and `self-test: the pool 224..255 is unused:
+  no pooled monster id is registered`. The name/notes hooks were not in this run's code
+  library, so the `isn't a hook point` lines in it belong to the text work, not to a ported
+  id.
 
 The name/notes message getters and the text table were added after the run above: the code
 library has not been rebuilt with the mod's 19 hook names (50 hook points), `text/monster_text.bin` has not

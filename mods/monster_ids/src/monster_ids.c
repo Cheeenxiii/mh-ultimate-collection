@@ -506,6 +506,19 @@ static uint32_t build_record(MH4UCall *call, const MhucMonsterId *row) {
                 if (field_ends_at_null[f]) {
                     break;
                 }
+                /* A port can ship a slot the stand-in leaves empty: Giadrome's motion slot 4
+                 * against Great Jaggi's four lists. The converter names the port's motion
+                 * lists by id and slot, so the record can name it with no stand-in path to
+                 * rewrite. */
+                if (field_kinds[f][k] == MHUC_FILES_MOTIONS && slot_is_ours(row, f, k)) {
+                    const int n = snprintf(staged[f][k], PATH_MAX, "enemy\\em%03u\\mot\\em%03u_%u",
+                                           (unsigned)row->id, (unsigned)row->id, k);
+                    if (n > 0 && (size_t)n < PATH_MAX) {
+                        text += (size_t)n + 1;
+                    } else {
+                        staged[f][k][0] = '\0';
+                    }
+                }
                 continue;
             }
             const int own = slot_is_ours(row, f, k);
