@@ -42,10 +42,9 @@
  * sound (+0x1c), four extra paths (+0x20, the command/EMC at +0x20 slot 3), the effect lists
  * (+0x24) and a second effect list (+0x28). The stand-in's record names `enemy\em001\...`
  * paths; answering a ported id with it would load MH4U's own files. So on the first frame the
- * plugin builds, for every registered id, a record of its own from the stand-in's: every path
- * is copied and its monster-id token rewritten to the ported id (`em001` -> `em124`, and the
- * camera's `e001` -> `e124`), so the port's files live under its own id's paths. The record,
- * its slots and its strings are guest memory from the game's own heap (alloc, ABI 2).
+ * plugin builds, for every registered id, a record of its own from the stand-in's, with the
+ * paths of the kinds the port ships rewritten to the ported id so its files live under its
+ * own id's paths.
  *
  * A port ships only some of those path kinds (its arc holds the model, motions, tail and
  * command for 124, the model, the first three motion lists and the tail for 125); MH4U stops
