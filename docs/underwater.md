@@ -19,7 +19,7 @@ Where a part is not marked as checked, "where it likely lives" is a hypothesis t
 
 ## What is known
 
-- MH3U's 387 motion lists are LMT version 66. The layout in [specs/lmt.md](../specs/lmt.md) reads version 67 (MH4U, MHXX), so underwater motions need a version-66 layout or a converter. Cha-Cha's Wii U files are the lead.
+- MH3U's 387 motion lists are LMT version 66. Version 66 and 67 share one layout, so `mhuc` reads all 387 ([specs/lmt.md](../specs/lmt.md), check L3), underwater motions among them. Whether their keyframe buffers decode as version 67's do is unverified, so a converter may still be needed.
 - MH3U's stage collision is MH4U's format ([specs/sbc.md](../specs/sbc.md)).
 - Cha-Cha (MH3U on Wii U) marks some of this. Its Wii U offsets must be re-found on 3DS:
   - swim state: the player's pad block (player + 0xE30 there) holds 3 at +0x3D under water;
@@ -34,9 +34,9 @@ The two hunters are the same rig with one bone dropped and one renumbered.
 - **Bones.** MH3U's hunter body has 20 bones, ids 0 to 19; MH4U's has 19, ids 0 to 12 and 14 to 19. In every armour set checked, each MH4U bone has the same parent as its MH3U counterpart, and in the base set (armour id 1) the same rest position and parent distance too. MH4U id 0 is MH3U id 13, the pelvis (it carries the body's mesh); every other id is itself. MH3U id 0 is an empty root whose record is all zeroes; MH4U dropped it, and the torso (id 1) and the two leg chains (ids 14 and 17) hang off the pelvis.
 - **Parts.** Arm (9 bones), face (1) and hair (3) are identical. Leg (7) and waist (6) have the same ids and tree with the root renumbered 13 → 0. Helm is ids 2 to 4, and some sets add ids 20 and 21; those two are outside the motion rig.
 - **No names.** No hunter model stores bone names: the bone block is exactly bone count × 0x98 + 0x100 + skin count × 0x1C bytes and the file ends at the index buffer. The id is the only identity a model and a motion share.
-- **Motions name bones by id.** MH4U's player motion lists, common and per weapon, rotate every hunter id (0 to 12 and 14 to 19) and translate id 0; none carries id 13 (check L2). MH3U's 50 player motion lists, read with version 67's 0x24-byte track table, rotate ids 1 to 21 and translate id 0, with ids 20 and 21 never given a keyframe; both games keep track 255 for root motion. The version-66 buffers aren't decoded, so for MH3U this reads the tracks only.
+- **Motions name bones by id.** MH4U's player motion lists, common and per weapon, rotate every hunter id (0 to 12 and 14 to 19) and translate id 0; none carries id 13 (check L2). MH3U's 50 player motion lists, read with version 67's 0x24-byte track table, rotate ids 1 to 21 and translate id 0, with ids 20 and 21 never given a keyframe; both games keep track 255 for root motion. The keyframe buffers aren't decoded, so for MH3U this reads the tracks only.
 
-**The mapping.** Rewrite each MH3U track's bone id: 1 to 12 and 14 to 19 stay; 13 becomes 0; 0 stays 0; 20 and 21 are dropped; 255 stays. MH3U's translation track on id 0 and its rotation track on id 13 become MH4U's two tracks on id 0, so no keyframe has to be composed. Converting the version-66 keyframe buffers is still open (first known bullet above); this mapping only says where each track goes.
+**The mapping.** Rewrite each MH3U track's bone id: 1 to 12 and 14 to 19 stay; 13 becomes 0; 0 stays 0; 20 and 21 are dropped; 255 stays. MH3U's translation track on id 0 and its rotation track on id 13 become MH4U's two tracks on id 0, so no keyframe has to be composed. Converting the keyframe buffers is still open (first known bullet above); this mapping only says where each track goes.
 
 Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py -k "hunter_skeleton or address_bones_by_id"` ([specs/mod.md](../specs/mod.md), check M4; [specs/lmt.md](../specs/lmt.md), check L2).
 
