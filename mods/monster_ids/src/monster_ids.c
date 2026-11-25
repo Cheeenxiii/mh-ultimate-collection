@@ -1429,7 +1429,9 @@ static void frame(MH4UCall *call, void *user) {
     first_frame = 0;
     build_records(call);
     load_text(call);
-    if (selftest && !logged) {
+    /* The message tables the text lines read are loaded after the first frame: load_text
+     * retries until they are up, so the one-shot self-test waits for its result. */
+    if (selftest && !logged && (text_loaded || text_failed)) {
         logged = 1;
         self_test(call);
     }
