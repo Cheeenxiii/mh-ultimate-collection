@@ -16,8 +16,10 @@ mod folder the fork's mod manager installs.
 
 The kinds it produces, and how:
 
-- model, tail (rModel and their rMaterial files): taken as is (MOD 0xE6, MRL 0x20 in both
-  games); the textures the materials name are converted and kept at MHXX's paths (below);
+- model, tail (rModel and their rMaterial files): taken as is, except the material's signature
+  at 0x10, which must be MH4U's for MH4U's loader to accept it (MOD 0xE6, MRL 0x20 in both
+  games; specs/mrl.md); the textures the materials name are converted and kept at MHXX's paths
+  (below);
 - motions (rMotionList): the slots the row's `motions=` names, taken as is (LMT 67 in both).
   MHXX may store a monster's motion lists under another monster's folder because the family
   shares them (Giadrome's are em014's); the converter renames them to the port's id and keeps
@@ -50,7 +52,7 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from .formats import arc, camera, tex
+from .formats import arc, camera, mrl, tex
 
 SOURCE_ARC = "arc/enemy/{source_key}_{variant:02d}.arc"
 REGISTRY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -252,6 +254,12 @@ def convert(data: bytes, row: Row, variant: int = 0) -> tuple[bytes, Report]:
                 renamed = _rename_mod_file(stem, row.source_key, new_key, variant)
                 if kind in row.files and renamed:
                     new_path = f"enemy/{new_key}/mod/{renamed}"
+                    if entry.type_name == "rMaterial":
+                        try:
+                            data_out = mrl.for_mh4u(entry.data)
+                        except mrl.MrlError as e:
+                            raise ConvertError(f"{path}: {e}") from None
+                        change = " (MRL signature -> MH4U's)"
                 else:
                     report.leave(_not_shipped(kind) if kind not in row.files else MONSTER_DATA, path)
             elif folder == "mod" and entry.type_name == "rTexture":
