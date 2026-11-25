@@ -14,7 +14,12 @@ call resets the state and the handler stays on its first frame, holding a pose.
 
 The plugin wraps the setter through the fork's plugin API. For the chosen monster it replaces
 the category and index arguments with the forced pair, so the AI's change becomes the forced
-action and the game's own setter initializes it. The dispatcher hook is kept only as a
+action and the game's own setter initializes it. The game calls the setter about twice a
+frame, and once a monster has a target its idle routine (`0x0094dc84`) returns it to idle
+every frame, so the plugin starts the forced pair only from another action and, while the
+move runs, skips every setter call (for at most 300 in a row, so a monster can't hang); the
+next change after that is forced again, and the move loops. What each try of this showed is
+in R1p's result in [checks.md](../../docs/checks.md#the-plugins-check-r1p). The dispatcher hook is kept only as a
 fallback for a code library built before the setter hook existed; it logs a warning, and that
 library needs rebuilding.
 
@@ -46,7 +51,8 @@ python3 <fork>/tools/build_game.py --dump "Monster Hunter 4 Ultimate Update v1.1
 
 The build prints the mod's hooks and lists the plugin beside the code library. A run then
 logs `plugin Force a monster action: ... ready: forcing action 3/17 on monster 1 via the
-action setter`, one `first force:` line, and one line each time the AI's action changes. If
+action setter`, one `first force:` line, and one `setter` line per distinct call (current
+action, requested action, mode, caller) saying whether it was forced, skipped or let through. If
 the log says the action setter isn't a hook point, the code library was built before that
 hook: rebuild it with the command above.
 
@@ -59,7 +65,7 @@ hook: rebuild it with the command above.
 |---|---|---|
 | `action` | `3/17` | the action to force, as `category/index` (decimal or `0x`), each 0–255 |
 | `monster` | `1` | the monster id to force it on (the work block's byte at `+0x1c0`), or `any`; Rathian is id 1 |
-| `hold` | `1` | `1`: replace the AI's action with the forced pair on every setter call; `0`: force the first setter call once, then leave the AI alone |
+| `hold` | `1` | `1`: keep the monster on the forced action, starting it again after each end; `0`: force the first setter call once, then leave the AI alone |
 
 Setting no `action` (an empty value) keeps `3/17`; an `action` that isn't a category and an
 index separated by `/` (or `:`) makes the plugin refuse to start, and the port logs why and

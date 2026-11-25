@@ -180,7 +180,8 @@ another function table.
 3. Take quest 10212 from the Hall (Low Rank 2★) and go to area 3, where the Rathian is.
 4. Start the quest. The log shows `plugin Force a monster action: ... ready: forcing action
    3/17 on monster 1 via the action setter`, then one `first force: monster 1 3/17 over ...`
-   line, then a line only when the AI's action changes. If it says the action setter isn't a
+   line, then one `setter` line per distinct call (current action, requested action, mode,
+   caller) saying what the plugin did with it. If it says the action setter isn't a
    hook point, the code library needs rebuilding. A headless boot with the same library
    (`mh4u_runner` with `--code`, the update installed) already logs that `ready` line at
    start-up, which shows the hook is in the library; with no monster loaded there is no
@@ -190,14 +191,32 @@ another function table.
 
 | Row | What to watch | Status |
 |---|---|---|
-| 3/17, `hold = 1` | the move plays, not a frozen pose | planned for the maintainer's first session |
+| 3/17, `hold = 1` | the move plays, not a frozen pose | passed (2026-11-25): one move, played over and over |
 | 3/0, `hold = 1` | the move plays | not done |
 | 7/5, `hold = 1` | the move plays | not done |
 | 3/17, `hold = 0` | forced once, then the AI resumes | not done |
 | 3/0, `hold = 0` | forced once | not done |
 | 7/5, `hold = 0` | forced once | not done |
 
-Result: not yet run; the maintainer reports it here. The source games can still be forced
+Result (2026-11-25, the maintainer, quest 10212, area 3): 3/17 with `hold = 1` passed on the
+fourth try; the Rathian plays one move over and over. The three tries before it fixed the
+plugin, and their logs are what the plugin's handling of the setter rests on:
+
+- Forcing every setter call restarted the move each time: the game calls the setter about
+  twice a frame (the monster's return to idle, then the AI's pick), so the move stayed on its
+  first frame, sinking into the ground with only its start effect (sand) playing.
+- Not restarting a running move was enough until the Rathian saw the hunter. With a target,
+  the idle routine `0x0094dc84` runs every frame even while the forced move is current and
+  returns the monster to idle (`0/3`, mode 2, called from `0x0094dd38`); the AI's next pick
+  (mode 0, through `0x0094de74`) was then forced again, and the move restarted each frame.
+- Skipping that idle return let the move run, but letting the AI's own picks through mixed
+  its moves into the forced one.
+
+The plugin now starts the forced pair only from another action and, while it runs, skips
+every setter call for at most 300 calls in a row, after which one change goes through and the
+next is forced again. Why the idle routine runs during a forced move is not traced.
+
+ The source games can still be forced
 with [reference/force_action.py](../reference/force_action.py) through Azahar's GDB stub; it
 is a debugging tool for later move investigations, not part of this check.
 
