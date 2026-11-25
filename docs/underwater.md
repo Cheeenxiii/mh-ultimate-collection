@@ -52,7 +52,7 @@ At the class level, MH4U kept `uOcean`, the only water-named class in either gam
 
 | MH3U class (class id) | Carries | MH3U | MH4U |
 |---|---|---|---|
-| `uIDCockpitAir` (`0x3db8d448`) | the oxygen gauge | `uIDCockpit` subclass, `0x238`, 65 vtable slots | **lacks** it: no class with this id or name, and no `uIDCockpit` class at all |
+| `uIDCockpitAir` (`0x3db8d448`) | nothing of its own: a registered cockpit class with no gauge code (the gauge is drawn by `uIDCockpitMain`, below) | `uIDCockpit` subclass, `0x238`, 65 vtable slots | **lacks** it: no class with this id or name, and no `uIDCockpit` class at all |
 | `uPlayer` (`0x72b401fd`) | the swim state, dive and surface | `uCharacter` subclass, `0x26a8`, 46 slots | **name only**: same id, now a `uPlChar` subclass, `0xace0`, 89 slots, and 25 of its 82 code slots pair with MH3U's |
 | `uPlayerGuest` (`0x47916456`) | the guest player's copy of the same state | `uPlayer` subclass, `0x26b8`, 48 slots | **lacks** it |
 | `sCamera` (`0x3261a0a7`) | the camera; Cha-Cha's underwater-camera mark is in a camera block | `cSystem` subclass, `0xd90`, 11 slots | **kept**: `0xe10`, 11 slots, 6 paired; MH4U adds `sMhCamera` (`0x576b8b6f`), the quest camera the port hooks |
@@ -63,7 +63,7 @@ The monster behaviour and the effects of the first table are not here: each mons
 
 **What MH4U's own water names are not.** MH4U's code still names the water element and a water area colour: `DMATTR_WATER` with `pw->mRegupTimer[DMATTR_WATER]` and `pw->mWaterDmTimer` (the element's damage and blight timers), `d_water`, and `area_color_water` (a stage tint). Those are water-element and rendering names, not swimming, and none of them is MH3U's water code.
 
-**Answer.** MH4U kept `uOcean` and the camera base, and none of the underwater systems' own code: the oxygen-gauge class, the guest player and MH3U's in-game camera classes are absent, and `uPlayer` and `uStage` survive only as names on rewritten layers. So no MH3U swim, oxygen or underwater-camera code can be hooked into as it stands; they go on MH4U's own `uPlayer` and `sMhCamera` as the "How it reaches MH4U" column above says, and only the water surface is reused as it is (the converted stage can create `uOcean`, or a plugin hooks it).
+**Answer.** MH4U kept `uOcean` and the camera base, and none of the underwater systems' own code: the class MH3U registers as its air gauge (`uIDCockpitAir`, which draws nothing of its own), the guest player and MH3U's in-game camera classes are absent, and `uPlayer` and `uStage` survive only as names on rewritten layers. So no MH3U swim, oxygen or underwater-camera code can be hooked into as it stands; they go on MH4U's own `uPlayer` and `sMhCamera` as the "How it reaches MH4U" column above says, and only the water surface is reused as it is (the converted stage can create `uOcean`, or a plugin hooks it).
 
 **How this was checked.** Nothing here is bytes from a dump; the results are class ids, sizes, slot counts and pair counts.
 
@@ -74,7 +74,26 @@ The monster behaviour and the effects of the first table are not here: each mons
 5. Search both name lists for water, swim, dive, oxygen, breath, ocean, sea, aqua, submerge, drown, buoy, tide, wave, bubble, splash and air, each followed by a capital letter or the end of the name, so that `Search` does not count.
 6. Read the identifiers in the paragraph above with `strings` over the decompressed images.
 
-The oxygen gauge's role is inferred from its name and its cockpit siblings, not read in code or seen in game. Whether MH4U's stages instantiate `uOcean` is likewise unverified; the class and its code are present, but the data side is not checked.
+**The oxygen gauge is a display, not the oxygen system.** `uIDCockpitAir` has no gauge code of its own. Its instance vtable (`0xb53c48`, 65 slots) differs from `uIDCockpit`'s (`0xb4f038`) in five slots only: slot 1 is its destructor (`0x2f9288`), slot 4 branches to the base's no-op (`0x2f927c`, to `0x535b04`), slot 5 returns its DTI (`0xa12b04`), and slots 58 and 59 are `bx lr` (`0x2f9280`, `0x2f9278`) where `uIDCockpit` runs `0x1f2d94` and `0x1f26c4`. Apart from that destructor, its constructor and its DTI getter, the class has no code. Registering a class does not create it, and nothing in MH3U's code or RomFS names it outside its own registration, constructor, destructor and getters: an instance of it, were one made, has no gauge code to run.
+
+The gauge is drawn by `uIDCockpitMain` (`0x3f4318b3`, DTI `0xd461f8`), the quest cockpit. Its per-frame update (vtable `0xb55930`, slot 59 = `0x33ff2c`) calls `0x341a58`, which calls `0x33f3fc(self, status)`; `status` is the player status at `[uPlayer+0xd5c]`. That function reads `status+0x3d` (3 = underwater), shows nodes 8 to 10 (`ariA1` to `ariA3`) underwater and 11 to 13 (`ariB1` to `ariB3`) on land, shows node 14 (`ariber`) only underwater, and sets the bar's length: 64 px at full, filled by 64 px × current / 150, eased, where the current is the signed 16-bit at `status+0x654` and the capacity the signed 16-bit at `status+0x656`, capped at `0x96` (150).
+
+The timer itself is player code. `0xa39c20(player, delta)` adds `delta` to the current air and clamps it to `[0, capacity]`; `0xa3a478(player, delta)` raises the capacity (cap 150) and sets the current to it. The player's update (`0x8d60c0`) calls `0xa39c20(player, -1)` at `0x8d6fe4` while `status+0x3d == 3` (underwater) and `0xa39c20(player, +150)` at `0x8d6ad8` otherwise; `0x8eccb8` calls `0xa3a478` at `0x8ecd70`.
+
+So the gauge is a display of the player's oxygen timer, not the oxygen system's HUD half. The drain, capacity and refill are player code, and the gauge is a few sprites in the quest cockpit layout `GUI\texlayout\quest\coc_main_eng` (in `/arc/ID/ID_cock_eng.arc`), whose 52 nodes include `ariA1` to `ari_eff` at indices 8 to 15. A port carries the timer with the swim state and redraws the gauge as a layout; there is no `uIDCockpitAir` behaviour to rebuild.
+
+**How the air gauge was read.** Addresses and names only.
+
+1. Decompress MH3U's `code.bin`; its SHA-1 matches `reference/games/mh3u/game.json`.
+2. Recover the class registry and instance vtables with `reference/mt_dti.py` and `reference/mt_vtables.py`, then compare `uIDCockpitAir`'s vtable with `uIDCockpit`'s slot by slot; the five differing slots are read with capstone.
+3. Follow `uIDCockpitMain`'s slot 59 (`0x33ff2c`) to `0x341a58` and then `0x33f3fc`, and read the status offsets and layout node indices there.
+4. Extract `/arc/ID/ID_cock_eng.arc` from the RomFS (one file, 47 entries) and read `GUI\texlayout\quest\coc_main_eng` (14,960 bytes) with `mhuc`'s RomFS and ARC readers; walk its 52 nodes to read their names and indices.
+5. Read the player update `0x8d60c0` at its two calls to `0xa39c20`, `0x8eccb8` at its call to `0xa3a478`, and both functions' clamps.
+6. Search the decompressed image and the RomFS for the class id, DTI, vtable and name.
+
+The texlayout is a little-endian XFS variant that `mhuc`'s XFS reader rejects as it stands (its object-header flag and property count differ; check X1 is open), so step 4 walks its objects directly.
+
+Whether MH4U's stages instantiate `uOcean` is unverified; the class and its code are present, but the data side is not checked.
 
 ## Unknowns
 
