@@ -108,9 +108,30 @@ MH3U's wave is one version older. Its header is 0x5C for a mono effect and 0x8C 
 | 0x04 | u32 | version 11 | unverified | Definitive Edition snd4u2gu.py |
 | 0x08 | u32 | group record count | unverified | Definitive Edition snd4u2gu.py |
 | 0x0C | u32 | entry count | unverified | Definitive Edition snd4u2gu.py |
-| 0x10 | u32 | 3 or 4 | unverified | Definitive Edition snd4u2gu.py |
-| +0 (record) | u16, u16, u32, u32 | id; flags (0x8000, plus category shifted left by 11, plus 2 × count); first entry; x | unverified | Definitive Edition snd4u2gu.py |
-| +0 (entry) | char[], u32, 76 bytes | wave path (NUL-terminated); wave type id; parameters, a 4-byte key at +12 | unverified | Definitive Edition snd4u2gu.py |
+| 0x10 | u32 | tail record count x; the tail is 8 × x bytes after the entries | unverified | Definitive Edition snd4u2gu.py; the MH4U banks read in SN6 close with it |
+| 0x14 + 12 × i | u16, u16, u32, u32 | group i: id; flags (0x8000, plus category shifted left by 11, plus 2 × count); first entry; x | unverified | Definitive Edition snd4u2gu.py |
+| +0x00 (entry) | char[], u32, 76 bytes | wave path (NUL-terminated); wave type id; parameters, a 4-byte key at +12 | unverified | Definitive Edition snd4u2gu.py |
+| +0x00 (tail) | f32, u32 | one {value, index} record; the index's low byte is 0..x-1 | unverified | Definitive Edition snd4u2gu.py |
+
+## Bank (`SNDB`, version 10)
+
+MH3U's bank has the same container as version 11: a 0x14-byte header, 12-byte group records, one entry per wave (a NUL-terminated path, a u32 type id and 76 parameter bytes), then 8-byte tail records. In every MH3U bank read the counts and the sizes tile the file exactly (SN6).
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `SNDB` | verified | every MH3U bank (SN6) |
+| 0x04 | u32 | version 10 | verified | every MH3U bank (SN6) |
+| 0x08 | u32 | group record count | verified | SN6: the group records end where the entries begin |
+| 0x0C | u32 | entry count | verified | SN6: the entries close on the tail |
+| 0x10 | u32 | tail record count x; the tail is 8 × x bytes after the entries | verified | SN6: the tail ends the file |
+| 0x14 + 12 × i, +0x00 | u16 | group i's id | unverified | SN6 (histogram) |
+| 0x14 + 12 × i, +0x02 | u16 | group i's flags: 0x8000, a category in bits 11 to 14 and a count in the low bits; the low 15 bits are twice the group's 47 and 35 entries in Rathian's bank | unverified | SN6 (histogram) |
+| 0x14 + 12 × i, +0x04 | u32 | group i's first entry | verified | SN6: 0 ≤ first ≤ the entry count in every group |
+| 0x14 + 12 × i, +0x08 | u32 | not traced; 0 in every group read | unverified | SN6 (histogram) |
+| entry +0x00 | char[] | wave path, NUL-terminated | verified | SN6: the entries tile the file between the groups and the tail |
+| entry +len+1 | u32 | wave type id, `0x67195a2e` (`rLtSoundSourceADPCM`) | verified | SN6: every entry of every MH3U bank read |
+| entry +len+5 | u8[76] | parameters; byte 2 is 8 and the 4-byte key at +12 is {lo, hi, root, 0} with lo = hi = root | unverified | SN6 (histogram); the same 76 bytes carry the same values as version 11 for the 33 waves both games ship |
+| tail +0x00 | f32, u32 | one {value, index} record, 8 bytes; the index's low byte is 0..x-1 | verified | SN6: x records close every bank read |
 
 ## Request (`SREQ`, version 8)
 

@@ -104,3 +104,80 @@ def read_wave(data: bytes) -> Wave:
 def check_wave(data: bytes) -> dict:
     """The counts check SN6 keeps for one wave; read_wave has already validated it."""
     return {}
+
+
+# ---------------------------------------------------------------- banks
+
+BANK_MAGIC = b"SNDB"
+BANK_VERSIONS = (10, 11)
+BANK_HEADER = 0x14
+BANK_GROUP = 12
+BANK_PARAMS = 76               # per entry, after the wave path and the type id
+BANK_TAIL = 8                  # {f32, u32} per tail record
+
+
+@dataclass(frozen=True)
+class BankGroup:
+    """One group record: its id, flags (0x8000 | category << 11 | 2 × entry count), first entry."""
+    id: int
+    flags: int
+    first: int
+    x: int
+
+
+@dataclass(frozen=True)
+class BankEntry:
+    """One wave entry: its RomFS-like path, the resource class id it names and 76 parameter bytes."""
+    name: str
+    type_id: int
+    params: bytes
+
+
+@dataclass(frozen=True)
+class Bank:
+    version: int
+    groups: tuple[BankGroup, ...]
+    entries: tuple[BankEntry, ...]
+    tail: tuple[tuple[float, int], ...]   # {f32 value, u32 index}: one per header word 0x10
+
+
+def read_bank(data: bytes) -> Bank:
+    """Parse one bank. Raises SoundError unless its groups, entries and tail tile the file."""
+    if len(data) < BANK_HEADER or data[:4] != BANK_MAGIC:
+        raise SoundError("not a bank (magic)")
+    version, groups_n, entries_n, tail_n = struct.unpack_from("<4I", data, 4)
+    if version not in BANK_VERSIONS:
+        raise SoundError(f"SNDB version {version}, not MH4U's 11 or MH3U's 10")
+    at = BANK_HEADER + BANK_GROUP * groups_n
+    if at > len(data):
+        raise SoundError("group records run past the end of the file")
+    groups = tuple(BankGroup(*struct.unpack_from("<HHII", data, BANK_HEADER + BANK_GROUP * i))
+                   for i in range(groups_n))
+    for g in groups:
+        if g.first > entries_n:
+            raise SoundError(f"group {g.id}: first entry {g.first} of {entries_n}")
+    entries = []
+    for i in range(entries_n):
+        end = data.find(b"\0", at)
+        if end < 0:
+            raise SoundError(f"entry {i}: path at {at:#x} isn't NUL-terminated")
+        path = data[at:end].decode("latin-1")
+        params_at = end + 1 + 4
+        if params_at + BANK_PARAMS > len(data):
+            raise SoundError(f"entry {i}: parameters run past the end of the file")
+        type_id, = struct.unpack_from("<I", data, end + 1)
+        entries.append(BankEntry(path, type_id, data[params_at:params_at + BANK_PARAMS]))
+        at = params_at + BANK_PARAMS
+    if at + BANK_TAIL * tail_n != len(data):
+        raise SoundError(f"tail of {tail_n} records at {at:#x} ends at {at + BANK_TAIL * tail_n:#x}, "
+                         f"the file at {len(data):#x}")
+    tail = tuple(struct.unpack_from("<fI", data, at + BANK_TAIL * i) for i in range(tail_n))
+    return Bank(version, groups, tuple(entries), tail)
+
+
+def check_bank(data: bytes) -> dict:
+    """The counts check SN6 keeps for one bank; read_bank has already validated it."""
+    bank = read_bank(data)
+    return {"SN6 bank entries": len(bank.entries), "SN6 bank groups": len(bank.groups),
+            "SN6 bank tail records": len(bank.tail)}
+

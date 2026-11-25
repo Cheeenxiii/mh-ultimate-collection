@@ -244,3 +244,41 @@ def test_sound_reads_mh4us_madp_version_5_mono_and_refuses_the_stereo_music_layo
     with pytest.raises(sound.SoundError, match="stereo"):
         sound.read_wave(bytes(d))
 
+
+def bank(version: int = 10, tail: int = 1) -> bytes:
+    """A hand-built SNDB: one group, two wave entries, then one {f32, u32} tail record per word 0x10."""
+    groups, names = [(0, 0x8000 | 2, 0, 0)], ["sound\\se\\em\\em001\\wav\\a", "sound\\se\\em\\em001\\wav\\b"]
+    d = bytearray(struct.pack("<4s4I", b"SNDB", version, len(groups), len(names), tail))
+    for g in groups:
+        d += struct.pack("<HHII", *g)
+    for name in names:
+        d += name.encode() + b"\0" + struct.pack("<I", 0x67195A2E) + bytes(sound.BANK_PARAMS)
+    for i in range(tail):
+        d += struct.pack("<fI", 0.5, i)
+    return bytes(d)
+
+
+def test_sound_reads_mh3us_sndb_version_10():
+    """specs/sound.md bank version 10: header 0x14, 12-byte group records, entries of a NUL path,
+    a type id and 76 parameter bytes, then 8 × 0x10's value tail records"""
+    b = sound.read_bank(bank())
+    assert (b.version, len(b.groups), len(b.entries), len(b.tail)) == (10, 1, 2, 1)
+    assert b.groups[0] == sound.BankGroup(id=0, flags=0x8002, first=0, x=0)
+    assert [(e.name, e.type_id, len(e.params)) for e in b.entries] == \
+        [("sound\\se\\em\\em001\\wav\\a", 0x67195A2E, 76), ("sound\\se\\em\\em001\\wav\\b", 0x67195A2E, 76)]
+    assert b.tail == ((0.5, 0),)
+
+
+def test_sound_refuses_a_bank_tail_that_does_not_end_the_file():
+    d = bytearray(bank())
+    struct.pack_into("<I", d, 0x10, 2)
+    with pytest.raises(sound.SoundError, match="tail of 2 records"):
+        sound.read_bank(bytes(d))
+
+
+def test_sound_refuses_a_bank_group_whose_first_entry_is_past_the_entries():
+    d = bytearray(bank())
+    struct.pack_into("<I", d, sound.BANK_HEADER + 4, 3)
+    with pytest.raises(sound.SoundError, match="first entry 3 of 2"):
+        sound.read_bank(bytes(d))
+
