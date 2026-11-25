@@ -168,8 +168,8 @@ RevilLib's own arithmetic (`Evaluate`), not a simple little-endian split.
 
 ## What a converter must produce
 
-`mhuc convert monster --from mhxx` takes the source monster's camera list and writes version 4
-for MH4U:
+`mhuc convert camera SOURCE.lcm --from mhxx -o OUT.lcm` takes the source monster's camera list
+and writes version 4 for MH4U:
 
 1. version 4; keep the u16 count (256) and the source's camera ids and records;
 2. drop each record's 16-byte zero prefix, so every record is 0x9c bytes;
@@ -181,9 +181,16 @@ for MH4U:
 
 `camera.to_mhxx` is the exact inverse (the check round-trips every MHXX file through it). The
 source's camera ids stay: a ported monster's handlers post the source's event ids, so the ids
-must not be renumbered. A 3U port cannot convert a camera, because the source has none; it keeps
-MH4U's stand-in camera (its record's path is the stand-in's) or would need one authored, which is
-content work and not a conversion.
+must not be renumbered. The port's own converter (`mhuc convert monster`, #48's) will call
+`camera.from_mhxx` on the camera entry in the MHXX monster archive and place the result at
+`enemy\emNNN\mot\eNNN_cam`.
+
+The two Rathians' lists show what staying by id means: they share ids 0, 1, 2, 4, 5 and 8,
+MH4U's own has 9, 10 and 12 to 20 as well, and MHXX's has 40 to 44 and 50 to 53. A port that runs
+MH4U's shared handlers posts MH4U's event ids, so an id the port's list lacks does nothing
+(check C1; the wiring is #48's). A 3U port cannot convert a camera at all, because the source
+has none; it keeps MH4U's stand-in camera (its record's path is the stand-in's) or would need
+one authored, which is content work and not a conversion.
 
 ## Checks
 
