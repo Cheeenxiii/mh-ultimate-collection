@@ -138,6 +138,61 @@ Ancestral Steppe is chosen because it is the shared map whose Hall quest fields 
 
 **The Wroggi.** Five of the seven MH3U quests pair Great Wroggi with the Wroggi, but the Wroggi has no MH4U id yet, so MH4U's Jaggi (56) and Jaggia (57) stand in for it in the template's five areas. The Ludroth that 1307 also fields has no MH4U counterpart either, so the first quest keeps the template's one pack. When the Wroggi is ported, its id replaces 56 and 57 in those definitions and the sub-quest's text becomes its own. That is left undone.
 
+## Where a ported monster fights: Giadrome
+
+A ported monster's first quest goes where its own game already puts it, on a locale MH4U has. GU's Giadrome is MHXX's `em034`. The locale names are in [maps.csv](../data/catalog/maps.csv), and which of them MH4U has in [overlap.md](../data/catalog/overlap.md).
+
+### The MHXX quests that field it
+
+The game's own 1,331 quest archives (MHXX JPN v1.0's RomFS; the v4.8.0 update patches none of them) hold 1,331 `.mib`, 3,474 `.sem` and 2,426 `.esl`, all read with the layouts of checks Q2, Q11 and Q15 without a failure. **21 of them carry Giadrome in the boss set**, and the `.sem` entries and the `.mib`'s five boss blocks give the same 21. Six hunt it; 15 field it as an extra large monster. MHXX's DLC quests are not in this dump and are not counted. The titles below are the dump's Japanese; the English ones wait for MHGU's text (rule 2).
+
+| Map | Quest | Rank | Giadrome in | Hunt |
+|---|---|---|---|---|
+| Arctic Ridge | q0000705 商売ガタキのドスギアノス | High | area 7, with Giaprey | yes |
+| Arctic Ridge | q0000934 ベリオロスを捕獲せよ！ | High | area 7 | extra |
+| Arctic Ridge | q0010434 強敵、ドスギアノス現る！ | High | area 7, with Giaprey | yes |
+| Arctic Ridge | q0011105 ドスの威信を賭けた戦い | G | area 7, with Giaprey | yes |
+| Arctic Ridge | q0011122 雪山の採集ツアー | G | area 7, with Giaprey | extra |
+| Arctic Ridge | q0011213 ……欲するならば資格を示して | G | area 7 | extra |
+| Arctic Ridge, night | q0000708 氷雪に舞う白うさぎ | High | area 7 | extra |
+| Arctic Ridge, night | q0000726 雪山の採集ツアー | High | area 7 | extra |
+| Arctic Ridge, night | q0000805 フルフルのまごころ診療所 | High | area 7 | extra |
+| Arctic Ridge, night | q0000810 ホワイトアウト | High | area 7 | extra |
+| Arctic Ridge, night | q0011108 氷雪に舞う白うさぎ | G | area 7 | extra |
+| Arctic Ridge, night | q0011208 身体の芯までビッリビッリ | G | area 7 | extra |
+| Arctic Ridge, night | q0100802 冷血なるドスギアノス！ | High | areas 7 and 6, with Giaprey | yes, 2 |
+| Frozen Seaway | q0000831 狩人のための舞台～氷海～ | High | area 2 | extra |
+| Frozen Seaway | q0000928 ガムートの強さは世界一 | High | area 2 | extra |
+| Frozen Seaway | q0011207 閃きへの１ピースを求めて | G | area 2 | extra |
+| Frozen Seaway | q0011304 氷牙竜・ベリオロス！ | G | area 2 | extra |
+| Frozen Seaway | q0101004 スノーフェスティバル | High | area 2, with Giaprey | yes |
+| Frozen Seaway | q0111402 雪に紛れしドスギアノス | G | areas 2 and 5, with Giaprey | yes, 2 |
+| Arena | q0011241 子分の自覚が足りないっチャ！ | G | area 1 | extra |
+| Arena | q0101005 怒濤のドスラッシュ！ | High | area 1 | extra |
+
+The six hunts are q0000705, q0010434 and q0011105 (Arctic Ridge), q0100802 (night), and q0101004 and q0111402 (Frozen Seaway). Giaprey are MHXX's small monster id 15, which a slay quest names as `0x100F`; they stand in Giadrome's area in seven of the 21, and in all six hunts.
+
+### The MH4U map and areas
+
+Of the locales [overlap.md](../data/catalog/overlap.md) lists as MH4U's, the Frozen Seaway is the one MHXX fields Giadrome on: map 14 there (氷海, the name the quests' titles use), MH4U's map 4. Giadrome stands in area 2 in every MHXX Frozen Seaway quest, and in area 5 in the one with two of them.
+
+So the first quest uses the Frozen Seaway: **area 2**, one Giadrome; the two-Giadrome MHXX quest uses areas 2 and 5. The Arctic Ridge (map 3; 103 at night), where 13 of the 21 quests are, is one MH4U does not have ([overlap.md](../data/catalog/overlap.md): to add), so those quests wait for its port. The two Arena quests are arena quests (map 9, one area), not field quests, and the Polar Field has no MHXX Giadrome quest.
+
+### The MH4U quest it is built from
+
+**10210, "Snow with Occasional Lagombi"** (Hall, Low Rank ★2, `quest01.arc`): the Frozen Seaway (map 4), one Lagombi (id 47) in area 2, a hunt objective targeting 47, and two Felyne groups (id 65) in area 2's small-monster list. It is the same Hall Low Rank ★2 list as 10212, the quest [#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)'s headless proof starts, and it is the same map the converted Giadrome quests will use.
+
+To make it the first Giadrome quest, the large-monster definition's id 47 and the first objective's target 47 become Giadrome's id, the next free one in `data/ids/registry.csv` from 124 up that [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161) gives it (126 while Great Wroggi's row is not in). `mhuc mib export` and `mhuc mib import` make that one-field edit on the `.mib`, and the patched quest is what the headless proof runs. 10212's Rathian is changed to id 125 the same way.
+
+For a converted MHXX quest the id changes on the source side: Giadrome's `em034` row in [monster.csv](../data/idmap/mhxx-mh4u/monster.csv) points at the registry id, with [map.csv](../data/idmap/mhxx-mh4u/map.csv) `14`→`4` and [area.csv](../data/idmap/mhxx-mh4u/area.csv) `14:2`→`4:2` (and `14:5`→`4:5`). The two-Giadrome q0111402 then needs no new map or stage.
+
+### The pack, and what stands in
+
+Giaprey are a small monster MH4U does not have ([overlap.md](../data/catalog/overlap.md): "Small monsters to add"), and this milestone ports the large monster only. So **MH4U's Jaggi (id 56) stand in for the pack**: the two area-2 Felyne groups become Jaggi groups. Porting Giaprey is left to a task of its own.
+
+While Giadrome's own files are incomplete, its registry row's stand-in does the work: **MH4U's Great Jaggi (id 15)**, as [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161) records. Every kind of file the port does not ship yet — sound, effects, camera, `.emd`/`.etd` data and the motion slots it keeps — comes from Great Jaggi, and each kind it ships from its own folder ([monster_ids](../mods/monster_ids/README.md)). The first quest's rank, stat rows and texts stay 10210's as placeholders; it is not shipped, and the first shipped quest is a converted MHXX one.
+
+
 ## The MHXX converter
 
 `mhuc convert quest --from mhxx` (`src/mhuc/quests/convert.py`) takes three inputs:
