@@ -25,10 +25,13 @@ but its index is not a constant), `none` (no call) or `no-handler` (the action's
 inline). `compare` counts the common ids that start the same index and lists the ones that
 differ, plus the counts that could not be compared and why. With `--game-a`/`--lmt-a` and
 `--game-b`/`--lmt-b` it also compares the motions themselves: a motion index packs its LMT
-file and animation slot (MH4U and MHXX `file << 8 | slot`, MH3U `file * 100 + slot`), and the
-animation's frame count, loop frame and track count are its signature. The output splits the
+file and animation slot (MH4U and MHXX `file << 8 | slot`, MH3U `file * 100 + slot`), and an
+animation's frame count and loop frame are its signature (the track count is recorded but
+doesn't decide). The output splits the
 differing ids into same motion at another index (equal signature, or the signature found
-elsewhere in the other game), different motion, and no animation at the decoded index;
+elsewhere in the other game), different motion, and no animation at the decoded index. A
+category-7 id whose signatures differ is not resolved: its shared handler can start more than
+one animation, so the first constant is not the whole move;
 `--mapping` writes the per-id mapping.
 
 `place` turns the comparison into a port's plan for a monster that runs the target game's
@@ -240,9 +243,13 @@ def read_lmt(data: bytes) -> list[tuple[int, int, int] | None]:
 
 
 def same_motion(a: tuple[int, int, int], b: tuple[int, int, int]) -> bool:
-    """The same animation: same frames and loop, and the same track count or one more on
-    MH4U's side (its skeleton has one fewer bone; specs/mod.md)."""
-    return a[:2] == b[:2] and abs(a[2] - b[2]) <= 1
+    """The same animation: the same frame count and loop frame.
+
+    The track count is recorded but does not decide. MH4U's animations carry more tracks than
+    MH3U's for the same motion (every compared Zinogre id is 46 against 37), which is a
+    technical difference in how many bones an animation names, not a different-looking motion.
+    """
+    return a[:2] == b[:2]
 
 
 def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) -> dict:
@@ -282,6 +289,10 @@ def content_split(a: dict, b: dict, game_a: str, lmts_a, game_b: str, lmts_b) ->
             same.append((key, a[key]["motion"], b[key]["motion"], xa))
         elif same_motion(xa, xb):
             same_track.append((key, a[key]["motion"], b[key]["motion"], xa, xb))
+        elif key[0] == 7:
+            # Category 7's handlers share code that can start more than one motion, so the first
+            # constant is not the whole action: a different signature there is not resolved.
+            unresolved.append((key, a[key]["motion"], b[key]["motion"], xa, xb))
         else:
             different.append((key, a[key]["motion"], b[key]["motion"], xa, xb))
     return dict(same=same, same_track=same_track, elsewhere=elsewhere, different=different,

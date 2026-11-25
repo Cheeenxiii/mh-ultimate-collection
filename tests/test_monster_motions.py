@@ -212,3 +212,26 @@ def test_motion_lists_are_indexed_by_the_file_number_each_game_encodes():
     lists = monster_versions.lmts(files, "mh4u", "em003")
     assert len(lists) == 3
     assert lists[0] == [(1, 0, 0)] and lists[1] is None and lists[2] == [(1, 0, 0)], lists
+
+
+def test_an_animation_is_the_same_by_its_frames_and_loop_not_its_track_count():
+    # MH4U's Zinogre animations carry 46 tracks to MH3U's 37 for the same motion.
+    assert monster_motions.same_motion((345, -1, 46), (345, -1, 37))
+    assert not monster_motions.same_motion((347, 0, 42), (489, 62, 42))
+
+
+def test_a_category_7_id_with_a_different_signature_is_not_resolved():
+    # Category 7's shared handler can start more than one motion, so its first constant is not
+    # the whole move: a differing signature there is unresolved, not a different animation.
+    a = {(7, 2): {"motion": 0, "how": "constant"}}
+    b = {(7, 2): {"motion": 100, "how": "constant"}}
+    same_a = [[(189, -1, 46)], [(1, 0, 1)]]
+    same_b = [[(69, -1, 37)], [(1, 0, 1)]]
+    split = monster_motions.content_split(a, b, "mh4u", same_a, "mh3u", same_b)
+    assert split["different"] == []
+    assert [x[0] for x in split["unresolved"]] == [(7, 2)]
+
+    a[(3, 2)] = {"motion": 0, "how": "constant"}
+    b[(3, 2)] = {"motion": 100, "how": "constant"}
+    split = monster_motions.content_split(a, b, "mh4u", same_a, "mh3u", same_b)
+    assert [x[0] for x in split["different"]] == [(3, 2)]
