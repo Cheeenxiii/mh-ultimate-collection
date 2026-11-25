@@ -9,9 +9,10 @@ import json
 import struct
 
 import pytest
+from shader_packages import SHADERS_XX, model_header
 
 from mhuc import monsters
-from mhuc.formats import arc, camera, mrl, tex
+from mhuc.formats import arc, camera, mfx, mrl, tex
 
 SLOTS = frozenset({0, 1, 2, 3, 4})
 ROW = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
@@ -35,7 +36,8 @@ def material_mhxx() -> bytes:
     """A synthetic MHXX MRL 0x20: one texture reference and one material record."""
     refs = (struct.pack("<III", mrl.TEXTURE_CLASS, 0, 0)
             + b"enemy\\em001_00\\mod\\em001_00_BM".ljust(64, b"\0"))
-    records = struct.pack("<II", 0, 0x12345678) + bytes(0x3C - 4)
+    blend = struct.pack("<I", mfx.object_id("BSSolid", 0x91))      # the source package's slot
+    records = struct.pack("<II", 0, 0x12345678) + bytes(4) + blend + bytes(0x3C - 0x0C)
     header = mrl.HEADER.pack(b"MRL\0", 0x20, 1, 1, mrl.SIGNATURES["mhxx"], 0x1C,
                              0x1C + len(refs))
     return header + refs + records
@@ -45,9 +47,9 @@ def source_entries() -> list[arc.Entry]:
     image = tex.from_rgba("RGBA8", 8, 8, bytes([1, 2, 3, 4]) * 64)
     image.version = 0xA6
     return [
-        entry("enemy/em001/em001_00/mod/em001_00.mod", b"MOD\0" + bytes(8)),
+        entry("enemy/em001/em001_00/mod/em001_00.mod", model_header(1, mfx.object_id("IAObj4wtT", 0x17))),
         entry("enemy/em001/em001_00/mod/em001_00.mrl", material_mhxx()),
-        entry("enemy/em001/em001_00/mod/em001_00_tail.mod", b"MOD\0" + bytes(4)),
+        entry("enemy/em001/em001_00/mod/em001_00_tail.mod", model_header()),
         entry("enemy/em001/em001_00/mod/em001_00_tail.mrl", material_mhxx()),
         entry("enemy/em001/em001_00/mod/em001_00_BM.tex", tex.write(image)),
         entry("enemy/em001/em001_00/mot/em001_00_0.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
@@ -96,7 +98,7 @@ def stand_in_bytes(row: monsters.Row = ROW) -> bytes:
 
 def convert(row: monsters.Row = ROW, entries=None) -> tuple[arc.Archive, monsters.Report]:
     data = arc.write(arc.Archive(0x11, entries if entries is not None else source_entries()))
-    converted, report = monsters.convert(data, row, stand_in_bytes(row))
+    converted, report = monsters.convert(data, row, stand_in_bytes(row), SHADERS_XX)
     return arc.read(converted), report
 
 
@@ -140,7 +142,7 @@ def test_the_kept_paths_are_the_stand_in_entries_byte_for_byte():
                    for e in out.entries)
 
 
-def test_the_model_motions_and_ai_script_are_taken_as_is_and_the_material_only_changes_its_signature():
+def test_the_model_motions_and_ai_script_are_taken_as_is_and_the_material_changes_only_its_shader_ids():
     out, _ = convert()
     source = {e.file_name: e.data for e in source_entries()}
     pairs = {
@@ -154,10 +156,12 @@ def test_the_model_motions_and_ai_script_are_taken_as_is_and_the_material_only_c
     for port_path, source_path in pairs.items():
         got, want = next(e for e in out.entries if e.file_name == port_path).data, source[source_path]
         if port_path.endswith(".mrl"):
-            # specs/mrl.md check MR1: MH4U's loader accepts only its own signature at 0x10.
+            # specs/mrl.md check MR1: MH4U's loader accepts only its own package's signature at 0x10,
+            # and the blend state id moves to MH4U's slot for BSSolid (specs/mfx.md)
             assert struct.unpack_from("<I", got, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
-            assert [i for i in range(len(want)) if want[i] != got[i]] == \
-                list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4))
+            blend = mrl.read(want)["records_at"] + 4 + 0x08
+            assert struct.unpack_from("<I", got, blend)[0] == mfx.object_id("BSSolid", 0x9e)
+            assert {i & ~3 for i in range(len(want)) if want[i] != got[i]} == {mrl.SIGNATURE_AT, blend}
         else:
             assert got == want
 
@@ -214,7 +218,7 @@ def test_a_borrowed_motion_list_keeps_its_slot_under_the_ports_id():
     row = monsters.Row(126, "giadrome-gu", "mhxx", "em034", "Giadrome", 15,
                        frozenset({"model", "motions"}), frozenset({0, 2, 3, 4}))
     entries = [
-        entry("enemy/em034/em034_00/mod/em034_00.mod", b"MOD\0" + bytes(8)),
+        entry("enemy/em034/em034_00/mod/em034_00.mod", model_header()),
         entry("enemy/em014/em014_00/mot/em014_00_0.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
         entry("enemy/em014/em014_00/mot/em014_00_2.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
         entry("enemy/em014/em014_00/mot/em014_00_1.lmt", b"LMT\0" + struct.pack("<HH", 67, 0)),
@@ -246,7 +250,7 @@ def test_a_command_the_row_does_not_ship_is_left_out():
 def test_an_archive_with_no_file_of_a_shipped_kind_is_refused():
     data = arc.write(arc.Archive(0x11, [entry("sound/se/x.mca", b"MADP")]))
     with pytest.raises(monsters.ConvertError, match="the row's files lists it, but em001_00 has none"):
-        monsters.convert(data, ROW, stand_in_bytes())
+        monsters.convert(data, ROW, stand_in_bytes(), SHADERS_XX)
 
 
 def write_registry(tmp_path, files="model,motions=0-4,tail,cmd"):
@@ -269,7 +273,8 @@ def test_the_registry_row_reads_the_files_column(tmp_path):
 def test_a_kind_this_converter_cannot_produce_is_refused(tmp_path):
     row = monsters.registry_row(124, write_registry(tmp_path, "model,sound"))
     with pytest.raises(monsters.ConvertError, match="sound"):
-        monsters.convert(arc.write(arc.Archive(0x11, source_entries())), row, stand_in_bytes(row))
+        monsters.convert(arc.write(arc.Archive(0x11, source_entries())), row, stand_in_bytes(row),
+                         SHADERS_XX)
 
 
 def test_the_files_column_is_checked(tmp_path):
@@ -281,7 +286,8 @@ def test_the_files_column_is_checked(tmp_path):
 
 
 def test_the_mod_folder_holds_the_ports_archive_and_a_manifest(tmp_path):
-    converted, _ = monsters.convert(arc.write(arc.Archive(0x11, source_entries())), ROW, stand_in_bytes())
+    converted, _ = monsters.convert(arc.write(arc.Archive(0x11, source_entries())), ROW, stand_in_bytes(),
+                                   SHADERS_XX)
     monsters.build_mod(str(tmp_path / "mod"), ROW, converted)
     manifest = json.loads((tmp_path / "mod" / "mod.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "Rathian (GU) files"

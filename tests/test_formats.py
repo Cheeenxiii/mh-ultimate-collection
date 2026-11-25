@@ -7,9 +7,10 @@ import struct
 import zlib
 
 import pytest
+from shader_packages import MH4U, SHADERS, SOURCE_OBJECTS, model_header, package_bytes
 
 from mhuc import cli, monsterassets, monsterdata
-from mhuc.formats import arc, camera, classid, emd, hitdata, lmd, lmt, lyt, mrl, pica, sound, stq, xfs
+from mhuc.formats import arc, camera, classid, emd, hitdata, lmd, lmt, lyt, mfx, mod, mrl, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -331,14 +332,17 @@ def material_file(signature: int = mrl.SIGNATURES["mh3u"],
                   texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
     """A synthetic MRL 0x20 with one texture reference and one material record."""
     refs = struct.pack("<III", mrl.TEXTURE_CLASS, 0, 0) + texture.ljust(64, b"\0")
-    records = struct.pack("<I", 0x6b5d0d0e) + struct.pack("<I", 0x12345678) + bytes(0x3C - 4)
+    # the record's blend, depth-stencil and rasterizer ids at +0x08..+0x10, in the source package's slots
+    states = struct.pack("<III", mfx.object_id("BSSolid", 0x91), mfx.object_id("DSZTestWrite", 0xc4),
+                         mfx.object_id("RSMesh", 0xd0))
+    records = struct.pack("<II", 0x6b5d0d0e, 0x12345678) + bytes(4) + states + bytes(0x3C - 0x14)
     header = mrl.HEADER.pack(b"MRL\0", 0x20, 1, 1, signature, 0x1C, 0x1C + len(refs))
     return header + refs + records
 
 
 def source_archive(texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
     """A small MH3U-style monster archive: one model, its material naming one texture, and a motion list."""
-    model = struct.pack("<4sHHHHII", b"MOD\0", 0xE6, 0, 0, 0, 0, 0) + bytes(0x40 - 20)
+    model = model_header(1, mfx.object_id("IAObj4wtT", 0x17))
     material = material_file(texture=texture)
     entries = [
         arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rModel"), model),
@@ -353,7 +357,7 @@ def source_archive(texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
 def test_monsterassets_moves_the_source_files_to_the_ported_ids_paths():
     """docs/architecture.md#monsters: the model, material and texture are the source's, the motion list is
     version 67, and every path names the ported id so the stand-in's files stay untouched"""
-    mod = monsterassets.convert(source_archive(), 125)
+    mod = monsterassets.convert(source_archive(), 125, SHADERS)
     paths = {(e.type_name, e.path): e for e in mod.entries}
     assert set(paths) == {
         ("rModel", "enemy\\em125\\mod\\em125"), ("rMaterial", "enemy\\em125\\mod\\em125"),
@@ -367,18 +371,19 @@ def test_monsterassets_moves_the_source_files_to_the_ported_ids_paths():
     assert b"enemy\\em125\\mod\\em125_BM" in material.data
     assert b"em001" not in material.data
     assert struct.unpack_from("<I", material.data, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
-    # the signature is the material's only change besides the moved texture path
+    # besides the moved texture path, only the signature and the three state ids change (specs/mfx.md)
     restored = material.data.replace(b"em125", b"em001")
     source_material = material_file()
-    assert [i for i in range(len(source_material)) if source_material[i] != restored[i]] == \
-        list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4))
+    changed = [i for i in range(len(source_material)) if source_material[i] != restored[i]]
+    records = mrl.read(source_material)["records_at"] + 4
+    assert {i & ~3 for i in changed} == {mrl.SIGNATURE_AT, records + 0x08, records + 0x0c, records + 0x10}
     assert mod.archive_path == "data/em125.arc"
 
 
 def test_monsterassets_refuses_a_material_naming_a_texture_the_mod_does_not_hold():
     """the conversion checks the material's paths against what it builds, so a stale name fails here, not in game"""
     with pytest.raises(monsterassets.ConvertError, match="em125_02_BM"):
-        monsterassets.convert(source_archive(texture=b"enemy\\em001\\mod\\em001_02_BM"), 125)
+        monsterassets.convert(source_archive(texture=b"enemy\\em001\\mod\\em001_02_BM"), 125, SHADERS)
 
 
 def model_naming(name: bytes) -> bytes:
@@ -386,6 +391,7 @@ def model_naming(name: bytes) -> bytes:
     d = bytearray(0x40 + 0x80)
     struct.pack_into("<4sHHHHII", d, 0, b"MOD\0", 0xE6, 0, 0, 1, 0, 0)
     struct.pack_into("<I", d, 0x30, 0x40)
+    struct.pack_into("<I", d, 0x34, len(d))              # no meshes, after the material table
     d[0x40:0x40 + len(name)] = name
     return bytes(d)
 
@@ -423,7 +429,7 @@ def test_monsterassets_refuses_a_material_whose_record_key_is_not_its_models_nam
     names = monsterassets.material_names(model_naming(b"body"))
     assert names == [b"body"]
     with pytest.raises(monsterassets.ConvertError, match="body"):
-        monsterassets.convert(bound_archive(b"body", mrl.material_key(b"other")), 125)
+        monsterassets.convert(bound_archive(b"body", mrl.material_key(b"other")), 125, SHADERS)
 
 
 
@@ -1009,21 +1015,65 @@ def test_mrl_reads_the_header_and_the_material_name_hashes():
     assert mrl.material_hashes(data) == [0x12345678]
 
 
-def test_mrl_for_mh4u_rewrites_only_the_signature():
+def test_mfx_object_id_is_the_names_uninverted_crc_over_its_slot():
+    """a material's state id is (crc32_string(~0, name) & 0xfffff) << 12 | slot (specs/mfx.md): MH4U's own
+    Rathian material stores 0x62b2d09e for BSSolid in slot 0x9e; the CRC-32 vector "123456789" ->
+    0xCBF43926 gives the high bits 0xbc6d9 by hand"""
+    assert mfx.object_id("BSSolid", 0x9e) == 0x62b2d09e
+    assert mfx.name_hash("123456789") == 0xBC6D9
+
+
+def test_mfx_package_names_only_words_whose_slot_holds_a_name_with_that_hash():
+    assert MH4U.name_of(0x62b2d09e) == "BSSolid"
+    assert MH4U.name_of(0x62b2d091) is None              # BSSolid's hash, but slot 0x91 is SSLinear here
+    assert MH4U.id_for("BSSolid") == 0x62b2d09e
+    assert MH4U.id_for("CBMaterial") is None
+
+
+def test_mrl_for_mh4u_moves_each_shader_id_to_mh4us_slot_for_the_same_name():
+    """MH4U uses a material's slots as they are: an MH3U BSSolid (slot 0x91) read in MH4U's package is
+    SSLinear, a sampler, so the ids must move to MH4U's slots"""
     data = material_file(mrl.SIGNATURES["mh3u"])
-    out = mrl.for_mh4u(data)
-    assert len(out) == len(data)
-    assert [i for i in range(len(data)) if data[i] != out[i]] == \
-        list(range(mrl.SIGNATURE_AT, mrl.SIGNATURE_AT + 4))
+    out = mrl.for_mh4u(data, *SHADERS)
+    records = mrl.read(data)["records_at"] + 4
+    assert struct.unpack_from("<III", out, records + 0x08) == (0x62b2d09e, mfx.object_id("DSZTestWrite", 0xd2),
+                                                               mfx.object_id("RSMesh", 0xde))
     assert struct.unpack_from("<I", out, mrl.SIGNATURE_AT)[0] == mrl.SIGNATURES["mh4u"]
-    assert mrl.for_mh4u(out) == out                       # already MH4U's: unchanged
+    changed = {i & ~3 for i in range(len(data)) if data[i] != out[i]}
+    assert changed == {mrl.SIGNATURE_AT, records + 0x08, records + 0x0c, records + 0x10}
+    assert mrl.for_mh4u(out, *SHADERS) == out             # already MH4U's: unchanged
+
+
+def test_mrl_for_mh4u_leaves_texture_paths_alone_even_when_they_spell_an_id():
+    path = b"enemy\\em001\\" + struct.pack("<I", mfx.object_id("RSMesh", 0xd0))
+    data = material_file(texture=path)
+    out = mrl.for_mh4u(data, *SHADERS)
+    assert path in out
+
+
+def test_mrl_for_mh4u_refuses_an_object_mh4us_package_lacks():
+    source = mfx.Package(package_bytes(mrl.SIGNATURES["mh3u"], {**SOURCE_OBJECTS, 0x91: "BSOnlyIn3U"}))
+    data = bytearray(material_file())
+    records = mrl.read(bytes(data))["records_at"] + 4
+    struct.pack_into("<I", data, records + 0x08, mfx.object_id("BSOnlyIn3U", 0x91))
+    with pytest.raises(mrl.MrlError, match="BSOnlyIn3U"):
+        mrl.for_mh4u(bytes(data), source, MH4U)
 
 
 def test_mrl_for_mh4u_refuses_a_file_whose_layout_it_does_not_know():
     with pytest.raises(mrl.MrlError, match="signature"):
-        mrl.for_mh4u(material_file(0x12345678))
+        mrl.for_mh4u(material_file(0x12345678), *SHADERS)
     with pytest.raises(mrl.MrlError, match="version"):
-        mrl.for_mh4u(material_file()[:4] + struct.pack("<I", 0x21) + material_file()[8:])
+        mrl.for_mh4u(material_file()[:4] + struct.pack("<I", 0x21) + material_file()[8:], *SHADERS)
+
+
+def test_mod_for_mh4u_moves_each_meshs_vertex_format_to_mh4us_slot():
+    source = mfx.Package(package_bytes(mrl.SIGNATURES["mh3u"], {**SOURCE_OBJECTS, 0x18: "IAObj4wtT"}))
+    model = model_header(2, mfx.object_id("IAObj4wtT", 0x18))
+    out = mod.for_mh4u(model, source, MH4U)
+    assert [m["vertex_format"] for m in mod.meshes(out)] == [mfx.object_id("IAObj4wtT", 0x17)] * 2
+    with pytest.raises(mod.ModError, match="vertex format"):
+        mod.for_mh4u(model_header(1, 0x12345678), source, MH4U)
 
 
 def test_the_survey_counts_a_material_header():

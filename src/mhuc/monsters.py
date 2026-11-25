@@ -57,9 +57,10 @@ import csv
 import json
 import os
 import re
+import struct
 from dataclasses import dataclass, field
 
-from .formats import arc, camera, mrl, romfs, tex
+from .formats import arc, camera, mfx, mod, mrl, romfs, tex
 
 SOURCE_ARC = "arc/enemy/{source_key}_{variant:02d}.arc"
 STAND_IN_ARC = "/data/em{stand_in:03d}.arc"
@@ -296,7 +297,8 @@ def with_stand_in(arc_data: bytes, row: Row, stand_in_data: bytes) -> tuple[byte
     return arc.write(port), kept
 
 
-def convert(data: bytes, row: Row, stand_in_data: bytes, variant: int = 0) -> tuple[bytes, Report]:
+def convert(data: bytes, row: Row, stand_in_data: bytes, shaders: tuple[mfx.Package, mfx.Package],
+            variant: int = 0) -> tuple[bytes, Report]:
     """MHXX's monster archive as MH4U's, and a report of each entry's kind.
 
     The port's own file tree is `enemy/<id>/...`: the model `enemy/emNNN/mod/emNNN`, the tail
@@ -339,12 +341,16 @@ def convert(data: bytes, row: Row, stand_in_data: bytes, variant: int = 0) -> tu
                 renamed = _rename_mod_file(stem, row.source_key, new_key, variant)
                 if kind in row.files and renamed:
                     new_path = f"enemy/{new_key}/mod/{renamed}"
-                    if entry.type_name == "rMaterial":
-                        try:
-                            data_out = mrl.for_mh4u(entry.data)
-                        except mrl.MrlError as e:
-                            raise ConvertError(f"{path}: {e}") from None
-                        change = " (MRL signature -> MH4U's)"
+                    try:
+                        if entry.type_name == "rMaterial":
+                            data_out = mrl.for_mh4u(entry.data, *shaders)
+                            change = " (MRL shader ids and signature -> MH4U's package)"
+                        else:
+                            data_out = mod.for_mh4u(entry.data, *shaders)
+                            if data_out != entry.data:
+                                change = " (MOD vertex formats -> MH4U's package)"
+                    except (mrl.MrlError, mod.ModError, struct.error) as e:
+                        raise ConvertError(f"{path}: {e}") from None
                 else:
                     report.leave(_not_shipped(kind) if kind not in row.files else MONSTER_DATA, path)
             elif folder == "mod" and entry.type_name == "rTexture":

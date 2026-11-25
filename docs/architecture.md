@@ -136,7 +136,7 @@ data yet (step 3).
 | File kind | MHXX | MH4U | What the converter does |
 |---|---|---|---|
 | model and tail model (rModel) | MOD 0xE6 | MOD 0xE6 | taken as is, when the row ships `model` and `tail` |
-| material (rMaterial) | MRL 0x20 | MRL 0x20 | taken as is except the signature at 0x10, rewritten to MH4U's (each game's material files carry their own and MH4U's loader refuses the others, [mrl](../specs/mrl.md)); the texture paths it names are MHXX's and kept |
+| material (rMaterial) | MRL 0x20 | MRL 0x20 | taken as is except its shader ids, moved to MH4U's slots for the same object names, and the signature at 0x10, MH4U's shader package hash (a material names its shader objects by slot in its own game's package, and MH4U's loader refuses another package's hash: [mfx](../specs/mfx.md), [mrl](../specs/mrl.md)); the texture paths it names are MHXX's and kept |
 | motion lists (rMotionList) | LMT 67 | LMT 67 | taken as is, at the slots the row's `motions=` names. MHXX may store them under another monster's folder (a family shares them: Giadrome's are em014's, at slots 0, 2, 3 and 4), so the converter takes a list from any `enemy/emNNN/.../mot/` and renames it to the port's id at its own slot |
 | camera list (rCameraList) | LCM 5 | LCM 4 | converted with `camera.from_mhxx` when the row ships `camera` ([camera](../specs/camera.md)); the shipped rows don't, so the record keeps the stand-in's camera |
 | AI script (rEnemyCmd) | EMC 0x20120804, 21 group rows, MHGU's 167 opcodes | EMC 0x20120804, 23 rows, 146 opcodes | taken as is only when the row ships `cmd`, which is unverified to load: MHXX's rows and opcode table are not MH4U's ([emc](../specs/emc.md), checks A1 to A4), so a port that needs its own AI waits for that conversion. Giadrome's row ships no `cmd` and keeps the stand-in's script |
@@ -154,13 +154,15 @@ source, or a kind this mode cannot produce (sound, mef, efl), is an error naming
 materials keep MHXX's texture paths (`enemy\em001\em001_00\mod\em001_00_BM`), because they
 are bytes of the material file whose string data isn't documented beyond the resources it
 names; the textures are therefore kept at those paths, which MH4U has no file of. The one field
-the converter does rewrite is the material's signature: MHXX writes `0xeaca0cbd` where MH4U's
-loader wants its own `0xcec1aa61`, and refuses the file otherwise ([mrl](../specs/mrl.md)).
+the converter does rewrite are the material's shader ids and signature: MHXX's ids are slots of
+MHXX's shader package and its signature `0xeaca0cbd` is that package's hash, where MH4U's loader
+wants its own `0xcec1aa61` and uses the slots as stored ([mfx](../specs/mfx.md),
+[mrl](../specs/mrl.md)). The converter reads both packages from the two RomFS images.
 Nothing is authored: every file comes from MHXX, taken or converted as the table says.
 
 ### 3U Rathian's files
 
-`mhuc convert monster --id 125 --romfs <MH3U RomFS> --out <mod folder>` is the MH3U side of [the converter
+`mhuc convert monster --id 125 --romfs <MH3U RomFS> --mh4u-romfs <MH4U RomFS> --out <mod folder>` is the MH3U side of [the converter
 above](#a-ported-monsters-files): the id comes from [data/ids](../data/ids/README.md), the row's `source_key`
 finds `arc/enemy/em001.arc`, and the mod holds one RomFS file, `/data/em125.arc`, whose every path names that id
 (`enemy\em125\...`), so it never touches the MH4U monster whose tables stand in for it. 3U Rathian is the
@@ -170,7 +172,7 @@ her sound set (`--arc --sound-arc`).
 | File kind | MH3U entries | In the mod | Why |
 |---|---|---|---|
 | models (`MOD`, 0xE6) | 2 | as they are, under MH4U's model flag | the same version in MH3U and MH4U ([mod.md](../specs/mod.md), checks M1 to M3); her body's 44 bones (MH4U's Rathian has 43) and her tail's 3 are kept whole, because her motions are hers too; her meshes use vertex format `0xf606f017` at stride 36, which MH4U's own Rathian models use as well, and the archive's entry flag is MH4U's `0xA0000000` on models ([arc.md](../specs/arc.md#size-word-flags)) |
-| materials (`MRL`, 0x20) | 2 | as they are, the signature at 0x10 rewritten to MH4U's and their texture paths rewritten | the same version and layout in both games, but MH3U's files carry the signature `0x3810b2e2` where MH4U's loader checks for `0xcec1aa61` and refuses the file otherwise, which stalled the archive load ([mrl.md](../specs/mrl.md), check MR3); the paths are absolute and are moved in place from `enemy\em001\mod\em001*` to `enemy\em125\mod\em125*`, the two names being the same length. The material records and their name hashes are kept, so the model still finds its materials, and MH4U's archive loader completes with the converted material (#203, [check M3](../docs/checks.md#a-converted-material-loads-m3)); the ported model itself still does not draw, which is the model's side of the binding |
+| materials (`MRL`, 0x20) | 2 | as they are, with their shader ids moved to MH4U's slots, the signature at 0x10 rewritten to MH4U's package hash and their texture paths rewritten | the same version and layout in both games, but a material names its shader objects by slot in its own game's shader package and carries that package's hash: MH3U's `0x3810b2e2` stalled the archive load where MH4U's loader checks for `0xcec1aa61` ([mrl.md](../specs/mrl.md), check MR3), and with only the signature rewritten MH4U reads MH3U's slots as its own, so her blend state is a sampler ([mfx.md](../specs/mfx.md)); the paths are absolute and are moved in place from `enemy\em001\mod\em001*` to `enemy\em125\mod\em125*`, the two names being the same length. The material records and their name hashes are kept, so the model still finds its materials, and MH4U's archive loader completes with the converted material (#203, [check M3](../docs/checks.md#a-converted-material-loads-m3)); and with the ids moved the model draws in game ([X4](../docs/checks.md#the-materials-shader-ids-x4-game)) |
 | model textures (`TEX`, 0xA5) | 2 | as they are | the same version in both games ([tex.md](../specs/tex.md), check T1) |
 | motion lists (`LMT`, 66) | 3 | converted to version 67 | the layouts are the same, but version 66 stores keyframe types 11 to 13 signed and version 67 unsigned behind a bounds block ([lmt.md](../specs/lmt.md#keyframe-buffers)): each key is re-encoded, within 6.11e-5 of the source's component (check L6) |
 | monster data (`EMS`, `BDD`, `HTS`, `HTD`) | 5 | left out of the archive | they become MH4U's `.emd`/`.etd` rows through `mhuc monsterdata`, on her own skeleton ([hitdata.md](../specs/hitdata.md)); those rows live in `/data/em_data.arc`, not in her archive |

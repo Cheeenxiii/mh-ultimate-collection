@@ -1,12 +1,14 @@
-"""MT Framework Mobile materials (MRL), header only (specs/mrl.md).
+"""MT Framework Mobile materials (MRL), header, name hashes and shader ids (specs/mrl.md).
 
 A monster's model names its materials by name; the material file holds one record per name
-whose first word hashes it. MH4U, MH3U and MHXX share one MRL layout at version 0x20, but each
-game's loader only accepts the *signature* its own files carry at 0x10: MH4U's rMaterial load
-compares it with the value the engine holds and rejects the file when it differs, which leaves
-the resource it belongs to unloaded. A ported material therefore keeps every byte of the
-source's file and only has its signature rewritten; the texture paths it names are moved in
-place by the caller.
+whose first word hashes it. MH4U, MH3U and MHXX share one MRL layout at version 0x20, but a
+material refers to its shader objects (states, constant buffers, textures, samplers) by their
+slot in its own game's shader package (mfx.py), and carries that package's hash as its
+*signature* at 0x10. MH4U's rMaterial load rejects a file whose signature is not its package's,
+which leaves the resource it belongs to unloaded, and past that check it uses the slots as they
+are. A ported material therefore keeps the source's file and body with its shader ids moved to
+MH4U's slots for the same names and its signature rewritten; the texture paths it names are
+moved in place by the caller.
 
 The header (0x1c bytes, little endian):
 
@@ -14,22 +16,24 @@ The header (0x1c bytes, little endian):
     0x04  u32      version, 0x20
     0x08  u32      material record count
     0x0c  u32      reference count
-    0x10  u32      the source game's signature (SIGNATURES)
+    0x10  u32      the hash of the shader package the file was made against (SIGNATURES)
     0x14  u32      reference array offset, 0x1c
     0x18  u32      material record array offset, 0x14 + 0x4c * reference count
 
 The references start where the header ends. Each is 0x4c bytes: its first word is a class id,
 0x241f5deb (rTexture's) with a 64-byte path at +0x0c, or 0 for an inline block whose data sits
 there instead. Each material record is 0x3c bytes and its first word is (~crc32(name)) of one of
-the model's material names; the rest is the material's shader and parameter data, not decoded.
-The arrays are followed by more parameter data, whose placement is not decoded either. Only the
-header and the name hash are needed to make a source material load and bind in MH4U.
+the model's material names; its words at +0x08, +0x0c and +0x10 are the blend, depth-stencil and
+rasterizer state ids, and the command blocks after the records hold more ids. The rest is not
+decoded.
 """
 from __future__ import annotations
 
 import struct
 import zlib
 from collections import Counter
+
+from . import mfx
 
 MAGIC = b"MRL\0"
 VERSION = 0x20
@@ -42,8 +46,6 @@ SIGNATURES = {
     "mh3u": 0x3810b2e2,
     "mhxx": 0xeaca0cbd,
 }
-# The source games whose material layout is MH4U's, so only the signature needs rewriting.
-SOURCE_SIGNATURES = frozenset({SIGNATURES["mh3u"], SIGNATURES["mhxx"]})
 
 REFERENCE = 0x4C
 MATERIAL_RECORD = 0x3C
@@ -101,22 +103,62 @@ def unbound(data: bytes, names: list[bytes]) -> list[bytes]:
     return [name for name in names if material_key(name) not in hashes]
 
 
-def for_mh4u(data: bytes) -> bytes:
-    """A source game's material file with MH4U's signature at 0x10; every other byte kept.
+def _texture_paths(data: bytes, h: dict) -> list[range]:
+    """The byte ranges of the texture references' path fields, which hold text, not ids."""
+    out = []
+    for i in range(h["references"]):
+        at = h["references_at"] + REFERENCE * i
+        if struct.unpack_from("<I", data, at)[0] == TEXTURE_CLASS:
+            out.append(range(at + 0x0C, at + REFERENCE))
+    return out
 
-    MH4U's rMaterial load (`0x00be7000`) rejects a file whose signature is not the one the
-    engine holds, so a port must write MH4U's for the loader to accept it. An unknown signature
-    is refused rather than rewritten: the layouts could differ and the loader would then read
-    the body the wrong way.
+
+def shader_ids(data: bytes, package: mfx.Package) -> list[tuple[int, str]]:
+    """Every shader-object id `data` stores for `package`, as (offset, object name).
+
+    The ids sit in the material records (the blend, depth-stencil and rasterizer states) and in
+    the command blocks after them (constant buffers, textures, samplers); the blocks are not
+    decoded, so every aligned word past the header that is one of the package's ids counts,
+    outside the texture paths. A word is an id only if its slot holds an object whose name
+    hashes to its high 20 bits (specs/mfx.md).
     """
     h = read(data)
-    if h["signature"] == SIGNATURES["mh4u"]:
+    skip = _texture_paths(data, h)
+    out = []
+    for at in range(HEADER.size, len(data) - 3, 4):
+        if any(at in r for r in skip):
+            continue
+        name = package.name_of(struct.unpack_from("<I", data, at)[0])
+        if name is not None:
+            out.append((at, name))
+    return out
+
+
+def for_mh4u(data: bytes, source: mfx.Package, mh4u: mfx.Package) -> bytes:
+    """A source game's material file made against MH4U's shader package.
+
+    A material refers to its shader objects by slot in its own game's package (specs/mfx.md),
+    and carries that package's hash as its signature at 0x10. MH4U's rMaterial load
+    (`0x00be7000`) refuses a signature that is not its package's; past that check it uses the
+    slots as they are, so a source material with only its signature rewritten draws with
+    whatever MH4U keeps in those slots (MH3U's Rathian gets a sampler as her blend state). Each id
+    is rewritten to MH4U's slot for the same object name, and the signature to MH4U's package.
+    A file whose signature is not `source`'s is refused, and so is an object MH4U's package
+    lacks.
+    """
+    h = read(data)
+    if h["signature"] == mh4u.signature:
         return data
-    if h["signature"] not in SOURCE_SIGNATURES:
-        raise MrlError(f"MRL signature {h['signature']:#x} is not MH3U's or MHXX's; this "
-                       "converter only rewrites the signature of a layout it knows")
+    if h["signature"] != source.signature:
+        raise MrlError(f"MRL signature {h['signature']:#x} is not the source package's "
+                       f"({source.signature:#x}); its shader ids can't be read")
     out = bytearray(data)
-    struct.pack_into("<I", out, SIGNATURE_AT, SIGNATURES["mh4u"])
+    struct.pack_into("<I", out, SIGNATURE_AT, mh4u.signature)
+    for at, name in shader_ids(data, source):
+        new = mh4u.id_for(name)
+        if new is None:
+            raise MrlError(f"shader object {name} (at {at:#x}) is not in MH4U's package")
+        struct.pack_into("<I", out, at, new)
     return bytes(out)
 
 

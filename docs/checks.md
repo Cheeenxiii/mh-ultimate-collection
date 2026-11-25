@@ -691,7 +691,35 @@ The map itself loads: the screenshot at 148 s shows the player and the two Palic
 Ancestral Steppe. **The Rathian is still not drawn**: from the factory line the model-missing
 read storm starts (519,678 unmapped reads by 150 s, at the same PCs as #182: `0x0092076c`,
 `0x00936a34`, `0x00944e60`, `0x00920578`, `0x0091518c`). The material loads; the model binding to
-it is the remaining cause, and it is #203's model-side half.
+it is the remaining cause, and it is #203's model-side half. (That storm was the stand-in's
+missing enemy data, fixed by #182's preload; with it the run has 0 unmapped reads.)
+
+### The material's shader ids (X4, game)
+
+A converted material that loads still names its shader objects by MH3U's slots unless its ids
+are moved to MH4U's package ([specs/mfx.md](../specs/mfx.md)): with the signature alone
+rewritten, MH4U read 3U Rathian's blend state as the sampler `SSLinear`. `mhuc convert monster
+--mh4u-romfs` now moves every id; its 3U Rathian material's state ids are MH4U Rathian's own
+(mfx check X2).
+
+Procedure:
+
+1. Convert 3U Rathian (`mhuc convert monster --id 125 --romfs <MH3U RomFS> --mh4u-romfs <MH4U
+   RomFS> --out <mod folder>`, then the sound mode), add the mod and the quest of #182, and run
+   `tools/mods.py deploy`: the runner and the frontend read the deployed copies under
+   `load/mods/<program id>/romfs/`, not the mod library. Turn "Force a monster action" off.
+2. Play the 125 quest to the wave's area (area 3) and look at the Rathian; compare with the
+   stock quest's MH4U Rathian at the same spot.
+
+Result (2026-11-26, USA v1.3.0 update, the Qt frontend, the maintainer's walk): **pass.** In
+area 3 of the Ancestral Steppe, 3U Rathian stands at the wave's spawn, drawn with her own model
+and textures, and the minimap marks her in that area. Before the ids were moved, the same walk
+found no Rathian. She plays her limp animation in a loop: the motion number MH4U's action asks
+for picks another motion in her MH3U lists, which is the motion translation of
+[#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125), not the material. Headlessly the 125 quest loads with the converted archive (0 unmapped reads),
+but the harness's route never puts a large monster on screen: with the wave moved to area 1,
+MH4U's own Rathian (id 1) was not in view either. So this check is a player's walk, not a
+headless run.
 
 ## A ported camera's cut-in (C2)
 
