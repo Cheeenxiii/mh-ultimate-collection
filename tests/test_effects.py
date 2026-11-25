@@ -94,3 +94,64 @@ def test_pel_reads_its_version_and_refuses_another():
     assert parsed.body == b"body"
     with pytest.raises(efl.EflError, match="version"):
         efl.read_pel(efl.PEL_MAGIC + struct.pack("<I", 14))
+
+
+def test_mef_round_trips_its_bytes():
+    data = _mef(3)
+    assert mef.read_mef(data).to_bytes() == data
+
+
+def test_esq_and_psl_round_trip_their_bytes():
+    esq = mef.ESQ_MAGIC + struct.pack("<II", mef.ESQ_VERSION, mef.ESQ_HEADER) + \
+        struct.pack("<6I", 0x24, 0x30, 0x30, 0x40, 0x40, 0x50) + bytes(0x40)
+    assert mef.read_esq(esq).to_bytes() == esq
+    tiny = mef.PSL_MAGIC + struct.pack("<HH", mef.PSL_VERSION, 0)
+    assert mef.read_psl(tiny).to_bytes() == tiny
+    table = struct.pack("<HH", mef.PSL_VERSION, 2) + struct.pack("<2I", 0, 0x10)
+    psl = mef.PSL_MAGIC + table + bytes(0x10)
+    assert mef.read_psl(psl).to_bytes() == psl
+
+
+def test_efl_round_trips_and_converts_to_each_game_version():
+    mh4u = _efl()
+    assert efl.read_efl(mh4u).to_bytes() == mh4u
+    mh3u = efl.to_mh3u(mh4u)
+    mhxx = efl.to_mhxx(mh4u)
+    assert efl.read_efl(mh3u).version == efl.EFL_VERSION["mh3u"]
+    assert efl.read_efl(mhxx).version == efl.EFL_VERSION["mhxx"]
+    assert efl.from_mh3u(mh3u) == mh4u
+    assert efl.from_mhxx(mhxx) == mh4u
+    assert efl.convert(mh3u, efl.EFL_VERSION["mh4u"])[0x30:] == mh4u[0x30:], "the block moved"
+
+
+def test_efl_refuses_to_convert_from_the_wrong_game():
+    with pytest.raises(efl.EflError, match="not an MHXX"):
+        efl.from_mhxx(_efl(version=efl.EFL_VERSION["mh3u"]))
+
+
+def test_pel_round_trips_its_bytes():
+    data = efl.PEL_MAGIC + struct.pack("<I", efl.PEL_VERSION) + b"body"
+    assert efl.read_pel(data).to_bytes() == data
+
+
+def test_effect_map_loads_a_table_and_names_every_unmapped_id(tmp_path):
+    from mhuc import effectmap
+    folder = tmp_path / "mh3u-mh4u"
+    folder.mkdir()
+    (folder / "effect.csv").write_text("source,target,source_name,target_name,how\n0x46,544,a,b,match\n")
+    rows = effectmap.load(str(folder))
+    assert rows == {0x46: 544}
+    m = effectmap.EffectMap(rows)
+    assert m.target(0x46) == 544
+    assert m.target(0x99) is None
+    with pytest.raises(effectmap.EffectMapError, match="0x99"):
+        m.check("test")
+
+
+def test_mef_round_trips_an_mh4u_file_and_refuses_a_source_one():
+    data = _mef(1)
+    assert mef.to_mh4u(data, "mh4u") == data
+    esq = mef.ESQ_MAGIC + struct.pack("<II", mef.ESQ_VERSION, mef.ESQ_HEADER) + \
+        struct.pack("<6I", 0x24, 0x30, 0x30, 0x40, 0x40, 0x50) + bytes(0x40)
+    with pytest.raises(mef.MefError, match="can't become an MH4U MEF yet"):
+        mef.to_mh4u(esq, "mh3u")

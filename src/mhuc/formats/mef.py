@@ -58,6 +58,11 @@ class Mef:
     def __len__(self) -> int:
         return len(self.records)
 
+    def to_bytes(self) -> bytes:
+        """The file again: the header from its fields and the records unchanged."""
+        return (MEF_MAGIC + struct.pack("<II", self.version, len(self.records))
+                + b"".join(record.raw for record in self.records))
+
 
 def read_mef(data: bytes) -> Mef:
     if len(data) < MEF_HEADER or data[:4] != MEF_MAGIC:
@@ -77,6 +82,12 @@ def read_mef(data: bytes) -> Mef:
 class Esq:
     version: int
     sections: tuple[int, ...]   # the six offsets the header holds, in header order
+    body: bytes                 # everything after the 0x24-byte header
+
+    def to_bytes(self) -> bytes:
+        """The file again: the header from its fields and the body unchanged."""
+        return (ESQ_MAGIC + struct.pack("<II", self.version, ESQ_HEADER) + struct.pack("<6I", *self.sections)
+                + self.body)
 
 
 def read_esq(data: bytes) -> Esq:
@@ -93,13 +104,19 @@ def read_esq(data: bytes) -> Esq:
         if offset < previous or offset > len(data):
             raise MefError(f"ESQ section offset {offset:#x} isn't between {previous:#x} and {len(data):#x}")
         previous = offset
-    return Esq(version, sections)
+    return Esq(version, sections, data[ESQ_HEADER:])
 
 
 @dataclass(frozen=True)
 class Psl:
     version: int
     slots: tuple[int, ...]   # one offset per animation slot, 0 for a slot with no effects
+    body: bytes              # everything after the slot table: its padding, the descriptors and the lists
+
+    def to_bytes(self) -> bytes:
+        """The file again: the header and slot table from its fields and the rest unchanged."""
+        return (PSL_MAGIC + struct.pack("<HH", self.version, len(self.slots))
+                + struct.pack(f"<{len(self.slots)}I", *self.slots) + self.body)
 
 
 def read_psl(data: bytes) -> Psl:
@@ -122,4 +139,33 @@ def read_psl(data: bytes) -> Psl:
         if offset + PSL_DESCRIPTOR > len(data):
             raise MefError(f"slot descriptor {offset:#x} runs past the file's {len(data):#x} bytes")
         seen += 1
-    return Psl(version, slots)
+    return Psl(version, slots, data[PSL_HEADER + 4 * count:])
+
+
+# What a source game's motion effect still lacks before it can be written as MH4U's. The first
+# item is the blocker: MH4U's loader (0x398f94) builds a u16 lookup table from each record's
+# +0x04, but nothing read yet says what the table is looked up by, and a record the game never
+# looks up never plays its effect.
+UNVERIFIED = ("the record key at +0x04 is a unique u16 the loader indexes the records by, but what "
+              "looks it up (an action, a motion or an animation event id) is unverified, and the source "
+              "games' effect-id, frame, key and placement fields have no verified position")
+
+
+def to_mh4u(data: bytes, game: str, effectmap=None) -> bytes:
+    """A source game's motion effect as MH4U's MEF.
+
+    MH4U's own file round-trips. MH3U's ESQ and MHXX's PSL are read and checked, then refused:
+    their records' fields are not placed, so a converter written from them would carry guesses,
+    not effects. `effectmap` (an `mhuc.effectmap.EffectMap`) is where the source-to-MH4U effect
+    ids will come from once the fields are placed; it is not used until then.
+    """
+    if game == "mh4u":
+        return read_mef(data).to_bytes()
+    if game == "mh3u":
+        read_esq(data)
+    elif game == "mhxx":
+        read_psl(data)
+    else:
+        raise MefError(f"unknown source game {game!r}")
+    raise MefError(f"{game} motion effects can't become an MH4U MEF yet: {UNVERIFIED} "
+                   "(specs/mef.md#what-a-converter-does)")
