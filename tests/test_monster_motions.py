@@ -97,3 +97,80 @@ def test_content_split_finds_same_elsewhere_and_unresolved():
     assert [x[0] for x in s["different"]] == [(13, 5)]
     assert [x[0] for x in s["elsewhere"]] == [(7, 1)]
     assert [x[0] for x in s["unresolved"]] == [(7, 36)]
+
+
+def test_content_split_records_where_the_animation_was_found_elsewhere():
+    a = {(7, 1): dict(motion=0x41A, how="constant")}          # file 4, slot 26: empty
+    b = {(7, 1): dict(motion=209, how="constant")}            # file 2, slot 9: empty too
+    lmts_a = [[None] * 100 for _ in range(5)]
+    lmts_b = [[None] * 30 for _ in range(3)]
+    lmts_b[2][9] = (175, -1, 42)
+    lmts_a[0][3] = (175, -1, 42)
+    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
+    assert s["elsewhere"] == [((7, 1), 0x41A, 209, (175, -1, 42), (0, 3))]
+
+
+def test_placement_groups_actions_by_target_slot_and_source():
+    a = {
+        (3, 17): dict(motion=0x101, how="constant"),     # file 1, slot 1
+        (7, 6): dict(motion=0x010, how="constant"),      # file 0, slot 16
+        (7, 7): dict(motion=0x010, how="constant"),      # the same target and source
+        (9, 1): dict(motion=17, how="constant"),         # the same index in both games
+    }
+    b = {
+        (3, 17): dict(motion=26, how="constant"),        # file 0, slot 26
+        (7, 6): dict(motion=19, how="constant"),         # file 0, slot 19
+        (7, 7): dict(motion=19, how="constant"),
+        (9, 1): dict(motion=17, how="constant"),
+    }
+    lmts_a = [[None] * 100 for _ in range(5)]
+    lmts_a[1][1] = (133, 0, 42)
+    lmts_a[0][16] = (489, 62, 42)
+    lmts_b = [[None] * 30 for _ in range(3)]
+    lmts_b[0][26] = (133, 0, 42)
+    lmts_b[0][19] = (489, 62, 42)
+    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
+    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
+    assert unresolved == []
+    assert rows == [
+        dict(target=(0, 16), source=(0, 19), how="same", actions=[(7, 6), (7, 7)]),
+        dict(target=(0, 17), source=(0, 17), how="same-index", actions=[(9, 1)]),
+        dict(target=(1, 1), source=(0, 26), how="same", actions=[(3, 17)]),
+    ]
+
+
+def test_placement_refuses_a_target_slot_two_animations_want():
+    a = {
+        (13, 5): dict(motion=2, how="constant"),         # both target file 0, slot 2
+        (13, 6): dict(motion=2, how="constant"),
+    }
+    b = {
+        (13, 5): dict(motion=19, how="constant"),
+        (13, 6): dict(motion=26, how="constant"),
+    }
+    lmts_a = [[None] * 100 for _ in range(5)]
+    lmts_a[0][2] = (347, 0, 42)
+    lmts_b = [[None] * 30 for _ in range(3)]
+    lmts_b[0][19] = (489, 62, 42)
+    lmts_b[0][26] = (133, 0, 42)
+    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
+    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
+    assert unresolved == []
+    assert all(r["how"] == "conflict" and r["target"] == (0, 2) for r in rows)
+    assert [r["actions"] for r in rows] == [[(13, 5)], [(13, 6)]]
+    assert [r["source"] for r in rows] == [(0, 19), (0, 26)]
+
+
+def test_placement_takes_an_elsewhere_animation_from_the_source_game():
+    """`elsewhere` is a fact about the target's own lists; the port still copies the source's
+    animation from the source game's slot."""
+    a = {(7, 1): dict(motion=0x41A, how="constant")}          # file 4, slot 26: empty
+    b = {(7, 1): dict(motion=209, how="constant")}            # file 2, slot 9
+    lmts_a = [[None] * 100 for _ in range(5)]
+    lmts_a[0][3] = (175, -1, 42)                              # the same animation, another slot
+    lmts_b = [[None] * 30 for _ in range(3)]
+    lmts_b[2][9] = (175, -1, 42)
+    s = monster_motions.content_split(a, b, "mh4u", lmts_a, "mh3u", lmts_b)
+    rows, unresolved = monster_motions.placement(s, "mh4u", "mh3u")
+    assert unresolved == []
+    assert rows == [dict(target=(4, 26), source=(2, 9), how="elsewhere", actions=[(7, 1)])]

@@ -19,7 +19,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `loader_trace.py` | runs MHXX's `dttune`, `dtbase` or `dtbparts` loader, or MH3U's `em_status` walk, on every such file and checks `mhuc`'s readers against it ([specs/dttune.md](../specs/dttune.md), [specs/dtbase.md](../specs/dtbase.md), [specs/dtbparts.md](../specs/dtbparts.md), [specs/emstatus.md](../specs/emstatus.md)) |
 | `trace_calls.py` | logs who calls chosen functions while the game runs in Azahar, through its GDB stub (standard library only; procedure in [docs/checks.md](../docs/checks.md#tracing-engine-calls-in-mhxx)) |
 | `force_action.py` | forces the next action of the monster at the dispatcher in MHXX or MH3U through the same GDB stub; a debugging tool for a move, not check R1 |
-| `monster_motions.py` | lists the motion each of a monster's action handlers starts, and compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)) |
+| `monster_motions.py` | lists the motion each of a monster's action handlers starts, compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions)), and plans where a port writes the source's animations ([3U Rathian's moves](#a-3u-rathians-moves-on-mh4us-handlers)) |
 | `action_map.py` | joins two games' action and motion inventories: the MH4U handler each shared action id reaches, the ids only one game has, and the ids where the two sides' start motions differ (check R2 in [docs/checks.md](../docs/checks.md#the-shared-action-map-r2)) |
 
 Typical MHXX run, with `<work>` holding your own extraction:
@@ -396,6 +396,46 @@ Read in MH3U's code; the last column says what MH4U does instead, or that a trac
 | 0x00a347bc | `uCharacter` | maps r1 (0 to 0x1c) through a 0xff table and returns the entry | Needs an in-game trace: no MH4U function with these steps was found. No token candidate; the paired handlers 0x006db3dc, 0x006db540 and 0x006db948 have no spare call (best 0.0). |
 
 **What was searched for the 19.** `fnmap.py`'s instruction-token index (NGRAM) over both games' whole code gives each of them its closest MH4U bodies, scoring 0.39 to 1.0, the highest only over 4 to 10 tokens where a score says little; some have no candidate at all. Aligning her handlers with their MH4U counterparts (the call-site method above) shows no unmatched call left where one should be: the nearest spare call in each paired handler scores 0.0 to 0.6, and none is the function in question. An in-game trace is what settled the joint sound and the quest manager for MHXX (same tracer, MH4U's addresses); these 19 need it too. They are tracked in issue #55.
+
+### A 3U Rathian's moves on MH4U's handlers
+
+The 3U port keeps the source's animations and runs MH4U's handler for the action ids both
+games have. MH3U's dispatcher reaches 191 action ids on 66 handlers; 174 of those ids also
+exist in MH4U's `uEm001`, which has 342 ids on 97 handlers. R1 ([checks.md](../docs/checks.md#monster-actions))
+compares the animation each action's handler starts: 117 of the 174 start a constant
+animation in both games, and 115 of those start a different index.
+
+| The 117 compared ids | ids |
+|---|---|
+| the same index in both games | 2 (1/11 and 1/12) |
+| the same animation at another index | 93 (86 identical, 2 with the skeleton's extra MH4U track, 5 whose target slot is empty in MH4U's own lists but whose animation is found at another index there) |
+| a different animation | 3 (13/5, 13/6 and 13/8) |
+| not resolved | 19 (all category 7, whose shared code can start more than one motion, so the first constant is not enough) |
+
+The other 57 ids are not compared: one handler or both starts no constant animation (it
+computes the index, starts none, or does its work inline).
+
+**The 17 ids MH4U has no action for** are 0/4, 4, 7/64, 7/87, 7/93, 10/0 to 10/6, 11/5,
+11/15, 11/26, 11/28 and 13/9, on 8 of the 66 handlers. Their handlers have to be translated
+onto MH4U's engine, which takes a plugin API that can call an MH4U engine function (the
+fork's ABI 3); the 19 calls of #55 whose MH4U counterpart is unknown belong to that work too.
+`monster_actions.py pairs` finds 63 body pairs between the two classes; 58 of the 66 3U
+handlers have one, 8 have none.
+
+**Where the port's animations go.** `monster_motions.py place` writes the plan for a port:
+one row per target (file, slot), with the source slot and the action ids that ask for it, and
+a row for each id it cannot place. On Rathian's data it places 96 ids at 27 target slots
+(5 of them whose target slot MH4U's own lists leave empty), and has two kinds of row left
+over:
+
+- 19 ids whose animation has no unique match, which stay wherever the source's file keeps
+  them; the handler's computed index decides whether that is where it is asked for.
+- one target slot, asked by 13/5 and 13/6 with two different animations. No single placement
+  serves both; 13/6 wants the animation MH4U's 13/8 handler starts, so running 13/8's handler
+  for 13/6 is the one option to check, and it is not settled.
+
+The plan holds motion indices read from the games' code, so it is written to a file outside
+the repository, like R1's mapping. The 57 not-compared ids keep the source's own slot.
 
 ### Lessons from MHGU Definitive Edition's ports
 
