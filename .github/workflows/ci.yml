@@ -1,14 +1,59 @@
 name: CI
 
+# Pull requests run here; main runs again after a merge. A push to a PR's branch doesn't also run
+# as a push (that doubled every job). A newer push cancels the run it replaces.
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # The repository's own guards run on every change, docs included: game data could arrive in a
+  # Markdown file as easily as in code (check_no_game_data), and specs have their own rules.
+  checks:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python tools/check_no_game_data.py
+      - run: python tools/check_specs.py
+      - run: python tools/check_ids.py
+      - id: changes
+        name: Did code change?
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if git cat-file -e "$base" 2>/dev/null; then
+            files=$(git diff --name-only "$base" HEAD)
+          else
+            files=$(git ls-files)
+          fi
+          if echo "$files" | grep -qvE '\.md$|^data/catalog/|^docs/|^specs/|^LICENSE'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Lint and the test suite, on both supported Pythons, only when a file other than Markdown changed.
   test:
+    needs: checks
+    if: needs.checks.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -20,6 +65,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: .github/workflows/ci.yml
       - run: pip install pytest ruff
       - run: ruff check .
       - run: python -m pytest -q
