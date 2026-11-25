@@ -314,9 +314,11 @@ def cmd_extdata(args) -> int:
 def cmd_save(args) -> int:
     from . import save
     data = _read(args.file)
+    key = seed = None
     if args.key:
         key = _read(args.key).rstrip(b"\r\n")
         try:
+            seed = dlccrypt.mh4u_save_seed(data, key) if args.action == "clean" else None
             data = dlccrypt.mh4u_save_decrypt(data, key)
         except dlccrypt.CryptoError as e:
             print(f"mhuc save: {e}", file=sys.stderr)
@@ -331,6 +333,22 @@ def cmd_save(args) -> int:
         print(f"mhuc save: {len(data)} bytes is neither a decrypted character save "
               f"({save.CHARACTER_SIZE}) nor a system save ({save.SYSTEM_SIZE})", file=sys.stderr)
         return 2
+    if args.action == "clean":
+        if out["kind"] == "system":
+            print("mhuc save clean: the system save is left untouched: its DLC and quest registration is "
+                  "not mapped (specs/save.md, check S10), so the mod's bits cannot be told from MH4U's",
+                  file=sys.stderr)
+            return 1
+        if not args.out:
+            print("mhuc save clean: needs --out", file=sys.stderr)
+            return 2
+        cleaned, report = save.clean_character(data)
+        result = dlccrypt.mh4u_save_encrypt(cleaned, key, "normal", seed) if key else cleaned
+        with open(args.out, "wb") as f:
+            f.write(result)
+        print(f"{len(report['removed_items'])} item slots and {len(report['removed_guild_quests'])} "
+              f"guild quests removed, {len(result)} bytes to {args.out}")
+        return 0
     if args.action == "check":
         if problems:
             print("\n".join(problems))
@@ -688,11 +706,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("save", help="MH4U saves: a character file (user1..user3) or system, decrypted here "
                                     "when --key is given (specs/save.md)")
-    p.add_argument("action", choices=["dump", "check"],
-                   help="dump lists the structures as JSON; check lists structural problems only")
+    p.add_argument("action", choices=["dump", "check", "clean"],
+                   help="dump lists the structures as JSON; check lists structural problems only; clean writes "
+                        "the save back without the mod's data (a character save only; check S11)")
     p.add_argument("file", help="an encrypted or decrypted save file")
     p.add_argument("--key", help="a file holding the save cipher's key; without it the file must be decrypted")
-    p.add_argument("--out", help="write the JSON here instead of printing it")
+    p.add_argument("--out", help="dump: write the JSON here instead of printing it; clean: the save to write "
+                                 "(encrypted again with the input's seed when --key is given)")
     p.set_defaults(func=cmd_save)
 
     p = sub.add_parser("catalog", help="what MH4U already has of 3U's and GU's monsters and maps (data/catalog)")

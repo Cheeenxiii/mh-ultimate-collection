@@ -71,6 +71,35 @@ the Extra Data with a save manager first; `mhuc save dump` reads the decrypted f
 
 Status: open. The steps need the game (or the port); files alone cannot say which bit is which.
 
+## Save converter (S11)
+
+`mhuc save clean` gives back a clean MH4U save ([specs/save.md](../specs/save.md#converting-a-modded-save-back)).
+Check S11 is its file-side half, run by `tests/test_save.py` and `tests/test_with_game_files.py`: on a save
+that never met the mod it changes no byte and re-encrypts to the same file. This is the in-game half: the
+cleaned save loads and shows none of the mod's data.
+
+Back up `system`, `user1` to `user3` and the Extra Data with a save manager first, and keep the backups until
+the check passes.
+
+1. Make a modded copy of one character save. With a save editor, put an item id above MH4U's item list (1,937
+   or higher) in an empty item-box slot, and a monster id from the registry (124 or higher) in one monster
+   record of a guild-quest slot. Note the slots. If a save the mod wrote exists, use that copy instead.
+2. Clean it: `mhuc save clean user1 --key save.key --out user1.clean`. Pass: it reports one item slot and one
+   guild quest removed. On a save that never met the mod it must report none and write the same bytes.
+3. `mhuc save check user1.clean --key save.key`. Pass: it prints `character save ok`.
+4. Compare the cleaned and original files (`mhuc save dump` both): the only differences are the cleared item
+   slots and the cleared guild-quest slot; the profile, both boxes, the worn gear, the Palicos, the monster
+   log, the item flags and the unknown blocks are unchanged.
+5. Put `user1.clean`, the untouched `system` and the other character files back and boot MH4U. Pass: the
+   save-data screen lists the character, it loads in the hub, the item box has no slot the converter counted,
+   the guild quest is gone, and every other item, piece of gear, Palico and quest is the one in the backup;
+   the game saves again without an error and the character is there after a restart.
+6. Put the backups back.
+
+Status: open. Needs the game. "Indistinguishable from a save that never met the mod" holds for the mapped
+structures only: the unknown blocks and the `system` save are left as they are until decision 0003 settles
+where the mod's data goes and check S10 maps the system save's registration.
+
 ## Monster actions
 
 | Check | What | Pass |

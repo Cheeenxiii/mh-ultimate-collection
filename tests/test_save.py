@@ -9,7 +9,8 @@ import struct
 
 import pytest
 
-from mhuc import save
+from mhuc import cli, save
+from mhuc.crypto import dlccrypt
 
 
 def utf16(text: str, size: int) -> bytes:
@@ -103,6 +104,56 @@ def test_character_save_problems_name_the_slot_that_breaks_the_bound():
     data = character_save()
     struct.pack_into("<I", data, 0x34, 100_000_000)
     assert "funds 100000000 are above 99,999,999" in save.character_problems(data)
+
+
+def test_clean_removes_the_mods_items_and_guild_quests_and_nothing_else():
+    data = character_save()
+    # a ported item in the item box and in the item pouch, and a second guild quest naming a ported monster;
+    # the ids are literals so a changed bound in the module fails this test, not follows it
+    data[0x15E + 4:0x15E + 8] = struct.pack("<HH", 1937, 1)      # MH4U's last item id is 1,936
+    data[save.POUCH_ITEM_AT:save.POUCH_ITEM_AT + 4] = struct.pack("<HH", 2000, 1)
+    at = save.GUILD_QUEST_AT + save.GUILD_QUEST_SIZE
+    data[at:at + 24] = utf16("Ported", 24)
+    data[at + save.GUILD_QUEST_MONSTER_AT] = 124                 # MH4U's last monster id is 123
+
+    cleaned, report = save.clean_character(data)
+    assert [slot["slot"] for slot in save.item_box(cleaned)] == [0], "MH4U's own item slot 0 must stay"
+    assert save.pouches(cleaned)["item"][0] == {"slot": 0, "item": 0, "count": 0}
+    assert save.guild_quests(cleaned)[0]["owner"] == "Owner", "MH4U's own guild quest must stay"
+    assert save.guild_quests(cleaned)[1] is None
+    assert report == {"removed_items": [{"where": "item_box", "slot": 1},
+                                        {"where": "item_pouch", "slot": 0}],
+                      "removed_guild_quests": [{"slot": 1}]}
+    cleared = (set(range(0x15E + 4, 0x15E + 8))
+               | set(range(save.POUCH_ITEM_AT, save.POUCH_ITEM_AT + 4))
+               | set(range(at, at + save.GUILD_QUEST_SIZE)))
+    changed = {i for i in range(len(data)) if data[i] != cleaned[i]}
+    assert changed <= cleared, f"bytes outside the cleared slots changed: {sorted(changed - cleared)[:8]}"
+    assert save.character_problems(cleaned) == []
+    assert save.clean_character(cleaned) == (cleaned, {"removed_items": [], "removed_guild_quests": []})
+
+
+def test_clean_leaves_a_save_that_never_met_the_mod_byte_for_byte():
+    data = character_save()
+    cleaned, report = save.clean_character(data)
+    assert cleaned == bytes(data)
+    assert report == {"removed_items": [], "removed_guild_quests": []}
+
+
+def test_the_clean_command_keeps_the_files_own_seed_and_refuses_system(tmp_path):
+    key = b"a test key"
+    original = dlccrypt.mh4u_save_encrypt(bytes(character_save()), key, "normal", 0xABCD)
+    key_path, src = tmp_path / "save.key", tmp_path / "user1"
+    key_path.write_bytes(key)
+    src.write_bytes(original)
+    out = tmp_path / "user1.clean"
+    assert cli.main(["save", "clean", str(src), "--key", str(key_path), "--out", str(out)]) == 0
+    assert out.read_bytes() == original, "a clean save must come back byte for byte, its seed kept"
+
+    system = tmp_path / "system"
+    system.write_bytes(bytes(save.SYSTEM_SIZE))
+    assert cli.main(["save", "clean", str(system), "--out", str(tmp_path / "system.clean")]) == 1
+    assert not (tmp_path / "system.clean").exists()
 
 
 def test_a_save_of_the_wrong_size_is_refused_not_sliced():

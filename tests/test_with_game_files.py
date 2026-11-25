@@ -135,6 +135,34 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
     assert characters >= 1, "no character save found"
 
 
+def test_clean_mh4u_saves_leave_the_file_byte_for_byte_and_reencrypt_to_it(dump):
+    """specs/save.md check S11: the converter changes no byte of a save that never met the mod, and
+    re-encrypting its output with the file's own seed gives the file back."""
+    from mhuc import save
+
+    folder = dump("mh4u", "saves")
+    with open(dump("mh4u", "save.key"), "rb") as f:
+        key = f.read().strip()
+    checked = 0
+    for name in ("user1", "user2", "user3"):
+        path = os.path.join(folder, name)
+        if not os.path.exists(path):
+            continue
+        with open(path, "rb") as f:
+            original = f.read()
+        plain = dlccrypt.mh4u_save_decrypt(original, key)
+        if len(plain) != save.CHARACTER_SIZE:
+            continue
+        seed = dlccrypt.mh4u_save_seed(original, key)
+        cleaned, report = save.clean_character(plain)
+        assert cleaned == plain, f"{name}: the converter changed a save that never met the mod"
+        assert report == {"removed_items": [], "removed_guild_quests": []}, name
+        assert dlccrypt.mh4u_save_encrypt(cleaned, key, "normal", seed) == original, name
+        assert not save.character_problems(cleaned), name
+        checked += 1
+    assert checked >= 1, "no character save found"
+
+
 def test_every_mh4u_stream_request_reads_and_matches_the_wave_it_names(dump):
     """specs/sound.md check S4: every .stq's tables and names close, and each stream record's length, sample count,
     channels, rate and loop start/end are the .mca header's own"""

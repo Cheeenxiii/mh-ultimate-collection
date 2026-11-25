@@ -2,6 +2,8 @@
 
 A character save is 81,400 bytes decrypted, one character per file. The `system` save is 504 bytes
 decrypted and shared by the three characters; `system_summary` reads the fields that are mapped so far.
+`clean_character` removes the mod's data from the structures whose layout is mapped, which is what the
+converter (`mhuc save clean`) writes back as a clean MH4U save (specs/save.md, check S11).
 Offsets in this module are in the decrypted file, as `mhuc decrypt mh4u-save` writes it (the cipher's
 8-byte header is gone). Layouts: specs/save.md, from the community save editor mh4edit (MIT) and the
 MH4G save-editor wiki for the profile, pouches, quest counts and weapon usage, and from the mhff wiki
@@ -54,6 +56,9 @@ PALICO_SIZE = 232
 GUILD_QUEST_AT = 0xDCA8
 GUILD_QUEST_COUNT = 10
 GUILD_QUEST_SIZE = 304
+GUILD_QUEST_MONSTER_AT = 0x28   # five 40-byte monster records; the id is the record's first byte
+GUILD_QUEST_MONSTER_SIZE = 40
+GUILD_QUEST_MONSTER_COUNT = 5
 MONSTER_LOG_AT = 0x12E5C
 MONSTER_LOG_COUNT = 82
 MONSTER_LOG_SIZE = 10
@@ -70,6 +75,13 @@ ITEM_FLAGS_SIZE = 272
 QUEST_FLAGS_AT = 0x11E          # 512 bits; candidate for the village quest clear list, unproved
 QUEST_FLAGS_SIZE = 64
 SHARP_ARENA_AT = 0x131A4        # the arena leaderboard block (specs/save.md); partly mapped
+
+# The converter's bounds: what MH4U itself can have written. MH4U's item ids end at 1,936 (itemName has
+# 1,937 names, reference/README.md) and its monster ids at 123 (reference/README.md#mh4u-monster-tables);
+# the item id is the low 11 bits of its u16 (specs/save.md). Anything above either is not MH4U's.
+ITEM_ID_MASK = 0x7FF
+ITEM_ID_LAST = 1936
+MH4U_MONSTER_LAST = 123
 
 # The blocks the spec lists. (name, offset, size); the unknown blocks keep their extent only.
 BLOCKS = (
@@ -327,6 +339,41 @@ def system_summary(data: bytes) -> dict:
         "first_nonzero": nonzero[0] if nonzero else None,
         "last_nonzero": nonzero[-1] if nonzero else None,
     }
+
+
+def clean_character(data: bytes) -> tuple[bytes, dict]:
+    """A character save with the mod's data removed, and what was removed (specs/save.md, check S11).
+
+    Only the structures whose layout is mapped are cleaned: an item-box or pouch slot whose id is above
+    MH4U's item list is emptied, and a guild-quest slot that names a monster above MH4U's last id is zeroed
+    whole (MH4U wrote neither record, and a quest short one monster is not one MH4U wrote either). The
+    unknown blocks, the item flags and the quest-clear candidate stay as they are because their meaning is
+    unmapped, and a `system` save is refused for the same reason: its DLC/quest registration is not mapped.
+    """
+    _check_size(data, CHARACTER_SIZE, "character save")
+    out = bytearray(data)
+    items = []
+    for where, at, count in (("item_box", ITEM_BOX_AT, ITEM_BOX_COUNT),
+                             ("item_pouch", POUCH_ITEM_AT, POUCH_ITEM_COUNT),
+                             ("gunner_pouch", POUCH_GUNNER_AT, POUCH_GUNNER_COUNT)):
+        for i in range(count):
+            slot = at + 4 * i
+            item, n = _u16(data, slot), _u16(data, slot + 2)
+            if (item or n) and (item & ITEM_ID_MASK) > ITEM_ID_LAST:
+                out[slot:slot + 4] = b"\0" * 4
+                items.append({"where": where, "slot": i})
+    quests = []
+    for i in range(GUILD_QUEST_COUNT):
+        at = GUILD_QUEST_AT + i * GUILD_QUEST_SIZE
+        rec = data[at:at + GUILD_QUEST_SIZE]
+        if not any(rec):
+            continue
+        monster_ids = [rec[GUILD_QUEST_MONSTER_AT + GUILD_QUEST_MONSTER_SIZE * m]
+                       for m in range(GUILD_QUEST_MONSTER_COUNT)]
+        if any(monster_id > MH4U_MONSTER_LAST for monster_id in monster_ids):
+            out[at:at + GUILD_QUEST_SIZE] = b"\0" * GUILD_QUEST_SIZE
+            quests.append({"slot": i})
+    return bytes(out), {"removed_items": items, "removed_guild_quests": quests}
 
 
 def character_problems(data: bytes) -> list[str]:
