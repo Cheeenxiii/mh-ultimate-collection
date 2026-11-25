@@ -135,8 +135,8 @@ comparable ids. The two ids whose index also agrees with MH3U are 1/11 and 1/12;
 comparison above shows that the rest are mostly the same motion at another index, not different
 moves. The not-compared ids are those where one side (or both) is `computed`, `none` or
 `no-handler`; the run prints the reason counts. The port translates MH3U's motion indices at
-run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125));
-13/5, 13/6 and 13/8 each keep their own animation.
+run time from a generated table (check [M1](#the-motion-translation-m1)); 13/5, 13/6 and 13/8
+each keep their own animation.
 
 To rerun, write the TSVs outside the repository (for example under `build/`):
 
@@ -158,6 +158,25 @@ python3 reference/monster_motions.py compare build/mh4u.tsv build/mh3u.tsv \
     --game-a mh4u --lmt-a build/lmt/em001_{0,1,2,3,4} \
     --game-b mh3u --lmt-b build/lmt/mot_em001_{000,100,200} \
     --mapping build/mh4u-mh3u-map.tsv
+python3 reference/monster_motions.py compare build/mh4u.tsv build/mhxx.tsv \
+    --game-a mh4u --lmt-a build/lmt/em001_{0,1,2,3,4} \
+    --game-b mhxx --lmt-b build/lmt/em001_00_{0,1,2,3,4} \
+    --mapping build/mh4u-mhxx-map.tsv
+```
+
+The per-id mappings are what the port's motion table is generated from: `monster_motions.py
+table` writes one table per ported monster into `mods/monster_motions/src/motions.h`, and
+`tools/check_motion_tables.py` checks the header against R1's counts and, with the same inputs,
+that it is exactly what the generator writes (check [M1](#the-motion-translation-m1)):
+
+```bash
+python3 reference/monster_motions.py table --mh4u build/mh4u.tsv \
+    --source mh3u build/mh3u.tsv build/mh4u-mh3u-map.tsv \
+    --source mhxx build/mhxx.tsv build/mh4u-mhxx-map.tsv \
+    -o mods/monster_motions/src/motions.h
+python3 tools/check_motion_tables.py --mh4u build/mh4u.tsv \
+    --source mh3u build/mh3u.tsv build/mh4u-mh3u-map.tsv \
+    --source mhxx build/mhxx.tsv build/mh4u-mhxx-map.tsv
 ```
 
 For another monster, change `--range` to its code (or `--module`/`--crs` to its MHXX
@@ -280,6 +299,39 @@ next is forced again. Why the idle routine runs during a forced move is not trac
  The source games can still be forced
 with [reference/force_action.py](../reference/force_action.py) through Azahar's GDB stub; it
 is a debugging tool for later move investigations, not part of this check.
+
+### The motion translation (M1)
+
+| Check | What | Pass |
+|---|---|---|
+| M1 | force 13/5, 13/6 and 13/8 on the ported 3U Rathian with `mods/force_action`, the code library built with `mods/monster_motions` | the log shows the plugin ready and each action translated to her own motion number (13/5 -> 0x013, 13/6 -> 0x01a, 13/8 -> 0x01a), each of the three plays a different animation, a motion the table lacks passes through and is logged once, and MH4U's own Rathian is unchanged |
+
+`mods/monster_motions` ([README](../mods/monster_motions/README.md)) wraps MH4U's motion-start
+wrapper (0x0094e318, R1's) and translates the number in r1 through `src/motions.h`, which
+`reference/monster_motions.py table` generates from R1's comparison and
+`tools/check_motion_tables.py` checks. The headless part needs one code-library build; the
+in-game part also needs #48/#49's converted files, #105's resource paths and the ported id byte
+both this plugin and `force_action` read at `work+0x1c0` (the block holds the stand-in's id
+until the port's own rows load).
+
+1. `make` in `mods/monster_motions`; add it to a user folder's mod library
+   (`tools/mods.py add mods/monster_motions`) and enable it; build the code library with the
+   mod on: `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`.
+   The build lists the `uEnemy::startMotion` hook point.
+2. Run the game headless:
+   `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
+   Pass: the log has `ready: translating motion numbers for 2 ported monster id(s), 96 entries;
+   MH4U's own ids pass through`.
+3. In game, on a quest whose monster is the ported 3U Rathian, set `action = 13/5`,
+   `monster = <her data block's id>` and `hold = 1` in `mods/force_action`'s `config.ini`, take
+   the quest and watch her; repeat for 13/6 and 13/8. Pass: each action plays a different
+   animation, and the first log line for each says what it asked for (`action 13/5 asks motion
+   0x002 -> source 0x013`). A motion the table leaves out (7/36) logs `no entry for action 7/36
+   motion 0x41c; passing it through` once and plays the MH4U index.
+4. MH4U's own Rathian, in another quest, plays as before: the plugin leaves ids below 124 alone.
+
+Status: not done. The headless part waits for one code-library rebuild; the in-game part waits
+for #48, #49 and #105.
 
 ## Ported monster ids
 
