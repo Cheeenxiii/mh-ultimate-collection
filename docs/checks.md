@@ -478,8 +478,8 @@ P1, headless:
    mapping shows here; a real spawn's reader lines are P2's.
 
 P2, in game: needs the ported files (#48, #49) and a quest that names id 124
-([quests.md](quests.md)), and for the pool a pooled monster's row, files and a quest that names
-its registry id (256). Not done.
+([quests.md](quests.md)), for the pool a pooled monster's row, files and a quest that names
+its registry id (256), and its headless prerequisite is P4. Not done.
 
 Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod's 16 hook
 points (the two quest hooks among them), headless runner. Both passes:
@@ -560,6 +560,64 @@ with it (P1), and a quest that spawns the id (#144). It is the in-game half of S
    ([specs/sound.md](../specs/sound.md#the-request-records-words)).
 
 Status: not done; waits for #48, #49 and #144.
+
+### The quest's headless load (P4)
+
+| Check | What | Pass |
+|---|---|---|
+| P4 | a headless run starts quest 10212 with a ported id (125 in the 3U profile, 124 in the GU one) and the quest loads past "Now Loading" | the log shows the quest's map loading with the player in it and no hang, and the ported id's factory and resource lines; one input script does it for both profiles |
+
+The per-move checks (#113, #116) need a quest that names a ported id. This check starts one
+without a window: the runner's `--input` script plays from the title to the Gathering Hall's
+Low-rank quest counter, posts quest 10212, and leaves the quest to load.
+
+1. Profiles: two user folders, each a copy of the maintainer's save. The 3U one has the wave of
+   the deployed `loc/data/quest01.arc` naming monster 125 and `data/em125.arc` deployed; the GU
+   one names 124 and deploys `data/em124.arc`. Both have the code library built with
+   `mods/monster_ids` on (`selftest = 1`) and the plugin as merged for #143.
+2. The input script stays outside the repository. It can be written from the route or converted
+   from an Azahar `.ctm` recording of the same run: the movie holds the controller states in the
+   order the HID service consumes them, and a pad record is one HID update, 234 per emulated
+   second, so a record's time is about (index + 1) * 1000 / 234 ms. The route the maintainer
+   recorded: 7-15 s, A through the Circle Pad Pro and break screens, the title, the save and the
+   character select; 26-32 s, R held with the circle pad up, running through Val Habar; 33-52 s,
+   A through the World Map, the Gathering Hall fast travel, the Hall's Low-rank quest counter,
+   the 2★ list and "Royal Assassination"; the departure confirmation is A at 52.3 s. The quest
+   loads at about 54 s and its "Royal Assassination" splash is drawn by 60 s.
+3. Run, from the workspace root, under the team's heavy-job lock:
+   ```
+   mh4u_runner "<MH4U USA .3ds>" --code <user>/recomp/0004000000126300.so --user <user> \
+       --ms 90000 --speed 0 --input "<script>" --draw-window 1 --log "*:Info"
+   ```
+   Screenshots (`--shots`, `--shot-every`, `--shots-from`) show the route; `--draw-window` without
+   `--shots` draws nothing and is much faster.
+4. Pass: the log shows the quest loading past "Now Loading" (the player is in the quest's map, no
+   hang) and the ported id's factory and resource reader lines. A stock quest (MH4U's own id 1)
+   started with the same script is the control.
+
+Result (2026-11-25, USA v1.3.0 update, headless runner, the maintainer's `.ctm` replayed):
+
+- **Stock control: pass.** The same script posts quest 10212 with MH4U's own monster (id 1) on
+  the same save and the player is in the Ancestral Steppe at 60 s, quest HUD up, no hang.
+- **id 125: fail.** The script reaches the Hall's quest counter, departs at 52.3 s, and the
+  "Royal Assassination" splash is drawn by 60 s; it stays frozen and the quest never reaches the
+  monster spawn (no factory or resource reader line for 125). An `RC_CALL_COUNTS` comparison with
+  the stock run shows a wait, not a spin (14.5 M calls over 489 functions in 60-85 s against
+  37.3 M over 2172 in stock). An RSP thread dump of the frozen session (all 19 threads) shows
+  every thread blocked: 13 in `svcArbitrateAddress`, 4 in `svcSleepThread`, none running. The main
+  thread waits in libctru's pthread mutex (`0x0010f4cc`) inside the engine's error reporter
+  `0x00d82d00`, called from the per-frame checker `0x00bf6f20` when two fields of the rotating
+  state buffer at `this+0x6e08`/`this+0x6e10` differ. A throwaway probe hooked on the checker and
+  on the counter update shows that difference fires thousands of times in the healthy stock run
+  too (checker calls: 125 3087 differ / 490 equal; stock 3178 / 381), with the same advance/check
+  order in both: the assertion is benign in stock and the 125 load only turns it into a deadlock
+  by holding the mutex the error reporter takes. `Service.FS:Debug` shows no file request in
+  flight at the deadlock, so the holder waits on a guest lock, not on the files.
+- **id 124: not run.** It was to follow 125; the 125 deadlock blocks the proof.
+
+The deadlock is the open problem: the quest cannot load until the 125 load path stops holding the
+engine mutex while the error reporter takes it. The harness above and the stock control are
+reusable for that. The input script and the `.ctm` stay outside the repository.
 
 ## Calling the engine from a plugin (P3)
 
