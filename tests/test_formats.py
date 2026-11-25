@@ -196,22 +196,43 @@ def test_etd_part_table_outside_the_file_is_counted_not_read():
 
 
 def test_emd_word_35_records_end_at_the_minus_one_record_and_count_the_sever_ones():
-    """specs/emd.md word 35, check E11: the kind-0 records after the marker are the sever/detach ones"""
+    """specs/emd.md word 35, checks E11 and E12: kinds 0/3/5 are the severs; the index, limit, a and b are counted"""
     d = bytearray(0x140)
     d[:4] = b"emd\0"
     struct.pack_into("<I", d, 4 * 35, 0xC0)                                # after the 0xB8 header
     struct.pack_into("<iIIIII", d, 0xC0, 4, 4, 0, 0, 255, 0)               # a dtbparts joint record
     struct.pack_into("<iIIIII", d, 0xD8, 255, 0, 0, 0xFFFFFFFF, 0, 0)      # the (255, 0, 0, -1) marker
-    struct.pack_into("<iIIIII", d, 0xF0, 143, 0, 1, 143, 0, 0)             # a sever record
+    struct.pack_into("<iIIIII", d, 0xF0, 143, 0, 1, 143, 0, 0)             # a kind-0 sever record
     struct.pack_into("<iIIIII", d, 0x108, -1, 0, 0, 0, 255, 0)             # the terminator
     recs = emd.joint_records(bytes(d))
     assert recs is not None, "word 35's list must end at its -1 record"
     assert [r[0] for r in recs] == [4, 255, 143, -1]
     counts = emd.check_emd(bytes(d))
     assert counts["E11 emd sever records"] == 1
-    assert counts["E11 emd sever joint 143"] == 1
+    assert counts["E11 emd sever kind 0 joint 143"] == 1
     assert counts["E11 emd files with the (255, 0, 0, -1) marker"] == 1
-    assert "E11 emd sever a is not 0" not in counts
+    assert counts["E12 emd sever index 1"] == 1
+    assert counts["E12 emd sever limit is the joint"] == 1
+    assert counts["E12 emd sever a is 0"] == 1
+    assert counts["E12 emd sever b is 0"] == 1
+
+
+def test_emd_counts_every_sever_kind_and_the_block_a_sever_record_b_points_at():
+    """specs/emd.md, checks E11 and E12: a kind-5 sever counts, and E12 follows the loader's b relocation:
+    b inside the file, and the six u32 there inside it with three nonzero"""
+    d = bytearray(0x300)
+    d[:4] = b"emd\0"
+    struct.pack_into("<I", d, 4 * 35, 0xC0)
+    struct.pack_into("<iIIIII", d, 0xC0, 200, 5, 1, 200, 0, 0x2A0)         # a cut-type-3 sever, b -> 0x2A0
+    struct.pack_into("<iIIIII", d, 0xD8, -1, 0, 0, 0, 255, 0)
+    struct.pack_into("<6I", d, 0x2A0, 0x2C0, 0x2C4, 0x2C8, 0, 0, 0)       # the block: three offsets, three zeros
+    counts = emd.check_emd(bytes(d))
+    assert counts["E11 emd sever records"] == 1
+    assert counts["E11 emd sever kind 5 joint 200"] == 1
+    assert counts["E12 emd sever b inside the file"] == 1
+    assert counts["E12 emd sever b block inside the file"] == 1
+    assert counts["E12 emd sever b block with 3 nonzero words"] == 1
+    assert "E12 emd sever b OUTSIDE the file" not in counts
 
 
 def test_emd_counts_a_word_35_list_that_runs_off_the_end_instead_of_crashing():
