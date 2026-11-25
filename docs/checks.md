@@ -214,16 +214,48 @@ where only one side starts a motion are what R2p looks at first.
 
 | Check | What | Pass |
 |---|---|---|
-| R2p | force each action id the port ships on the ported GU Rathian and compare the move with MHXX's | every shipped id is recorded below, and the ids that do not play like MHXX are named with what differs |
+| R2p | force each action id the port ships on the ported Rathian and compare the move with its source game | every shipped id has a row below, and the ids that do not play like the source game are named with what differs |
 
-For each id in R2's map, set it in `mods/force_action`'s `config.ini` (`action = <cat>/<idx>`,
-`monster = 124`, `hold = 1`), take a quest that names id 124, and watch the move. R2's map says
-what to expect: a shared id starts MHXX's motion at the same index, and the ids R2 lists as
-one-sided may start no motion or another one. Record pass or fail per id and what differs: no
-motion, another motion, a different timing, a missing effect or projectile.
+For each id in R2's map (the GU port, id 124), set it in `mods/force_action`'s `config.ini`
+(`action = <cat>/<idx>`, `monster = 124`, `hold = 1`), take a quest that names id 124, and watch
+the move. R2's map says what to expect: a shared id starts MHXX's motion at the same index, and
+the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
+what differs: no motion, another motion, a different timing, a missing effect or projectile.
 
-Status: not done. It waits for #48 (the ported files) and #105 (the ported monster's own
-resource paths); the ids themselves are in R2.
+The 3U port (id 125) has the rows below (#116's). They are the 16 ids MH4U's `uEm001` lacks that
+reach a handler a shared action also reaches, so `mods/monster_actions` sends each to the MH4U
+action the map names and MH4U's own handler runs
+([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each row, enable
+both plugins, put `force_action` after `monster_actions` in the mod order (the last mod's hook
+runs first, so `force_action` writes the forced pair and the map translates it), set
+`action = <3U id>`, `monster = 125` and `hold = 1`, take a quest that names id 125, and watch
+the move. The plugin's log shows its ready line and one `monster 125: action <source> -> <target>`
+line per id. Record pass or fail and what differs; if the move is another variant, the actions
+in the page's "other MH4U actions with the same body" column are what to try next.
+
+| 3U id | the map runs | status |
+|---|---|---|
+| 0/4 | 0/0 | not done |
+| 7/64 | 7/35 | not done |
+| 7/87 | 7/92 | not done |
+| 7/93 | 7/92 | not done |
+| 10/0 | 10/7 | not done |
+| 10/1 | 10/7 | not done |
+| 10/2 | 10/7 | not done |
+| 10/3 | 10/7 | not done |
+| 10/4 | 10/7 | not done |
+| 10/5 | 10/7 | not done |
+| 10/6 | 10/7 | not done |
+| 11/5 | 11/0 | not done |
+| 11/15 | 11/0 | not done |
+| 11/26 | 11/0 | not done |
+| 11/28 | 11/0 | not done |
+| 13/9 | 0/3 | not done |
+
+Action 4 needs new C (#136) and is not on the map; it joins this table when it plays.
+
+Status: not done. The GU rows wait for #48 (the ported files) and #105 (the ported monster's own
+resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
 
 ### The plugin's check (R1p)
 
