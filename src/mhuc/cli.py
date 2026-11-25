@@ -405,6 +405,8 @@ def cmd_convert(args) -> int:
         print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
               "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)\n"
               "mhuc convert camera SOURCE.lcm --from mh4u|mhxx -o OUT.lcm  (specs/camera.md)\n"
+              "mhuc convert monster --id N --romfs ROMFS --out MOD_FOLDER [--variant V] "
+              "(docs/architecture.md#a-ported-monsters-files)\n"
               "mhuc convert monster --id N --arc SOURCE.arc [--sound-arc SND.arc] --out MOD_FOLDER "
               "(specs/sound.md)", file=sys.stderr)
         return 2
@@ -431,6 +433,69 @@ def cmd_convert(args) -> int:
 
 
 def _convert_monster(args) -> int:
+    """A ported monster's files or its own sound set, by the source flag that was given."""
+    if args.romfs is not None:
+        if args.arc is not None or args.sound_arc is not None:
+            print("mhuc convert monster: pass --romfs or --arc, not both", file=sys.stderr)
+            return 2
+        return _convert_monster_files(args)
+    if args.arc is None:
+        print("mhuc convert monster: pass --romfs for the port's files, or --arc (and --sound-arc "
+              "for MH3U) for its sound set", file=sys.stderr)
+        return 2
+    return _convert_monster_sound(args)
+
+
+def _convert_monster_files(args) -> int:
+    """A ported monster's model, materials, motions and AI script: its source files into a mod."""
+    from . import monsters
+    from .formats import romfs
+    if args.id is None or not args.out:
+        print("mhuc convert monster --id N --romfs ROMFS --out MOD_FOLDER [--variant V] "
+              "(docs/architecture.md#a-ported-monsters-files)", file=sys.stderr)
+        return 2
+    try:
+        row = monsters.registry_row(args.id, args.registry)
+        if row.source_game != "mhxx":
+            raise monsters.ConvertError(f"id {args.id} comes from {row.source_game}; this converter "
+                                        "reads MHXX")
+        if args.game and args.game != row.source_game:
+            raise monsters.ConvertError(f"id {row.id}'s source game is {row.source_game}, not {args.game}")
+        want = "/" + monsters.source_archive_path(row, args.variant)
+        entry = next((f for f in romfs.open_image(args.romfs).files() if f.path == want), None)
+        if entry is None:
+            raise monsters.ConvertError(f"{args.romfs} has no {want}")
+        with open(args.romfs, "rb") as f:
+            f.seek(entry.offset)
+            data = f.read(entry.size)
+        arc_data, report = monsters.convert(data, row, args.variant)
+        path = monsters.build_mod(args.out, row, arc_data)
+    except (monsters.ConvertError, arc.ArcError, OSError) as e:
+        print(f"mhuc convert monster: {e}", file=sys.stderr)
+        return 1
+    kept = len(report.as_is) + len(report.converted)
+    print(f"{row.name} (id {row.id}, from {row.source_game.upper()} {row.source_key}): "
+          f"{kept} files to {path}")
+    print(f"  as is: {len(report.as_is)}")
+    print(f"  converted: {len(report.converted)}")
+    left = sum(len(v) for v in report.left_out.values())
+    print(f"  left out: {left}")
+    for reason, paths in sorted(report.left_out.items()):
+        print(f"    {len(paths):>4}  {reason}")
+    if args.report:
+        with open(args.report, "w", encoding="utf-8") as f:
+            f.write(f"{row.name} (id {row.id}, MHXX {row.source_key})\n")
+            for kind, paths in (("as is", report.as_is), ("converted", report.converted)):
+                for line in paths:
+                    f.write(f"{kind}: {line}\n")
+            for reason, paths in sorted(report.left_out.items()):
+                for line in paths:
+                    f.write(f"left out ({reason}): {line}\n")
+        print(f"  each entry's kind: {args.report}")
+    return 0
+
+
+def _convert_monster_sound(args) -> int:
     """A ported monster's own sound set: its source game's files into the port's arc."""
     from . import monstersound
     if args.id is None or not args.arc or not args.out:
@@ -728,8 +793,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", required=True, help="the CSV to write, outside the repository")
     p.set_defaults(func=cmd_idnames)
 
-    p = sub.add_parser("convert", help="convert a source game's quest, camera list or a ported "
-                                       "monster's own sounds into MH4U's formats")
+    p = sub.add_parser("convert", help="convert a source game's quest, camera list, or a ported "
+                                       "monster's own files or sounds into MH4U's formats")
     p.add_argument("what", nargs="?", choices=["quest", "camera", "monster"])
     p.add_argument("src", nargs="?", help="quest: the quest as `mhuc quest dump mhxx` prints it; "
                                            "camera: the source game's .lcm")
@@ -739,8 +804,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--template", help="an MH4U quest as `mhuc mib export` writes it, for what isn't converted")
     p.add_argument("--texts", help="JSON: for each of eng, fre, spa, ger, ita, the 7 MH4U strings")
     p.add_argument("--id", type=int, help="the MH4U quest or ported monster id")
-    p.add_argument("--arc", help="a monster's source archive (arc/enemy/emNNN[_VV].arc, data/emNNN.arc)")
-    p.add_argument("--sound-arc", help="MH3U's separate sound archive (arc/sound/se/em/emNNN/snd_emNNN.arc)")
+    p.add_argument("--romfs", help="monster files: the source game's RomFS image; the archive is "
+                                   "read from it by the registry's source key")
+    p.add_argument("--arc", help="monster sounds: the monster's source archive "
+                                 "(arc/enemy/emNNN[_VV].arc or data/emNNN.arc)")
+    p.add_argument("--sound-arc", help="monster sounds, MH3U: its separate sound archive "
+                                       "(arc/sound/se/em/emNNN/snd_emNNN.arc)")
+    p.add_argument("--variant", type=int, default=0, help="monster files: the MHXX archive number "
+                                                          "(_00 by default)")
+    p.add_argument("--registry", help="monster files: the id registry "
+                                      "(default: data/ids/registry.csv)")
+    p.add_argument("--report", help="monster files: write each entry's kind here")
     p.add_argument("--tables", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "idmap",
                                                      "mhxx-mh4u"))
     p.add_argument("--out", "-o", help="quest: the .mib model; camera: the converted .lcm; "

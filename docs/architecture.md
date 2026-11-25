@@ -78,6 +78,7 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 | `survey.py` | runs the specs' checks over a whole RomFS and prints counts only |
 | `catalog.py` | what MH4U already has of 3U's and GU's monsters and maps, from `data/catalog/` |
 | `monsterdata.py` | rebuilds an MH4U monster's `.etd`/`.emd` values from MHXX's or MH3U's files and compares, counts only |
+| `monsters.py` | a ported monster's files: an MHXX monster archive sorted into the kinds the registry's `files` column ships, converted where needed and packed as a mod folder |
 | `monstersound.py` | a ported monster's own sounds: its source game's waves, bank, request and sound call converted to MH4U's and written into the port's arc ([specs/sound.md](../specs/sound.md#what-a-converter-must-produce)) |
 | `save.py` | MH4U's character and `system` saves: profile, boxes, equipment, guild quests, Palicos, the monster log, the guild card and the mapped `system` fields |
 
@@ -94,11 +95,51 @@ A 3U or GU monster is ported onto MH4U's own enemy class, `uEnemy`. Its source g
 | Step | What | State |
 |---|---|---|
 | 1. Study the source | class, vtable, action dispatcher, engine calls | done for Rathian in all three games |
-| 2. Assets | models, textures, motions, AI scripts, collision, sounds | MOD is the same version in all three games; MHXX's LMT matches MH4U's, MH3U's LMT is version 66, which reads with MH4U's layout ([lmt](../specs/lmt.md), check L3) and whose keyframe buffers decode too, except types 11 to 13, which version 66 encodes differently (check L4); the AI scripts share their file shape but not their bytecode: MH3U's EMC is version `0x20110601` with 13 group rows and 113 opcodes, MH4U's `0x20120804` with 23 rows and 146, and MHXX's has MH4U's version word but 21 rows and MHGU's 167 opcodes ([emc](../specs/emc.md), checks A1 to A4), so a 3U script is converted to MH4U's version and a MHXX one needs the same for the ports that use it. The motion-effect and effect-list containers are laid out and read on the three games' monster archives ([mef](../specs/mef.md), [efl](../specs/efl.md), checks FX1, FX2, FX3, EF1, EF2, EF3), the effect lists convert between the three games' versions and every container round-trips, but an ESQ/PSL to MEF conversion is refused until the record fields are placed, so no port ships its own effects yet; MHXX's camera list is version 5 against MH4U's 4, the only difference being a 16-byte record prefix ([camera](../specs/camera.md), check C1), MH3U ships none, and `mhuc convert camera` writes the version 4 list |
+| 2. Assets | models, textures, motions, AI scripts, collision, sounds | MOD is the same version in all three games; MHXX's LMT matches MH4U's, MH3U's LMT is version 66, which reads with MH4U's layout ([lmt](../specs/lmt.md), check L3) and whose keyframe buffers decode too, except types 11 to 13, which version 66 encodes differently (check L4); the AI scripts share their file shape but not their bytecode: MH3U's EMC is version `0x20110601` with 13 group rows and 113 opcodes, MH4U's `0x20120804` with 23 rows and 146, and MHXX's has MH4U's version word but 21 rows and MHGU's 167 opcodes ([emc](../specs/emc.md), checks A1 to A4), so a 3U script is converted to MH4U's version and a MHXX one needs the same for the ports that use it. The motion-effect and effect-list containers are laid out and read on the three games' monster archives ([mef](../specs/mef.md), [efl](../specs/efl.md), checks FX1, FX2, FX3, EF1, EF2, EF3), the effect lists convert between the three games' versions and every container round-trips, but an ESQ/PSL to MEF conversion is refused until the record fields are placed, so no port ships its own effects yet; MHXX's camera list is version 5 against MH4U's 4, the only difference being a 16-byte record prefix ([camera](../specs/camera.md), check C1), MH3U ships none, and `mhuc convert camera` writes the version 4 list; `mhuc convert monster` turns a GU monster's MHXX archive into the port's files for the kinds its registry row ships, kind by kind below |
 | 3. Monster data | hitzones, parts, breaks, severing, attacks, stats | known in all three games ([emd](../specs/emd.md), [dttune](../specs/dttune.md), [dtbase](../specs/dtbase.md), [dtbparts](../specs/dtbparts.md), [emstatus](../specs/emstatus.md), [hitdata](../specs/hitdata.md)); `mhuc monsterdata` rebuilds MH4U Rathian's HP, parts, hitzones, break parts and joint records from MHXX, and her HP, most hitzone rows, her attack records' shared fields and her part records from MH3U, whose fields are mapped one by one ([part record mapping](../specs/emstatus.md#part-record-mapping)) and whose break blocks' meanings stay unverified; her part kind is MH4U's Insect Glaive extract kind, which 3U never had and MH4U's own Rathian supplies by part index ([specs/emd.md](../specs/emd.md), check E13); MH4U's own 40-byte attack record is placed from its reader, its two flag words' consumers in the hit check and the slot update are named, and its values are checked against both games' records ([specs/emd.md](../specs/emd.md), check E10); MH4U's sever records have no counterpart in MHXX's or MH3U's data: both sever a part by swapping in a `_tail.mod`, the joint coming from the monster class's code, and MH4U's sever records' kind, index and b are read by its own loader and cut-object spawner while limit and a have no reader ([emd](../specs/emd.md#joint-and-sever-record-24-bytes), checks E11, E12) |
 | 4. Register | a new monster id and the tables it indexes | MH4U's tables are found ([reference/](../reference/README.md#mh4u-monster-tables)), and MH3U's ids are paired with MH4U's: 32 of the 85 have an MH4U monster, 44 are monsters MH4U does not have, and 9 are props ([reference/](../reference/README.md#mh3u-ids-to-mh4us)); ids 124 and 125 are in `data/ids/registry.csv`, checked by `tools/check_ids.py` and generated into `mods/monster_ids/src/ids.h`; `mods/monster_ids` answers the readers of the factory, data path, enemy data, crowns, list order, icon, resource index and drop tables, with a resource record built for the ported id that keeps its own paths for the kinds of file and motion slots it ships and the stand-in's for the rest, and the stand-in's rows elsewhere; MH4U's 0 to 123 fall through. Once the permanent range (124 to 223) is full, a ported monster takes a registry id from 256 up and is lent a byte of 224 to 255 per quest; no pooled row ships yet. The data path stays the stand-in's until the ports ship `.emd`/`.etd`; the name and notes text and the notes-list walk are not answered yet |
 | 5. Behaviour | each action handler, translated onto `uEnemy` | shared action ids run MH4U's own handlers ([R2](checks.md#the-shared-action-map-r2): 273 of MHXX's 301 and 174 of MH3U's 191, 167 of 167 GU-comparable ids at the same motion index); of the 45 ids MH4U lacks (28 GU, 17 3U), the GU ones are translated handlers and `mods/rathian_actions` carries 3/98, 12/1-3, 4/27-32, 8/0 and category 17 (checks T0/T1), leaving shared ids and 12/0 to the game, while of the 3U ones 16 run the shared MH4U action through `mods/monster_actions`'s generated action-id map and action 4 is new C that waits on #55; the action-start record action 4 passes is converted from MH3U's and checked against the 3/5 pair both games have ([actiondata](../specs/actiondata.md), checks N1/N2), its value curves are carried because both games' evaluators are the same body (N4), and the command lists the mapped ids pass need no conversion because the map runs MH4U's own handler and lists ([actiondata](../specs/actiondata.md#command-list-8-byte-commands), N3) ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112), [#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115), [#137](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/137)); the plugin host's ABI 4 `call2` runs MH4U's engine functions with r0-r3 and s0/s1 ([#110](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/110), [#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134), checks P3 and P4); the per-move in-game checks wait for #48/#49 and #143 ([#113](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/113), [#116](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/116)) |
 | 6. Quests, arena | the monster's quests and map | quest conversion exists for MHXX |
+
+
+### A ported monster's files
+
+`mhuc convert monster --id 124 --romfs <MHXX RomFS> --out <mod folder>` reads the id's registry
+row ([data/ids](../data/ids/README.md)), takes the row's `source_key` and variant to find the
+monster's MHXX archive (`arc/enemy/em001_00.arc`), and writes the kinds the row's `files` column
+ships into MH4U's `/data/em124.arc` plus a `mod.json` the fork's mod manager installs. The same
+column is what `mods/monster_ids` reads: it rewrites the resource record's path for each kind
+the port ships to the port's own names and keeps the stand-in's path for the rest, so the
+converter and the plugin agree on what is in the archive. For Rathian the row is
+`model,motions=5,tail,cmd`.
+
+The port's files take MH4U's names with the port's id: `enemy\em124\mod\em124` and
+`..._tail`, `enemy\em124\mot\em124_0` to `_4`, `enemy\em124\mot\e124_cam` and
+`enemy\em124\data\em124_cmd`. MH4U builds the archive's own name from the id
+(`data\em%03d`). The data path stays the stand-in's: MH4U reads the monster's `.etd`/`.emd`
+from `data/em_data.arc` and the port ships no data yet (step 3).
+
+| File kind | MHXX | MH4U | What the converter does |
+|---|---|---|---|
+| model and tail model (rModel) | MOD 0xE6 | MOD 0xE6 | taken as is, when the row ships `model` and `tail` |
+| material (rMaterial) | MRL 0x20 | MRL 0x20 | taken as is, the texture paths it names included |
+| motion lists (rMotionList) | LMT 67 | LMT 67 | taken as is, the first `motions=N` slots the row ships |
+| camera list (rCameraList) | LCM 5 | LCM 4 | converted with `camera.from_mhxx` when the row ships `camera` ([camera](../specs/camera.md)); the shipped rows don't, so the record keeps the stand-in's camera |
+| AI script (rEnemyCmd) | EMC 0x20120804 | EMC 0x20120804 | taken as is, when the row ships `cmd` |
+| textures (rTexture) | TEX 0xA6 | TEX 0xA5 | converted: the version field 0xA6 → 0xA5, the one byte that differs, the PICA200 layout is the same ([tex](../specs/tex.md)); on Rathian's two textures the converted file differs from MHXX's in that byte alone. They stay at MHXX's paths (below) |
+| archive | ARC 0x11 | ARC 0x13 | converted: the kept entries are re-packed in MH4U's ARC version |
+| sound | MHXX's SBKR banks and SRQR requests | MH4U's SNDB banks and SREQ requests | not this mode: the same command's sound mode (`--arc`, `--sound-arc`) converts the set for a row that ships `sound` ([specs/sound.md](../specs/sound.md)) |
+| effects (EFL, EAN, PEL, PSL) | versions 0x30120306 and 0x20120224 | 0x30111104 and 0x20100924 | left out: the versions differ and effects are not ported yet |
+| motion effects | PSL and PEL | MEF | left out: MHXX has no MEF |
+| shells, projectiles | `shell/em/...` | MH4U's own classes | left out: MH4U's projectile code is its own ([reference](../reference/README.md#rathian-the-first-port)) |
+| monster data, collision, AI auxiliaries | `dttune`, `dtbase`, `dtbparts`, body, hit and area data | MH4U's `.etd`/`.emd` and systems | left out: MH4U reads its own rows, and the registry's stand-in answers until the port ships its data (step 3) |
+
+The converter fails rather than ship a short archive: a kind in `files` with no entry in the
+source, or a kind this mode cannot produce (sound, mef, efl), is an error naming it. The
+materials keep MHXX's texture paths (`enemy\em001\em001_00\mod\em001_00_BM`), because they
+are bytes of the material file whose meaning isn't documented; the textures are therefore kept
+at those paths, which MH4U has no file of. Nothing is authored: every file comes from MHXX,
+taken or converted as the table says.
 
 What makes this tractable:
 
