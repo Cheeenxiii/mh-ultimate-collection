@@ -1274,6 +1274,49 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
     assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == 5
     assert sum(len(v) for v in report.left_out.values()) == 534
 
+def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump):
+    """docs/architecture.md#monsters, issue #49: `mhuc convert monster` turns MH3U's `arc/enemy/em001.arc` into
+    `/data/em125.arc`: her two models, materials and textures as they are, her three motion lists as LMT version 67,
+    and nothing else."""
+    from mhuc import monsterassets
+
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    src = next(image.read(f) for f in image.files() if f.path == "/arc/enemy/em001.arc")
+    source = [e for e in arc.read(src).entries if e.path.startswith("enemy\\em001\\")]
+    mod = monsterassets.convert(src, 125)
+    built = arc.read(mod.archive())
+    assert {e.type_name for e in built.entries} == {"rModel", "rMaterial", "rTexture", "rMotionList"}
+    assert Counter(e.type_name for e in built.entries) == {"rModel": 2, "rMaterial": 2, "rTexture": 2,
+                                                           "rMotionList": 3}
+    assert all(e.path.startswith("enemy\\em125\\") for e in built.entries)
+    # the kept files are the source's bytes; only their paths (and the materials' texture paths) differ
+    kept = {e.path.rsplit("\\", 1)[1]: e for e in source if e.type_name in ("rModel", "rTexture")}
+    for e in built.entries:
+        if e.type_name in ("rModel", "rTexture"):
+            name = e.path.rsplit("\\", 1)[1].replace("em125", "em001")
+            assert e.data == kept[name].data, e.path
+    textures = {e.path for e in built.entries}
+    for e in built.entries:
+        if e.type_name == "rMaterial":
+            assert b"enemy\\em001\\" not in e.data, e.path
+            for path in monsterassets.TEXTURE_PATH.findall(e.data):
+                assert path.decode() in textures, (e.path, path)
+    # the motion lists are version 67 and hold the source's animations and tracks
+    source_motions = sorted((e for e in source if e.type_name == "rMotionList"), key=lambda e: e.path)
+    built_motions = sorted((e for e in built.entries if e.type_name == "rMotionList"), key=lambda e: e.path)
+    assert [e.path for e in built_motions] == [f"enemy\\em125\\mot\\em125_{i}" for i in range(3)]
+    for old, new in zip(source_motions, built_motions, strict=True):
+        old_version, old_animations = lmt.read(old.data)
+        new_version, new_animations = lmt.read(new.data)
+        assert (old_version, new_version) == (66, 67)
+        assert len(old_animations) == len(new_animations)
+        for a, b in zip(old_animations, new_animations, strict=True):
+            if a is None:
+                assert b is None
+                continue
+            assert (a.frames, a.loop_frame, len(a.tracks), bool(a.events)) == \
+                   (b.frames, b.loop_frame, len(b.tracks), bool(b.events))
+
 def test_every_mh3u_motion_list_converts_to_version_67(dump):
     """specs/lmt.md check L6: `mhuc.formats.lmt.convert` rebuilds every MH3U motion list as version 67, keeping
     every animation's frames, tracks and events and every key's frames and components (type 11 to 13 within the

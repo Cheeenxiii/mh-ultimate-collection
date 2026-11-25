@@ -8,8 +8,8 @@ import zlib
 
 import pytest
 
-from mhuc import cli, monsterdata
-from mhuc.formats import camera, classid, emd, hitdata, lmd, lmt, lyt, pica, sound, stq, xfs
+from mhuc import cli, monsterassets, monsterdata
+from mhuc.formats import arc, camera, classid, emd, hitdata, lmd, lmt, lyt, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -325,6 +325,42 @@ def test_lmt_convert_refuses_a_float_track_block_it_does_not_move():
     struct.pack_into("<I", d, 0x10 + 0x38, len(d) - 0x30)
     with pytest.raises(lmt.LmtError, match="float-track block"):
         lmt.convert(bytes(d))
+
+
+def source_archive(texture: bytes = b"enemy\\em001\\mod\\em001_BM") -> bytes:
+    """A small MH3U-style monster archive: one model, its material naming one texture, and a motion list."""
+    model = struct.pack("<4sHHHHII", b"MOD\0", 0xE6, 0, 0, 0, 0, 0)
+    material = (b"MRL\0" + struct.pack("<HH", 0x20, 0) + texture + b"\0" + b"\0" * 4)
+    entries = [
+        arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rModel"), model),
+        arc.Entry("enemy\\em001\\mod\\em001", classid.class_id("rMaterial"), material),
+        arc.Entry("enemy\\em001\\mod\\em001_BM", classid.class_id("rTexture"), b"TEX\0"),
+        arc.Entry("enemy\\em001\\mot\\mot_em001_000", classid.class_id("rMotionList"),
+                  lmt_version_66_to_convert()),
+    ]
+    return arc.write(arc.Archive(0x10, entries))
+
+
+def test_monsterassets_moves_the_source_files_to_the_ported_ids_paths():
+    """docs/architecture.md#monsters: the model, material and texture are the source's, the motion list is
+    version 67, and every path names the ported id so the stand-in's files stay untouched"""
+    mod = monsterassets.convert(source_archive(), 125)
+    paths = {(e.type_name, e.path): e for e in mod.entries}
+    assert set(paths) == {
+        ("rModel", "enemy\\em125\\mod\\em125"), ("rMaterial", "enemy\\em125\\mod\\em125"),
+        ("rTexture", "enemy\\em125\\mod\\em125_BM"), ("rMotionList", "enemy\\em125\\mot\\em125_0")}
+    assert lmt.read(paths["rMotionList", "enemy\\em125\\mot\\em125_0"].data)[0] == 67
+    # the material's texture path is absolute, so it must name the texture at the ported id's path
+    material = paths["rMaterial", "enemy\\em125\\mod\\em125"]
+    assert b"enemy\\em125\\mod\\em125_BM" in material.data
+    assert b"em001" not in material.data
+    assert mod.archive_path == "data/em125.arc"
+
+
+def test_monsterassets_refuses_a_material_naming_a_texture_the_mod_does_not_hold():
+    """the conversion checks the material's paths against what it builds, so a stale name fails here, not in game"""
+    with pytest.raises(monsterassets.ConvertError, match="em125_02_BM"):
+        monsterassets.convert(source_archive(texture=b"enemy\\em001\\mod\\em001_02_BM"), 125)
 
 
 def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():
