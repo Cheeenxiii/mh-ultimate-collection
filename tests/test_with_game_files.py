@@ -10,7 +10,7 @@ import pytest
 from mhuc import monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
-from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, lmt, mod, romfs
+from mhuc.formats import arc, dtbase, dtbparts, dttune, emstatus, hitdata, lmt, mod, romfs, stq
 from mhuc.quests import mibwrite, quest
 
 pytestmark = pytest.mark.game_files
@@ -67,6 +67,33 @@ def test_extra_data_files_reencrypt_byte_for_byte(dump):
         assert dlccrypt.mh4u_save_encrypt(plain, key, mode, seed) == original, name
         checked += 1
     assert checked, "no Extra Data file found"
+
+
+def test_every_mh4u_stream_request_reads_and_matches_the_wave_it_names(dump):
+    """specs/sound.md check S4: every .stq's tables and names close, and each stream record's length, sample count,
+    channels, rate and loop start/end are the .mca header's own"""
+    image = romfs.open_image(dump("mh4u", "romfs.bin"))
+    files = {f.path: f for f in image.files()}
+    stqs = [f for f in files.values() if f.path.lower().endswith(".stq")]
+    assert stqs, "no .stq found"
+    streams = sequences = 0
+    for f in stqs:
+        s = stq.read(image.read(f))
+        ids = [q.id for q in s.sequences]
+        assert ids == sorted(ids) and len(set(ids)) == len(ids), f"{f.path}: request ids aren't unique and ascending"
+        assert {q.stream for q in s.sequences if q.stream is not None} == set(range(len(s.streams))), \
+            f"{f.path}: a stream isn't used"
+        sequences += len(s.sequences)
+        for stream in s.streams:
+            path = "/" + stream.name.replace("\\", "/") + ".mca"
+            assert path in files, f"{f.path}: {stream.name} isn't in the RomFS"
+            wave = image.read(files[path])
+            samples, rate, loop_start, loop_end = struct.unpack_from("<4I", wave, 0x0C)
+            got = (stream.size, stream.samples, stream.channels, stream.rate, stream.loop_start, stream.loop_end)
+            assert got == (len(wave), samples, wave[8], rate, loop_start, loop_end), f"{f.path}: {stream.name}"
+            streams += 1
+    assert streams >= 400, f"{streams} streams in {len(stqs)} .stq"
+    assert sequences >= 1000, f"{sequences} sequences in {len(stqs)} .stq"
 
 
 def monster_entries(path: str):

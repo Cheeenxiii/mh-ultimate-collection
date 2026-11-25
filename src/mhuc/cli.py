@@ -9,7 +9,7 @@ import sys
 
 from . import __version__, entropy, survey
 from .crypto import dlccrypt
-from .formats import arc, classid, gmd, romfs, tex, xfs
+from .formats import arc, classid, gmd, romfs, stq, tex, xfs
 from .quests import quest
 
 
@@ -68,6 +68,19 @@ def cmd_tex(args) -> int:
         w, h, rgba = tex.to_rgba(t, flip_y=args.flip_y)
         tex.write_ppm(args.out, w, h, rgba)
         print(f"{w}x{h} to {args.out}")
+    return 0
+
+
+def cmd_stq(args) -> int:
+    s = stq.read(_read(args.file))
+    print(f"STRQ version 0x{stq.VERSION:x}, {len(s.streams)} streams, {len(s.sequences)} sequences")
+    for i, st in enumerate(s.streams):
+        print(f"stream {i}: {st.size} bytes, {st.samples} samples, {st.channels} ch, {st.rate} Hz, "
+              f"loop {st.loop_start}-{st.loop_end}")
+        print(f"          {st.name}")
+    for q in s.sequences:
+        where = "-" if q.stream is None else f"{q.stream} ({s.streams[q.stream].name})"
+        print(f"seq {q.id}: level {q.level:g}, stream {where}")
     return 0
 
 
@@ -451,6 +464,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("out", nargs="?")
     p.add_argument("--flip-y", action="store_true", help="rows stored bottom-up")
     p.set_defaults(func=cmd_tex)
+
+    p = sub.add_parser("stq", help="MH4U stream requests (.stq): the waves and the sequence levels")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_stq)
 
     p = sub.add_parser("romfs", help="list the files of a RomFS image (romfs.bin)")
     p.add_argument("action", choices=["list"])

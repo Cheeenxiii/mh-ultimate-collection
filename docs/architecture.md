@@ -66,7 +66,7 @@ What makes this tractable:
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.
 
-Before porting a monster, MH4U's id-indexed tables have to grow. Two ways are open: relocate a table into plugin memory and patch its readers, or hook the readers and answer new ids. Ids only ever grow, because saves and quests keep them. How ids are handed out, and where the mod keeps what MH4U's save doesn't hold, is open ([decisions.md](decisions.md#id-allocation-and-mod-saves)).
+Before porting a monster, MH4U's id-indexed tables have to grow. They grow by hooks on their readers, which answer the new ids; a table is relocated only where a case needs it. Ids come from one registry file, start at 124 and only ever grow, because saves and quests keep them; the mod's data may go in MH4U's save, which a converter will clean back to MH4U's own ([decisions.md](decisions.md#0003-id-allocation-and-mod-saves)).
 
 ## Quests
 
@@ -99,7 +99,7 @@ Sounds and music come from each piece of content's own game and play through MH4
 
 - MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1), so 3U's sound needs a version-aware reader or a conversion.
 - MHXX uses the next generation of classes, shared with MHGU on Switch: its waves are MH4U's version, its banks and requests are GU's.
-- MH4U's wave, bank and emitter layouts come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files ([specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table)).
+- MH4U's wave, bank and emitter layouts come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files and every stream request in the image (214, loose and inside ARCs) is read ([specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table), check S4).
 - A monster's theme is a sequence id in a stream request, chosen by a hardcoded switch over its id, not by a table ([audio.md](audio.md#how-mh4u-picks-a-monsters-theme)).
 - **There is no separate sound heap.** MH4U loads banks, requests and waves from the 47 MiB Resource heap it shares with every other non-drawing resource; the SoundBuffer allocator is an alias of Resource ([audio.md](audio.md#memory)).
 

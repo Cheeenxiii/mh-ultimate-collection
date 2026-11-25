@@ -18,9 +18,9 @@ Every sound and piece of music the mod adds comes from its source game's files, 
 
 - **MH3U uses MH4U's sound classes,** with the same class ids, but its file versions are one older (SN1): waves `MADP` version 4 against 5, banks `SNDB` 10 against 11, requests `SREQ` 6 against 8, stream requests 0x20 against 0x22. 3U's sound therefore needs version-aware readers or a conversion; new request ids alone don't make it play. Its RomFS ships no area emitter file at all.
 - **MHXX uses the next generation of classes,** shared with MHGU on Switch: its banks (`SBKR` version 4) and requests (`SRQR` version 5) carry GU's magics and versions, while its waves are `MADP` version 5 like MH4U's. Its stream requests are `STQR` 4 and its area emitters are `rFestaSoundEmitter` (version 0x20160706) against MH4U's `rMHSoundEmitter` (0x20120623). MHGU Definitive Edition converts MH4U sound to GU's formats with rules taken from Capcom's own conversions, and its waves convert bit for bit (both are DSP-ADPCM). If MHXX's banks and requests match GU's layouts, the same rules run backwards.
-- **MH4U's layouts** come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files ([specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table)).
+- **MH4U's layouts** come from MHGU Definitive Edition and are unverified, except the stream request (`.stq`): its tables are checked against all 50 files and `mhuc` reads every stream request in MH4U (214, 50 loose and 164 inside ARCs), matching every loose stream record to the wave header it names ([specs/sound.md](../specs/sound.md#stream-request-strq-a-stream-table-and-a-sequence-table), check S4).
 - **Code asks for request ids.** A monster's code and its motions' sound events name request ids, resolved through its own request file, so ids only clash within one loaded set. Area and stage ids are per stage.
-- **Music is per stream request id:** Gogmazios's two phases are ids 32 and 33 of `bgm_bat.stq`. A new theme needs a free id there, or a stream request of its own.
+- **Music is per stream request id:** Gogmazios's two phases are ids 32 and 33 of `bgm_bat.stq`, each naming its wave, level and loop through the stream request. A new theme needs a free id there, or a stream request of its own: the sequence record carries the id, the dB level and the stream index, the stream record the wave's path, length, samples, channels, rate and loop. The 100-byte sequence record's other words stay unverified, so a new theme copies them from an existing one.
 - **A monster's theme is chosen in code, not in a data table.** A hardcoded switch over the monster id returns one sequence id and one of three sources; see below.
 
 ## How MH4U picks a monster's theme
@@ -107,7 +107,7 @@ So a monster theme is **not** in the quest, in the stage's data or in a per-mons
 
 ### What a new monster must add
 
-1. **Its id, in the usual places.** The quest's monster list and the id-indexed tables ([reference/README.md](../reference/README.md#mh4u-monster-tables), [decisions.md](decisions.md#id-allocation-and-mod-saves)). The theme follows the id; no sound data goes in the quest.
+1. **Its id, in the usual places.** The quest's monster list and the id-indexed tables ([reference/README.md](../reference/README.md#mh4u-monster-tables), [decisions.md](decisions.md#0003-id-allocation-and-mod-saves)). The theme follows the id; no sound data goes in the quest.
 2. **A selector answer for the id.** The switch has no row for a new id, so it returns kind 1, theme 11. A plugin hooks `0x30e148` and answers for the new id instead. Kind 2 for a theme of its own; kind 1 if it should share its stage's battle theme; 255 for none. A phase, like Gogmazios's, is a second answer for the same id, keyed on `sound+0x1838` or on the monster's own state.
 3. **A stream and a sequence in the stream request the kind selects.** For kind 2, add the theme to `bgm_bat.stq`: a stream record for the `.mca` and a sequence record with an unused id (12, 24 and 25 carry no stream, or append an id past 39 and raise the count), its volume and its stream index. For kind 1, add it to that stage's `bgm_st_NN.stq` at id 11 or 12, as the boss stages do. Nothing else in the game names the theme.
 4. **The wave.** The `MADP` `.mca` in `sound/bgm/battle/wav/` (kind 2) or `sound/bgm/stage/wav/` (kind 1), at the path the stream record gives, with the size, samples, channels, rate and loop the record repeats.
@@ -154,7 +154,7 @@ A quest loading two of the largest monsters puts at most about 3.2 MB of monster
 ## Unknowns
 
 1. Whether MHXX's bank and request layouts match GU's (check S3).
-2. The `.stq` fields outside the two tables above, its id-to-row index, and how much of a music stream stays in memory while it plays.
+2. The `.stq` fields the spec leaves unverified, its id-to-row index, and how much of a music stream stays in memory while it plays.
 3. How MH3U muffles the mix and swaps the ambience when the hunter dives.
 
 ## In-game checks, once it runs
