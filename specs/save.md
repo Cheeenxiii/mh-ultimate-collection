@@ -22,8 +22,8 @@ Sources: [Rokumaehn/mh4edit](https://github.com/Rokumaehn/mh4edit) (MIT) for the
 equipment box, guild quests and Palicos; the MH4G save-editor wiki
 ([saveeditor_mh4g](https://w.atwiki.jp/saveeditor_mh4g/)) for the pouches, quest counts and weapon usage; the
 mhff wiki (svanheulen/mhff, GPL-3.0) and a community board post for the monster log's shape; mhef (GPL-3.0)
-for the cipher. All are credited in [README.md](README.md). The reader is `mhuc save dump|check`
-(`src/mhuc/save.py`); its checks are this page's S1 to S9.
+for the cipher. All are credited in [README.md](README.md). The command is `mhuc save dump|check|clean`
+(`src/mhuc/save.py`); its checks are this page's S1 to S11.
 
 ## Files
 
@@ -286,6 +286,41 @@ to 0x37, which a changed option or a few more registered quests would explain â€
 converter needs the DLC/quest bits: until S10, `mhuc` cannot tell a mod's registration from MH4U's, so
 the converter must leave `system` untouched.
 
+## Converting a modded save back
+
+[Decision 0003](../docs/decisions.md#0003-id-allocation-and-mod-saves) lets MH4U's save hold the mod's data on
+condition that a converter removes it again. `mhuc save clean FILE --out OUT [--key K]` is that converter: it
+reads a character save (decrypting it when `--key` is given), empties the records that cannot be MH4U's, and
+writes it back, encrypted again with the input file's own seed when it was encrypted. A `system` save is
+refused, because its DLC and quest registration is not mapped (check S10).
+
+What it removes, from the structures this page marks verified:
+
+| Structure | What is removed | Why it cannot be MH4U's |
+|---|---|---|
+| item box, item pouch, gunner pouch | the whole 4-byte slot, when its id's low 11 bits are above 1,936 | MH4U's item ids end at 1,936 (itemName has 1,937 names, [reference](../reference/README.md)) |
+| guild quests | the whole 304-byte slot, when any of its five monster ids is above 123 | MH4U's monster ids end at 123, and an unmodded game that meets a ported id may crash (decision 0003) |
+
+The whole guild quest goes, not just the monster record: a quest with one monster missing is not one MH4U
+wrote, while an unused slot is ordinary.
+
+What it leaves, and why:
+
+- **The unknown blocks.** Their meaning is unmapped, and decision 0003 has not settled where the mod's own
+  data goes or in what form. Until it does, the converter cannot tell the mod's bytes in them from MH4U's.
+- **The item flags at 0xF220.** Their meaning is unverified, and both completed saves set all 2,176 bits, so
+  a set bit above MH4U's item ids is no evidence of a modded item.
+- **The quest-clear candidate at 0x11E.** It is unproved ([#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153)),
+  so clearing its bits could clear MH4U's own progress.
+- **The monster log and the Palicos.** Neither is indexed by monster id: the log's order is unknown, and no
+  Palico id is decoded.
+- **Ported weapons and armour.** MH4U's equipment ids per kind are not bounded in this repository, so a
+  ported gear id cannot yet be told from MH4U's. The converter leaves the equipment box and the worn pieces
+  alone until the id registry covers gear (decision 0003's open part).
+
+A save that never met the mod therefore comes back byte for byte, which check S11 proves on the maintainer's
+saves.
+
 ## Checks
 
 Run on 2026-11-25 on the maintainer's own saves (`game_files/saves/MH4U`: `system`, `user1` to `user3`)
@@ -350,3 +385,10 @@ repeatable on any player's saves.
 - **S10 (open, in game):** the options, the guild-card list and the DLC/quest registration. The procedure is
   [docs/checks.md](../docs/checks.md#system-save-fields). Pass: each setting, guild card and DLC quest is
   placed in the table above with its own row and status, and `mhuc save dump` prints it.
+- **S11 (done):** the converter's own check. On the maintainer's three character saves, `mhuc save clean`
+  changes no byte: the cleaned plaintext equals the input plaintext, and encrypting it again with the input
+  file's seed gives the input file back. Pass: all three come back byte-identical, the cleaned save still
+  passes `mhuc save check`, and a `system` file is refused. A synthetic character save with item ids 1,937
+  and 2,000 in the item box and the item pouch and monster id 124 in a second guild quest loses exactly
+  those records and no other byte, and cleaning it again changes nothing. `tests/test_save.py` builds the
+  synthetic save; `tests/test_with_game_files.py` runs the maintainer's saves.

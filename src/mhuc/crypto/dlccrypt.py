@@ -55,6 +55,13 @@ def mh4u_save_decrypt(data: bytes, key: bytes, mode: str = "normal") -> bytes:
     return plain
 
 
+def mh4u_save_seed(data: bytes, key: bytes) -> int:
+    """The 16-bit XOR seed in an encrypted save's first word, so a rewritten save keeps it (`mh4u save
+    clean`; specs/save.md). Reads the header only, so it is taken before the file is decrypted."""
+    first = Blowfish(key).ecb_decrypt(data[:8], "<")
+    return struct.unpack_from("<I", first)[0] >> 16
+
+
 def mh4u_save_encrypt(plain: bytes, key: bytes, mode: str = "normal", seed: int = 0x1234) -> bytes:
     if mode not in MH4U_SAVE_MODES:
         raise ValueError(f"mode is one of {MH4U_SAVE_MODES}")
