@@ -507,6 +507,17 @@ REGISTRY = os.path.join(ROOT, "data", "ids", "registry.csv")
 HEADER = os.path.join(ROOT, "mods", "monster_actions", "src", "actions.h")
 MAP_ACTIONS = ("0/4,4,7/64,7/87,7/93,10/0,10/1,10/2,10/3,10/4,10/5,10/6,"
                "11/5,11/15,11/26,11/28,13/9")
+# The registered monster whose action-id map reference/README.md records (the 17 ids MH4U has
+# no action for, #115). It is the only port with a recorded map; every other registered
+# monster gets an empty table until its own map is worked out.
+MAP_KEY = "rathian-3u"
+NO_MAP_REASON = "no action-id map is recorded for it yet"
+# A reason that stays: GU Rathian's table is empty because R2 checked that every shared
+# action id runs MH4U's own handler as it is.
+NO_MAP_REASONS = {
+    "rathian-gu": "every action id her port keeps is shared with MH4U and runs MH4U's handler "
+                  "as it is (check R2)",
+}
 GENERATED = "Generated from the per-id action-id map by reference/monster_handlers.py table."
 NO_INDEX = 0xff      # a category-only action's index byte is unused; the plugin matches any
 
@@ -588,12 +599,16 @@ def action_id(action: tuple[int, int | None]) -> str:
 
 def render_header(mapped: list[tuple[tuple[int, int | None], tuple[int, int | None]]],
                   registry: list[dict[str, str]]) -> str:
-    """The generated header, mods/monster_actions/src/actions.h, as text."""
-    source = [r for r in registry if r["source_game"] == "mh3u"]
-    if len(source) != 1:
-        raise SystemExit("the action-id map is for exactly one ported mh3u monster; "
-                         f"the registry has {len(source)}")
-    ported_id = int(source[0]["id"])
+    """The generated header, mods/monster_actions/src/actions.h, as text.
+
+    The map belongs to the monster `MAP_KEY` names; every other registered monster gets a NULL
+    table with the reason its table is empty, so a port without a map still falls through to
+    MH4U's own handler for every action."""
+    owner = next((r for r in registry if r["key"] == MAP_KEY), None)
+    if owner is None:
+        raise SystemExit(f"the registry has no {MAP_KEY} row, the monster whose action-id map "
+                         "is recorded")
+    ported_id = int(owner["id"])
     entries = sorted({(action_bytes(s), action_bytes(t)) for s, t in mapped})
     if not entries:
         raise SystemExit("the action-id map is empty")
@@ -643,11 +658,9 @@ def render_header(mapped: list[tuple[tuple[int, int | None], tuple[int, int | No
             lines.append("};")
         else:
             counts[mid] = 0
-            why = ("no entry: every action id her port keeps is shared with MH4U and runs "
-                   "MH4U's handler as it is (check R2)"
-                   if row["source_game"] == "mhxx" else "no entry")
+            why = NO_MAP_REASONS.get(row["key"], NO_MAP_REASON)
             lines.append(f"/* {row['name']}, ported from {row['source_game']} {row['source_key']} "
-                         f"({row['key']}, id {mid}): {why}. */")
+                         f"({row['key']}, id {mid}): no entry: {why}. */")
             lines.append(f"static const MhucAction *const mhuc_actions_{mid} = NULL;")
         lines.append("")
     lines.append(f"#define MHUC_PORTED_ACTIONS_COUNT {len(by_id)}")

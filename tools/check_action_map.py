@@ -13,8 +13,9 @@ Checked without the player's own dumps:
   in id order, with the tables' ids and counts;
 - each table's entries are sorted, unique, and hold action numbers in range; an empty table is
   NULL with a count of 0; an entry does not map an action to itself;
-- the 3U monster's table maps exactly the ids MH4U lacks that reach a shared handler: the 16
-  of #115, and not action 4, which needs new C;
+- the recorded map belongs to the monster `reference/monster_handlers.py`'s `MAP_KEY` names
+  (`rathian-3u`): its table maps exactly the ids MH4U lacks that reach a shared handler (the 16
+  of #115), and every other registered monster's table is empty;
 - the table's source ids and targets are the ones reference/README.md records, no more and no
   fewer.
 
@@ -151,11 +152,16 @@ def check(text: str, registry: list[dict[str, str]], page: dict[str, str]) -> li
             if f"static const MhucAction *const mhuc_actions_{mid} = NULL;" not in text:
                 problems.append(f"id {mid}: an empty table must be NULL")
 
-    mh3u = [r for r in registry if r["source_game"] == "mh3u"]
-    if len(mh3u) != 1:
-        problems.append(f"the registry has {len(mh3u)} ported mh3u monster(s), the map is for one")
+    owner = next((r for r in registry if r["key"] == monster_handlers.MAP_KEY), None)
+    if owner is None:
+        problems.append(f"the registry has no {monster_handlers.MAP_KEY} row, the monster whose "
+                        "action-id map is recorded")
         return problems
-    ported = int(mh3u[0]["id"])
+    ported = int(owner["id"])
+    for mid in sorted(ids):
+        if mid != ported and parsed["tables"].get(mid):
+            problems.append(f"id {mid}: {monster_handlers.MAP_KEY}'s is the only recorded map; "
+                            "every other monster's table must be empty")
     entries = parsed["tables"].get(ported, [])
     header_map = {action_key(e["category"], e["index"]):
                   action_key(e["target_category"], e["target_index"])

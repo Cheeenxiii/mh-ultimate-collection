@@ -52,6 +52,21 @@ def test_a_table_that_is_not_sorted_is_named():
     assert any("not sorted" in p for p in found)
 
 
+def test_only_the_recorded_map_may_carry_entries():
+    # A port with no recorded map must leave every action to MH4U's own handler.
+    text = checked_in().replace(
+        "static const MhucAction *const mhuc_actions_124 = NULL;",
+        "static const MhucAction mhuc_actions_124[] = {\n    {0, 4, 0, 0},\n};")
+    found = problems(text)
+    assert any("only recorded map" in p for p in found)
+
+
+def test_a_registry_without_the_monster_that_owns_the_map_is_named():
+    registry = [r for r in mh.read_registry(cam.REGISTRY) if r["key"] != mh.MAP_KEY]
+    found = cam.check(checked_in(), registry, cam.read_page(cam.PAGE))
+    assert any("no rathian-3u row" in p for p in found)
+
+
 def test_the_header_is_exactly_what_the_generator_writes(tmp_path):
     text = checked_in()
     mapping = {mh.action_id((e["category"], e["index"])):
