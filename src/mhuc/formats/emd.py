@@ -56,7 +56,8 @@ def vis_rows(d: bytes) -> list[tuple[int, int, int, int, int]] | None:
 def joint_records(d: bytes) -> list[tuple[int, int, int, int, int, int]] | None:
     """Word 35's records: (joint, kind, index, limit, a, b) each, the joint -1 terminator last; [] when word 35 is 0;
     None if the list doesn't end in the file. A kind of 0, 3 or 5 marks a sever/detach record (checks E11, E12); the
-    records of kind 1 and 4 are MHXX's `dtbparts` joint records, and a (255, 0, 0, -1) record may separate the two."""
+    records of kind 1 and 4 are MHXX's `dtbparts` joint records, and a (255, kind, 0, -1) record may
+    separate the two."""
     p, out = _w(d, 35), []
     if not p:
         return []

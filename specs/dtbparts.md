@@ -73,6 +73,9 @@ cut part is a model beside the body model in the monster's archive.
 | `dtbase`, the three pairs | no block matches the `.emd` word 35 records (E5) |
 | every entry of `em001_00.arc` (546) | no u32 143 outside one texture's pixels: no data block spells out a joint (E11) |
 
+The block's one kind-3 record is not copied into MH4U's word 35 (no MH4U file has kind 3), and the three
+paired monsters' joint records are of kinds 1 and 4 (E5), so it is not evidence of a stored sever record.
+
 **The cut part is a model.** Each of the three paired monsters' MHXX archive holds a `_tail.mod` beside its body
 model (`enemy/em001/em001_00/mod/em001_00_tail.mod`, likewise em024_00 and em027_00), and MH4U and MH3U ship the
 same pair (`em001_tail.mod` and so on): the cut piece travels as a model in all three games. MHXX's and MH4U's are
