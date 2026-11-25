@@ -152,12 +152,12 @@ def test_htd_volume_group_must_be_below_the_hts_group_count():
     assert counts["E8 htd volume group OUTSIDE"] == 1
 
 
-def stq_with_stream(name: str = "sound\\bgm\\test") -> bytes:
+def stq_with_stream(name: str = "sound\\bgm\\test", version: int = 0x22) -> bytes:
     """A hand-built STRQ: one stream, one sequence, then the stream's name."""
     stream_at, sequence_at = 0x18, 0x18 + 36
     name_at = sequence_at + 100
     d = bytearray(name_at + len(name) + 1)
-    struct.pack_into("<4s5I", d, 0, b"STRQ", 0x22, 1, 1, stream_at, sequence_at)
+    struct.pack_into("<4s5I", d, 0, b"STRQ", version, 1, 1, stream_at, sequence_at)
     struct.pack_into("<9I", d, stream_at, name_at, 0x1234, 0x1000, 2, 32728, 0, 0, 0x67195A2E, 2)
     struct.pack_into("<I", d, sequence_at, 7)
     struct.pack_into("<f", d, sequence_at + 0x24, -0.9)
@@ -174,6 +174,17 @@ def test_stq_reads_a_hand_built_stream_request():
     assert s.sequences[0].id == 7
     assert s.sequences[0].level == pytest.approx(-0.9)
     assert s.sequences[0].stream == 0
+
+
+def test_stq_reads_mh3us_version_0x20_with_the_same_layout():
+    """specs/sound.md stream request: MH3U's 0x20 closes exactly as MH4U's 0x22 does (check SN6)"""
+    s = stq.read(stq_with_stream(version=0x20))
+    assert (s.version, s.streams[0].name, s.sequences[0].id) == (0x20, "sound\\bgm\\test", 7)
+
+
+def test_stq_refuses_a_stream_request_version_it_does_not_lay_out():
+    with pytest.raises(stq.StqError, match="version 0x21"):
+        stq.read(stq_with_stream(version=0x21))
 
 
 def test_stq_refuses_a_sequence_naming_a_stream_past_the_table():
