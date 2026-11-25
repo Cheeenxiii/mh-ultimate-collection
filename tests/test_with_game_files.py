@@ -1,6 +1,7 @@
 """The real contract: our readers and writers against the game's own files."""
 from __future__ import annotations
 
+import math
 import os
 import struct
 from collections import Counter
@@ -242,10 +243,6 @@ def motion_lists(image):
                 yield f.path, data
 
 
-# bytes one key takes in each keyframe buffer type, from RevilLib's src/mtf_lmt/codecs.hpp
-LMT_KEY_STRIDE = {1: 12, 2: 12, 3: 16, 4: 8, 5: 4, 6: 8, 7: 4, 11: 4, 12: 4, 13: 4, 14: 6, 15: 6}
-
-
 def test_mh3u_motion_lists_read_as_version_66(dump):
     """specs/lmt.md check L3: MH3U's motion lists are LMT version 66. RevilLib puts 66 and 67 in the
     same class layouts, so one reader covers both: every animation, track table, keyframe buffer,
@@ -273,7 +270,7 @@ def test_mh3u_motion_lists_read_as_version_66(dump):
                 usage[t.usage] += 1
                 buffered += bool(t.buffer_size)
                 bounds += bool(t.bounds)
-                assert not t.buffer_size or t.buffer_size % LMT_KEY_STRIDE[t.buffer_type] == 0, (name, t.buffer_size)
+                assert not t.buffer_size or t.buffer_size % lmt.KEY_STRIDES[t.buffer_type] == 0, (name, t.buffer_size)
     assert versions == {66}, versions
     assert (lists, animations, empty, tracks) == (387, 8336, 7258, 270420), \
         (lists, animations, empty, tracks)
@@ -297,6 +294,106 @@ def test_mh3u_player_motion_tracks_address_bones_by_id(dump):
                 _version, anims = lmt.read(e.data)
                 seen |= {t.bone for a in anims if a for t in a.tracks}
     assert seen == set(range(22)) | {255}, sorted(seen)
+
+
+KEYFRAME_COUNTS = {   # lists, animations, empty slots, tracks, tracks with a buffer, keys
+    "mh4u": (1466, 23412, 25633, 732404, 603620, 40672238),
+    "mhxx": (988, 21154, 57010, 677909, 569298, 33075719),
+    "mh3u": (387, 8336, 7258, 270420, 231142, 16788906),
+}
+KEYFRAME_ALL = {      # tracks by the type byte at track +0x00
+    "mh4u": {1: 71515, 2: 57269, 3: 641, 4: 24613, 5: 12999, 6: 362290, 7: 110522,
+             11: 66482, 12: 19469, 13: 6604},
+    "mhxx": {1: 62925, 2: 45686, 3: 3, 4: 21593, 5: 13735, 6: 321115, 7: 113725,
+             11: 71569, 12: 20887, 13: 6671},
+    "mh3u": {1: 15671, 2: 23607, 3: 214, 4: 10000, 5: 6470, 6: 143814, 7: 32333,
+             11: 26368, 12: 11310, 13: 633},
+}
+KEYFRAME_BOUNDS = {   # tracks with a bounds block, by buffer type (types 1 and 2 have no buffer at all)
+    "mh4u": {4: 24613, 5: 12999, 7: 110522, 11: 66482, 12: 19469, 13: 6604},
+    "mhxx": {4: 21593, 5: 13735, 7: 113725, 11: 71569, 12: 20887, 13: 6671},
+    "mh3u": {4: 10000, 5: 6470, 6: 2991, 7: 32333},
+}
+# version 66's types 11 to 13 are signed magnitude: keys whose value is a unit quaternion within 0.01
+KEYFRAME_V66_UNIT = {11: 1628374, 12: 718846, 13: 21795}
+
+
+def _length(v) -> float:
+    return sum(c * c for c in v) ** 0.5
+
+
+def test_every_motion_keyframe_buffer_decodes_in_all_three_games(dump):
+    """specs/lmt.md check L4: every keyframe buffer of the three games' 2,841 motion lists decodes, its keys
+    start at frame 0 and end at the animation's frame count - 1, every type 3 to 13 track carries one while
+    types 1 and 2 never do, and the quaternion types come out unit (version 67 after the bounds block, version
+    66's types 11 to 13 under their signed-magnitude reading)"""
+    for game in ("mh4u", "mhxx", "mh3u"):
+        image = romfs.open_image(dump(game, "romfs.bin"))
+        counts, types, keyless, bounds = Counter(), Counter(), Counter(), Counter()
+        norms = {}      # (buffer type, "raw" or "bounded") -> keys, summed |1-norm|, worst, unit within 0.01
+        for name, data in motion_lists(image):
+            counts["lists"] += 1
+            version, anims = lmt.read(data)
+            assert version == (66 if game == "mh3u" else 67), name
+            for a in anims:
+                if a is None:
+                    counts["empty"] += 1
+                    continue
+                counts["animations"] += 1
+                for t in a.tracks:
+                    counts["tracks"] += 1
+                    types[t.buffer_type] += 1
+                    if not t.buffer_size:
+                        keyless[t.buffer_type] += 1
+                        continue
+                    counts["buffered"] += 1
+                    keys = lmt.decode_keys(data, t, version, a.frames)
+                    counts["keys"] += len(keys)
+                    assert keys[0].frame == 0, (name, t.buffer_type)
+                    assert keys[-1].frame == a.frames - 1, (name, t.buffer_type, a.frames, keys[-1].frame)
+                    ascending = all(keys[i].frame < keys[i + 1].frame for i in range(len(keys) - 1))
+                    assert ascending, (name, t.buffer_type)
+                    assert all(math.isfinite(c) for k in keys for c in k.value), (name, t.buffer_type)
+                    b = lmt.bounds(data, t)
+                    bounds[t.buffer_type] += bool(b)
+                    if t.buffer_type in (4, 5):        # normalized components, offset + scale x value
+                        scale, offset = b
+                        for k in keys:
+                            v = tuple(o + s * c for o, s, c in zip(offset, scale, k.value, strict=True))
+                            assert all(min(o, o + s) - 1e-3 <= c <= max(o, o + s) + 1e-3
+                                       for o, s, c in zip(offset, scale, v, strict=True)), (name, t.buffer_type)
+                    if t.buffer_type in (6, 7, 11, 12, 13):
+                        bounded = t.buffer_type == 7 or (t.buffer_type in (11, 12, 13) and version == 67)
+                        if bounded:
+                            assert b is not None, (name, t.buffer_type)
+                        slot = norms.setdefault((t.buffer_type, "bounded" if bounded else "raw"),
+                                                [0, 0.0, 0.0, 0])
+                        for k in keys:
+                            v = k.value
+                            if bounded:
+                                scale, offset = b
+                                v = tuple(o + s * c for o, s, c in zip(offset, scale, v, strict=True))
+                            d = abs(1 - _length(v))
+                            slot[0] += 1
+                            slot[1] += d
+                            slot[2] = max(slot[2], d)
+                            slot[3] += d <= 0.01
+        got = (counts["lists"], counts["animations"], counts["empty"], counts["tracks"],
+               counts["buffered"], counts["keys"])
+        assert got == KEYFRAME_COUNTS[game], (game, got)
+        assert dict(types) == KEYFRAME_ALL[game], (game, dict(types))
+        assert dict(keyless) == {1: KEYFRAME_ALL[game][1], 2: KEYFRAME_ALL[game][2]}, (game, dict(keyless))
+        assert {t: n for t, n in bounds.items() if n} == KEYFRAME_BOUNDS[game], (game, dict(bounds))
+        for (buffer_type, mode), (n, total, worst, unit) in norms.items():
+            mean = total / n
+            if buffer_type == 6:
+                assert mean < 1e-3 and worst < 1e-3, (game, buffer_type, mode, mean, worst)
+            elif buffer_type == 7:
+                assert mean < 0.01 and worst < 0.14, (game, buffer_type, mode, mean, worst)
+            elif game == "mh3u":
+                assert unit == KEYFRAME_V66_UNIT[buffer_type], (game, buffer_type, mode, unit)
+            else:
+                assert mean < 1e-3 and worst < 0.009, (game, buffer_type, mode, mean, worst)
 
 
 def _r_model(image, files, arc_path: str) -> bytes:

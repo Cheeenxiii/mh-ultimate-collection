@@ -63,6 +63,90 @@ def test_lmt_refuses_a_track_buffer_outside_the_file():
         lmt.read(lmt_with_track_buffer_at(len(d) - 8))
 
 
+def key_track(buffer_type: int, buffer: bytes, bounds: int = 0) -> tuple[bytes, lmt.Track]:
+    at = 0x10
+    d = bytearray(at + len(buffer) + bounds)
+    d[at:at + len(buffer)] = buffer
+    return bytes(d), lmt.Track(buffer_type, 0, 0, 0, 1.0, len(buffer), at, at + len(buffer) if bounds else 0)
+
+
+def test_lmt_decodes_each_uncompressed_key_type():
+    """specs/lmt.md, "Keyframe buffers": hand-computed keys of types 1, 2 and 3"""
+    buffer = struct.pack("<3f", 1.0, 2.0, 3.0) + struct.pack("<3f", 4.0, 5.0, 6.0)
+    d, t = key_track(1, buffer)
+    assert [(k.frame, k.value) for k in lmt.decode_keys(d, t, 67)] == \
+        [(0, (1.0, 2.0, 3.0, 1.0)), (1, (4.0, 5.0, 6.0, 1.0))]
+
+    d, t = key_track(2, struct.pack("<3f", 0.5, 0.5, 0.5))
+    assert lmt.decode_keys(d, t, 67)[0].value == (0.5, 0.5, 0.5, 0.5)   # w from 1 - |xyz|^2
+
+    d, t = key_track(3, struct.pack("<3fI", 1.0, 2.0, 3.0, 5) + struct.pack("<3fI", 4.0, 5.0, 6.0, 2))
+    assert [(k.frame, k.value[:3]) for k in lmt.decode_keys(d, t, 67)] == \
+        [(0, (1.0, 2.0, 3.0)), (5, (4.0, 5.0, 6.0))]
+
+
+def test_lmt_decodes_each_normalized_key_type():
+    """type 4 stores three u16 (1/0xFFFF each) and type 5 three u8 (1/0xFF), the last field the frame gap"""
+    d, t = key_track(4, struct.pack("<3HH", 0xFFFF, 0x8000, 0, 4))
+    (k,) = lmt.decode_keys(d, t, 67)
+    assert k.value == (1.0, 0x8000 / 0xFFFF, 0.0, 1.0)
+    assert lmt.decode_keys(b"", lmt.Track(4, 0, 0, 0, 1.0, 0, 0, 0), 67) == []   # no buffer size, no keys
+
+    d, t = key_track(5, struct.pack("<3BB", 0xFF, 0x80, 0, 7))
+    assert lmt.decode_keys(d, t, 67)[0].value == (1.0, 0x80 / 0xFF, 0.0, 1.0)
+
+
+def test_lmt_decodes_each_packed_rotation_type():
+    """types 6, 7 and 11 to 13, packed by hand: 14-bit signed magnitude, 7-bit unsigned, one axis plus w"""
+    # type 6: w 0, z 0, y 0, x = -1 (raw 12288, the negative half), frame gap 3 in the top byte
+    d, t = key_track(6, struct.pack("<Q", 12288 << 42 | 3 << 56))
+    (k,) = lmt.decode_keys(d, t, 67)
+    assert (k.frame, k.value) == (0, (-4095 / 4095.75, 0.0, 0.0, 0.0))
+    d, t = key_track(6, struct.pack("<Q", 4096 << 42))              # the positive half: raw / 4095.75
+    assert lmt.decode_keys(d, t, 67)[0].value[0] == 4096 / 4095.75
+
+    # type 7: x = 64/127, w = 1, and a frame gap of 5 in the top nibble
+    d, t = key_track(7, struct.pack("<I", 64 << 21 | 0x7F | 5 << 28))
+    assert [(k.frame, k.value) for k in lmt.decode_keys(d, t, 67)] == [(0, (64 / 127, 0.0, 0.0, 1.0))]
+
+    # types 11 to 13: the low 14 bits are the named axis, the next 14 are w, the top nibble the frame gap
+    for buffer_type, axis in ((11, 0), (12, 1), (13, 2)):
+        d, t = key_track(buffer_type, struct.pack("<I", 0x3FFF | 0x3FFF << 14 | 2 << 28))
+        (k,) = lmt.decode_keys(d, t, 67)
+        assert (k.frame, k.value) == (0, tuple(1.0 if i in (axis, 3) else 0.0 for i in range(4))), buffer_type
+
+    # version 66 reads the same pair as signed magnitude (as type 6 does); version 67 as unsigned
+    d, t = key_track(11, struct.pack("<I", 12288))
+    assert lmt.decode_keys(d, t, 66)[0].value == (-4095 / 4095.75, 0.0, 0.0, 0.0)
+    assert lmt.decode_keys(d, t, 67)[0].value == (12288 / 0x3FFF, 0.0, 0.0, 0.0)
+
+
+def test_lmt_key_frames_accumulate_and_must_stay_inside_the_animation():
+    d, t = key_track(3, struct.pack("<3fI", 0.0, 0.0, 0.0, 4) + struct.pack("<3fI", 0.0, 0.0, 0.0, 4))
+    assert [k.frame for k in lmt.decode_keys(d, t, 67, frames=9)] == [0, 4]
+    with pytest.raises(lmt.LmtError, match="past the animation"):
+        lmt.decode_keys(d, t, 67, frames=4)
+
+
+def test_lmt_refuses_a_key_buffer_it_cannot_split_into_keys():
+    d, t = key_track(1, struct.pack("<3f", 1.0, 2.0, 3.0) + b"\0" * 4)
+    with pytest.raises(lmt.LmtError, match="whole number of SingleVector3 keys"):
+        lmt.decode_keys(d, t, 67)
+    d, t = key_track(8, b"\0" * 12)
+    with pytest.raises(lmt.LmtError, match="type 8"):
+        lmt.decode_keys(d, t, 67)
+
+
+def test_lmt_bounds_block_is_scale_then_offset():
+    """specs/lmt.md: RevilLib applies the block as offset + scale x value, so its first vector scales"""
+    buffer = b"\0" * 4
+    d, t = key_track(5, buffer, bounds=0x20)
+    d = bytearray(d)
+    struct.pack_into("<4f", d, 0x14, 2.0, 2.0, 2.0, 2.0)      # scale
+    struct.pack_into("<4f", d, 0x24, -1.0, -1.0, -1.0, -1.0)  # offset
+    assert lmt.bounds(bytes(d), t) == ((2.0, 2.0, 2.0, 2.0), (-1.0, -1.0, -1.0, -1.0))
+
+
 def test_emd_counts_a_body_list_that_runs_off_the_end_instead_of_crashing():
     d = bytearray(0x200)
     d[:4] = b"emd\0"
