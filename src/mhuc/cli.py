@@ -352,11 +352,50 @@ def cmd_catalog(args) -> int:
     return 0
 
 
+def _convert_camera(args) -> int:
+    """`mhuc convert camera`: a source game's camera list as MH4U's version 4 (specs/camera.md)."""
+    from .formats import camera
+
+    if not args.src or not args.out:
+        print("mhuc convert camera SOURCE.lcm --from mhxx -o OUT.lcm  (specs/camera.md)", file=sys.stderr)
+        return 2
+    if args.game == "mh3u":
+        print("mhuc convert camera: MH3U ships no rCameraList (specs/camera.md#versions), so there is no "
+              "camera to convert", file=sys.stderr)
+        return 1
+    repo = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    out_real = os.path.realpath(args.out)
+    if out_real == repo or out_real.startswith(repo + os.sep):
+        print("mhuc convert camera: a converted camera is derived from the game's files; write it outside "
+              "the repository", file=sys.stderr)
+        return 2
+    try:
+        data = _read(args.src)
+        source = camera.read(data)
+        wanted = {"mh4u": camera.VERSION_MH4U, "mhxx": camera.VERSION_MHXX}[args.game]
+        if source.version != wanted:
+            raise camera.CameraError(f"{args.src} is version {source.version}, not {args.game.upper()}'s {wanted}")
+        out = camera.convert(data, camera.VERSION_MH4U)
+        with open(args.out, "wb") as f:
+            f.write(out)
+    except (camera.CameraError, OSError) as e:
+        print(f"mhuc convert camera: {e}", file=sys.stderr)
+        return 1
+    converted = camera.read(out)
+    print(f"{args.src}: {len(source.records)} cameras, version {source.version} -> "
+          f"{len(converted.records)} cameras, version {converted.version}, {len(out)} bytes to {args.out}")
+    return 0
+
+
 def cmd_convert(args) -> int:
+    if args.what == "camera":
+        return _convert_camera(args)
     need = (args.what, args.src, args.template, args.texts, args.id, args.out)
-    if args.what != "quest" or None in need:
+    if args.what != "quest" or args.game != "mhxx" or None in need:
         print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
-              "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)", file=sys.stderr)
+              "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)\n"
+              "mhuc convert camera SOURCE.lcm --from mh4u|mhxx -o OUT.lcm  (specs/camera.md)",
+              file=sys.stderr)
         return 2
     from .quests import convert
 
@@ -621,16 +660,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", required=True, help="the CSV to write, outside the repository")
     p.set_defaults(func=cmd_idnames)
 
-    p = sub.add_parser("convert", help="convert a source game's quest into an MH4U .mib model (JSON)")
-    p.add_argument("what", nargs="?", choices=["quest"])
-    p.add_argument("src", nargs="?", help="the quest as `mhuc quest dump mhxx` prints it")
-    p.add_argument("--from", dest="game", choices=["mhxx"], default="mhxx")
+    p = sub.add_parser("convert", help="convert a source game's quest or camera list into MH4U's format")
+    p.add_argument("what", nargs="?", choices=["quest", "camera"])
+    p.add_argument("src", nargs="?", help="quest: the quest as `mhuc quest dump mhxx` prints it; "
+                                           "camera: the source game's .lcm")
+    p.add_argument("--from", dest="game", choices=["mh4u", "mh3u", "mhxx"], default="mhxx",
+                   help="the source game (camera: mhxx for a port; mh4u to re-lay its own)")
     p.add_argument("--template", help="an MH4U quest as `mhuc mib export` writes it, for what isn't converted")
     p.add_argument("--texts", help="JSON: for each of eng, fre, spa, ger, ita, the 7 MH4U strings")
     p.add_argument("--id", type=int, help="the MH4U quest id to give it")
     p.add_argument("--tables", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "idmap",
                                                      "mhxx-mh4u"))
-    p.add_argument("--out")
+    p.add_argument("--out", "-o", help="quest: the .mib model; camera: the converted .lcm")
     p.set_defaults(func=cmd_convert)
 
     return ap

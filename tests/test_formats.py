@@ -1,12 +1,13 @@
 """File formats: known values computed independently of the code, and bugs met on real files."""
 from __future__ import annotations
 
+import os
 import struct
 import zlib
 
 import pytest
 
-from mhuc import monsterdata
+from mhuc import cli, monsterdata
 from mhuc.formats import camera, classid, emd, hitdata, lmt, pica, sound, stq, xfs
 
 
@@ -217,6 +218,43 @@ def test_a_camera_list_converts_to_version_5_and_back_with_its_offsets():
     assert struct.unpack_from("<I", v5, track5 + camera.TRACK_BOUNDS)[0] == data_start5 + 8
     assert len(v5) == data_start5 + 8 + camera.BOUNDS_SIZE
     assert camera.from_mhxx(v5) == v4
+
+
+def test_the_camera_converter_writes_mh4us_layout(tmp_path):
+    source = tmp_path / "e001_cam_mhxx.lcm"
+    source.write_bytes(camera.to_mhxx(camera_v4_with_one_track()))
+    out = tmp_path / "e001_cam.lcm"
+    assert cli.main(["convert", "camera", str(source), "--from", "mhxx", "-o", str(out)]) == 0
+    assert out.read_bytes() == camera_v4_with_one_track()
+
+
+def test_the_camera_converter_re_lays_mh4us_own_file(tmp_path):
+    source = tmp_path / "e001_cam.lcm"
+    source.write_bytes(camera_v4_with_one_track())
+    out = tmp_path / "e001_cam_re.lcm"
+    assert cli.main(["convert", "camera", str(source), "--from", "mh4u", "-o", str(out)]) == 0
+    assert out.read_bytes() == source.read_bytes()
+
+
+def test_the_camera_converter_refuses_mh3u_which_has_no_camera_list(tmp_path):
+    source = tmp_path / "e001_cam.lcm"
+    source.write_bytes(camera_v4_with_one_track())
+    assert cli.main(["convert", "camera", str(source), "--from", "mh3u", "-o", str(tmp_path / "x.lcm")]) == 1
+
+
+def test_the_camera_converter_refuses_a_version_that_is_not_its_source(tmp_path):
+    source = tmp_path / "e001_cam_mhxx.lcm"
+    source.write_bytes(camera.to_mhxx(camera_v4_with_one_track()))
+    assert cli.main(["convert", "camera", str(source), "--from", "mh4u", "-o", str(tmp_path / "x.lcm")]) == 1
+
+
+def test_the_camera_converter_refuses_to_write_in_the_repository(tmp_path):
+    source = tmp_path / "e001_cam.lcm"
+    source.write_bytes(camera_v4_with_one_track())
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = os.path.join(repo, "e001_cam.lcm")
+    assert cli.main(["convert", "camera", str(source), "--from", "mh4u", "-o", out]) == 2
+    assert not os.path.exists(out)
 
 
 def test_camera_read_refuses_a_record_that_is_not_contiguous():

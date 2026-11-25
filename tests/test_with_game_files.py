@@ -10,7 +10,7 @@ from collections import Counter
 
 import pytest
 
-from mhuc import monsterdata
+from mhuc import cli, monsterdata
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
 from mhuc.formats import (
@@ -666,6 +666,56 @@ def test_every_monster_camera_list_reads_and_converts(dump):
     # MH3U registers rCameraList but ships no file of it: the 3U port has no source camera.
     mh3u_arcs, mh3u_with, mh3u = monster_cameras("mh3u", r"/arc/enemy/em\d{3}\.arc")
     assert (mh3u_arcs, mh3u_with, mh3u) == (85, 0, {}), (mh3u_arcs, mh3u_with, mh3u)
+
+
+def rathian_camera(dump, game, arc_path):
+    """The rCameraList entry in one monster archive, or None."""
+    image = romfs.open_image(dump(game, "romfs.bin"))
+    archive = next(f for f in image.files() if f.path == arc_path)
+    return next((e.data for e in arc.read(image.read(archive)).entries if e.type_name == "rCameraList"), None)
+
+
+def test_rathian_camera_converts_from_mhxx_and_mh4us_re_lays_to_itself(dump, tmp_path):
+    """specs/camera.md: MHXX em001's list becomes MH4U's layout; MH4U em001 re-lays to itself."""
+    mh4u = rathian_camera(dump, "mh4u", "/data/em001.arc")
+    mhxx = rathian_camera(dump, "mhxx", "/arc/enemy/em001_00.arc")
+    assert rathian_camera(dump, "mh3u", "/arc/enemy/em001.arc") is None     # MH3U ships no camera list
+    source4, source5 = camera.read(mh4u), camera.read(mhxx)
+    assert (source4.version, source5.version) == (4, 5)
+
+    # MH4U's own file re-lays as version 4 unchanged, and its version 5 form inverts back.
+    assert camera.convert(mh4u, 4) == mh4u
+    assert camera.from_mhxx(camera.to_mhxx(mh4u)) == mh4u
+
+    # MHXX's list converts to a version 4 file with the source's cameras and data; only the
+    # seven relocated words move, by 16 per record.
+    converted = camera.from_mhxx(mhxx)
+    dst = camera.read(converted)
+    assert dst.version == 4 and len(dst.records) == len(source5.records)
+    assert dst.order == source5.order and dst.data == source5.data
+    shift = 16 * len(source5.order)
+    for camera_id in source5.order:
+        a, b = source5.records[camera_id], dst.records[camera_id]
+        assert (a.frames, a.flag, a.aspect) == (b.frames, b.flag, b.aspect)
+        for ta, tb in zip(a.tracks, b.tracks, strict=True):
+            assert (ta.buffer_type, ta.usage, ta.joint_type, ta.bone, ta.weight, ta.size,
+                    ta.reference) == (tb.buffer_type, tb.usage, tb.joint_type, tb.bone, tb.weight,
+                                      tb.size, tb.reference)
+            assert tb.offset == ta.offset - shift
+            assert tb.bounds == (ta.bounds - shift if ta.bounds else 0)
+        assert b.fourth.offset == (a.fourth.offset - shift if a.fourth.offset else 0)
+    assert camera.to_mhxx(converted) == mhxx
+
+    # The two Rathians' lists share the ids MH4U's own file has and MHXX's keeps; each has
+    # extra cameras of its own (MH4U 9, 10, 12..20; MHXX 40..44 and 50..53).
+    assert set(source4.records) & set(source5.records) == {0, 1, 2, 4, 5, 8}
+
+    # The command writes exactly the converted file from the player's MHXX list.
+    source = tmp_path / "em001_00_cam.lcm"
+    source.write_bytes(mhxx)
+    out = tmp_path / "e001_cam.lcm"
+    assert cli.main(["convert", "camera", str(source), "--from", "mhxx", "-o", str(out)]) == 0
+    assert out.read_bytes() == converted
 
 
 def test_every_mh3u_sound_file_reads_and_its_stream_requests_match_their_waves(dump):

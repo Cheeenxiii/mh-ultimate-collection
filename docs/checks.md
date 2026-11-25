@@ -506,8 +506,8 @@ arc at `enemy\emNNN\mot\eNNN_cam` (the `camera` kind in [data/ids](../data/ids/R
 This check needs the converted camera in the port's arc, the `camera` kind on the id, the
 plugin's record built with it (P1), and a quest that spawns the id (#144).
 
-1. Convert the source camera with `mhuc convert monster --from mhxx --id 124 --arc <MHXX
-   arc/enemy/em001_00.arc> --out <mod folder>`; the port's arc holds
+1. Take MHXX's camera list out of `arc/enemy/em001_00.arc` and convert it with `mhuc convert
+   camera <camera>.lcm --from mhxx -o <camera>_4u.lcm`; put it in the port's arc at
    `enemy\em124\mot\e124_cam`. Check that 124's `files` in `data/ids/registry.csv` lists
    `camera`, regenerate `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
 2. Force an action whose handler posts a camera event: MH4U's camera event is `0x00934544`
