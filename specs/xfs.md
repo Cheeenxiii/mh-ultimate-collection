@@ -7,7 +7,7 @@ status: unknown
 
 # XFS: MT Framework's serialised objects
 
-XFS writes an object the way the class's `createProperty()` describes it, schema first: one definition per class (its DTI id and property list), then the root object. A reader needs no per-class code. In MH3U, `.supp` (`rSuppItem`, quest supply boxes), `.pop` (`rPopData`), `.list` (`rQuestList`) and several ARC classes use it, among them the quest cockpit layouts (`rTexLayout`). MH4U's only XFS files are eight `rSoundAttributeSe`; its HUD layouts are `rLayout` (`.lyt`) entries, a different format.
+XFS writes an object the way the class's `createProperty()` describes it, schema first: one definition per class (its DTI id and property list), then the root object. A reader needs no per-class code. In MH3U, `.supp` (`rSuppItem`, quest supply boxes), `.pop` (`rPopData`), `.list` (`rQuestList`) and several ARC classes use it, among them the quest cockpit layouts (`rTexLayout`). MH4U's only XFS files are eight `rSoundAttributeSe`; its HUD layouts are `rLayout` (`.lyt`) entries, a different format ([lyt.md](lyt.md)).
 
 **Byte order comes from the magic.** The bytes `XFS\0` in file order are a little-endian file, `\0SFX` a big-endian one: the 3DS games (MH3U and MH4U) write little-endian, Cha-Cha's Wii U build big-endian. Three words are laid out differently, each given per byte order below; everything else is the same. Reader: `mhuc xfs dump FILE` (`src/mhuc/formats/xfs.py`), which takes the byte order from the magic.
 
@@ -98,7 +98,7 @@ never occur, so their encodings are the reader's assumptions.
 - The attr bits other than 0x20: 0x80, 0x01 and 0x91 seen.
 - Not every registered property is written (Cha-Cha: `rPopData` registers a type-0x19 `DataList` the files lack).
 - Whether MHXX uses XFS. MH3U's and MH4U's RomFS are checked (X1).
-- MH4U's only XFS files are its sound attribute sets; its HUD layouts are `rLayout` (`.lyt`), whose format is its own.
+- MH4U's only XFS files are its sound attribute sets; its HUD layouts are `rLayout` (`.lyt`), laid out in [lyt.md](lyt.md).
 
 ## Checks
 
@@ -114,7 +114,7 @@ never occur, so their encodings are the reader's assumptions.
     1 `.list`. Versions 15.1 (545 files), 15.2 (274) and 15.3 (26).
   - MH4U: 8 files, all `rSoundAttributeSe`, version 15.3, all read. No `.supp`, `.pop`, `.list` and no
     `rTexLayout`: the test's scan of every ARC entry finds none, and its HUD layouts are
-    `rLayout` (`.lyt`, such as `eng\lyt\quest\ui200`).
+    `rLayout` (`.lyt`, such as `eng\lyt\quest\ui200`), laid out in [lyt.md](lyt.md).
   The three little-endian differences the check settled: a class definition's property count is the count
   itself, a property's size is a u16 in the file's byte order, and an object's class word is
   `class index << 1 | 1`.

@@ -9,7 +9,7 @@ import sys
 
 from . import __version__, entropy, survey
 from .crypto import dlccrypt
-from .formats import arc, classid, gmd, romfs, sound, stq, tex, xfs
+from .formats import arc, classid, gmd, lyt, romfs, sound, stq, tex, xfs
 from .quests import quest
 
 
@@ -113,6 +113,12 @@ def cmd_xfs(args) -> int:
 
 DECRYPT = {"mh4u-save": "mh4u_save_decrypt", "mh4u-dlc": "mh4u_dlc_decrypt",
            "mhxx-dlc": "mhxx_dlc_decrypt", "mh3u-dlc": "mh3u_dlc_decrypt"}
+
+
+def cmd_lyt(args) -> int:
+    json.dump(lyt.to_json(lyt.read(_read(args.file))), sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
 
 
 def cmd_decrypt(args) -> int:
@@ -619,6 +625,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["dump"])
     p.add_argument("file")
     p.set_defaults(func=cmd_xfs)
+
+    p = sub.add_parser("lyt", help="MT Framework layouts (.lyt, rLayout): MH4U's HUD and menu layouts as JSON")
+    p.add_argument("action", choices=["dump"])
+    p.add_argument("file")
+    p.set_defaults(func=cmd_lyt)
 
     p = sub.add_parser("decrypt", help="decrypt a DLC or Extra Data file (the key comes from a file you supply)")
     p.add_argument("kind", choices=sorted(DECRYPT))

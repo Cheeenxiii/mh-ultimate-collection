@@ -70,7 +70,7 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 
 | Module | Does |
 |---|---|
-| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), camera lists (LCM), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), motion effects and effect lists (MEF/ESQ/PSL, EFL/PEL), serialised objects (XFS), RomFS images, class ids |
+| `formats/` | MT Framework archives (ARC), 3DS textures (TEX), text (GMD), motions (LMT), camera lists (LCM), models (MOD), monster data (MH4U EMD, MHXX `dttune`, `dtbase` and `dtbparts`, MH3U `em_status`, hurt and attack volumes), motion effects and effect lists (MEF/ESQ/PSL, EFL/PEL), serialised objects (XFS), MH4U layouts (LYT), RomFS images, class ids |
 | `crypto/` | Blowfish and the save, Extra Data and DLC ciphers of the three games |
 | `quests/` | quest readers for the three games, the MH4U `.mib` writer, conversion from MHXX, monster ids by name |
 | `extdata.py` | MH4U Extra Data records: guild quest cards, DLC Palicos, the in-game test kit |

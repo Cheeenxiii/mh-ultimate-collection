@@ -1,6 +1,7 @@
 """File formats: known values computed independently of the code, and bugs met on real files."""
 from __future__ import annotations
 
+import json
 import os
 import struct
 import zlib
@@ -8,7 +9,7 @@ import zlib
 import pytest
 
 from mhuc import cli, monsterdata
-from mhuc.formats import camera, classid, emd, hitdata, lmt, pica, sound, stq, xfs
+from mhuc.formats import camera, classid, emd, hitdata, lmt, lyt, pica, sound, stq, xfs
 
 
 def test_class_id_is_crc32_without_final_inversion_on_31_bits():
@@ -682,3 +683,104 @@ def test_xfs_refuses_a_little_endian_object_without_its_flag():
     struct.pack_into("<H", d, root_at, 0)
     with pytest.raises(xfs.XfsError, match="bad object header"):
         xfs.read(bytes(d))
+
+
+def one_of_each_layout() -> bytes:
+    """A hand-built MH4U layout: one texture slot and one root, picture, text and boundary.
+
+    The offsets are worked out here, not read from a game file, so the reader is checked against
+    the spec's layout rather than against its own output.
+    """
+    names_at, text_at, roots_at = 0x18C, 0x1A6, 0x1AC
+    d = bytearray(roots_at + 4)
+    d[:4] = b"lyt\0"
+    struct.pack_into("<I", d, 4, lyt.VERSION)
+    struct.pack_into("<10I", d, 8,
+                     1, 1, 1, 1, 0, 1, 1,          # roots, textures, group+text, pictures, unknown, text, boundaries
+                     0x30, 0x38, roots_at)          # texture slots, nodes, root table
+    struct.pack_into("<II", d, 0x30, 0, 0x19D)      # one texture slot, its path below
+
+    def name(at: int, text: str) -> None:
+        d[at:at + len(text) + 1] = text.encode("ascii") + b"\0"
+
+    def node(at: int, typ: int, depth: int, text: str, name_at: int, size: int) -> None:
+        struct.pack_into("<5I", d, at, typ, depth,
+                         (~zlib.crc32(text.encode("ascii")) & 0xFFFFFFFF), name_at, size)
+
+    node(0x38, 2, 0, "root", names_at, 0x28)
+    struct.pack_into("<ffIfI", d, 0x38 + 0x14, 1.5, -2.5, 0, 1.0, 0x201)
+    node(0x60, 0, 1, "pic", names_at + 5, 0x6C)
+    struct.pack_into("<5f", d, 0x60 + 0x14, 10.0, 20.0, 0.0, 30.0, 40.0)
+    struct.pack_into("<3f", d, 0x60 + 0x28, 1.0, 1.0, 0.0)
+    struct.pack_into("<4I", d, 0x60 + 0x40, 0xFFFFFFFF, 0x11223344, 0, 0)
+    node(0xCC, 3, 1, "msg", names_at + 9, 0x7C)
+    struct.pack_into("<I", d, 0xCC + 0x14, text_at)
+    node(0x148, 4, 1, "hit", names_at + 13, 0x30)
+    struct.pack_into("<4f", d, 0x148 + 0x14, 1.0, 2.0, 3.0, 4.0)
+    struct.pack_into("<I", d, 0x178, 0xFF)          # terminator, then the 0x10 zero bytes
+    name(names_at, "root")
+    name(names_at + 5, "pic")
+    name(names_at + 9, "msg")
+    name(names_at + 13, "hit")
+    name(0x19D, "tex\\pic")
+    d[text_at:text_at + 6] = "Hi".encode("utf-16-le") + b"\0\0"
+    return bytes(d)
+
+
+def test_lyt_reads_the_header_nodes_textures_and_text():
+    """specs/lyt.md: the header counts, the 8-byte texture slot, the 0x14-byte node header and
+    the per-type data; the text string is UTF-16LE behind the record's +0x14 offset"""
+    layout = lyt.read(one_of_each_layout())
+    assert layout.version == lyt.VERSION and layout.root_count == 1
+    assert [n.type_name for n in layout.nodes] == ["root", "picture", "text", "boundary"]
+    assert [n.name for n in layout.nodes] == ["root", "pic", "msg", "hit"]
+    assert [n.depth for n in layout.nodes] == [0, 1, 1, 1]
+    assert layout.textures[0].path == "tex\\pic"
+    assert [n.name for n in layout.children(0)] == ["pic", "msg", "hit"]
+    assert layout.find("msg") is layout.nodes[2]
+    root, picture, _, boundary = layout.nodes
+    assert (root.fields["x"], root.fields["y"], root.fields["flags"]) == (1.5, -2.5, 0x201)
+    assert (picture.fields["x"], picture.fields["y"], picture.fields["w"], picture.fields["h"]) == (
+        10.0, 20.0, 30.0, 40.0)
+    assert (boundary.fields["x"], boundary.fields["y"], boundary.fields["w"], boundary.fields["h"]) == (
+        1.0, 2.0, 3.0, 4.0)
+    assert layout.nodes[2].fields["text"] == "Hi"
+    assert layout.nodes[3].size == 0x30
+
+
+def test_lyt_read_refuses_a_file_that_is_not_a_layout():
+    """the loader gates on `lyt\0` and version 0x70C before it reads any offset"""
+    d = bytearray(one_of_each_layout())
+    d[4:8] = struct.pack("<I", 0x70D)
+    with pytest.raises(lyt.LytError, match="version 0x70d"):
+        lyt.read(bytes(d))
+    d = bytearray(one_of_each_layout())
+    d[:4] = b"LYT\0"
+    with pytest.raises(lyt.LytError, match="magic"):
+        lyt.read(bytes(d))
+
+
+def test_lyt_read_refuses_a_node_whose_hash_is_not_its_name():
+    """the name hash is ~crc32(name); a wrong name or hash is refused"""
+    d = bytearray(one_of_each_layout())
+    d[0x38 + 8] ^= 1
+    with pytest.raises(lyt.LytError, match="has hash"):
+        lyt.read(bytes(d))
+
+
+def test_lyt_read_refuses_a_header_count_that_does_not_match_the_chain():
+    """every header count must equal the chain's, so a truncated or mislaid file is refused"""
+    d = bytearray(one_of_each_layout())
+    struct.pack_into("<I", d, 0x1C, 2)      # the text count
+    with pytest.raises(lyt.LytError, match="2 text nodes"):
+        lyt.read(bytes(d))
+
+
+def test_lyt_dump_writes_the_tree_as_json(tmp_path, capsys):
+    source = tmp_path / "ui000.lyt"
+    source.write_bytes(one_of_each_layout())
+    assert cli.main(["lyt", "dump", str(source)]) == 0
+    dumped = json.loads(capsys.readouterr().out)
+    assert dumped["root_count"] == 1
+    assert [n["name"] for n in dumped["nodes"]] == ["root", "pic", "msg", "hit"]
+    assert dumped["nodes"][2]["text"] == "Hi"
