@@ -593,12 +593,13 @@ ABI 3's `call` sets r0-r2 and returns r0. ABI 4 adds
 s1, returns r0 and, through `s0_out`, the function's s0 (a float return). This check calls a
 game function that stores the arguments it receives, so the log shows they arrived: MH4U USA
 v1.3.0 `0x0022e43c` stores r3 at `+0` and r2 at `+2` of the block in r0, s0 at `+8`, and the
-remainder of s1 divided by a count from r1 at `+0xc`; with r1 = 0 the count is 1, so the
-remainder is 0. It reads and writes only that block, so it needs no monster and no quest.
+remainder of s1 divided by a count from r1 at `+0xc`; with r1 = 0 the count is 1, so s0 comes
+back as 10.0f and the remainder is 0. It reads and writes only that block, so it needs no
+monster and no quest.
 
 | Check | What | Pass |
 |---|---|---|
-| P4 | a plugin calls `0x0022e43c` through ABI 4 `call2` in a headless run | the log shows the host's ABI 4 and `call2 ... -> r0=..., out=0; block +0: r3=0xbeef r2=7, +8: s0=1.5, +0xc: remainder=0`; the runner exits 0 |
+| P4 | a plugin calls `0x0022e43c` through ABI 4 `call2` in a headless run | the log shows the host's ABI 4 and `call2 ... -> r0=<block>, out=10; block +0: r3=0xbeef r2=7, +8: s0=1.5, +0xc: remainder=0`; the runner exits 0 |
 
 1. Build the headless runner after the ABI 4 change, in its existing CMake tree:
    `cmake --build <build> --target mh4u_runner`. The Qt frontend compiles the same header and
@@ -616,6 +617,17 @@ remainder is 0. It reads and writes only that block, so it needs no monster and 
    `tools/build_game.py` builds.
 4. Run
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 12000 --speed 0 --log "*:Info"`.
+
+Result (2026-11-25, MH4U USA v1.3.0, headless runner rebuilt with ABI 4): pass. The log had
+`plugin <name>: ready: host ABI 4, size 0xb8, call2 present` when the plugin loaded, then
+`plugin <name>: frame 30: call2 0x0022e43c(block=0x08e44668, r1=0, r2=7, r3=0xbeef, s0=1.5f, s1=10.0f) -> r0=0x08e44668, out=10; block +0: r3=0xbeef r2=7, +8: s0=1.5, +0xc: remainder=0`,
+and the runner exited 0. The block holds r3 and r2 exactly as the call set them, and its `+8`
+is s0 as 1.5f, so the function received the r3 and the VFP arguments. `out=10` is the
+function's own s0 (s1 divided by its count of 1), so the float return came back through
+`s0_out`. The run continued to its end, so the guest's registers, VFP registers and flags were
+put back. The function only reads and writes the block the plugin allocates, so this proves
+the call mechanism at boot; the translated 3U handler ([#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115))
+calls the engine's motion and effect functions the same way on a live monster.
 
 ## Tracing engine calls in MHXX
 
