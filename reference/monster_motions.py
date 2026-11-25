@@ -585,6 +585,169 @@ def cmd_table(args) -> int:
     return 0
 
 
+FALLBACK_GENERATOR = "reference/monster_motions.py fallback"
+
+
+def monster_lists(romfs_path: str, game: str, key: str) -> list[bytes]:
+    """A monster's motion list files in their file order.
+
+    MH4U: `/data/emNNN.arc`, lists `enemy\\emNNN\\mot\\emNNN_<file>`. MH3U: `/arc/enemy/emNNN.arc`,
+    lists `mot_emNNN_<file * 100>`. MHXX: `/arc/enemy/emNNN_00.arc`, lists `emNNN_00_<file>`.
+    The converted lists keep this order (the port's record slot is the file number)."""
+    sys.path.insert(0, os.path.join(HERE, "..", "src"))
+    from mhuc.formats import arc, romfs
+
+    path = {"mh4u": f"/data/{key}.arc", "mh3u": f"/arc/enemy/{key}.arc",
+            "mhxx": f"/arc/enemy/{key}_00.arc"}[game]
+    image = romfs.open_image(romfs_path)
+    entry = next((f for f in image.files() if f.path == path), None)
+    if entry is None:
+        raise ValueError(f"{romfs_path} has no {path}")
+    lists = []
+    for e in arc.read(image.read(entry)).entries:
+        if e.type_name != "rMotionList" or "\\mot\\" not in e.path:
+            continue
+        number = e.path.rsplit("_", 1)[-1]
+        if not number.isdigit():
+            continue
+        file = int(number) // 100 if game == "mh3u" else int(number)
+        lists.append((file, e.path, e.data))
+    lists.sort()
+    if [f for f, _, _ in lists] != list(range(len(lists))):
+        raise ValueError(f"{path}: motion list numbers {[f for f, _, _ in lists]} aren't 0 to n-1")
+    return [data for _, _, data in lists]
+
+
+def identical_tracks(a: dict, b: dict) -> int:
+    """How many (bone, usage) tracks two animations' decoded keys share exactly."""
+    return sum(1 for k in set(a) & set(b) if a[k] == b[k])
+
+
+def decoded_tracks(data: bytes, version: int, anim) -> dict:
+    """An animation's keys per (bone, usage), rounded to 2 decimals so that the two LMT
+    versions' encodings of one key compare equal."""
+    from mhuc.formats import lmt
+
+    out = {}
+    for t in anim.tracks:
+        try:
+            keys = lmt.decode_keys(data, t, version, anim.frames)
+        except lmt.LmtError:
+            continue
+        out[(t.bone, t.usage)] = [(k.frame,) + tuple(round(c, 2) for c in k.value) for k in keys]
+    return out
+
+
+def build_fallback(mh4u_files: list[bytes], source_files: list[bytes]) -> list[tuple[int, int]]:
+    """(MH4U motion number, the source's animation) for every MH4U animation with exactly one
+    source counterpart, both in MH4U's packing.
+
+    A counterpart has the same signature (same_motion: frames, loop frame, track count). When
+    several do, the one whose decoded keys equal MH4U's on strictly more tracks than any other
+    is taken; otherwise the number is left out. This is keyed by the number alone, so it
+    answers what the action-keyed table can't: a handler that computes its index (category 7)
+    or starts a second motion. A number left out passes through; an identity is left out
+    because it changes nothing."""
+    sys.path.insert(0, os.path.join(HERE, "..", "src"))
+    from mhuc.formats import lmt
+
+    def anims(data):
+        version, out = lmt.read(data)
+        return version, out
+    source = [anims(d) for d in source_files]
+    by_frames = collections.defaultdict(list)
+    for file, (_, items) in enumerate(source):
+        for slot, a in enumerate(items):
+            if a:
+                by_frames[(a.frames, a.loop_frame)].append((file, slot, a))
+    out = []
+    for file, data in enumerate(mh4u_files):
+        version, items = anims(data)
+        for slot, a in enumerate(items):
+            if not a:
+                continue
+            sig = (a.frames, a.loop_frame, len(a.tracks))
+            hits = [(f, s, b) for f, s, b in by_frames.get(sig[:2], [])
+                    if same_motion(sig, (b.frames, b.loop_frame, len(b.tracks)))]
+            if len(hits) > 1:
+                mine = decoded_tracks(data, version, a)
+                scored = sorted(((identical_tracks(mine, decoded_tracks(source_files[f], source[f][0], b)),
+                                  f, s) for f, s, b in hits), reverse=True)
+                hits = [h for h in hits if (h[0], h[1]) == scored[0][1:]] \
+                    if scored[0][0] > scored[1][0] else []
+            motion = (file << 8) | slot
+            if len(hits) == 1 and (hits[0][0] << 8 | hits[0][1]) != motion:
+                out.append((motion, hits[0][0] << 8 | hits[0][1]))
+    return out
+
+
+def render_fallback(tables: list[dict]) -> str:
+    """The plugin's second header: each ported monster's signature fallback."""
+    lines = [
+        f"/* Generated from the two games' motion lists by {FALLBACK_GENERATOR}.",
+        " * Do not edit: run the tool against the player's own dumps. Licence: GPL-3.0-or-later. */",
+        "#ifndef MHUC_FALLBACK_H",
+        "#define MHUC_FALLBACK_H",
+        "",
+        "#include <stdint.h>",
+        "",
+        "/* MH4U's handler asks `motion` (file << 8 | slot of the stand-in's lists); the one source",
+        " * animation with the same frames, loop frame and track count (one more on MH4U's side",
+        " * allowed), or among several the one whose keys equal MH4U's on the most tracks, is at",
+        " * `source` in the converted lists. Used when motions.h has no entry for the current",
+        " * action. Sorted by motion. */",
+        "typedef struct MhucMotionFallback {",
+        "    uint16_t motion;",
+        "    uint16_t source;",
+        "} MhucMotionFallback;",
+        "",
+        "typedef struct MhucPortedFallback {",
+        "    uint8_t id;",
+        "    uint16_t count;",
+        "    const MhucMotionFallback *entries;",
+        "} MhucPortedFallback;",
+        "",
+    ]
+    for t in tables:
+        m, ident = t["monster"], int(t["monster"]["id"], 0)
+        lines.append(f"/* {m['name']}, {m['source_game']} {m['source_key']} on MH4U em{int(m['stand_in'], 0):03d} "
+                     f"({m['key']}, id {ident}): {len(t['entries'])} numbers. */")
+        if t["entries"]:
+            lines.append(f"static const MhucMotionFallback mhuc_fallback_{ident}[] = {{")
+            lines += [f"    {{0x{a:03x}, 0x{b:03x}}}," for a, b in t["entries"]]
+            lines.append("};")
+        else:
+            lines.append(f"static const MhucMotionFallback *const mhuc_fallback_{ident} = NULL;")
+        lines.append("")
+    lines += [f"#define MHUC_PORTED_FALLBACK_COUNT {len(tables)}",
+              "static const MhucPortedFallback mhuc_ported_fallback[MHUC_PORTED_FALLBACK_COUNT] = {"]
+    for t in tables:
+        ident = int(t["monster"]["id"], 0)
+        lines.append(f"    {{{ident}, {len(t['entries'])}, mhuc_fallback_{ident}}},")
+    lines += ["};", "", "#endif", ""]
+    return "\n".join(lines)
+
+
+def cmd_fallback(args) -> int:
+    romfs_of = {"mh4u": args.mh4u_romfs}
+    for game, path in args.source_romfs:
+        romfs_of[game] = path
+    tables = []
+    for row in sorted(read_registry(args.registry), key=lambda r: int(r["id"], 0)):
+        game = row["source_game"]
+        if game not in romfs_of:
+            raise ValueError(f"{row['key']}: no --source-romfs for {game}")
+        mh4u_lists = monster_lists(args.mh4u_romfs, "mh4u", f"em{int(row['stand_in'], 0):03d}")
+        source_lists = monster_lists(romfs_of[game], game, row["source_key"])
+        tables.append(dict(monster=row, entries=build_fallback(mh4u_lists, source_lists)))
+    with open(args.output, "w", encoding="utf-8", newline="") as f:
+        f.write(render_fallback(tables))
+    for t in tables:
+        print(f"{t['monster']['key']}: {len(t['entries'])} fallback numbers")
+    print(f"wrote {args.output}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -620,6 +783,14 @@ def main(argv: list[str] | None = None) -> int:
                    help="the ported content registry (default: data/ids/registry.csv)")
     p.add_argument("-o", "--output", required=True, help="the generated header")
     p.set_defaults(fn=cmd_table)
+    p = sub.add_parser("fallback", help="each ported monster's motion-number fallback by animation signature")
+    p.add_argument("--mh4u-romfs", required=True, help="MH4U's RomFS image (the stand-ins' lists)")
+    p.add_argument("--source-romfs", nargs=2, action="append", required=True, metavar=("GAME", "ROMFS"),
+                   help="a source game's RomFS image; repeatable")
+    p.add_argument("--registry", default=os.path.join(HERE, "..", "data", "ids", "registry.csv"),
+                   help="the ported content registry (default: data/ids/registry.csv)")
+    p.add_argument("-o", "--output", required=True, help="the generated header")
+    p.set_defaults(fn=cmd_fallback)
     a = ap.parse_args(argv)
     return a.fn(a)
 

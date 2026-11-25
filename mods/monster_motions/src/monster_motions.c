@@ -9,7 +9,10 @@
  * replaces the number in r1 with the source game's animation from a generated table
  * (src/motions.h, reference/monster_motions.py table). The mapping is keyed by the monster's
  * current action (the category and index bytes in its work block) and by the number MH4U's
- * handler asks; a missing entry passes the number through unchanged and is logged once.
+ * handler asks. When it has no entry (category 7's computed index, a second motion, an id R1
+ * doesn't compare), a second generated table (src/fallback.h, reference/monster_motions.py
+ * fallback) answers by the number alone: the source animation whose signature matches MH4U's
+ * animation at that number. A number neither answers passes through unchanged, logged once.
  *
  * The work block is this+0xe28, with the id byte at +0x1c0 and the current action at +0x1ca
  * and +0x1cb (mods/force_action; docs/checks.md R1p). A ported monster is created as its
@@ -30,6 +33,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "fallback.h"
 #include "motions.h"
 #include "mh4u_plugin.h"
 
@@ -117,6 +121,22 @@ static int first_time(uint32_t *keys, int *count, uint32_t key) {
     return 1;
 }
 
+/* The source animation for a number by its signature alone (fallback.h), or 0 when none. */
+static unsigned fallback_for(unsigned id, unsigned motion) {
+    for (int i = 0; i < MHUC_PORTED_FALLBACK_COUNT; i++) {
+        const MhucPortedFallback *table = &mhuc_ported_fallback[i];
+        if (table->id != id) {
+            continue;
+        }
+        for (unsigned k = 0; k < table->count; k++) {
+            if (table->entries[k].motion == motion) {
+                return table->entries[k].source;
+            }
+        }
+    }
+    return 0;
+}
+
 /* The ported id the factory made `enemy` for, or 0. */
 static unsigned ported_id(uint32_t enemy) {
     for (int i = 0; i < PORTED_CAP; i++) {
@@ -193,9 +213,21 @@ static void start_motion(MH4UCall *call, void *user) {
         if (first_time(translated, &translated_count, key)) {
             log_translation(id, category, index, motion, entry->source);
         }
-    } else if (first_time(missing, &missing_count, key)) {
-        /* A distinct missing entry is logged once; the cap keeps a hunt's log readable. */
-        log_missing(id, category, index, motion);
+    } else {
+        const unsigned source = fallback_for(id, motion);
+        if (source) {
+            host->set_reg(call, 1, source);
+            if (first_time(translated, &translated_count, key)) {
+                char line[180];
+                snprintf(line, sizeof line, "monster %u: action %u/%u asks motion 0x%03x -> "
+                         "source 0x%03x (by its animation's signature)", id, category, index,
+                         motion, source);
+                say(MH4U_LOG_INFO, line);
+            }
+        } else if (first_time(missing, &missing_count, key)) {
+            /* A distinct missing entry is logged once; the cap keeps a hunt's log readable. */
+            log_missing(id, category, index, motion);
+        }
     }
     host->call_original(call);
 }

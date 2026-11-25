@@ -26,7 +26,14 @@ exactly what it writes (the check `tools/check_ids.py` gets from the registry):
         --source mh3u build/mh3u.tsv build/map-mh4u-mh3u.tsv \
         --source mhxx build/mhxx.tsv build/map-mh4u-mhxx.tsv
 
-Usage: check_motion_tables.py [--header PATH] [--registry PATH] [--mh4u TSV --source GAME TSV MAP ...]
+The signature fallback, mods/monster_motions/src/fallback.h (`reference/monster_motions.py
+fallback`), is checked too: its generator's marker, one table per registered monster in id
+order whose count is its entries', entries sorted by MH4U motion number and unique, no entry
+that maps a number to itself, and both numbers a motion index (file 0 to 4, slot below 0x100).
+With `--mh4u-romfs` and `--source-romfs`, it must be exactly what the generator writes.
+
+Usage: check_motion_tables.py [--header PATH] [--fallback PATH] [--registry PATH]
+           [--mh4u TSV --source GAME TSV MAP ...] [--mh4u-romfs PATH --source-romfs GAME PATH ...]
 """
 from __future__ import annotations
 
@@ -41,6 +48,11 @@ sys.path.insert(0, os.path.join(ROOT, "reference"))
 import monster_motions  # noqa: E402
 
 HEADER = os.path.join(ROOT, "mods", "monster_motions", "src", "motions.h")
+FALLBACK = os.path.join(ROOT, "mods", "monster_motions", "src", "fallback.h")
+FALLBACK_TABLE = re.compile(r"^static const MhucMotionFallback mhuc_fallback_(\d+)\[\] = \{$")
+NO_FALLBACK = re.compile(r"^static const MhucMotionFallback \*const mhuc_fallback_(\d+) = NULL;$")
+FALLBACK_ENTRY = re.compile(r"^    \{0x([0-9a-f]{3}), 0x([0-9a-f]{3})\},$")
+FALLBACK_META = re.compile(r"^    \{(\d+), (\d+), mhuc_fallback_(\d+)\},$")
 REGISTRY = os.path.join(ROOT, "data", "ids", "registry.csv")
 
 # R1's last result (docs/checks.md#monster-actions): the MH4U/source pair's counts, and the
@@ -213,10 +225,62 @@ def _check_counts(where: str, meta: dict, row: dict | None) -> list[str]:
     return problems
 
 
+def check_fallback(text: str, registry: list[dict]) -> list[str]:
+    """fallback.h's shape: see the module's docstring."""
+    where = os.path.relpath(FALLBACK, ROOT)
+    problems = []
+    if f"by {monster_motions.FALLBACK_GENERATOR}." not in text.splitlines()[0]:
+        problems.append(f"{where}: no generator marker on its first line")
+    tables, metas, current = {}, [], None
+    for line in text.splitlines():
+        m = FALLBACK_TABLE.match(line)
+        if m:
+            current = tables.setdefault(int(m.group(1)), [])
+            continue
+        m = NO_FALLBACK.match(line)
+        if m:
+            tables.setdefault(int(m.group(1)), [])
+            continue
+        if line == "};":
+            current = None
+            continue
+        m = FALLBACK_ENTRY.match(line)
+        if m and current is not None:
+            current.append((int(m.group(1), 16), int(m.group(2), 16)))
+            continue
+        m = FALLBACK_META.match(line)
+        if m:
+            metas.append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
+    ids = [int(row["id"], 0) for row in registry]
+    if [m[0] for m in metas] != ids:
+        problems.append(f"{where}: its tables {[m[0] for m in metas]} aren't the registry's ported "
+                        f"monsters {ids}")
+    for ident, count, named in metas:
+        entries = tables.get(ident)
+        if entries is None or named != ident:
+            problems.append(f"{where}: id {ident}'s table is missing or misnamed")
+            continue
+        if count != len(entries):
+            problems.append(f"{where}: id {ident} counts {count} entries but holds {len(entries)}")
+        motions = [a for a, _ in entries]
+        if motions != sorted(set(motions)):
+            problems.append(f"{where}: id {ident}'s entries aren't sorted and unique by motion")
+        for a, b in entries:
+            if a == b:
+                problems.append(f"{where}: id {ident} maps 0x{a:03x} to itself")
+            if a >> 8 > 4 or b >> 8 > 4:
+                problems.append(f"{where}: id {ident}: 0x{a:03x} -> 0x{b:03x} isn't in files 0 to 4")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--header", default=HEADER)
+    ap.add_argument("--fallback", default=FALLBACK)
     ap.add_argument("--registry", default=REGISTRY)
+    ap.add_argument("--mh4u-romfs", help="MH4U's RomFS, to regenerate fallback.h and compare")
+    ap.add_argument("--source-romfs", nargs=2, action="append", metavar=("GAME", "ROMFS"),
+                    help="a source game's RomFS; repeatable (needs --mh4u-romfs)")
     ap.add_argument("--mh4u", help="R1's MH4U inventory, to regenerate and compare")
     ap.add_argument("--source", nargs=3, action="append", metavar=("GAME", "INVENTORY", "MAPPING"),
                     help="a source game's R1 inventory and mapping; repeatable (needs --mh4u)")
@@ -237,6 +301,24 @@ def main(argv: list[str] | None = None) -> int:
         if monster_motions.render_header(tables) != text:
             problems.append(f"{os.path.relpath(args.header, ROOT)} isn't what the generator "
                             "writes from these inputs: run reference/monster_motions.py table")
+    fallback = ""
+    if os.path.exists(args.fallback):
+        with open(args.fallback, encoding="utf-8") as f:
+            fallback = f.read()
+    problems += check_fallback(fallback, registry) if fallback else [f"{args.fallback}: no header"]
+    if args.mh4u_romfs:
+        out = os.path.join(os.path.dirname(os.path.abspath(args.fallback)), ".fallback.check")
+        try:
+            monster_motions.cmd_fallback(argparse.Namespace(
+                mh4u_romfs=args.mh4u_romfs, source_romfs=args.source_romfs or [],
+                registry=args.registry, output=out))
+            with open(out, encoding="utf-8") as f:
+                if f.read() != fallback:
+                    problems.append(f"{os.path.relpath(args.fallback, ROOT)} isn't what the generator "
+                                    "writes from these RomFS: run reference/monster_motions.py fallback")
+        finally:
+            if os.path.exists(out):
+                os.remove(out)
     if problems:
         for p in problems:
             print(p)

@@ -38,6 +38,27 @@ python3 reference/monster_motions.py table --mh4u build/mh4u.tsv \
 python3 tools/check_motion_tables.py
 ```
 
+## The fallback
+
+`src/fallback.h` is generated too: `reference/monster_motions.py fallback` writes it from the two
+games' motion lists in the player's RomFS images, one table per ported monster. When the action
+table has no entry for (current action, number), the plugin looks the number alone up there: the
+source animation whose signature (frames, loop frame, track count, one more track on MH4U's side
+allowed) matches MH4U's animation at that number, and among several the one whose decoded keys
+equal MH4U's on strictly more tracks. It answers what the action table can't: category 7's
+computed index, a handler's second motion, the ids R1 doesn't compare. The 3U Rathian has 89
+numbers; the GU Rathian none (MHXX starts the same indices). A number neither table answers
+passes through. `tools/check_motion_tables.py` checks its shape, and with the RomFS images that
+it is exactly what the generator writes:
+
+```bash
+python3 reference/monster_motions.py fallback --mh4u-romfs <MH4U RomFS> \
+    --source-romfs mh3u <MH3U RomFS> --source-romfs mhxx <MHXX RomFS> \
+    -o mods/monster_motions/src/fallback.h
+python3 tools/check_motion_tables.py --mh4u-romfs <MH4U RomFS> \
+    --source-romfs mh3u <MH3U RomFS> --source-romfs mhxx <MHXX RomFS>
+```
+
 ## What it hooks
 
 | Function | Address | What it does |
@@ -58,19 +79,21 @@ Logging, one line per distinct case and at most 64 of each:
 
 - `ready: translating motion numbers for 2 ported monster id(s), 96 entries; MH4U's own ids pass through`
 - `monster 125: action 13/5 asks motion 0x002 -> source 0x013` (the first time that translation runs)
-- `monster 125: no entry for action 7/36 motion 0x41c; passing it through` (a missing entry, once)
+- `monster 125: action 2/7 asks motion 0x005 -> source 0x006 (by its animation's signature)` (the fallback, once)
+- `monster 125: no entry for action 7/36 motion 0x4ff; passing it through` (a number neither table answers, once)
 
 ## What it does not do yet
 
 - **Category 7's computed index.** R1's first-constant scan cannot tell which of several
-  motions a category-7 handler starts, so the 19 action ids are left out and their numbers
-  pass through; they need their handler's computed index read. They are listed in the header
-  and [checks.md](../../docs/checks.md#monster-actions).
+  motions a category-7 handler starts, so the 19 action ids are left out of the action table
+  (listed in the header and [checks.md](../../docs/checks.md#monster-actions)); the fallback
+  answers their numbers where MH4U's animation has a counterpart. 21 numbers of MH4U's files 3
+  and 4 have none in MH3U's lists and still play MH4U's animation.
 - **GU's one-sided ids.** 19 action ids start a constant motion only in MH4U and 2 only in
   MHXX (R2); neither side is compared, so both pass through. The GU table is otherwise empty
   because every compared id shares its index.
-- **Motions after the entry motion.** The table is built from each handler's first constant
-  motion. A handler that starts another motion later passes that number through.
+- **Motions after the entry motion.** The action table is built from each handler's first
+  constant motion; a later motion goes to the fallback.
 
 ## Build
 

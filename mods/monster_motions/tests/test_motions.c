@@ -182,6 +182,7 @@ int main(void) {
     place(125, 13, 5, 2);
     run();
     CHECK(call.r[1] == 0x13);
+    call.r[1] = 2;                              /* the next motion start is a fresh call */
     run();
     CHECK(call.r[1] == 0x13);
     CHECK(occurrences("action 13/5 asks motion 0x002 -> source 0x013") == 1);
@@ -202,14 +203,21 @@ int main(void) {
     run();
     CHECK(call.r[1] == 0x202);
 
-    /* 7/36 is one of the ids the table leaves out: pass through, log the first time only. */
-    place(125, 7, 36, 0x41c);
+    /* 2/7 has no table entry; the fallback answers MH4U's motion 5 by its signature: her 6. */
+    place(125, 2, 7, 0x005);
     run();
-    CHECK(call.r[1] == 0x41c);
-    CHECK(occurrences("no entry for action 7/36 motion 0x41c") == 1);
+    CHECK(call.r[1] == 0x006);
+    CHECK(occurrences("action 2/7 asks motion 0x005 -> source 0x006 (by its animation's signature)") == 1);
+
+    /* An action the table leaves out and a number the fallback lacks pass through, logged once. */
+    place(125, 7, 36, 0x4ff);
     run();
-    CHECK(call.r[1] == 0x41c);
-    CHECK(occurrences("no entry for action 7/36 motion 0x41c") == 1);
+    CHECK(call.r[1] == 0x4ff);
+    CHECK(occurrences("no entry for action 7/36 motion 0x4ff") == 1);
+    call.r[1] = 0x4ff;
+    run();
+    CHECK(call.r[1] == 0x4ff);
+    CHECK(occurrences("no entry for action 7/36 motion 0x4ff") == 1);
 
     /* MH4U's own monsters are untouched and not logged. */
     place(1, 3, 17, 0x101);

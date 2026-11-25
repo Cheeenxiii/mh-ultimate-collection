@@ -305,14 +305,16 @@ is a debugging tool for later move investigations, not part of this check.
 | Check | What | Pass |
 |---|---|---|
 | M1 | force 13/5, 13/6 and 13/8 on the ported 3U Rathian with `mods/force_action`, the code library built with `mods/monster_motions` | the log shows the plugin ready and each action translated to the animation her own handler starts (13/5 -> 0x013, 13/6 -> 0x01a, 13/8 -> 0x01a; 13/5 and 13/6 no longer share MH4U's number 2), a motion the table lacks passes through and is logged once, and MH4U's own Rathian is unchanged |
+| M2 | the signature fallback (`src/fallback.h`) on the ported 3U Rathian's unforced play | the numbers the action table lacks are answered by her animation with the same signature (`... -> source 0x0NN (by its animation's signature)`), she idles, walks and flies with her own animations, and only MH4U numbers without a counterpart pass through |
 
 `mods/monster_motions` ([README](../mods/monster_motions/README.md)) wraps MH4U's motion-start
 wrapper (0x0094e318, R1's) and translates the number in r1 through `src/motions.h`, which
 `reference/monster_motions.py table` generates from R1's comparison and
 `tools/check_motion_tables.py` checks. The headless part needs one code-library build; the
-in-game part also needs #48/#49's converted files, #105's resource paths and the ported id byte
-both this plugin and `force_action` read at `work+0x1c0` (the block holds the stand-in's id
-until the port's own rows load).
+in-game part also needs #48/#49's converted files and #105's resource paths. A ported monster
+is created as its stand-in, so its block's id byte at `work+0x1c0` holds the stand-in's id: the
+plugin recognises her by the factory call that made her (`uEnemyFactory::create`), and
+`force_action`'s `monster` setting takes the stand-in's id.
 
 1. `make` in `mods/monster_motions`; add it to a user folder's mod library
    (`tools/mods.py add mods/monster_motions`) and enable it; build the code library with the
@@ -332,8 +334,38 @@ until the port's own rows load).
 
 Status: the headless part passed on 2026-11-25 (USA v1.3.0 update, the code library built
 with the mod): the boot logs `ready: translating motion numbers for 2 ported monster id(s), 96
-entries; MH4U's own ids pass through` and loads the plugin. The in-game part is not done; it
-waits for #48, #49 and #105.
+entries; MH4U's own ids pass through` and loads the plugin. In game (2026-11-26) the rendered 3U
+Rathian looped her limp: the plugin read her block's id byte, found the stand-in's 1, and
+translated nothing. Recognised by her factory call, the 125 quest's headless run logs her
+translations (3/1, 3/6, 3/7, 3/12).
+
+### The signature fallback (M2)
+
+The action table answers only the (action, number) pairs R1 compared. Her unforced play asks
+others: 3/86 starts four motions (0x101, 0x104, 0x110, 0x111), 3/94 and 2/7 one each, and
+category 7 computes its index, which is how she reached MH4U's own lists in files 3 and 4 (the
+port's record keeps MH4U's `em001_3` and `_4`) and played MH4U's flight on her 44-bone skeleton.
+`src/fallback.h` (`reference/monster_motions.py fallback`, from the two games' motion lists in
+the player's RomFS) answers by the number alone: MH4U's animation at that number has one source
+animation with the same frames, loop frame and track count (one more on MH4U's side), or, among
+several, one whose decoded keys equal MH4U's on strictly more tracks than any other.
+
+- **Agreement with R1 (static):** where the action table and the fallback both answer a number,
+  they give the same animation on 65 entries; the one difference is 13/8, which R1 found starting
+  another animation in each game, and the table wins there. The keyframe tie-break picked R1's
+  answer on all 22 table entries it decided, and was left out where a closeness measure was
+  wrong on 8 of 45. Procedure: `MHUC_DUMPS=<dumps> python3 -m pytest tests/test_with_game_files.py
+  -k motion_fallback`.
+- **Coverage:** 89 MH4U numbers for 3U Rathian (34 in files 3 and 4, of MH4U's 55 there), none for
+  GU Rathian (MHXX starts the same indices, R2). The 21 numbers in files 3 and 4 without a
+  counterpart are MH4U animations her source has none of; they still pass through.
+- **In game:** play the 125 quest unforced (`force.sh off`) and watch her idle, walk, take off and
+  land. Pass: no limp loop, no sideways flight, and the log's `by its animation's signature`
+  lines for the numbers the table lacks.
+
+Headless (2026-11-26, the 125 quest with the wave in area 1, unforced, 175 s): every motion she
+started was translated, 4 by the action table and 8 by the fallback (1/1, 2/7, 3/1's second
+motion, 3/86's four, 3/94); none passed through. The in-game check is open.
 
 ## Ported monster ids
 

@@ -80,3 +80,29 @@ def test_the_header_must_be_what_the_generator_writes(tmp_path, monkeypatch):
     assert check_motion_tables.main(args) == 0
     header.write_text(header.read_text().replace("0x013", "0x014", 1))
     assert check_motion_tables.main(args) == 1
+
+
+FALLBACK = os.path.join(ROOT, "mods", "monster_motions", "src", "fallback.h")
+
+
+def fallback_problems(old: str, new: str) -> list[str]:
+    with open(FALLBACK, encoding="utf-8") as f:
+        original = f.read()
+    changed = original.replace(old, new, 1)
+    assert changed != original, f"fallback.h no longer holds {old!r}"
+    return check_motion_tables.check_fallback(changed, registry())
+
+
+def test_the_checked_in_fallback_passes():
+    with open(FALLBACK, encoding="utf-8") as f:
+        assert check_motion_tables.check_fallback(f.read(), registry()) == []
+
+
+@pytest.mark.parametrize("old, new, message", [
+    ("    {0x004, 0x005},", "    {0x005, 0x005},", "maps 0x005 to itself"),
+    ("    {0x004, 0x005},", "    {0x006, 0x005},", "aren't sorted and unique"),
+    ("    {0x004, 0x005},", "    {0x504, 0x005},", "isn't in files 0 to 4"),
+    ("    {125, 89, mhuc_fallback_125},", "    {125, 88, mhuc_fallback_125},", "counts 88 entries"),
+])
+def test_the_checker_refuses_a_hand_edited_fallback(old, new, message):
+    assert any(message in p for p in fallback_problems(old, new))

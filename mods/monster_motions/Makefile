@@ -1,7 +1,8 @@
 # Builds the ported-monster motion-translation plugin against the engine fork's plugin API
 # (its docs/PLUGINS.md). The plugin is the mod's native library; mod.json names it and the game
 # function it wraps.
-# src/motions.h is generated from R1's comparison by reference/monster_motions.py table and
+# src/motions.h is generated from R1's comparison by reference/monster_motions.py table, src/fallback.h
+# by reference/monster_motions.py fallback, and both are
 # checked by tools/check_motion_tables.py.
 #
 #   make                     monster_motions.so next to mod.json
@@ -15,7 +16,7 @@ TARGET := $(if $(filter Darwin,$(shell uname -s)),monster_motions.dylib,monster_
 
 all: $(TARGET)
 
-$(TARGET): src/monster_motions.c src/motions.h
+$(TARGET): src/monster_motions.c src/motions.h src/fallback.h
 	$(CC) $(CFLAGS) -fPIC -shared -I$(FORK)/include $< -o $@
 
 clean:

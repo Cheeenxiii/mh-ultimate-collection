@@ -687,3 +687,41 @@ def test_mh4u_ships_no_texlayout_and_its_xfs_files_read(dump):
             failures.append(f"{label}: {x.endian}-endian")
     assert not failures, f"{len(failures)} XFS files not read, first: {failures[:3]}"
     assert counts == Counter({classid.class_id("rSoundAttributeSe"): 8}), counts
+
+
+def test_the_motion_fallback_is_regenerated_from_the_dumps_and_agrees_with_r1(dump):
+    """mods/monster_motions/src/fallback.h (check M2): regenerated from the player's RomFS it is
+    byte for byte the checked-in header, and wherever R1's action-keyed table (motions.h, built
+    from the handlers' code) and the fallback (built from the animations' data) both answer an
+    MH4U motion number, they give 3U Rathian the same animation, except for the actions R1
+    found starting another animation in each game (13/5, 13/6, 13/8)."""
+    import re
+
+    import check_motion_tables
+
+    assert check_motion_tables.main(["--mh4u-romfs", dump("mh4u", "romfs.bin"),
+                                     "--source-romfs", "mh3u", dump("mh3u", "romfs.bin"),
+                                     "--source-romfs", "mhxx", dump("mhxx", "romfs.bin")]) == 0
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src = os.path.join(root, "mods", "monster_motions", "src")
+    with open(os.path.join(src, "motions.h"), encoding="utf-8") as f:
+        motions = f.read()
+    with open(os.path.join(src, "fallback.h"), encoding="utf-8") as f:
+        fallback = f.read()
+    table = motions[motions.index("mhuc_motions_125[]"):]
+    table = table[:table.index("};")]
+    entries = re.findall(r"\{(\d+), (\d+), 0x([0-9a-f]+), 0x([0-9a-f]+)\}", table)
+    block = fallback[fallback.index("mhuc_fallback_125[]"):]
+    block = block[:block.index("};")]
+    by_number = {int(a, 16): int(b, 16) for a, b in re.findall(r"\{0x([0-9a-f]+), 0x([0-9a-f]+)\}", block)}
+    agree, differ = 0, set()
+    for cat, idx, motion, source in entries:
+        got = by_number.get(int(motion, 16))
+        if got is None:
+            continue
+        if got == int(source, 16):
+            agree += 1
+        else:
+            differ.add(f"{cat}/{idx}")
+    assert differ <= {"13/5", "13/6", "13/8"}, differ
+    assert agree >= 60, agree
