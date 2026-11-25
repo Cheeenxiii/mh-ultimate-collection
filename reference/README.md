@@ -416,11 +416,74 @@ The other 57 ids are not compared: one handler or both starts no constant animat
 computes the index, starts none, or does its work inline).
 
 **The 17 ids MH4U has no action for** are 0/4, 4, 7/64, 7/87, 7/93, 10/0 to 10/6, 11/5,
-11/15, 11/26, 11/28 and 13/9, on 8 of the 66 handlers. Their handlers have to be translated
-onto MH4U's engine, which takes a plugin API that can call an MH4U engine function (the
-fork's ABI 3); the 19 calls of #55 whose MH4U counterpart is unknown belong to that work too.
-`monster_actions.py pairs` finds 63 body pairs between the two classes; 58 of the 66 3U
-handlers have one, 8 have none.
+11/15, 11/26, 11/28 and 13/9, on 8 of the 66 handlers. 16 of them reach a handler a shared
+action also reaches, so the port's action-id map can send them to that action and let MH4U
+run its own handler; action 4 is the one that needs new C. Both outcomes, with each call's
+MH4U counterpart or blocker, are in [The 17 ids MH4U has no action for](#the-17-ids-mh4u-has-no-action-for)
+below. `monster_actions.py pairs` finds 63 body pairs between the two classes; 58 of the 66
+3U handlers have one, 8 have none.
+
+### The 17 ids MH4U has no action for
+
+16 of the 17 reach the same handler function as a shared id, so the port's action-id map — the
+translation of the source's pair onto the MH4U pair it already plays — can send the missing id
+to that shared id and MH4U runs its own handler. No new code is compiled for them.
+
+| 3U id | 3U handler | MH4U action it can run | evidence |
+|---|---|---|---|
+| 0/4 | 0x00699ad4 | 0/0 (inline) | body match: 0/0 and 0/4 are the same handler; R1 cannot compare (neither starts a constant motion) |
+| 7/64 | 0x006971c0 | 7/35, 7/46, 7/48, 7/65 (MH4U 0x006e2764); 7/47, 7/63 (0x006e3848); 7/62 (0x006e3c9c) | body match: 7/35 to 7/65 are one handler; R1 starts the same constant motion on all seven |
+| 7/87, 7/93 | 0x00697888 | 7/92, 7/96 (MH4U 0x006e8e54); 7/37, 7/84, 7/86 (inline) | body match: same handler through 0x00686bcc; R1 records no constant motion to compare |
+| 10/0 to 10/6 | 0x008326e0 | 10/7 (inline) | body match: 10/7 runs the same handler; R1 cannot compare |
+| 11/5 | 0x0084d864 | 11/0 (MH4U 0x00919788) | body match; its case block passes r2 = 1, which is MH4U 11/1's mode, and 11/0 is the shared id with the same handler |
+| 11/15, 11/26, 11/28 | 0x00687e88 | 11/0 (MH4U 0x00919788) | tail match: the wrapper calls 11/0's handler 0x0084d864; its r3 is the action index |
+| 13/9 | 0x00858b6c | 0/3 (MH4U 0x0094dc84), 3/10 (0x006d7868), 13/7 (0x006dc130) | body match; 13/9's case block calls 0x0083cbf4 like 0/3's |
+
+"Body match" is the source game reaching the same handler function for the missing id and the
+shared one; "tail match" is a short wrapper ending on the shared handler. R1 confirms the
+animation only where the handler starts a constant motion; the 10, 11 and 13 families start
+theirs inside an engine helper, so their map entry rests on the body match alone. Where several
+shared ids reach the handler, the target is a set: the port picks the one whose MH4U handler
+and variant arguments match, which the runtime action-id map's check settles.
+
+**Action 4 is the one that needs new C.** Its handler 0x0083cc24 is shared engine code (0x3cc
+bytes) that dispatches on the order state. It makes 25 calls with an MH4U counterpart and
+calls 7 of the class's own sub-handlers (0x00691930, 0x00691b38, 0x00691c74, 0x00691de0,
+0x00691fac, 0x006921b4, 0x00692290), which have to be translated with it. What blocks it:
+
+- **#55:** 0x00161798 and 0x0016052c, both reached through 0x00691fac. These are two of the
+  19 calls whose MH4U counterpart is unknown, so action 4 waits on #55.
+- **The plugin API's arguments:** ABI 3's `call` sets r0-r2 only. r3 can be set before the call
+  with `set_reg`, but the guest's VFP registers cannot, so a call that passes a float in s0 or
+  s1 (0x00833b2c, 0x008437f4 and 0x00839514 here) cannot be made as MH3U makes it. That needs
+  an ABI that also takes the float and r3 arguments, which is engine work (the fork).
+- **MH3U's data:** 0x0084704c and 0x00847134 take an address into MH3U's image (0x00b0b194);
+  MH4U's counterparts take MH4U's own tables, so the 3U attack/shell data has to be converted
+  first.
+- **One shared branch:** the handler falls back to 0x00858b6c, the shared 0/3 handler, so that
+  branch can call MH4U's 0x0094dc84 by the same map as 13/9.
+
+`reference/monster_handlers.py` builds both results from the two inventories and the motion
+list. `targets` prints the action-id map; `worklist` prints each missing id's handler, its
+calls in order with the constants left in r0-r3 and the floats in s0-s3, and each call's MH4U
+counterpart (#55, a body match, or unmapped). Both write their per-call TSV with `-o`, which
+holds addresses and constants only but is derived from game code, so it stays outside the
+repository:
+
+```bash
+python3 reference/monster_handlers.py targets --game mh3u --exheader <MH3U exheader> \
+    --code <MH3U code.bin> --range 0x686000 0x69b000 --dispatcher 0x00687d30 \
+    --functions reference/games/mh3u/functions.tsv \
+    --target build/mh4u-actions.tsv --motions build/mh3u-motions.tsv -o build/3u-targets.tsv
+python3 reference/monster_handlers.py worklist --game mh3u --exheader <MH3U exheader> \
+    --code <MH3U code.bin> --range 0x686000 0x69b000 --dispatcher 0x00687d30 \
+    --functions reference/games/mh3u/functions.tsv \
+    --actions 0/4,4,7/64,7/87,7/93,10/0,10/1,10/2,10/3,10/4,10/5,10/6,11/5,11/15,11/26,11/28,13/9 \
+    -o build/3u-worklist.tsv
+```
+
+The inventories and the motion list come from `monster_actions.py list` and
+`monster_motions.py list` (their commands are above and in R1).
 
 **Where the port's animations go.** The converted animation file keeps the source game's
 grouping, and the port translates the motion number at run time: the ported monster's plugin
