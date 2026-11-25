@@ -92,7 +92,7 @@ No game has these, so they are made, each with a row in the [authored register](
 - Charge Blade and Insect Glaive underwater movesets, and the Kinsect underwater;
 - MH4U-era actions underwater (ledge mounts, jumping attacks), or their being disabled there;
 - MH4U-only and GU-only monsters entering water, if any are placed in water maps;
-- GU's Styles and Arts underwater, if GU's combat comes in ([decisions.md](decisions.md#combat-base)).
+- GU's Styles and Arts underwater, which don't come in ([decisions.md](decisions.md#0005-combat-base)).
 
 An option, not a decision: until a weapon class has underwater motions, keep it out of underwater quests (the quest board or the equipment check refuses it). That lets 3U's water quests ship before the new movesets exist.
 
