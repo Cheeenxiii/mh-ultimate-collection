@@ -5,6 +5,7 @@
     mh4u/extdata/       its Extra Data files, encrypted (quest1, card1, otomo1, ...)
     mh4u/save.key       the save cipher's key: the NUL-terminated string at 0xE05E04 in the player's own
                         decompressed code (EUR v1.1 or USA v1.3.0, specs/extdata.md)
+    mh4u/saves/         the character saves: system and user1 to user3, encrypted (specs/save.md)
     mhxx/romfs.bin      MHXX's RomFS from the game itself (JPN v1.0): the v4.8.0 update doesn't patch the
                         monster archives
     mh3u/romfs.bin      MH3U USA's RomFS

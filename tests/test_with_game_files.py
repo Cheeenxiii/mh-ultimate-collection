@@ -86,6 +86,38 @@ def test_extra_data_files_reencrypt_byte_for_byte(dump):
     assert checked, "no Extra Data file found"
 
 
+def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
+    """specs/save.md checks S1 and S3 to S7: each file re-encrypts byte for byte, and the structures tile."""
+    from mhuc import save
+
+    folder = dump("mh4u", "saves")
+    with open(dump("mh4u", "save.key"), "rb") as f:
+        key = f.read().strip()
+    names = [n for n in ("system", "user1", "user2", "user3") if os.path.exists(os.path.join(folder, n))]
+    assert names, "no save file found"
+    characters = 0
+    for name in names:
+        with open(os.path.join(folder, name), "rb") as f:
+            original = f.read()
+        first = Blowfish(key).ecb_decrypt(original[:8], "<")
+        seed = struct.unpack_from("<I", first)[0] >> 16
+        plain = dlccrypt.mh4u_save_decrypt(original, key)
+        assert dlccrypt.mh4u_save_encrypt(plain, key, "normal", seed) == original, name
+        if len(plain) == save.CHARACTER_SIZE:
+            problems = save.character_problems(plain)
+            assert not problems, f"{name}: {problems[:3]}"
+            data = save.dump_character(plain)
+            assert data["profile"]["name"], f"{name}: the character has no name"
+            assert len(data["monster_log"]) == 82, name
+            assert len(data["guild_quests"]) == 10, name
+            assert len(data["palicos"]) >= 1, name
+            assert data["profile"]["hunter_rank"] <= 999, name
+            characters += 1
+        else:
+            assert not save.system_problems(plain), name
+    assert characters >= 1, "no character save found"
+
+
 def test_every_mh4u_stream_request_reads_and_matches_the_wave_it_names(dump):
     """specs/sound.md check S4: every .stq's tables and names close, and each stream record's length, sample count,
     channels, rate and loop start/end are the .mca header's own"""
