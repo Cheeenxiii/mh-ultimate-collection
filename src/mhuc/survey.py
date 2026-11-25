@@ -136,6 +136,13 @@ def _sound(st: dict, data: bytes, kind: str, type_id: int | None) -> None:
             c[f"SN6 {kind} read"] += 1
         except (sound.SoundError, stq.StqError):
             c[f"SN6 {kind} not read"] += 1
+    # Check SN8: the sound call's three versions. They are small; reading every one is cheap.
+    if kind == "sequence":
+        try:
+            c.update(sound.check_sequence(data))
+            c["SN8 sequence read"] += 1
+        except sound.SoundError:
+            c["SN8 sequence not read"] += 1
     if type_id is None:
         c[f"{kind} {magic} loose"] += 1
     else:

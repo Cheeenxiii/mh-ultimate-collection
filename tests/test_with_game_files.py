@@ -10,7 +10,7 @@ from collections import Counter
 
 import pytest
 
-from mhuc import cli, monsterdata
+from mhuc import cli, monsterdata, monstersound
 from mhuc.crypto import dlccrypt
 from mhuc.crypto.blowfish import Blowfish
 from mhuc.formats import (
@@ -939,3 +939,106 @@ def test_every_effect_list_header_is_laid_out(dump):
         assert not failures, f"{game}: {len(failures)} problems, first: {failures[:3]}"
         assert (entries, sixties, tails) == (files, sixty, tail_zero), \
             f"{game}: {entries} files, {sixties} with 60.0, {tails} with a zero 0x20 to 0x2C"
+
+
+def _one_sound_set(image, paths):
+    files = {f.path: f for f in image.files()}
+    return [image.read(files[p]) for p in paths]
+
+
+def test_a_mh3u_monsters_own_sound_set_converts_to_what_mh4u_loads(dump):
+    """specs/sound.md check SN9: MH3U Rathian's sound set (the call in her monster arc, the waves,
+    bank and request in the sound arc) converts to MH4U's versions, and every converted file reads
+    with MH4U's readers: the audio is bit for bit, the bank keeps its entries, the request keeps
+    its ids and indices, and the call keeps its keys and record bytes."""
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    call, sound_arc = _one_sound_set(image, [r"/arc/enemy/em001.arc",
+                                             r"/arc/sound/se/em/em001/snd_em001.arc"])
+    sound_set = monstersound.read_sound_set(call, sound_arc)
+    conversion = monstersound.convert(sound_set, "mh3u", "em001", 125)
+    waves = {path: data for path, type_id, data in conversion.entries if type_id == monstersound.WAVE}
+    banks = [data for path, type_id, data in conversion.entries if type_id == monstersound.BANK]
+    requests = [data for path, type_id, data in conversion.entries if type_id == monstersound.REQUEST]
+    calls = [data for path, type_id, data in conversion.entries if type_id == monstersound.SEQUENCE]
+    assert (len(waves), len(banks), len(requests), len(calls)) == (48, 1, 1, 1)
+    assert all(sound.read_wave(d).layout == "mh4u" for d in waves.values())
+
+    source_bank = sound.read_bank(next(d for p, d in sound_set.banks.items() if "em001" in p))
+    bank = sound.read_bank(banks[0])
+    assert (bank.version, len(bank.groups), len(bank.entries)) == (11, len(source_bank.groups),
+                                                                   len(source_bank.entries))
+    source_waves = sound_set.waves
+    for old, new in zip(source_bank.entries, bank.entries, strict=True):
+        before = sound.read_wave(source_waves[old.name])
+        after = sound.read_wave(waves[new.name])
+        assert (before.samples, before.rate, before.seconds, before.word_14, before.word_18) == \
+               (after.samples, after.rate, after.seconds, after.word_14, after.word_18), new.name
+        assert source_waves[old.name][before.data_offset:before.data_offset + before.data_size] == \
+               waves[new.name][after.data_offset:after.data_offset + after.data_size], new.name
+
+    source_request = sound.read_request(next(iter(sound_set.requests.values())))
+    request = sound.read_request(requests[0])
+    assert [r.id for r in request.records] == [r.id for r in source_request.records]
+    assert [r.words[2] for r in request.records] == [r.words[2] for r in source_request.records]
+    assert [r.words[9] for r in request.records] == [r.words[9] for r in source_request.records]
+    assert request.banks == ("sound\\se\\em\\em125\\snd_em125",)
+
+    source_call = sound.read_sequence(next(iter(sound_set.sequences.values())))
+    converted_call = sound.read_sequence(calls[0])
+    assert converted_call.version == 0x20120123
+    assert [r.key for r in converted_call.records] == [r.key for r in source_call.records]
+    assert all(a.body == b.body for a, b in zip(converted_call.records, source_call.records, strict=True))
+    assert len(converted_call.records) == 229
+
+
+def test_a_mhxx_monsters_own_sound_set_converts_to_what_mh4u_loads(dump):
+    """specs/sound.md check SN9 for MHXX: the bank's GU flags and parameter permutation reverse,
+    the 100-byte request records become MH4U's 92-byte ones with words 0 to 21 kept, and the call
+    only changes its version."""
+    image = romfs.open_image(dump("mhxx", "romfs.bin"))
+    sound_set = monstersound.read_sound_set(*_one_sound_set(image, [r"/arc/enemy/em001_00.arc"]))
+    conversion = monstersound.convert(sound_set, "mhxx", "em001", 124)
+    waves = {path: data for path, type_id, data in conversion.entries if type_id == monstersound.WAVE}
+    banks = [data for path, type_id, data in conversion.entries if type_id == monstersound.BANK]
+    requests = [data for path, type_id, data in conversion.entries if type_id == monstersound.REQUEST]
+    calls = [data for path, type_id, data in conversion.entries if type_id == monstersound.SEQUENCE]
+    assert (len(waves), len(banks), len(requests), len(calls)) == (198, 2, 1, 1)
+
+    names = monstersound.Names("mhxx", "em001", 124)
+    for path, body in sound_set.waves.items():
+        before = sound.read_wave(body)
+        after = sound.read_wave(waves[names.wave(path)])
+        assert (before.samples, before.rate, before.word_14, before.word_18, before.seconds) == \
+               (after.samples, after.rate, after.word_14, after.word_18, after.seconds), path
+        assert body[0x68:0x68 + before.data_size] == \
+               waves[names.wave(path)][0x60:0x60 + after.data_size], path
+        assert body[0x38:0x58] == waves[names.wave(path)][0x30:0x50], path
+
+    source_bank = sound.read_bank(next(d for p, d in sound_set.banks.items() if "em001_00" in p))
+    bank = sound.read_bank(banks[0])
+    assert (bank.version, len(bank.groups), len(bank.entries)) == (11, len(source_bank.groups),
+                                                                   len(source_bank.entries))
+    for group in bank.groups:
+        assert group.flags & 0x8000
+    for source, converted in zip(source_bank.entries, bank.entries, strict=True):
+        p = source.params
+        assert converted.params == p[0:2] + b"\x08" + p[3:12] + p[71:75] + p[12:71] + b"\x00"
+        assert converted.name == names.wave(source.name)
+        assert converted.type_id == sound.WAVE_TYPE_ID
+
+    source_request = sound.read_request_gu(next(iter(sound_set.requests.values())))
+    request = sound.read_request(requests[0])
+    assert [r.id for r in request.records] == [r.id for r in source_request.records]
+    for old, new in zip(source_request.records, request.records, strict=True):
+        assert new.words[:8] == old.words[:8]
+        assert new.words[8] == old.words[8] | 0x10000
+        assert new.words[9:22] == old.words[9:22]
+        assert new.words[22] == 0
+    assert request.banks == ("sound\\se\\em\\em124\\snd_em124",
+                             "sound\\se\\em\\em124\\snd_common")
+
+    source_call = sound.read_sequence(next(iter(sound_set.sequences.values())))
+    converted_call = sound.read_sequence(calls[0])
+    assert converted_call.version == 0x20120123
+    assert [r.key for r in converted_call.records] == [r.key for r in source_call.records]
+    assert all(a.body == b.body for a, b in zip(converted_call.records, source_call.records, strict=True))

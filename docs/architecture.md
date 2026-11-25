@@ -78,6 +78,7 @@ Steps 1 and 2 work for single files today. The commands that would run the whole
 | `survey.py` | runs the specs' checks over a whole RomFS and prints counts only |
 | `catalog.py` | what MH4U already has of 3U's and GU's monsters and maps, from `data/catalog/` |
 | `monsterdata.py` | rebuilds an MH4U monster's `.etd`/`.emd` values from MHXX's or MH3U's files and compares, counts only |
+| `monstersound.py` | a ported monster's own sounds: its source game's waves, bank, request and sound call converted to MH4U's and written into the port's arc ([specs/sound.md](../specs/sound.md#what-a-converter-must-produce)) |
 | `save.py` | MH4U's character and `system` saves: profile, boxes, equipment, guild quests, Palicos, the monster log, the guild card and the mapped `system` fields |
 
 Each format follows its spec in [specs/](../specs/README.md). A field is marked verified only once it has been checked against real files, with the procedure written down.
@@ -138,10 +139,11 @@ The first target is the Water Arena: enter water, swim, surface, oxygen, with Sw
 
 Sounds and music come from each piece of content's own game and play through MH4U's sound engine by request id. The port needs no audio change.
 
-- MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1); `mhuc` now reads the older wave, bank, request and stream request layouts against the whole MH3U RomFS (SN6), so a 3U monster's sound can be read. Converting it to MH4U's versions is still undone.
-- MHXX uses the next generation of classes, shared with MHGU on Switch: its waves are MH4U's version, its banks and requests are GU's.
+- MH3U uses MH4U's sound classes, with the same class ids, but each file version is one older (SN1); `mhuc` reads the older wave, bank, request and stream request layouts against the whole MH3U RomFS (SN6). A 3U monster's whole call set converts to MH4U's versions (`mhuc convert monster`, [specs/sound.md](../specs/sound.md), checks SN7 to SN9).
+- MHXX uses the next generation of classes, shared with MHGU on Switch: its banks are GU's (`SBKR` 4), but its requests are 100-byte records, not GU Switch's 132 (S3), and its waves are `MADP` 5 in a header MH4U doesn't read.
 - MH4U's wave, bank and emitter layouts come from MHGU Definitive Edition and are unverified; the `.stq` tables are checked against all 50 MH4U `.stq` files and every stream request in the image (214, loose and inside ARCs) is read (check S4), and the 100-byte sequence record's readers and the loader's id-to-row index are named from the game's code (check S7).
 - A monster's theme is a sequence id in a stream request, chosen by a hardcoded switch over its id, not by a table ([audio.md](audio.md#how-mh4u-picks-a-monsters-theme)).
+- **A monster's set is one path in its resource record.** The record's +0x1c names the sound call (`sound\call\em\emNNN`), and the call, request and bank name the rest by path; MH4U ships all four kinds in the monster's own `data/emNNN.arc` ([specs/sound.md](../specs/sound.md#a-monsters-sound-set-and-how-the-record-points-to-it-sn7)). A port ships its own set under its own id (`mhuc convert monster`), so a monster MH4U never had brings its own voice.
 - **There is no separate sound heap.** MH4U loads banks, requests and waves from the 47 MiB Resource heap it shares with every other non-drawing resource; the SoundBuffer allocator is an alias of Resource ([audio.md](audio.md#memory)).
 
 What the mod needs, what is known and the unknowns: [audio.md](audio.md).

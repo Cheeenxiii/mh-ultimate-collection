@@ -9,7 +9,7 @@ import sys
 
 from . import __version__, entropy, survey
 from .crypto import dlccrypt
-from .formats import arc, classid, gmd, romfs, stq, tex, xfs
+from .formats import arc, classid, gmd, romfs, sound, stq, tex, xfs
 from .quests import quest
 
 
@@ -363,6 +363,8 @@ def _convert_camera(args) -> int:
         print("mhuc convert camera: MH3U ships no rCameraList (specs/camera.md#versions), so there is no "
               "camera to convert", file=sys.stderr)
         return 1
+    if args.game is None:            # the camera's default source is MHXX, like the quest's
+        args.game = "mhxx"
     repo = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
     out_real = os.path.realpath(args.out)
     if out_real == repo or out_real.startswith(repo + os.sep):
@@ -390,12 +392,15 @@ def _convert_camera(args) -> int:
 def cmd_convert(args) -> int:
     if args.what == "camera":
         return _convert_camera(args)
+    if args.what == "monster":
+        return _convert_monster(args)
     need = (args.what, args.src, args.template, args.texts, args.id, args.out)
-    if args.what != "quest" or args.game != "mhxx" or None in need:
+    if args.what != "quest" or args.game not in (None, "mhxx") or None in need:
         print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
               "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)\n"
-              "mhuc convert camera SOURCE.lcm --from mh4u|mhxx -o OUT.lcm  (specs/camera.md)",
-              file=sys.stderr)
+              "mhuc convert camera SOURCE.lcm --from mh4u|mhxx -o OUT.lcm  (specs/camera.md)\n"
+              "mhuc convert monster --id N --arc SOURCE.arc [--sound-arc SND.arc] --out MOD_FOLDER "
+              "(specs/sound.md)", file=sys.stderr)
         return 2
     from .quests import convert
 
@@ -416,6 +421,58 @@ def cmd_convert(args) -> int:
         f.write("\n")
     print(f"{args.out}: {len(out['placeholders'])} placeholders to record (docs/sources.md#authored-register); "
           "build it with mhuc mib import")
+    return 0
+
+
+def _convert_monster(args) -> int:
+    """A ported monster's own sound set: its source game's files into the port's arc."""
+    from . import monstersound
+    if args.id is None or not args.arc or not args.out:
+        print("mhuc convert monster --id N --arc SOURCE.arc [--sound-arc SND.arc] --out MOD_FOLDER "
+              "(specs/sound.md)", file=sys.stderr)
+        return 2
+    try:
+        row = monstersound.registry_row(args.id)
+    except monstersound.ConvertError as e:
+        print(f"mhuc convert monster: {e}", file=sys.stderr)
+        return 1
+    if args.game and args.game != row.source_game:
+        print(f"mhuc convert monster: id {row.id}'s source game is {row.source_game}, not "
+              f"{args.game}", file=sys.stderr)
+        return 2
+    if row.source_game == "mh3u" and not args.sound_arc:
+        print("mhuc convert monster: MH3U keeps the waves, bank and request in the separate "
+              "arc/sound/se/em/emNNN/snd_emNNN.arc; pass it as --sound-arc", file=sys.stderr)
+        return 2
+    archives = [_read(args.arc)]
+    if args.sound_arc:
+        archives.append(_read(args.sound_arc))
+    try:
+        sound_set = monstersound.read_sound_set(*archives)
+        conversion = monstersound.convert(sound_set, row.source_game, row.source_key, row.id)
+    except (monstersound.ConvertError, sound.SoundError, arc.ArcError) as e:
+        print(f"mhuc convert monster: {e}", file=sys.stderr)
+        return 1
+
+    target = os.path.join(args.out, "romfs", "data", f"em{row.id:03d}.arc")
+    archive = arc.read(_read(target)) if os.path.exists(target) else arc.Archive(0x13, [])
+    kept = [(e.path, e.type_id, e.data) for e in archive.entries]
+    new = [(path, type_id, data) for path, type_id, data in conversion.entries]
+    replaced = {(path, type_id) for path, type_id, _ in new}
+    kept = [e for e in kept if (e[0], e[1]) not in replaced]
+    for path, type_id, data in new:
+        kept.append((path, type_id, data))
+    archive.entries = [arc.Entry(path, type_id, data) for path, type_id, data in kept]
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "wb") as f:
+        f.write(arc.write(archive))
+    sizes = sum(len(data) for _, _, data in new)
+    print(f"{target}: {conversion.notes[0]} ({sizes} bytes)")
+    for note in conversion.notes[1:]:
+        print(f"  {note}")
+    if "sound" not in row.files:
+        print(f"  note: data/ids/registry.csv's row for {row.id} doesn't list `sound`, so "
+              "mods/monster_ids keeps the stand-in's sound path", file=sys.stderr)
     return 0
 
 
@@ -660,18 +717,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", required=True, help="the CSV to write, outside the repository")
     p.set_defaults(func=cmd_idnames)
 
-    p = sub.add_parser("convert", help="convert a source game's quest or camera list into MH4U's format")
-    p.add_argument("what", nargs="?", choices=["quest", "camera"])
+    p = sub.add_parser("convert", help="convert a source game's quest, camera list or a ported "
+                                       "monster's own sounds into MH4U's formats")
+    p.add_argument("what", nargs="?", choices=["quest", "camera", "monster"])
     p.add_argument("src", nargs="?", help="quest: the quest as `mhuc quest dump mhxx` prints it; "
                                            "camera: the source game's .lcm")
-    p.add_argument("--from", dest="game", choices=["mh4u", "mh3u", "mhxx"], default="mhxx",
-                   help="the source game (camera: mhxx for a port; mh4u to re-lay its own)")
+    p.add_argument("--from", dest="game", choices=["mh4u", "mh3u", "mhxx"],
+                   help="the source game (quest: mhxx; camera: mhxx for a port, mh4u to re-lay its "
+                        "own; monster: its registry row's)")
     p.add_argument("--template", help="an MH4U quest as `mhuc mib export` writes it, for what isn't converted")
     p.add_argument("--texts", help="JSON: for each of eng, fre, spa, ger, ita, the 7 MH4U strings")
-    p.add_argument("--id", type=int, help="the MH4U quest id to give it")
+    p.add_argument("--id", type=int, help="the MH4U quest or ported monster id")
+    p.add_argument("--arc", help="a monster's source archive (arc/enemy/emNNN[_VV].arc, data/emNNN.arc)")
+    p.add_argument("--sound-arc", help="MH3U's separate sound archive (arc/sound/se/em/emNNN/snd_emNNN.arc)")
     p.add_argument("--tables", default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "idmap",
                                                      "mhxx-mh4u"))
-    p.add_argument("--out", "-o", help="quest: the .mib model; camera: the converted .lcm")
+    p.add_argument("--out", "-o", help="quest: the .mib model; camera: the converted .lcm; "
+                                       "monster: the mod folder")
     p.set_defaults(func=cmd_convert)
 
     return ap
