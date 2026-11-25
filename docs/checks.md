@@ -316,6 +316,46 @@ runner. Result: the plugin loaded, and the log showed the ready line and a self-
 for each reader it logs, with `id 124 -> 1` and `id 125 -> 1` and `ids 0..123 pass through`, and the
 stand-in's path `enemy\em001\data\em001`. P2 is not done.
 
+## Calling the engine from a plugin (P3)
+
+The plugin API's ABI 3 `call` runs a game function by address with r0-r2 as its arguments and
+returns its r0 (`call(call, addr, a0, a1, a2)`, the fork's [docs/PLUGINS.md](https://github.com/Cheeenxiii/MH4UltimateDC-fork/blob/uc/main/docs/PLUGINS.md)). This check calls a
+getter that only reads a table, so it needs no monster and no quest: MH4U's crown getter,
+`getCrown` (USA v1.3.0 `0x0068877c`, id in r0, a scale in r1, and a pointer to its 8-byte
+result in r2).
+
+| Check | What | Pass |
+|---|---|---|
+| P3 | a plugin calls `getCrown` through ABI 3 `call` in a headless run | the log shows the host's ABI 3 and `call getCrown(id=1, scale=1.0f, out=<guest address>) -> r0=0x1, class=1`; the runner exits 0 |
+
+1. Build both port binaries after the ABI 3 change, each in its existing CMake tree:
+   `cmake --build <build> --target mh4u_runner` for the headless runner and
+   `cmake --build <build-qt> --target azahar` for the Qt frontend. Both compile
+   `port/src/plugin_host.h`, so both carry `call`.
+2. Build a throwaway plugin (not in either repository) against the fork's
+   `include/mh4u_plugin.h`: in `mh4u_plugin_init` it checks `host->abi >= 3` and that
+   `host->size` covers `call`, then asks for `on_frame`. In a frame call after start-up it
+   takes 8 bytes from `alloc`, calls
+   `host->call(call, 0x0068877c, 1, 0x3f800000, out)` (id 1, scale 1.0f, out) and logs the
+   returned r0 and the byte at `out`. r1 is a float: the getter reads it as one.
+3. Put the plugin's line in the code library's `<program id>.plugins.tsv`
+   (`plugin`, name, library path and mod folder, tab-separated) in a copy of a user folder. No
+   code library rebuild is needed: `sMhMain::frame` is a hook point of every library the
+   fork's `tools/build_game.py` builds.
+4. Run
+   `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 12000 --speed 0 --log "*:Info"`.
+
+Result (2026-11-25, MH4U USA v1.3.0, headless runner rebuilt with ABI 3): pass. The log had
+`plugin <name>: ready: host ABI 3, size 0xb0, call present` when the plugin loaded, then
+`plugin <name>: frame 30: call getCrown(id=1, scale=1.0f, out=0x08e44670) -> r0=0x00000001, class=1`,
+and the runner exited 0. r0=1 is the getter's crown class for id 1 (0 to 3), and the same
+class byte was written into the out buffer: the call reached the game function and returned
+its r0, and the run continued to its end, so the guest's registers were put back. The
+motion-start wrapper `0x0094e318` reads the enemy at `this+0xe28`, so it needs a live `uEnemy`
+and is called from a quest, not from this boot-only check: P3 proves the call mechanism, and
+the translated handlers ([#112](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/112),
+[#115](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/115)) call it on a monster.
+
 ## Tracing engine calls in MHXX
 
 Shows which code calls an engine function at run time, and with which arguments, when reading the code doesn't settle it (the open entries of [reference/README.md](../reference/README.md#the-62-imports-one-by-one)). The maintainer plays; the tracer and the recording run beside the game.
