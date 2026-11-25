@@ -400,12 +400,33 @@ Read in MH3U's code; the last column says what MH4U does instead, or that a trac
 ### A 3U Rathian's moves on MH4U's handlers
 
 The 3U port keeps the source's animations and runs MH4U's handler for the action ids both
-games have, so the source's animation must sit where that handler asks for it.
+games have. MH3U's dispatcher reaches 191 action ids on 66 handlers; 174 of those ids also
+exist in MH4U's `uEm001`, which has 342 ids on 97 handlers. R1 ([checks.md](../docs/checks.md#monster-actions))
+compares the animation each action's handler starts: 117 of the 174 start a constant
+animation in both games, and 115 of those start a different index.
 
-**Where the port's animations go.** `monster_motions.py place` writes that plan: one row
-per target (file, slot), with the source slot and the action ids that ask for it, and a row
-for each id it cannot place. On Rathian's data it places 96 ids at 27 target slots (5 of them
-by the animation's signature found at another index), and has two kinds of row left over:
+| The 117 compared ids | ids |
+|---|---|
+| the same index in both games | 2 (1/11 and 1/12) |
+| the same animation at another index | 93 (86 identical, 2 with the skeleton's extra MH4U track, 5 whose animation is found at another index in MH3U's lists) |
+| a different animation | 3 (13/5, 13/6 and 13/8) |
+| not resolved | 19 (all category 7, whose shared code can start more than one motion, so the first constant is not enough) |
+
+The other 57 ids are not compared: one handler or both starts no constant animation (it
+computes the index, starts none, or does its work inline).
+
+**The 17 ids MH4U has no action for** are 0/4, 4, 7/64, 7/87, 7/93, 10/0 to 10/6, 11/5,
+11/15, 11/26, 11/28 and 13/9, on 8 of the 66 handlers. Their handlers have to be translated
+onto MH4U's engine, which takes a plugin API that can call an MH4U engine function (the
+fork's ABI 3); the 19 calls of #55 whose MH4U counterpart is unknown belong to that work too.
+`monster_actions.py pairs` finds 63 body pairs between the two classes; 58 of the 66 3U
+handlers have one, 8 have none.
+
+**Where the port's animations go.** `monster_motions.py place` writes the plan for a port:
+one row per target (file, slot), with the source slot and the action ids that ask for it, and
+a row for each id it cannot place. On Rathian's data it places 96 ids at 27 target slots
+(5 of them by the animation's signature found at another index), and has two kinds of row
+left over:
 
 - 19 ids whose animation has no unique match, which stay wherever the source's file keeps
   them; the handler's computed index decides whether that is where it is asked for.
