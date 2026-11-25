@@ -116,8 +116,10 @@ not an id and stays). The motion slots are named, `motions=0-4` or `motions=0,2,
 those slots are rewritten and the other slots keep the stand-in's paths, because the port's
 motion-number translation only targets the source slots it ships (125 keeps MH4U's
 `enemy\em001\mot\em001_3` and `_4`; 126 ships MHXX's slots 0, 2, 3 and 4 and keeps the
-stand-in's 1 and 5; 127 ships slots 0, 1 and 2 and keeps 3, 4 and 5). For a kind it does not
-ship, the stand-in's path is
+stand-in's 1 and 5; 127 ships slots 0, 1 and 2 and keeps 3, 4 and 5). A slot the stand-in's
+own record leaves empty but the port ships gets the port's own motion-list name,
+`enemy\emNNN\mot\emNNN_<slot>`, which is what the converter writes: 126's slot 4 is one,
+because Great Jaggi's record has no slot 4. For a kind it does not ship, the stand-in's path is
 copied unchanged, so the monster loads MH4U's own camera, motion effects and effect lists
 until its game's are converted; 125 ships her own sound (`mhuc convert monster`, issue
 #158). The record, its slots and its strings are one block from the game's own heap (`alloc`,
