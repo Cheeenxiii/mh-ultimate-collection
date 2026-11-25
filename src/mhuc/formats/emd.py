@@ -185,6 +185,11 @@ def attack_records(d: bytes) -> list[bytes] | None:
 
 ATTACK_ZERO = ((0x15, 0x18), (0x1E, 0x1F), (0x21, 0x22), (0x23, 0x24), (0x24, 0x28))
 ATTACK_VALUES = {0x13: (0, 0x08, 0x40), 0x14: (0, 2, 4), 0x1F: (0, 10), 0x20: (0, 1, 5, 6)}
+# The two words 0xb700a8 copies to the attack state's +0x40/+0x44 are flag bitfields. The bits MH4U's readers
+# test (specs/emd.md, "Attack record"): 0xbe9c14's masks 0x3400f, 0x208000, 0x800000 and 0xbe8dac's 0x1, 0x2, 0x4,
+# 0x400, 0x800, 0x4000, 0x10000, 0x20000, 0x400000; the second word's 0x1 (0xbe9c14) and 0x2, 0x4 (0xbe8dac).
+ATTACK_FLAGS1_READ = 0x34000F | 0x208000 | 0x800000 | 0x400000 | 0x400 | 0x800 | 0x4000
+ATTACK_FLAGS2_READ = 0x1 | 0x2 | 0x4
 
 
 def check_attack_records(d: bytes) -> Counter:
@@ -209,6 +214,17 @@ def check_attack_records(d: bytes) -> Counter:
               f"E10 etd attack +{off:#04x} OTHER {r[off]:#04x}"] += 1
         c["E10 etd attack volume group below the word-27 group count" if r[0x19] < groups else
           "E10 etd attack volume group OUTSIDE"] += 1
+        flags1 = struct.unpack_from("<I", r, 0x10)[0]
+        flags2 = struct.unpack_from("<I", r, 0x14)[0]
+        c["E10 etd attack +0x40 has a bit a reader tests" if flags1 & ATTACK_FLAGS1_READ else
+          "E10 etd attack +0x40 no bit a reader tests"] += 1
+        c["E10 etd attack +0x40 has a bit no reader tests" if flags1 & ~ATTACK_FLAGS1_READ else
+          "E10 etd attack +0x40 every set bit read"] += 1
+        c["E10 etd attack +0x44 bit 0 set" if flags2 & 1 else "E10 etd attack +0x44 bit 0 clear"] += 1
+        c["E10 etd attack +0x44 bits 1-2 set" if flags2 & 0x6 else "E10 etd attack +0x44 bits 1-2 clear"] += 1
+        c["E10 etd attack +0x44 has a bit no reader tests" if flags2 & ~ATTACK_FLAGS2_READ else
+          "E10 etd attack +0x44 every set bit read"] += 1
+        c["E10 etd attack +0x22 zero" if not r[0x22] else "E10 etd attack +0x22 nonzero"] += 1
     return c
 
 
