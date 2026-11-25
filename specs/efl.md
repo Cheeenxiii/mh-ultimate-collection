@@ -75,9 +75,8 @@ block that today:
 - the effect ids and resources a list names are each game's own: converting them needs the
   source→MH4U effect-id map and the effect assets, exactly as `specs/mef.md` says.
 
-MH4U's two slots (`+0x24`, `+0x28`) are filled by the same file in the records whose data can be
-read; how the two differ is unverified, so a converter that writes one must say which slot it goes
-in. Until then a port keeps its stand-in's EFL paths ([data/ids/README.md](../data/ids/README.md)).
+MH4U's record has two effect-list slots (`+0x24`, `+0x28`); what the second one holds is
+unverified, so a converter that writes an EFL must say which slot it goes in. Until then a port keeps its stand-in's EFL paths ([data/ids/README.md](../data/ids/README.md)).
 
 ## Checks
 

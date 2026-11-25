@@ -10,7 +10,7 @@ status: unverified
 A monster's visual effects are played at frames of its animations. Each game keeps that timing in a
 resource of its own: MH4U in `rMhMotionEffect` (magic `MEF\0`, extension `mef`), MH3U in
 `rEffectSequence` (`ESQ\0`, `esq`) and MHXX in `rProofEffectMotSequenceList` (`PSL\0`, `psl`).
-MH4U's resource record names two MEF files per monster; MH3U ships one ESQ per monster; MHXX ships
+MH4U's resource record names two MEF files per monster; MH3U ships one ESQ per monster (44 of its 85 monster archives have one); MHXX ships
 one PSL per motion list. MH4U's is what a port must produce, the other two are what it must read.
 
 **Source.** No public tool lays these out. The class names, ids and sizes come from the engines'
@@ -48,7 +48,7 @@ range is the one FX1 found across all 6,216 records; a name in parentheses is a 
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u8 | 0 to 31; repeats with the motion-list file, so (animation slot) is the guess | unverified | ours; FX1 |
+| +0x00 | u8 | 0 to 31; (an animation slot) is the guess | unverified | ours; FX1 |
 | +0x01 | u8 | 0 to 2 | unverified | ours; FX1 |
 | +0x02 | u8 | 0 or 1 | unverified | ours; FX1 |
 | +0x03 | u8 | 0, 1 or 5 | unverified | ours; FX1 |
@@ -83,7 +83,7 @@ The header is 0x24 bytes and holds six offsets into the rest of the file.
 | 0x00 | char[4] | magic `ESQ\0` | verified | ours; FX2 (44 entries) |
 | 0x04 | u32 | version `0x20110217` in every file | verified | ours; FX2 |
 | 0x08 | u32 | header size, `0x24` in every file | verified | ours; FX2 |
-| 0x0C | u32[6] | six section offsets, each `0x24` ≤ offset ≤ file size and non-decreasing; an empty section repeats its neighbour's offset (five files do) | verified | ours; FX2 |
+| 0x0C | u32[6] | six section offsets, each `0x24` ≤ offset ≤ file size and non-decreasing; an empty section repeats its neighbour's offset | verified | ours; FX2 |
 | 0x24 | bytes | the six sections; the first two look like fixed 0x3C-byte entries, but no field is placed | unverified | ours; FX2 |
 
 ## MHXX PSL
@@ -133,7 +133,7 @@ Until then, a port keeps its stand-in's MEF paths ([data/ids/README.md](../data/
 - **FX2 (done, 2026-11-25).** Read every `rEffectSequence` and `rProofEffectMotSequenceList` entry
   of MH3U's and MHXX's monster archives: `MHUC_DUMPS=… python3 -m pytest -q -m game_files -k
   "effect_sequence or mhxx_motion_effect"`. Result: 44 ESQ entries, every header size `0x24`, every
-  version `0x20110217`, every set of six offsets inside the file and non-decreasing; 507 PSL
-  entries with 18,831 slots and 8,129 descriptors, every version 2, every nonzero slot offset where
+  version `0x20110217`, every set of six offsets inside the file and non-decreasing, with five files repeating one offset; 507 PSL
+  entries with 18,831 slots and 8,129 descriptors, every version 2, slot 0's offset 0 in every file, every nonzero slot offset where
   the slot order puts it, seventeen 8-byte files with no slots. The section contents and descriptor
   contents were not decoded.

@@ -797,9 +797,13 @@ def test_every_mhxx_motion_effect_and_proof_effect_list_is_laid_out(dump):
             continue
         motion += 1
         try:
-            slots += len(mef.read_psl(data).slots)
+            parsed = mef.read_psl(data)
         except mef.MefError as e:
             failures.append(f"{label}: {e}")
+            continue
+        slots += len(parsed.slots)
+        if parsed.slots and parsed.slots[0] != 0:
+            failures.append(f"{label}: slot 0's offset is {parsed.slots[0]:#x}, not 0")
     assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
     assert (motion, slots, proofs) == (507, 18831, 280)
 
