@@ -358,15 +358,20 @@ resource paths); the ids themselves are in R2.
 |---|---|---|
 | R3 | play the ported 3U Rathian (id 125) without forcing, and read the actions her AI asks for | she asks for an action only MH3U's script picks, so `mods/monster_actions` logs `monster 125: action 7/64 -> 7/35`; MH4U's own script never asks for 7/64, so the line is only there if her converted EMC drives her |
 
-The 3U Rathian's EMC is converted at build time (version, 23 group rows, the 15 opcodes whose
-argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)). Cut by the
-game's tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and 7/85,
-are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so
+The 3U Rathian's EMC is to be converted at build time (version, 23 group rows, the 15 opcodes
+whose argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)). Cut by
+the game's tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and
+7/85, are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so
 `mods/monster_actions` translates it to 7/35 and logs one line the first time it runs.
 
-1. Build 125's files with #49, including the converted EMC at `enemy\em125\data\em125_cmd`.
-   The registry names `cmd` for her, so the resource record loads it
-   ([data/ids](../data/ids/README.md)).
+The converter does not exist yet: #159 (closed) laid the method out and [specs/emc.md](../specs/emc.md)
+records it, but the 15 opcodes' added argument's meaning is unverified, so it is a follow-up
+after #49. Until it ships, 125's registry row does not list `cmd` and her resource record keeps
+the stand-in's script path, so MH4U's own Rathian AI drives her.
+
+1. Build 125's files with #49 (`model,motions=3,tail,sound`; no `cmd` yet). The registry does
+   not list `cmd`, so the resource record keeps the stand-in's
+   `enemy\em001\data\em001_cmd` ([data/ids](../data/ids/README.md)).
 2. Check the converted EMC first: 23 group rows, every script cuts cleanly with MH4U's table
    (A2):
 
@@ -378,13 +383,13 @@ are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lac
 3. Enable `mods/monster_ids` and `mods/monster_actions`, build the code library with them
    (the fork's `tools/build_game.py`), and take a quest that names 125.
 4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the log has
-   `monster 125: action 7/64 -> 7/35`. The control is a build whose 125 row has no `cmd`, so
-   her record keeps the stand-in's script; that run never logs the line.
+   `monster 125: action 7/64 -> 7/35`. Today, with the stand-in's script driving her, that line
+   is the control: it must not appear until the converted EMC ships.
 5. Category-4 lines are expected too: action 4 has no MH4U handler and is not on the map
    ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)), so the AI's
    category-4 picks are recorded but are not this check's pass.
 
-Status: not done. It waits for #49's converted EMC and a quest that names 125.
+Status: not done. It waits for the EMC converter (a follow-up after #49) and a quest that names 125.
 
 ### The plugin's check (R1p)
 
@@ -494,8 +499,8 @@ P1, headless:
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
    record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, tail,
    cmd; keeps stand-in 1's paths for motions 5, camera, mef, sound, efl` line; one for 125
-   (`ships model, motions 0,1,2, tail, sound, cmd; keeps stand-in 1's paths for motions 3,4,
-   camera, mef, efl`); one for 126 (`ships model, motions 0,2,3,4; keeps stand-in 15's paths
+   (`ships model, motions 0,1,2, tail, sound; keeps stand-in 1's paths for motions 3,4,
+   camera, mef, cmd, efl`); one for 126 (`ships model, motions 0,2,3,4; keeps stand-in 15's paths
    for motions 1,5, camera, tail, mef, sound, cmd, efl`); one for 127 (`ships model, motions
    0,1,2; keeps stand-in 15's paths for motions 3,4,5, camera, tail, mef, sound, cmd, efl`);
    and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass through`. In the
@@ -509,10 +514,8 @@ P1, headless:
    for the model and motion slots 0, 1 and 2, and keeps stand-in 15's `em015` for motion slots
    3, 4 and 5, the tail, the camera, the motion effects, the sound, the command and the effect
    lists; no path may name a file the port's arc does not ship ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
-   The 125 sound path is the converted call `mhuc convert monster` writes (#158), and the 125
-   command path is the port's converted EMC, which #49 ships; a P1 run before that file exists
-   still builds the record (the self-test does not load files), but a quest with 125 would hang
-   as in #143.
+   The 125 sound path is the converted call `mhuc convert monster` writes (#158); the 125
+   command path stays the stand-in's until the EMC converter (a follow-up after #49) ships.
    The factory's and data path's lines name the path the stand-in's files are read from
    (`enemy\em001\data\em001` for stand-in 1, `enemy\em015\data\em015` for the Great
    Jaggi), which the record does not change. With the fixture the ready
@@ -561,10 +564,11 @@ After that run, 125's registry row gained `cmd`
 ([#158](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/158)), and 126 and 127
 were registered for Giadrome ([#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161))
 and Great Wroggi ([#166](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/166)), so
-the next P1 run's 125 record also names `enemy\em125\data\em125_cmd`, the converted EMC #49
-ships, and `sound\call\em\em125`, the converted sound call #158's `mhuc convert monster`
-writes, and its 126 and 127 records name `em126`/`em127` for the model and the motion slots
-their rows list while keeping the stand-in's `em015` elsewhere; that run is not done yet.
+the next P1 run's 125 record also names `sound\call\em\em125`, the converted sound call
+#158's `mhuc convert monster` writes, and its 126 and 127 records name `em126`/`em127` for the
+model and the motion slots their rows list while keeping the stand-in's `em015` elsewhere;
+#159 added `cmd` on the plan to convert 125's EMC, but that converter is a follow-up after #49,
+so the row lists no `cmd` and the record keeps the stand-in's script. That run is not done yet.
 
 ## A ported camera's cut-in (C2)
 

@@ -67,11 +67,14 @@ group of paths in the record:
 | `tail` | the tail model | yes | yes | no | no |
 | `mef` | the motion effects | no | no | no | no |
 | `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no | no |
-| `cmd` | the command/EMC | yes | yes | no | no |
+| `cmd` | the command/EMC | yes | no, until the EMC converter (a follow-up after #49) ships | no | no |
 | `efl` | the effect lists | no | no | no | no |
 
 124's `em124.arc` holds the model, five motion lists, the tail and the command; 125's holds
-the model, three motion lists, the tail, the command and its converted sound set; 126's holds
+the model, three motion lists, the tail and its converted sound set, but no command yet: the
+EMC converter that would give her MH3U's own script is a follow-up after #49
+([specs/emc.md](../../specs/emc.md#what-a-converter-must-do)), so her record keeps MH4U
+Rathian's script path; 126's holds
 the model and four motion lists, borrowed from MHXX's em014 (Velocidrome) and shipped at the
 same slots 0, 2, 3 and 4 the source groups them in, so its record keeps the stand-in's paths
 for slots 1 and 5; 127's holds the model and three motion lists, its own MH3U lists at slots
@@ -98,11 +101,12 @@ namespace (`sound\se\em\emNNN\...`), so a port never shadows MH4U's own monster 
 port. [specs/sound.md](../../specs/sound.md) has the formats and the conversion, and check A1
 in [checks.md](../docs/checks.md#a-ported-monsters-own-voice-a1) the in-game listen.
 
-125's command is her own AI script: MH3U's EMC is an older format, so her port converts it at
-build time (version, 23 group rows and the 15 opcodes whose argument count differs) rather than
-running MH4U Rathian's, [specs/emc.md](../specs/emc.md#what-a-converter-must-do). The ported
-id's record names it, and [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49)
-ships it with the rest of her files.
+125's command would be her own AI script: MH3U's EMC is an older format, so a converter would
+rewrite it at build time (version, 23 group rows and the 15 opcodes whose argument count
+differs), [specs/emc.md](../specs/emc.md#what-a-converter-must-do). #159 recorded the method,
+but the 15 opcodes' added argument's meaning is unverified, so the converter is a follow-up
+after [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49); until it ships her
+row lists no `cmd` and MH4U's own script drives her.
 
 ## Rules the tool checks
 

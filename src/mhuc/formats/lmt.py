@@ -1,8 +1,8 @@
 """MT Framework motion lists (`.lmt`, rMotionList), as specs/lmt.md lays them out (from MHGU Definitive Edition's
 `tools/lmt.py`, read off MH4U files: version 67; and from RevilLib's version layouts, which put 66 and 67 in the
 same class layouts, so MH3U's files read with the same code). `read` returns the structure, `decode_keys` its
-keyframes, `bounds` a track's bounds block and `read_float_tracks` an animation's float-track block; `check` gives
-checks L1 and L5's counts.
+keyframes, `bounds` a track's bounds block and `read_float_tracks` an animation's float-track block; `convert`
+rebuilds a version 66 list as version 67; `check` gives checks L1 and L5's counts.
 """
 from __future__ import annotations
 
@@ -240,6 +240,95 @@ def bounds(d: bytes, track: Track) -> tuple[tuple[float, ...], tuple[float, ...]
         return None
     return (struct.unpack_from("<4f", d, track.bounds),
             struct.unpack_from("<4f", d, track.bounds + 0x10))
+
+
+def _unsigned14(value: float) -> int:
+    """The version-67 field for a component version 66 stored signed: (value + 1) / 2 across 0 to 0x3FFF.
+
+    `_reencode` gives the track the bounds block that maps it back (offset -1, scale 2), so the round trip is
+    within half a 14-bit step (0x3FFF / 2, about 6.1e-5), finer than the signed form's own step."""
+    return min(max(round((value + 1.0) * 0x3FFF / 2.0), 0), 0x3FFF)
+
+
+def _reencode(d: bytes, t: Track, frames: int) -> tuple[bytes, bytes]:
+    """(buffer, bounds block) for a version-66 type 11 to 13 track, in version 67's form.
+
+    Version 66 stores the two components signed-magnitude, as type 6 does, and the track has no bounds block;
+    version 67 stores them unsigned and the bounds block supplies the sign, so each component is re-encoded
+    over 0 to 0x3FFF and the block scales it by 2 and offsets it by -1. The frame gaps are the source's."""
+    keys = decode_keys(d, t, 66, frames)
+    axis = {11: 0, 12: 1, 13: 2}[t.buffer_type]
+    buffer = bytearray()
+    for i, key in enumerate(keys):
+        _, gap = _key_components(t.buffer_type, d, t.buffer + i * KEY_STRIDES[t.buffer_type], 66)
+        buffer += struct.pack("<I", _unsigned14(key.value[axis]) | _unsigned14(key.value[3]) << 14
+                              | gap << 28)
+    scale = [0.0, 0.0, 0.0, 0.0]
+    offset = [0.0, 0.0, 0.0, 0.0]
+    scale[axis] = scale[3] = 2.0
+    offset[axis] = offset[3] = -1.0
+    return bytes(buffer), struct.pack("<4f4f", *scale, *offset)
+
+
+def _convert_animation(d: bytes, a: Animation, version: int, to_version: int, at: int) -> bytes:
+    """One animation of a version 66 file as version 67, at file offset `at`: the blocks copied and type 11 to
+    13 tracks re-encoded. Every offset in the animation is a file offset."""
+    if a.floats is not None:
+        raise LmtError("a float-track block isn't moved: no motion list in the three games has one")
+    track_table = struct.unpack_from("<I", d, a.offset)[0]
+    body = bytearray(d[a.offset:a.offset + ANIM])
+    struct.pack_into("<I", body, 0, at + ANIM)                # the track table follows the animation header
+    body += bytes(TRACK * len(a.tracks))
+    for k, t in enumerate(a.tracks):
+        record = bytearray(d[track_table + TRACK * k: track_table + TRACK * (k + 1)])
+        if version == 66 and to_version == 67 and t.buffer_type in (11, 12, 13):
+            if t.bounds:
+                raise LmtError(f"a version 66 type {t.buffer_type} track carries a bounds block")
+            buffer, block = _reencode(d, t, a.frames)
+        else:
+            buffer = d[t.buffer:t.buffer + t.buffer_size] if t.buffer_size else b""
+            block = d[t.bounds:t.bounds + BOUNDS] if t.bounds else b""
+        struct.pack_into("<I", record, 0x20, at + len(body) if block else 0)
+        body += block
+        struct.pack_into("<II", record, 0x08, len(buffer), at + len(body) if buffer else 0)
+        body += buffer
+        body[ANIM + TRACK * k: ANIM + TRACK * (k + 1)] = record
+    if a.events:
+        groups_at = len(body)
+        struct.pack_into("<I", body, 0x34, at + groups_at)
+        body += bytearray(d[a.events:a.events + GROUP * GROUPS])
+        for g in range(GROUPS):
+            count, events = struct.unpack_from("<II", d, a.events + GROUP * g + 0x40)
+            struct.pack_into("<I", body, groups_at + GROUP * g + 0x44,
+                             at + len(body) if count and events else 0)
+            if count and events:
+                body += d[events:events + 8 * count]
+    return bytes(body)
+
+
+def convert(d: bytes, to_version: int = 67) -> bytes:
+    """Rebuild a motion list at `to_version`, the version the target game reads.
+
+    Version 66 and 67 share the layout (specs/lmt.md), so every block is copied and every key keeps its frame;
+    only the keyframe buffers of types 11 to 13 are re-encoded, since version 66 stores them signed and
+    version 67 unsigned behind a bounds block ([Keyframe buffers](#keyframe-buffers)). A list already at
+    `to_version` comes back as it is; no other version pair is handled."""
+    version, animations = read(d)
+    if version == to_version:
+        return d
+    if (version, to_version) != (66, 67):
+        raise LmtError(f"can't rebuild version {version} as version {to_version}")
+    out = bytearray(struct.pack("<4sHH", b"LMT\0", to_version, len(animations)))
+    out += bytes(4 * len(animations))
+    offsets = []
+    for a in animations:
+        if a is None:
+            offsets.append(0)
+            continue
+        offsets.append(len(out))
+        out += _convert_animation(d, a, version, to_version, len(out))
+    struct.pack_into(f"<{len(offsets)}I", out, 8, *offsets)
+    return bytes(out)
 
 
 def check(d: bytes) -> Counter:
