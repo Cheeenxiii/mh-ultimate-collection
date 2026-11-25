@@ -109,6 +109,38 @@ def test_a_save_of_the_wrong_size_is_refused_not_sliced():
         save.system_summary(bytes(save.CHARACTER_SIZE))
 
 
+def test_system_save_summary_lists_the_mapped_fields():
+    data = bytearray(save.SYSTEM_SIZE)
+    struct.pack_into("<I", data, save.SYSTEM_VERSION_AT, 1)
+    struct.pack_into("<I", data, save.SYSTEM_TIME_AT, 0x01020304)
+    for i in range(save.SYSTEM_ENTRY_COUNT):
+        struct.pack_into("<I", data, save.SYSTEM_ENTRIES_AT + 4 * i, 100 + i)
+    data[save.SYSTEM_FLAGS_AT:save.SYSTEM_FLAGS_AT + save.SYSTEM_FLAGS_SIZE] = b"\xff" * save.SYSTEM_FLAGS_SIZE
+    struct.pack_into("<I", data, save.SYSTEM_MARK_AT, 1)
+    struct.pack_into("<I", data, save.SYSTEM_CHARACTER_AT, 0xFFFFFFFF)
+    struct.pack_into("<I", data, save.SYSTEM_UNKNOWN_0X40, 2)
+    struct.pack_into("<I", data, save.SYSTEM_UNKNOWN_0X64, 1)
+
+    summary = save.system_summary(data)
+    assert summary["version"] == 1
+    assert summary["timestamp_0x04"] == 0x01020304
+    assert [entry["value"] for entry in summary["timestamps_0x08"]] == [100, 101, 102, 103]
+    assert summary["flags_0x18"]["words"] == [0xFFFFFFFF] * 8
+    assert summary["flags_0x18"]["set_bits"] == 256
+    assert summary["word_0x38"] == 1
+    assert summary["character_0x3c"] is None
+    assert (summary["word_0x40"], summary["word_0x64"]) == (2, 1)
+    assert summary["last_nonzero"] == save.SYSTEM_UNKNOWN_0X64
+    assert save.system_problems(data) == []
+
+
+def test_system_save_reports_the_selected_character_slot():
+    data = bytearray(save.SYSTEM_SIZE)
+    struct.pack_into("<I", data, save.SYSTEM_MARK_AT, 1)
+    struct.pack_into("<I", data, save.SYSTEM_CHARACTER_AT, 0)
+    assert save.system_summary(data)["character_0x3c"] == 0
+
+
 def test_system_save_summary_reports_the_files_extent():
     data = bytearray(save.SYSTEM_SIZE)
     struct.pack_into("<I", data, 0, 1)
@@ -116,5 +148,5 @@ def test_system_save_summary_reports_the_files_extent():
     summary = save.system_summary(data)
     assert summary["nonzero_bytes"] == 2
     assert summary["first_nonzero"] == 0 and summary["last_nonzero"] == 0x20
-    assert summary["head_words"][0] == {"offset": 0, "value": 1}
+    assert summary["flags_0x18"]["set_bits"] == 7
     assert save.system_problems(data) == []

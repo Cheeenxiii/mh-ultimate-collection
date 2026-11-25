@@ -120,6 +120,9 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
             characters += 1
         else:
             assert not save.system_problems(plain), name
+            system = save.system_summary(plain)
+            assert system["word_0x38"] == 1, name
+            assert system["character_0x3c"] in (None, 0, 1, 2), name
     assert characters >= 1, "no character save found"
 
 

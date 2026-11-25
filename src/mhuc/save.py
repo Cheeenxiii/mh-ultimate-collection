@@ -1,10 +1,11 @@
 """MH4U's saves: the character files `user1`..`user3` and `system`, read after `mhuc decrypt mh4u-save`.
 
-A character save is 81,400 bytes decrypted, one character per file. Offsets in this module are in the
-decrypted file, as `mhuc decrypt mh4u-save` writes it (the cipher's 8-byte header is gone). Layouts:
-specs/save.md, from the community save editor mh4edit (MIT) and the MH4G save-editor wiki for the
-profile, pouches, quest counts and weapon usage, and from the mhff wiki for the monster log; each field's
-status is in the spec.
+A character save is 81,400 bytes decrypted, one character per file. The `system` save is 504 bytes
+decrypted and shared by the three characters; `system_summary` reads the fields that are mapped so far.
+Offsets in this module are in the decrypted file, as `mhuc decrypt mh4u-save` writes it (the cipher's
+8-byte header is gone). Layouts: specs/save.md, from the community save editor mh4edit (MIT) and the
+MH4G save-editor wiki for the profile, pouches, quest counts and weapon usage, and from the mhff wiki
+for the monster log; each field's status is in the spec.
 
 No game data is stored here: the module holds offsets and shapes only, and reads a file the user supplies.
 """
@@ -18,6 +19,20 @@ CHARACTER_SIZE = 81400          # decrypted user1..user3
 ENCRYPTED_CHARACTER_SIZE = 81408
 SYSTEM_SIZE = 504               # decrypted system
 ENCRYPTED_SYSTEM_SIZE = 512
+
+# The `system` save's fields, as far as they are mapped (specs/save.md, check S9). The names with an
+# offset are the fields the spec still leaves unknown: the module reports their values without
+# giving them a meaning.
+SYSTEM_VERSION_AT = 0x00        # 0 before a character exists, 1 in the saves with characters
+SYSTEM_TIME_AT = 0x04           # candidate: a Unix time; it moves between saves
+SYSTEM_ENTRIES_AT = 0x08        # four u32; candidates: times (or ids) that stayed put
+SYSTEM_ENTRY_COUNT = 4
+SYSTEM_FLAGS_AT = 0x18          # 32 bytes; candidate: option bits or DLC/quest registration
+SYSTEM_FLAGS_SIZE = 0x20
+SYSTEM_MARK_AT = 0x38           # 1 in every save the game writes, including before a character
+SYSTEM_CHARACTER_AT = 0x3C      # 0xFFFFFFFF before a character exists, then the selected slot
+SYSTEM_UNKNOWN_0X40 = 0x40
+SYSTEM_UNKNOWN_0X64 = 0x64
 
 PROFILE_SIZE = 0x40
 EQUIPPED_SIZE = 7 * 28
@@ -257,13 +272,32 @@ def dump_character(data: bytes) -> dict:
 
 
 def system_summary(data: bytes) -> dict:
-    """The `system` save's extent and the bytes that differ from zero; its fields are unmapped."""
+    """The `system` save's fields, as far as they are mapped (specs/save.md, check S9).
+
+    The fields whose meaning is still unknown are reported by offset, not given a name, so a later
+    session can map them without the reader claiming a meaning it hasn't checked.
+    """
     _check_size(data, SYSTEM_SIZE, "system save")
     nonzero = [i for i, b in enumerate(data) if b]
-    words = [{"offset": 0x00 + 4 * i, "value": _u32(data, 4 * i)} for i in range(8)]
-    return {"kind": "system", "size": len(data), "nonzero_bytes": len(nonzero),
-            "first_nonzero": nonzero[0] if nonzero else None,
-            "last_nonzero": nonzero[-1] if nonzero else None, "head_words": words}
+    flags = [_u32(data, SYSTEM_FLAGS_AT + 4 * i) for i in range(SYSTEM_FLAGS_SIZE // 4)]
+    character = _u32(data, SYSTEM_CHARACTER_AT)
+    return {
+        "kind": "system", "size": len(data),
+        "version": _u32(data, SYSTEM_VERSION_AT),
+        "timestamp_0x04": _u32(data, SYSTEM_TIME_AT),
+        "timestamps_0x08": [{"offset": SYSTEM_ENTRIES_AT + 4 * i,
+                             "value": _u32(data, SYSTEM_ENTRIES_AT + 4 * i)}
+                            for i in range(SYSTEM_ENTRY_COUNT)],
+        "flags_0x18": {"offset": SYSTEM_FLAGS_AT, "size": SYSTEM_FLAGS_SIZE, "words": flags,
+                       "set_bits": sum(bin(word).count("1") for word in flags)},
+        "word_0x38": _u32(data, SYSTEM_MARK_AT),
+        "character_0x3c": None if character == 0xFFFFFFFF else character,
+        "word_0x40": _u32(data, SYSTEM_UNKNOWN_0X40),
+        "word_0x64": _u32(data, SYSTEM_UNKNOWN_0X64),
+        "nonzero_bytes": len(nonzero),
+        "first_nonzero": nonzero[0] if nonzero else None,
+        "last_nonzero": nonzero[-1] if nonzero else None,
+    }
 
 
 def character_problems(data: bytes) -> list[str]:

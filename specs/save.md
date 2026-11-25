@@ -227,23 +227,44 @@ was found. The 280-byte field at 0xF220 is the main candidate (2,240 bits: all s
 
 ## System save
 
-504 bytes decrypted. The cipher and checksum are the character saves' (check S1), and the file is shared by
-all three characters. Its fields are unmapped: the maintainer's has 50 non-zero bytes, most in the first
-0x39 bytes with single bytes at 0x40 and 0x64, and its first words look like a version word followed by
-per-save identifiers. mhef has no
-MH4U `system` layout and no community page found gives one, so every field below is unknown rather than
-unverified. Mapping them is [#154](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/154).
+504 bytes decrypted, shared by all three characters; `mhuc decrypt` and `mhuc save dump` handle it like
+a character save. The cipher and checksum are the character saves' (check S1). Three saved states were
+compared (check S9): the maintainer's current `system`, a second copy in the DLC Save Data folder,
+and the `system` the game writes on a fresh SD card before a character exists. The two copies differ in
+exactly six bytes, so they are the same save at two times. That comparison supports the candidate rows
+below, but it does not name their fields: no in-game screen has been compared yet and the game's own
+reader has not been read. Check S10 is the procedure that settles them.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | u32 | unknown; 1 in the maintainer's save, so possibly a version word | unknown | ours; `mhuc save dump` prints the first eight words |
-| 0x04 | 0x14 bytes | unknown; non-zero, different in every save seen | unknown | ours |
-| 0x18 | rest | unknown; zero except a few flag bytes in the first 0x78 | unknown | ours |
+| 0x00 | u32 | version: 0 in the save written before a character exists, 1 in the two saves with characters | unverified | ours; check S9 |
+| 0x04 | u32 | candidate: a Unix time that moves; it differs between the two copies | unverified | ours; check S9 |
+| 0x08 + 4i | u32 ×4 | four values; identical in both copies | unknown | ours; check S9 |
+| 0x18 | 32 bytes | bit flags: the only dense field, and the only other bytes that differ between the copies (at 0x35 to 0x37) | unknown | ours; check S9 |
+| 0x38 | u32 | 1 in every observed save, including the one written before a character exists | verified | ours; check S9 |
+| 0x3C | u32 | candidate: the selected character slot; 0xFFFFFFFF before a character exists, 0 once one does | unverified | ours; check S9 |
+| 0x40 | u32 | unknown; 0 before a character exists, 1 in the other copy, 2 in the current save (three character files) | unknown | ours; check S9 |
+| 0x44 | 0x20 bytes | no field found; zero in every observed save | unknown | ours; check S9 |
+| 0x64 | u32 | unknown; 1 in the current save, 0 in the other copy and before a character exists | unknown | ours; check S9 |
+| 0x68 | 0x190 bytes | no field found; zero in every observed save | unknown | ours; check S9 |
+
+Read little-endian as Unix seconds, the four words at 0x08 fall within 14 seconds of each other and the
+word at 0x04 moved by about three hours between the copies. That makes 0x04 a candidate for a time that
+moves (a last write) and 0x08 to 0x17 a candidate for four times or ids that stayed put (the last write
+of four save files, or four guild cards). Neither is verified.
+
+What is still unmapped: the options, the guild-card list and the DLC/quest registration. The candidates
+are the 32-byte flag block at 0x18 — the only dense bit field, and the other copy differs there at 0x35
+to 0x37, which a changed option or a few more registered quests would explain — and the four words at
+0x08. Mapping them is check S10. [#77](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/77)'s
+converter needs the DLC/quest bits: until S10, `mhuc` cannot tell a mod's registration from MH4U's, so
+the converter must leave `system` untouched.
 
 ## Checks
 
-Run on 2026-11-25 on the maintainer's own saves (`game_files/saves/MH4U`: `system`, `user1` to `user3`),
-outside the repository, decrypted with `mhuc decrypt mh4u-save` and the key in
+Run on 2026-11-25 on the maintainer's own saves (`game_files/saves/MH4U`: `system`, `user1` to `user3`)
+and, for S9, the copy of `system` that ships in the DLC Save Data folder and one the game wrote on a fresh
+SD card, outside the repository, decrypted with `mhuc decrypt mh4u-save` and the key in
 `game_files/work/mhuc_dumps/mh4u/save.key`. The procedures print values and counts, never bytes; they are
 repeatable on any player's saves.
 
@@ -279,6 +300,13 @@ repeatable on any player's saves.
   their sums are in the same order of magnitude as the quest counts; the brigade-points field is at or below
   9,999,999. The mid-game character's arena weapon-usage sum is 2 and its arena quest count is 2. The
   meanings of the tables and counts remain unverified.
-- **S8 (open):** the quest clear lists and the `system` fields. They are
-  [#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153) and
-  [#154](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/154).
+- **S8 (open):** the character save's quest clear lists.
+  [#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153).
+- **S9 (done):** decrypt three saved states of `system`: the maintainer's current one, the other copy in
+  the DLC Save Data folder, and one the game wrote on a fresh SD card. Pass: each is 504 bytes; the
+  fresh one's non-zero bytes are only 0x38 (1) and 0x3C (0xFFFFFFFF); the two saves with characters differ
+  in exactly six bytes, at 0x04, 0x35 to 0x37, 0x40 and 0x64; the four u32 at 0x08 are identical in both.
+  The differences are what the candidate rows above rest on; they do not name the fields.
+- **S10 (open, in game):** the options, the guild-card list and the DLC/quest registration. The procedure is
+  [docs/checks.md](../docs/checks.md#system-save-fields). Pass: each setting, guild card and DLC quest is
+  placed in the table above with its own row and status, and `mhuc save dump` prints it.

@@ -22,7 +22,7 @@ Why it matters to the mod: `otomo1` is a second place, after the quest slots, wh
 | file | 494,592 bytes (494,584 decrypted) | `card1`..`card3`: guild cards and the rest of the table below | verified | ours; quest.md checks Q3, Q4; check E1 |
 | file | 270,336 bytes (270,328 decrypted) | `cardbox`: empty in the maintainer's data, so no layout | unknown | ours; check E1 |
 | file | 8,704 bytes (8,696 decrypted) | `otomo1`: DLC Palicos, table "otomo1" below | verified | ours; check E2 |
-| file | 512 bytes (504 decrypted) | the save's `system`: small, mostly zero; no layout known for MH4U (mhff has MHX's and MHGen's) | unknown | ours; check E1 |
+| file | 512 bytes (504 decrypted) | the save's `system`: small, mostly zero; its mapped fields are in [save.md](save.md#system-save) | unknown | ours; checks E1, S9 |
 | file | 360,448, 196,608 and 12,288 bytes | MH3U 3DS: `card1`..`card3` and `cardbox` (all zero here), the save's `system` (plain, 37 non-zero bytes in the first 0x78) | verified | ours; check E3 |
 
 ## card1..card3 (decrypted)

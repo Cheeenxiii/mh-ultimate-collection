@@ -47,6 +47,30 @@ Status: open.
 
 Status: open. goshawk documents the protocol but is AGPL-3.0, so a server here would be written from the protocol, not from its code.
 
+## System save fields
+
+The `system` save's options, guild-card list and DLC/quest registration are the candidates in
+[specs/save.md](../specs/save.md#system-save) (checks S9, S10). Back up `system`, `user1` to `user3` and
+the Extra Data with a save manager first; `mhuc save dump` reads the decrypted file, or takes the key with
+`--key`.
+
+1. Keep the current file as the baseline. Change one option in the game's Options menu, save and quit,
+   then decrypt `system` again and compare. Pass: the option moved a byte or a bit that no other option
+   moved; write the offset and the value's encoding into the table. Repeat for every option. Ignore 0x04,
+   the four words at 0x08 and 0x64 while comparing: they may move on every save.
+2. Create a new character, then select each character in turn, saving after each. Pass: 0x3C holds the
+   selected slot and 0x40 the highest slot in use. If they move with something else, give them their own
+   rows instead.
+3. Receive a guild card (StreetPass or a Gathering Hall), save and compare. Pass: one of the four u32 at
+   0x08, or a bit in the block at 0x18, changes for the card and for no other action; the card list's
+   count and entry shape go in the spec.
+4. Download a DLC quest, then remove its Extra Data file, saving after each. Pass: the block at 0x18
+   changes at that quest's bit and no other field changes, the time fields aside; that bit is the
+   registration that #77's converter has to clear.
+5. Put the original files back.
+
+Status: open. The steps need the game (or the port); files alone cannot say which bit is which.
+
 ## Monster actions
 
 | Check | What | Pass |
