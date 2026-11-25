@@ -429,7 +429,8 @@ def cmd_convert(args) -> int:
         print("mhuc convert quest QUEST.json --from mhxx --template T.json --texts TEXTS.json --id N "
               "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)\n"
               "mhuc convert camera SOURCE.lcm --from mh4u|mhxx -o OUT.lcm  (specs/camera.md)\n"
-              "mhuc convert monster --id N --romfs ROMFS --out MOD_FOLDER [--variant V] "
+              "mhuc convert monster --id N --romfs SOURCE_ROMFS --mh4u-romfs MH4U_ROMFS "
+              "--out MOD_FOLDER [--variant V] "
               "(docs/architecture.md#a-ported-monsters-files)\n"
               "mhuc convert monster --id N --arc SOURCE.arc [--sound-arc SND.arc] --out MOD_FOLDER "
               "(specs/sound.md)", file=sys.stderr)
@@ -476,45 +477,37 @@ def _convert_monster_files(args) -> int:
 
     from . import monsterassets, monsters
     from .formats import romfs
-    if args.id is None or not args.out:
-        print("mhuc convert monster --id N --romfs ROMFS --out MOD_FOLDER [--variant V] "
-              "(docs/architecture.md#3u-rathians-files)", file=sys.stderr)
+    if args.id is None or not args.out or not args.mh4u_romfs:
+        print("mhuc convert monster --id N --romfs SOURCE_ROMFS --mh4u-romfs MH4U_ROMFS "
+              "--out MOD_FOLDER [--variant V] (docs/architecture.md#a-ported-monsters-files)",
+              file=sys.stderr)
         return 2
     try:
-        # The MH3U half predates the row's slot-list `motions`, so it reads the row leniently and
-        # builds the kinds it ships from the conversion itself; the MHXX half reads `files` strictly.
+        # The row's `files` is the contract for both halves: the kinds and motion slots the port
+        # ships, and so the kinds and slots whose stand-in paths the archive must carry.
         from . import monstersound
-        row = monstersound.registry_row(args.id, args.registry)
+        row = monsters.registry_row(args.id, args.registry)
         if row.source_game not in ("mhxx", "mh3u"):
             raise monsters.ConvertError(f"id {args.id} comes from {row.source_game}; this converter "
                                         "reads MHXX and MH3U")
         if args.game and args.game != row.source_game:
             raise monsters.ConvertError(f"id {row.id}'s source game is {row.source_game}, not {args.game}")
         want = ("/arc/enemy/" + row.source_key + ".arc" if row.source_game == "mh3u"
-                else "/" + monsters.source_archive_path(monsters.registry_row(args.id, args.registry),
-                                                        args.variant))
+                else "/" + monsters.source_archive_path(row, args.variant))
         entry = next((f for f in romfs.open_image(args.romfs).files() if f.path == want), None)
         if entry is None:
             raise monsters.ConvertError(f"{args.romfs} has no {want}")
         with open(args.romfs, "rb") as f:
             f.seek(entry.offset)
             data = f.read(entry.size)
+        stand_in_data = monsters.stand_in_archive(args.mh4u_romfs, row.stand_in)
         report = None
+        copied = []
         if row.source_game == "mh3u":
             mod = monsterassets.convert(data, row.id)
-            arc_data = mod.archive()
-            kinds = set()
-            for e in mod.entries:
-                if e.type_name == "rModel":
-                    kinds.add("tail" if e.path.endswith("_tail") else "model")
-                elif e.type_name == "rMotionList":
-                    kinds.add("motions")
-            slots = sum(1 for e in mod.entries if e.type_name == "rMotionList")
-            row = monsters.Row(row.id, row.key, row.source_game, row.source_key, row.name, row.stand_in,
-                               frozenset(kinds), slots)
+            arc_data, copied = monsters.with_stand_in(mod.archive(), row, stand_in_data)
         else:
-            row = monsters.registry_row(args.id, args.registry)
-            arc_data, report = monsters.convert(data, row, args.variant)
+            arc_data, report = monsters.convert(data, row, stand_in_data, args.variant)
         path = monsters.build_mod(args.out, row, arc_data)
     except (monsterassets.ConvertError, monsters.ConvertError, monstersound.ConvertError, arc.ArcError,
             OSError) as e:
@@ -522,15 +515,17 @@ def _convert_monster_files(args) -> int:
         return 1
     if report is None:
         counts = Counter(e.type_name for e in mod.entries)
-        print(f"{row.name} (id {row.id}, from MH3U {row.source_key}): {len(mod.entries)} files to {path}")
+        print(f"{row.name} (id {row.id}, from MH3U {row.source_key}): {len(mod.entries)} files and "
+              f"{len(copied)} stand-in files to {path}")
         for kind, number in sorted(counts.items()):
             print(f"  {number:>4}  {kind}")
         return 0
     kept = len(report.as_is) + len(report.converted)
     print(f"{row.name} (id {row.id}, from {row.source_game.upper()} {row.source_key}): "
-          f"{kept} files to {path}")
+          f"{kept} files and {len(report.copied)} stand-in files to {path}")
     print(f"  as is: {len(report.as_is)}")
     print(f"  converted: {len(report.converted)}")
+    print(f"  copied from the stand-in: {len(report.copied)}")
     left = sum(len(v) for v in report.left_out.values())
     print(f"  left out: {left}")
     for reason, paths in sorted(report.left_out.items()):
@@ -538,7 +533,8 @@ def _convert_monster_files(args) -> int:
     if args.report:
         with open(args.report, "w", encoding="utf-8") as f:
             f.write(f"{row.name} (id {row.id}, MHXX {row.source_key})\n")
-            for kind, paths in (("as is", report.as_is), ("converted", report.converted)):
+            for kind, paths in (("as is", report.as_is), ("converted", report.converted),
+                                ("copied from the stand-in", report.copied)):
                 for line in paths:
                     f.write(f"{kind}: {line}\n")
             for reason, paths in sorted(report.left_out.items()):
@@ -900,6 +896,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--id", type=int, help="the MH4U quest or ported monster id")
     p.add_argument("--romfs", help="monster files: the source game's RomFS image; the archive is "
                                    "read from it by the registry's source key")
+    p.add_argument("--mh4u-romfs", help="monster files: MH4U's own RomFS image; the stand-in's "
+                                        "data/emNNN.arc is read from it for the paths the port's "
+                                        "record keeps and the port's archive must carry")
     p.add_argument("--arc", help="monster sounds: the monster's source archive "
                                  "(arc/enemy/emNNN[_VV].arc or data/emNNN.arc)")
     p.add_argument("--sound-arc", help="monster sounds, MH3U: its separate sound archive "

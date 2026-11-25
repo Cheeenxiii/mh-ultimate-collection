@@ -56,7 +56,9 @@ is empty; `tests/fixtures/registry-pooled.csv` is a fixture the checker and chec
 MH4U does not tolerate a resource record that names a file it does not have: a 3U session
 hung at "Now Loading" on the record built for 125, which named 13 paths while `em125.arc`
 ships 6 ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)). So a port
-ships only some kinds and the record keeps the stand-in's path for the rest. A kind is one
+ships only some kinds and the record keeps the stand-in's path for the rest; `mhuc convert
+monster` then copies each kept stand-in entry into the port's own archive at the stand-in's
+path, so the one archive the game opens holds every path the record names. A kind is one
 group of paths in the record:
 
 | Kind | The record's paths | 124 ships | 125 ships | 126 ships | 127 ships |
@@ -79,10 +81,13 @@ the model and four motion lists, borrowed from MHXX's em014 (Velocidrome) and sh
 same slots 0, 2, 3 and 4 the source groups them in, so its record keeps the stand-in's paths
 for slots 1 and 5; 127's holds the model and three motion lists, its own MH3U lists at slots
 0, 1 and 2, and no tail, because MH3U's `em045.arc` has none (its tail is part of the body
-model). Until a port's
+model). Each archive also carries a copy of every stand-in entry its record keeps: the
+stand-in's camera, the motion slots the row does not ship, its motion effects, sound (unless
+the port ships its own), effect lists and command, at the stand-in's own paths (`enemy\em001\...`
+for 124 and 125, `enemy\em015\...` for 126 and 127), so the engine finds them in the archive
+it opens. Until a port's
 own camera, motion effects and effect lists are converted, its monster loads MH4U's own from
-the stand-in's paths (`enemy\em001\...` for 124 and 125, `enemy\em015\...` for 126 and
-127); 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
+those paths; 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
 0 to 2. The motion-effect and effect-list formats the `mef` and `efl` kinds carry are laid out
 and checked on the three games' monster archives ([mef](../../specs/mef.md),

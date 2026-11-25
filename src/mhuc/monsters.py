@@ -14,6 +14,13 @@ what the row's `files` says the port ships, converts what needs converting, and 
 entries as the port's own file tree (`enemy/em124/...`) inside MH4U's `/data/em124.arc` and the
 mod folder the fork's mod manager installs.
 
+The record also keeps the stand-in's paths for every kind and motion slot the port does not
+ship (`enemy\\em001\\...`), and MH4U resolves those in the archive the data path names, which is
+the port's own `/data/emNNN.arc`. The archive is therefore made self-sufficient: the stand-in's
+`data/emNNN.arc` is read from MH4U's RomFS and each entry the record keeps is copied into the
+port's archive under its original path. A record path then resolves from the one archive the
+game opens, and `mods/monster_ids` no longer maps a ported id's data path to the stand-in's.
+
 The kinds it produces, and how:
 
 - model, tail (rModel and their rMaterial files): taken as is, except the material's signature
@@ -52,9 +59,10 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from .formats import arc, camera, mrl, tex
+from .formats import arc, camera, mrl, romfs, tex
 
 SOURCE_ARC = "arc/enemy/{source_key}_{variant:02d}.arc"
+STAND_IN_ARC = "/data/em{stand_in:03d}.arc"
 REGISTRY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data", "ids", "registry.csv")
 
@@ -97,6 +105,7 @@ class Report:
     """What the conversion kept, converted and left out, for the command's output and docs."""
     as_is: list[str] = field(default_factory=list)
     converted: list[str] = field(default_factory=list)
+    copied: list[str] = field(default_factory=list)
     left_out: dict[str, list[str]] = field(default_factory=dict)
 
     def leave(self, reason: str, path: str) -> None:
@@ -213,14 +222,90 @@ def _not_shipped(kind: str) -> str:
     return f"not in the row's files: {kind}"
 
 
-def convert(data: bytes, row: Row, variant: int = 0) -> tuple[bytes, Report]:
+def stand_in_archive(romfs_path: str, stand_in: int) -> bytes:
+    """MH4U's own archive for a stand-in, `/data/emNNN.arc` of the base game's RomFS."""
+    image = romfs.open_image(romfs_path)
+    want = STAND_IN_ARC.format(stand_in=stand_in)
+    entry = next((f for f in image.files() if f.path == want), None)
+    if entry is None:
+        raise ConvertError(f"{romfs_path} has no {want}")
+    return image.read(entry)
+
+
+def _stand_in_kind(path: str, type_name: str, key: str) -> tuple[str, int | None] | None:
+    """The resource-record kind of one stand-in archive entry, and its motion slot.
+
+    MH4U's record names the stand-in's own file tree: `enemy\\emNNN\\mod` and `\\mot`,
+    `effect\\mef\\em\\emNNN_*`, `sound\\...`, `effect\\efl\\em\\emNNN\\*` and the command under
+    `enemy\\emNNN\\data`. Entries that are not one of those kinds (the enemy's data files,
+    collision and AI auxiliaries) are not in the record and are never copied.
+    """
+    p = path.replace("\\", "/")
+    stem = p.rsplit("/", 1)[-1]
+    if p.startswith(f"enemy/{key}/mod/"):
+        if type_name in ("rModel", "rMaterial", "rTexture"):
+            tail = stem.endswith(f"{key}_tail") or "_tail_" in stem
+            return ("tail" if tail else "model"), None
+        return None
+    if p.startswith(f"enemy/{key}/mot/"):
+        if type_name == "rCameraList" or stem == f"e{key[2:]}_cam":
+            return "camera", None
+        match = re.fullmatch(rf"{re.escape(key)}_(\d+)", stem)
+        return ("motions", int(match.group(1))) if match else None
+    if p.startswith(f"effect/mef/em/{key}_"):
+        return "mef", None
+    if p.startswith("sound/"):
+        return "sound", None
+    if p.startswith(f"effect/efl/em/{key}/"):
+        return "efl", None
+    if p.startswith(f"enemy/{key}/data/") and stem == f"{key}_cmd":
+        return "cmd", None
+    return None
+
+
+def kept_from_stand_in(stand_in_data: bytes, row: Row) -> list[arc.Entry]:
+    """The stand-in's entries the port's record keeps, under the stand-in's original paths.
+
+    The record rewrites a path only for a kind the row ships and a motion slot the row's
+    `motions=` names; every other kind and slot keeps the stand-in's path, which MH4U looks up
+    in the archive its data path names. The caller appends these to the port's archive.
+    """
+    key = f"em{row.stand_in:03d}"
+    kept: list[arc.Entry] = []
+    for entry in arc.read(stand_in_data).entries:
+        kind_slot = _stand_in_kind(entry.path, entry.type_name or "", key)
+        if kind_slot is None:
+            continue
+        kind, slot = kind_slot
+        if kind == "motions":
+            if slot in row.motions:
+                continue
+        elif kind in row.files:
+            continue
+        kept.append(entry)
+    return kept
+
+
+def with_stand_in(arc_data: bytes, row: Row, stand_in_data: bytes) -> tuple[bytes, list[arc.Entry]]:
+    """`arc_data` with a copy of every stand-in entry the record keeps; returns the archive and
+    the copies."""
+    port = arc.read(arc_data)
+    present = {e.path for e in port.entries}
+    kept = [e for e in kept_from_stand_in(stand_in_data, row) if e.path not in present]
+    port.entries.extend(kept)
+    return arc.write(port), kept
+
+
+def convert(data: bytes, row: Row, stand_in_data: bytes, variant: int = 0) -> tuple[bytes, Report]:
     """MHXX's monster archive as MH4U's, and a report of each entry's kind.
 
     The port's own file tree is `enemy/<id>/...`: the model `enemy/emNNN/mod/emNNN`, the tail
     `..._tail`, the motions `enemy/emNNN/mot/emNNN_<slot>`, the camera `enemy/emNNN/mot/eNNN_cam`
     and the AI script `enemy/emNNN/data/emNNN_cmd`. The textures keep the paths MHXX's material
     files give them. Only the kinds in `row.files` are produced; the rest are left out with a
-    reason, because the plugin keeps the stand-in's path for them.
+    reason, because the plugin keeps the stand-in's path for them. Those kept paths are copied
+    from MH4U's stand-in archive (`stand_in_data`) under their original paths, so the game
+    finds every path the record names in the one archive it opens.
     """
     missing = row.files - PRODUCED
     if missing:
@@ -340,6 +425,9 @@ def convert(data: bytes, row: Row, variant: int = 0) -> tuple[bytes, Report]:
             raise ConvertError(f"{kind}: the row's files lists it, but {prefix} has none")
     if not entries:
         raise ConvertError(f"{prefix}: no file of a kind the port ships")
+    kept = [e for e in kept_from_stand_in(stand_in_data, row) if e.path not in {x.path for x in entries}]
+    entries.extend(kept)
+    report.copied.extend(e.file_name for e in kept)
     return arc.write(arc.Archive(ARC_VERSION, entries)), report
 
 

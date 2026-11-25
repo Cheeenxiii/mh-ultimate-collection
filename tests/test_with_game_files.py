@@ -1283,12 +1283,15 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
     image = romfs.open_image(dump("mhxx", "romfs.bin"))
     source_file = next(f for f in image.files() if f.path == "/arc/enemy/em001_00.arc")
     source_data = image.read(source_file)
+    image4 = romfs.open_image(dump("mh4u", "romfs.bin"))
+    stand_in = image4.read(next(f for f in image4.files() if f.path == "/data/em001.arc"))
     row = monsters.registry_row(124)
-    converted_data, report = monsters.convert(source_data, row)
+    converted_data, report = monsters.convert(source_data, row, stand_in)
     converted = arc.read(converted_data)
     source = {e.file_name: e.data for e in arc.read(source_data).entries}
+    stand_in_entries = {e.file_name: e.data for e in arc.read(stand_in).entries}
     assert converted.version == 0x13
-    assert [e.file_name for e in converted.entries] == [
+    port = {
         "enemy/em001/em001_00/mod/em001_00_BM.tex",
         "enemy/em001/em001_00/mod/em001_00_NM_MIRROR.tex",
         "enemy/em124/mod/em124.mrl",
@@ -1301,7 +1304,21 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
         "enemy/em124/mot/em124_3.lmt",
         "enemy/em124/mot/em124_4.lmt",
         "enemy/em124/data/em124_cmd.emc",
-    ]
+    }
+    assert {e.file_name for e in converted.entries if e.file_name in port} == port
+    # Every other entry is an entry of MH4U's stand-in archive the record keeps (the camera,
+    # motion effects, sound and effect lists the row does not ship), at its original path.
+    kept = [e for e in converted.entries if e.file_name not in port]
+    assert {e.file_name for e in kept} == set(report.copied)
+    assert all(e.file_name in stand_in_entries for e in kept)
+    assert {e.file_name for e in kept if e.file_name.startswith("enemy/")} == {
+        "enemy/em001/mot/e001_cam.lcm"}
+    assert {e.file_name for e in kept if e.file_name.startswith("effect/mef/")} == {
+        "effect/mef/em/em001_0.mef", "effect/mef/em/em001_1.mef"}
+    assert "sound/call/em/em001.mss" in {e.file_name for e in kept}
+    assert any(e.file_name.startswith("effect/efl/em/em001/") for e in kept)
+    for e in kept:
+        assert e.data == stand_in_entries[e.file_name], e.file_name
     taken = {
         "enemy/em124/mod/em124.mod": "enemy/em001/em001_00/mod/em001_00.mod",
         "enemy/em124/mod/em124.mrl": "enemy/em001/em001_00/mod/em001_00.mrl",
@@ -1491,7 +1508,7 @@ def test_convert_monster_builds_her_files_and_sounds_into_one_folder(dump, tmp_p
             sources[f.path].write_bytes(image.read(f))
     out = tmp_path / "mod"
     assert cli.main(["convert", "monster", "--id", "125", "--romfs", dump("mh3u", "romfs.bin"),
-                     "--out", str(out)]) == 0
+                     "--mh4u-romfs", dump("mh4u", "romfs.bin"), "--out", str(out)]) == 0
     assert cli.main(["convert", "monster", "--id", "125", "--arc", str(sources["/arc/enemy/em001.arc"]),
                      "--sound-arc", str(sources["/arc/sound/se/em/em001/snd_em001.arc"]),
                      "--out", str(out)]) == 0
@@ -1503,11 +1520,19 @@ def test_convert_monster_builds_her_files_and_sounds_into_one_folder(dump, tmp_p
                  "enemy\\em125\\mot\\em125_2", "sound\\call\\em\\em125",
                  "sound\\se\\em\\em125\\snd_em125"):
         assert path in paths, path
+    # The record keeps the stand-in's camera, motion effects, command and effect lists, and the
+    # two motion slots the row does not ship; the archive carries a copy of each.
+    for path in ("enemy\\em001\\mot\\e001_cam", "effect\\mef\\em\\em001_0",
+                 "effect\\mef\\em\\em001_1", "enemy\\em001\\data\\em001_cmd",
+                 "effect\\efl\\em\\em001\\em001_000", "enemy\\em001\\mot\\em001_3",
+                 "enemy\\em001\\mot\\em001_4"):
+        assert path in paths, path
     counts = Counter(e.type_name for e in built.entries)
-    assert counts["rMotionList"] == 3 and counts["rLtSoundSourceADPCM"] == 48, counts
-    for e in built.entries:
-        if e.type_name == "rMotionList":
-            assert lmt.read(e.data)[0] == 67
+    port_motions = [e for e in built.entries
+                    if e.type_name == "rMotionList" and e.path.startswith("enemy\\em125\\")]
+    assert len(port_motions) == 3 and counts["rLtSoundSourceADPCM"] == 48, counts
+    for e in port_motions:
+        assert lmt.read(e.data)[0] == 67
 
 
 def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, tmp_path):
@@ -1517,7 +1542,8 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
     source_data = image.read(source_file)
     out = tmp_path / "giadrome"
     args = SimpleNamespace(id=126, romfs=dump("mhxx", "romfs.bin"), out=str(out), variant=0,
-                           registry=None, game="mhxx", report=str(tmp_path / "report.txt"))
+                           registry=None, game="mhxx", report=str(tmp_path / "report.txt"),
+                           mh4u_romfs=dump("mh4u", "romfs.bin"))
     assert cli._convert_monster_files(args) == 0
     converted = arc.read((out / "romfs" / "data" / "em126.arc").read_bytes())
     source = {e.file_name: e.data for e in arc.read(source_data).entries}
@@ -1525,7 +1551,7 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
     # Giadrome's motion lists are MHXX's em014's (Velocidrome), at slots 0, 2, 3 and 4; the
     # converter renames them to the port's id but keeps the slot. Its AI script is left out:
     # the row does not ship `cmd`, because MHXX's EMC is not MH4U's (specs/emc.md).
-    assert [e.file_name for e in converted.entries] == [
+    port = {
         "enemy/em034/em034_00/mod/em034_00_01_BM.tex",
         "enemy/em034/em034_00/mod/em034_00_01_NM_MQ_MIRROR.tex",
         "enemy/em126/mod/em126.mrl",
@@ -1534,7 +1560,21 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
         "enemy/em126/mot/em126_2.lmt",
         "enemy/em126/mot/em126_3.lmt",
         "enemy/em126/mot/em126_4.lmt",
-    ]
+    }
+    image4 = romfs.open_image(dump("mh4u", "romfs.bin"))
+    stand_in = image4.read(next(f for f in image4.files() if f.path == "/data/em015.arc"))
+    stand_in_entries = {e.file_name: e.data for e in arc.read(stand_in).entries}
+    assert {e.file_name for e in converted.entries if e.file_name in port} == port
+    # The rest is the stand-in's (Great Jaggi's) archive: the row ships no camera, tail, mef,
+    # sound, cmd or efl, so the record keeps those paths and the archive must carry them.
+    kept = [e for e in converted.entries if e.file_name not in port]
+    assert kept and all(e.file_name in stand_in_entries for e in kept)
+    assert {e.file_name for e in kept if e.file_name.startswith("enemy/em015/mot/")} == {
+        "enemy/em015/mot/e015_cam.lcm"}
+    assert "effect/mef/em/em015_0.mef" in {e.file_name for e in kept}
+    assert "sound/call/em/em015.mss" in {e.file_name for e in kept}
+    assert "enemy/em015/data/em015_cmd.emc" in {e.file_name for e in kept}
+    assert "effect/efl/em/em015/em015_000.efl" in {e.file_name for e in kept}
     taken = {
         "enemy/em126/mod/em126.mod": "enemy/em034/em034_00/mod/em034_00.mod",
         "enemy/em126/mod/em126.mrl": "enemy/em034/em034_00/mod/em034_00.mrl",
@@ -1559,7 +1599,8 @@ def test_the_giadrome_conversion_builds_its_folder_from_mhxxs_own_archive(dump, 
         before = source[entry.file_name]
         assert len(entry.data) == len(before), entry.file_name
         assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
-    assert not any(e.file_name.endswith("_cmd.emc") for e in converted.entries)
+    assert not any("em034" in e.file_name and e.file_name.endswith("_cmd.emc")
+                   for e in converted.entries)
     report = (tmp_path / "report.txt").read_text(encoding="utf-8")
     assert "left out (not in the row's files: cmd): enemy/cmd_tbl/em034_00_cmdtbl.emc" in report
 def test_great_wroggis_conversion_ships_the_kinds_and_slots_its_row_names(dump, tmp_path):
@@ -1576,12 +1617,23 @@ def test_great_wroggis_conversion_ships_the_kinds_and_slots_its_row_names(dump, 
 
     out = tmp_path / "mod"
     assert cli.main(["convert", "monster", "--from", "mh3u", "--id", "127",
-                     "--romfs", romfs_path, "--out", str(out)]) == 0
+                     "--romfs", romfs_path, "--mh4u-romfs", dump("mh4u", "romfs.bin"),
+                     "--out", str(out)]) == 0
     built = arc.read((out / "romfs" / "data" / "em127.arc").read_bytes())
     assert built.version == 0x13
-    assert Counter(e.type_name for e in built.entries) == {
+    port = [e for e in built.entries if e.path.startswith("enemy\\em127\\")]
+    assert Counter(e.type_name for e in port) == {
         "rModel": 1, "rMaterial": 1, "rTexture": 1, "rMotionList": 3}
-    assert all(e.path.startswith("enemy\\em127\\") for e in built.entries)
+    # The record keeps Great Jaggi's camera, motion effects, sound, command and effect lists
+    # (the row ships model and motions only), so the archive carries MH4U's own copies.
+    image4 = romfs.open_image(dump("mh4u", "romfs.bin"))
+    stand_in = arc.read(image4.read(next(f for f in image4.files() if f.path == "/data/em015.arc")))
+    stand_in_entries = {e.file_name for e in stand_in.entries}
+    kept = [e for e in built.entries if not e.path.startswith("enemy\\em127\\")]
+    assert kept and all(e.file_name in stand_in_entries for e in kept)
+    assert {"enemy/em015/mot/e015_cam.lcm", "effect/mef/em/em015_0.mef",
+            "sound/call/em/em015.mss", "enemy/em015/data/em015_cmd.emc"} <= {
+        e.file_name for e in kept}
 
     # The registry's row and the built archive agree on the kinds and motion slots.
     rows, problems = check_ids.read_registry(monstersound.REGISTRY)
@@ -1591,12 +1643,12 @@ def test_great_wroggis_conversion_ships_the_kinds_and_slots_its_row_names(dump, 
     ships = {kind for kind, _ in check_ids.files_tokens(row["files"])}
     assert ships == {"model", "motions"}
     assert check_ids.motion_slots(row["files"]) == sorted(
-        int(e.path.rsplit("_", 1)[1]) for e in built.entries if e.type_name == "rMotionList")
+        int(e.path.rsplit("_", 1)[1]) for e in port if e.type_name == "rMotionList")
 
     # The model and texture are the source's bytes; the materials name only textures the archive has.
     kept = {e.path.rsplit("\\", 1)[1].replace("em045", "em127"): e.data
             for e in source.entries if e.type_name in ("rModel", "rTexture")}
-    for e in built.entries:
+    for e in port:
         if e.type_name in ("rModel", "rTexture"):
             assert e.data == kept[e.path.rsplit("\\", 1)[1]], e.path
         if e.type_name == "rMaterial":
@@ -1606,7 +1658,7 @@ def test_great_wroggis_conversion_ships_the_kinds_and_slots_its_row_names(dump, 
 
     # The motion lists are version 67 and keep the source's animations, tracks and events.
     source_motions = sorted((e for e in source.entries if e.type_name == "rMotionList"), key=lambda e: e.path)
-    built_motions = sorted((e for e in built.entries if e.type_name == "rMotionList"), key=lambda e: e.path)
+    built_motions = sorted((e for e in port if e.type_name == "rMotionList"), key=lambda e: e.path)
     assert [e.path for e in built_motions] == [f"enemy\\em127\\mot\\em127_{i}" for i in range(3)]
     for old, new in zip(source_motions, built_motions, strict=True):
         old_version, before = lmt.read(old.data)
