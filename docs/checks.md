@@ -533,7 +533,7 @@ P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 its registry id (256), and its headless prerequisite is P4. Not done.
 
 Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod's 16 hook
-points (the two quest hooks among them), headless runner. The passes:
+points (the two quest hooks among them), headless runner. The runs:
 
 - **Shipped registry (2 permanent, 0 pooled):** pass. The log had `ready: answering MH4U's
   monster tables for 2 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest,
@@ -558,16 +558,30 @@ points (the two quest hooks among them), headless runner. The passes:
   record named `em127` for slots 0 to 2; each record's ships/keeps line and the reader lines
   with `ids 0..123 pass through` were as above; and `self-test: the pool 224..255 is unused:
   no pooled monster id is registered`. The name/notes hooks were not in this run's code
-  library, so the `isn't a hook point` lines in it belong to the text work, not to a ported
-  id.
+  library, so its text lines were not exercised.
+- **Four registered ids with the name/notes hooks (4 permanent, 0 pooled):** pass. The code
+  library was built from the three plugins (54 hook points), with the mod's text table in its
+  folder. The log had the ready line `ready: answering MH4U's monster tables and name/notes
+  message getters for 4 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest,
+  with the files each port ships and the stand-in's for the rest`; the 124 to 127 records
+  named `em124`/`em125`/`em126`/`em127` for the kinds and slots their registry rows list and
+  kept the stand-in's paths for the rest (the 125 record named `sound\call\em\em125`; the 126
+  and 127 records kept `em015` elsewhere); the ships/keeps lines reported the registry's
+  masks; every reader line had `ids 0..123 pass through`; `text: 4 of 4 entry(ies) from
+  text/monster_text.bin; every registered id has a name and notes`; a `self-test: message name
+  id 124 -> "Rathian", 7 UTF-16 unit(s)` line and a notes line per id (118, 223, 75 and 238
+  units for 124 to 127); one `self-test: id 124's getters answer its own record; ids 0..123
+  pass through` per id; `self-test: message tables: id 1 answers the game's own format; ids
+  0..123 pass through`; and `self-test: the pool 224..255 is unused: no pooled monster id is
+  registered`. The self-test logged at 3.22 s, when MH4U's message tables were up; the plugin
+  now waits for `load_text`'s result before running it.
 
-The name/notes message getters and the text table were added after the run above: the code
-library has not been rebuilt with the mod's 19 hook names (50 hook points), `text/monster_text.bin` has not
-been put in the mod's folder, and the text lines in step 4 are **not run yet**. The Python side
-is checked without the game: the message tables by LM1 (specs/lmd.md), and the text table by
-`tools/check_text.py --mod` on a table built from the dumps with `mhuc text build`.
+The name/notes message getters and the text table were in the run above: the code library
+has the mod's 19 hook names (50 hook points with the mod alone, 54 with the three plugins) and
+`text/monster_text.bin` was built from the dumps (4 entries) and passed `tools/check_text.py
+--mod`. The Python side is checked without the game: the message tables by LM1 (specs/lmd.md).
 
-No `isn't a hook point` line appeared in either run. P2 is not done; until it is, whether the
+No `isn't a hook point` line appeared in any run. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.
 
 After that run, 125's registry row gained `cmd`
@@ -579,7 +593,8 @@ the next P1 run's 125 record also names `sound\call\em\em125`, the converted sou
 #158's `mhuc convert monster` writes, and its 126 and 127 records name `em126`/`em127` for the
 model and the motion slots their rows list while keeping the stand-in's `em015` elsewhere;
 #159 added `cmd` on the plan to convert 125's EMC, but that converter is a follow-up after #49,
-so the row lists no `cmd` and the record keeps the stand-in's script. That run is not done yet.
+so the row lists no `cmd` and the record keeps the stand-in's script. That run is the
+four-id run above: its records, masks, text and readers pass.
 
 ### The quest's load, fixed (P2, headless)
 
