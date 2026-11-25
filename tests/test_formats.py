@@ -195,6 +195,29 @@ def test_etd_part_table_outside_the_file_is_counted_not_read():
     assert emd.check_etd(bytes(d))["E13 etd part table missing or short"] == 1
 
 
+def test_emd_attack_flag_words_count_the_bits_the_readers_test():
+    """specs/emd.md check E10: the two words at +0x10 and +0x14 are flag bitfields; the check counts the bits
+    0xbe9c14/0xbe8dac read against the ones no reader tests, and the state's +0x44 bit 0 that no record sets"""
+    d = bytearray(0x200)
+    d[:4] = b"etd\0"
+    struct.pack_into("<I", d, 4 * 28, 0x80)                   # attack records at 0x80, word 29 = 0
+    struct.pack_into("<H", d, 0x80 + 40 * 1 + 0x10, 0x8000)   # bit 15: a reader tests it
+    d[0x80 + 40 * 1 + 0x12] = 0x08                            # bit 19: no reader tests it
+    struct.pack_into("<H", d, 0x80 + 40 * 2 + 0x10, 0x0400)   # bit 10: a reader tests it
+    d[0x80 + 40 * 2 + 0x14] = 2                               # +0x44 bit 1: a reader tests it
+    struct.pack_into("<H", d, 0x80 + 40 * 3, 0xFFFF)          # terminator
+    counts = emd.check_attack_records(bytes(d))
+    assert counts["E10 etd attack records"] == 3
+    assert counts["E10 etd attack +0x40 has a bit a reader tests"] == 2
+    assert counts["E10 etd attack +0x40 no bit a reader tests"] == 1
+    assert counts["E10 etd attack +0x40 has a bit no reader tests"] == 1
+    assert counts["E10 etd attack +0x44 bit 0 clear"] == 3
+    assert counts["E10 etd attack +0x44 bit 0 set"] == 0
+    assert counts["E10 etd attack +0x44 bits 1-2 set"] == 1
+    assert counts["E10 etd attack +0x44 every set bit read"] == 3
+    assert counts["E10 etd attack +0x44 has a bit no reader tests"] == 0
+
+
 def test_emd_word_35_records_end_at_the_minus_one_record_and_count_the_sever_ones():
     """specs/emd.md word 35, checks E11 and E12: kinds 0/3/5 are the severs; the index, limit, a and b are counted"""
     d = bytearray(0x140)
