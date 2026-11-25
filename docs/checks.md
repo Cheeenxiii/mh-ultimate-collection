@@ -289,9 +289,17 @@ registry names as its stand-in, except its resource record, which the plugin bui
 ported id so the game loads the port's files from its own paths; 0 to 123 fall through. The
 headless check needs no converted monster files, so it runs before #48 and #49.
 
+Ids 124 to 223 are permanent. A monster ported after that range is full takes a registry id
+from 256 up, and the plugin lends it a free byte of 224 to 255 for each quest that names it: at
+quest start it rewrites the pooled ids in the loaded `.mib`'s large-monster waves, the reader
+hooks answer the lent byte with the pooled monster's rows, and the bytes are freed when the
+quest ends. The bytes, the quest data it reads and the fixture are in the plugin's
+[README](../mods/monster_ids/README.md#the-id-pool). No pooled monster ships, so the shipped
+registry has no row from 256 up and the pool is exercised through a registry fixture.
+
 | Check | What | Pass |
 |---|---|---|
-| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built and the paths it names under its own id, the path the stand-in's data comes from, and ids 0 to 123 passing through |
+| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built and the paths it names under its own id, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
 | P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
 
 P1, headless:
@@ -300,27 +308,47 @@ P1, headless:
    (`tools/mods.py add mods/monster_ids`). Set `selftest = 1` in the installed mod's
    `config.ini`. Build the code library with the mod on:
    `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`. The
-   build lists the mod's 14 hook points.
-2. Run the game headless:
+   build lists the mod's 16 hook points.
+2. For the pool's lines, use the registry fixture instead of the shipped registry: copy the
+   mod, write the copy's header from `tests/fixtures/registry-pooled.csv`
+   (`python3 tools/check_ids.py --registry tests/fixtures/registry-pooled.csv --header
+   <copy>/src/ids.h --write`), `make` in the copy, and install that library. It is a registry
+   fixture, not a shipped monster.
+3. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
-3. Pass: the log has `ready: answering MH4U's monster tables for 2 ported id(s), 124 and up`
-   and one `self-test: id 124 resource record at <address>, built from stand-in 1, names:
-   enemy\em124\mod\em124; ...` line per registered id, listing the paths read back from the
-   record built in guest memory; and, for each reader, `self-test: <reader> answers ...; ids
-   0..123 pass through`. The factory's and data path's lines name the path the stand-in's
-   files are read from (`enemy\em001\data\em001`), which the record does not change. MH4U's
-   own monsters were not loaded, so only the self-test's mapping shows here; a real spawn's
-   reader lines are P2's.
+4. Pass: the log has `ready: answering MH4U's monster tables for 1 permanent and 1 pooled
+   id(s), 124 and up, lending 224..255 per quest` (the shipped registry gives `2 permanent and
+   0 pooled`), and one `self-test: id <id> resource record at <address>, built from stand-in 1,
+   names: ...` line per registered id, listing the paths read back from the record built in
+   guest memory; and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass
+   through`. The factory's and data path's lines name the path the stand-in's files are read
+   from (`enemy\em001\data\em001`), which the record does not change. With the fixture the log
+   also has `quest 60001: pooled id 256 -> lent 224`, `self-test: quest 60001 names pooled id
+   256; lent 224; the readers answer 224 -> pooled id 256, stand-in 1, its own record`, `quest
+   60001 ends: freed the pool byte(s) 224` and `self-test: the quest ended, so byte 224 is free
+   again`; with the shipped registry its place is `self-test: the pool 224..255 is unused: no
+   pooled monster id is registered`. MH4U's own monsters were not loaded, so only the
+   self-test's mapping shows here; a real spawn's reader lines are P2's.
 
 P2, in game: needs the ported files (#48, #49) and a quest that names id 124
-([quests.md](quests.md)). Not done.
+([quests.md](quests.md)), and for the pool a pooled monster's row, files and a quest that names
+its registry id (256). Not done.
 
-Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod, headless
-runner. Result: the plugin loaded, and the log showed the ready line, a line per registered
-id naming the paths of the record it built in the game's heap (`enemy\em124\...` and
-`enemy\em125\...`), a self-test line for each reader with `ids 0..123 pass through` (including the effect lists
-reader, the third reader of the record), and the stand-in's data path
-`enemy\em001\data\em001`. P2 is not done; until it is, whether the
+Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod's 16 hook
+points (the two quest hooks among them), headless runner. Both passes:
+
+- **Shipped registry (2 permanent, 0 pooled):** pass. The log had `ready: answering MH4U's
+  monster tables for 2 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest`,
+  the `enemy\em124\...` and `enemy\em125\...` record lines, every reader line with `ids 0..123
+  pass through`, and `self-test: the pool 224..255 is unused: no pooled monster id is
+  registered`.
+- **Pooled fixture (1 permanent, 1 pooled):** pass. The log had the fixture's ready line, the
+  `enemy\em256\...` record line, and `quest 60001: pooled id 256 -> lent 224`, `self-test:
+  quest 60001 names pooled id 256; lent 224; the readers answer 224 -> pooled id 256, stand-in
+  1, its own record`, `quest 60001 ends: freed the pool byte(s) 224` and `self-test: the quest
+  ended, so byte 224 is free again`.
+
+No `isn't a hook point` line appeared in either run. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.
 
 ## Calling the engine from a plugin (P3)
