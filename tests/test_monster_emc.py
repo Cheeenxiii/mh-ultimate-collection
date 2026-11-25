@@ -38,6 +38,36 @@ def test_emc_reads_native_actions_and_skips_branches():
     assert monster_emc.actions(data) == {(3, 23), (8, 0)}
 
 
+def test_emc_cuts_scripts_with_the_length_table():
+    """The arity rules: an opcode's argument count, and a block's sub-code and value width."""
+    lens = bytearray(0x42)
+    lens[0x00] = 2       # 00 cat num
+    lens[0x10] = 0       # no arguments
+    lens[0x40] = 0x81    # a block opener with one argument
+    lens[0x41] = 0x90    # a case block whose value is two bytes
+    script = (b"\x00\x03\x17"          # action 3/23
+              b"\x10"                  # one byte
+              b"\x40\x00\x05"          # block opener, sub-code 0, one argument
+              b"\x40\x01\x2a"          # case, sub-code 1, one-byte value
+              b"\x41\x01\x2a\x2b"      # case, sub-code 1, two-byte value
+              b"\x40\x02"              # else
+              b"\x40\xff"              # block end
+              b"\xff")                 # the script's end marker
+    cut, rest = monster_emc.tokens(script, bytes(lens))
+    assert rest == b""
+    assert cut == [b"\x00\x03\x17", b"\x10", b"\x40\x00\x05", b"\x40\x01\x2a",
+                   b"\x41\x01\x2a\x2b", b"\x40\x02", b"\x40\xff"]
+
+
+def test_emc_reports_a_script_that_does_not_cut_cleanly():
+    lens = bytearray(0x42)
+    lens[0x00] = 2
+    lens[0x10] = 0
+    # 0x00 needs two arguments and has none; 0x50 is past the table.
+    assert monster_emc.tokens(b"\x10\x00", bytes(lens))[1] == b"\x00"
+    assert monster_emc.tokens(b"\x10\x50\xff", bytes(lens))[1] == b"\x50\xff"
+
+
 def test_emc_rejects_a_script_past_the_file():
     data = bytearray(emc(0x20110601, [[b"\x00\x01\x02"]]))
     table = struct.unpack_from("<I", data, 0x14)[0]    # group 0's script table
