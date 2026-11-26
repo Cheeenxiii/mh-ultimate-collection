@@ -116,16 +116,17 @@ uint32_t mhuc_scratch(MH4UCall *call) {
     return mhuc_stubs(call) ? stub_block + STUB_SCRATCH : 0;
 }
 
-/* vmov r0, sN; bx lr: one float the dispatcher's caller passed in s0-s3. */
+/* vmov r0, sN; bx lr: one float the dispatcher's caller passed in s0-s3. It runs through
+ * ABI 3's call, not call2: call2 sets s0 and s1 (to 0.0 when they are NULL), while this stub
+ * must read the caller's VFP registers as they are. */
 uint32_t mhuc_read_s(MH4UCall *call, unsigned n) {
     if (n > 3 || !mhuc_stubs(call)) {
         return 0;
     }
     const uint32_t at = stub_block + STUB_READ + 8u * n;
-    const uint32_t args[4] = {0, 0, 0, 0};
     host->write32(call, at + 0, 0xEE100A10u | (n << 16));
     host->write32(call, at + 4, 0xE12FFF1Eu);
-    return host->call2(call, at, args, NULL, NULL);
+    return host->call(call, at, 0, 0, 0);
 }
 
 /* vldr s0,[pc,#16]; vldr s1,[pc,#16]; vldr s2,[pc,#16]; ldr pc,[pc,#16]; pad; pad;

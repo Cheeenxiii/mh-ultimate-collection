@@ -257,11 +257,13 @@ static void host_skip_original(MH4UCall *call) {
 
 /* The runtime's guest stubs: the caller's s0-s3 readers at the stub block's read area, and the
  * s0/s1/s2 call after it. */
-static uint32_t run_stub(uint32_t addr, const uint32_t *r0_r3) {
+/* `s` is the guest's VFP state the stub runs with: call leaves the caller's s0-s3, call2
+ * sets s0/s1 (to 0.0 when its floats are NULL) and leaves s2/s3. */
+static uint32_t run_stub(uint32_t addr, const uint32_t *r0_r3, const float s[4]) {
     const uint32_t w0 = fake_mem_read32(addr);
     if ((w0 & 0xFFF0FFFFu) == 0xEE100A10u) {          /* vmov r0,sN; bx lr */
         const unsigned n = (w0 >> 16) & 3u;
-        return float_bits(fake_s[n]);
+        return float_bits(s[n]);
     }
     if (w0 == 0xED9F0A04u) {                          /* vldr s0/s1/s2; ldr pc; ... */
         const uint32_t fn = fake_mem_read32(addr + 36);
@@ -288,7 +290,8 @@ static uint32_t host_call(MH4UCall *call, uint32_t addr, uint32_t a0, uint32_t a
     }
     if (in_stubs(addr)) {
         const uint32_t args[4] = {a0, a1, a2, 0};
-        return run_stub(addr, args);
+        const float s[4] = {fake_s[0], fake_s[1], fake_s[2], fake_s[3]};
+        return run_stub(addr, args, s);
     }
     const uint32_t r[4] = {a0, a1, a2, 0};
     const float s[3] = {0.0f, 0.0f, 0.0f};
@@ -303,7 +306,10 @@ static uint32_t host_call2(MH4UCall *call, uint32_t addr, const uint32_t *r0_r3,
         return 0;
     }
     if (in_stubs(addr)) {
-        return run_stub(addr, r0_r3);
+        float s[4] = {fake_s[0], fake_s[1], fake_s[2], fake_s[3]};
+        s[0] = s0_s1 ? s0_s1[0] : 0.0f;
+        s[1] = s0_s1 ? s0_s1[1] : 0.0f;
+        return run_stub(addr, r0_r3, s);
     }
     uint32_t r[4] = {0, 0, 0, 0};
     float s[3] = {0.0f, 0.0f, 0.0f};
