@@ -22,6 +22,9 @@
     {"name": "message::getRecord", "address": "0x00cdfa18"},
     {"name": "message::getRecordById", "address": "0x00cdfa30"},
     {"name": "uc_dataPath", "address": "0x00b7300c"},
+    {"name": "notesList::pages", "address": "0x006191f8"},
+    {"name": "notesList::page", "address": "0x0061df4c"},
+    {"name": "notesList::detail", "address": "0x006234b4"},
     {"name": "uEnemy::dispatchAction", "address": "0x006e9cac"}
   ],
   "plugin": {

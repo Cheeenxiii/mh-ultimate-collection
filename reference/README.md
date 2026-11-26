@@ -743,10 +743,12 @@ register or from the monster's data block, so the plugin rewrites that one value
 game's function, which leaves MH4U's 0 to 123 untouched. The resource record is the exception:
 a port ships only some of its path kinds and motion slots, so the plugin builds the id a
 record of its own with its own paths for the kinds and motion slots its registry `files`
-lists and the stand-in's for the rest, and answers the three table readers with it. The name and notes text and the notes list's
-walk are not answered yet: the message layer is shared by every text kind, and the walk reads
-all 124 rows rather than one id. [The plugin's check](../docs/checks.md#uc-runtime) is
-the headless one.
+lists and the stand-in's for the rest, and answers the three table readers with it. The name
+and notes text is answered through the three message getters, and the notes list's page init
+(0x006191f8), page builder (0x0061df4c) and detail (0x006234b4) are hooked so a ported id gets
+a page of its own after MH4U's own pages; the walk still reads all 124 order rows, so the
+runtime adds its ids' pages rather than a row. [The plugin's check](../docs/checks.md#uc-runtime)
+is the headless one.
 
 The game's heap allocator, which plugins use, is named in the fork's `config/symbols.txt`, section "Heap".
 

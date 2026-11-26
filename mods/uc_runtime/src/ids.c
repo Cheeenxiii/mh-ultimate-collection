@@ -111,9 +111,18 @@
  * `mhuc text build` from the source game's notes table and the registry's name). Ids 0 to 123
  * and every other message table go to the game's getters.
  *
- * What is not answered yet (left undone): the Hunter's Notes list that walks all 124 rows
- * (0x0061df4c). The stand-in also means the spawned monster is MH4U's own (the data block
- * keeps its own id byte) until #48/#49's converted files and the port's own rows replace it.
+ * The Hunter's Notes list. MH4U builds the list from the 124 rows of `monsterListOrder`
+ * (0x00df35b0), so a ported id has no row and no page of its own. The plugin wraps the page
+ * init (0x006191f8) and the page builder (0x0061df4c): the init gets the pages the
+ * registered ids need after MH4U's own, and the builder fills those pages from the registry,
+ * setting each name through the game's own text widgets. The page slots are the registered
+ * ids; the detail (0x006234b4) maps such a slot to the ported id, runs the game's detail for
+ * its stand-in and then sets the name and notes objects to the ported id, whose getters above
+ * answer its own text. A page before the runtime's is MH4U's own and runs unchanged, so ids 0
+ * to 123 keep their rows and pages, and nothing is written to the game's tables.
+ *
+ * The stand-in still means the spawned monster is MH4U's own (the data block keeps its own
+ * id byte) until #48/#49's converted files and the port's own rows replace it.
  *
  * Settings (mod.json "config", the player's config.ini over it):
  *   selftest  "1": on the first frame, log what the reader hooks answer for each registered
@@ -1485,6 +1494,247 @@ static void self_test_text(MH4UCall *call) {
     say(ours ? MH4U_LOG_WARNING : MH4U_LOG_INFO, line);
 }
 
+/* ── the Hunter's Notes list ─────────────────────────────────────────────────────
+ *
+ * MH4U builds the notes list from `monsterListOrder` (0x00df35b0): 124 rows of 8 bytes, +0
+ * the monster id and +4 the message index of its name. The page builder 0x0061df4c takes a
+ * page number in r0 and fills the page object at 0x01090868: +0x30 the number of entries on
+ * the page and +0x34 eight order positions (-1 when empty). The page init 0x006191f8 sets
+ * the page count at +0x1f7 of the notes UI object it gets in r0: the rows whose name index is
+ * set in the bitset of the current message string table, ceil(visible/8). Rows 91 to 123 have
+ * no name index, so the count is at most 12 pages. The detail 0x006234b4 takes an order
+ * position, reads the id in that row, and sets the selected monster's name and notes text
+ * through the message layer.
+ *
+ * A ported id has no row, so the runtime adds pages of its own after MH4U's: the page init
+ * gets ceil(registered/8) more pages, and the page builder fills those pages with the
+ * registered permanent ids, setting each name through the same text widgets the game uses.
+ * The page slots are the registered ids themselves. The detail maps such a slot to its
+ * stand-in's order position, runs the game's detail for that position (the page, the
+ * widgets and the transition), and then sets the two text objects to the ported id, whose
+ * message getters answer its own name and notes. A page before the runtime's is the game's
+ * own and runs unchanged, so ids 0 to 123 keep their rows and pages; nothing is written to
+ * the game's tables. The page init hook knows the game's exact count; until it has run, the
+ * runtime counts the rows with a name index as an upper bound and leaves those pages to the
+ * game, which is safe because the page builder only runs after the init.
+ */
+#define MONSTER_ORDER_TABLE   0x00df35b0u
+#define MONSTER_ORDER_ROWS    124u
+#define MONSTER_ORDER_INDEX   4u
+#define NOTES_PAGE_OBJECT     0x01090868u
+#define NOTES_PAGE_COUNT      0x30u
+#define NOTES_PAGE_ENTRIES    0x34u
+#define NOTES_PAGE_MAX        8u
+#define NOTES_PAGE_COUNT_AT   0x1f7u
+#define NOTES_TEXT_HEAD       0x0108f608u   /* the text widget list */
+#define NOTES_TEXT_HEAD_AT    0x3cu
+#define NOTES_TEXT_STRUCT     0x00ae5e14u   /* (dest, src): dest = {src, src[8]} */
+#define NOTES_TEXT_SET_NAME   0x005a9184u   /* (entry, id): the name message */
+#define NOTES_TEXT_SET_NOTES  0x005a8698u   /* (entry, id): the notes message */
+#define NOTES_TEXT_ADVANCE    0x00d037d0u   /* (out, entry): the next entry */
+#define NOTES_WIDGET_RESET    0x0061a1a8u   /* resets the page's text widgets */
+#define NOTES_UI_TEXT_NAME    0x010908fcu   /* 0x010908d4 + 0x28, the name object */
+#define NOTES_UI_TEXT_NOTES   0x0109090cu   /* 0x010908d4 + 0x38, the notes object */
+
+static HookInfo h_notes_pages = {"notes list pages", 0, 0, 0};
+static HookInfo h_notes_walk = {"notes list", 0, 0, 0};
+static HookInfo h_notes_detail = {"notes detail", 0, 0, 0};
+static uint32_t notes_mh4u_pages;   /* MH4U's own page count */
+static int notes_pages_known;       /* set once the count is read or computed */
+
+/* MH4U's own page count. The page init hook learns it from the game (which also checks that
+ * each row's name message is loaded) and replaces this. Before that, count the rows with a
+ * name index: the visible count the game computes is at most that, so this upper bound never
+ * takes one of the game's pages for the runtime's. The page builder only runs after the
+ * notes list's init, so the exact count is known there. */
+static uint32_t notes_page_count(MH4UCall *call) {
+    if (notes_pages_known) {
+        return notes_mh4u_pages;
+    }
+    uint32_t listed = 0;
+    for (uint32_t i = 0; i < MONSTER_ORDER_ROWS; i++) {
+        if (host->read16(call, MONSTER_ORDER_TABLE + i * 8u + MONSTER_ORDER_INDEX)) {
+            listed++;
+        }
+    }
+    notes_mh4u_pages = (listed + NOTES_PAGE_MAX - 1u) / NOTES_PAGE_MAX;
+    notes_pages_known = 1;
+    return notes_mh4u_pages;
+}
+
+/* The order position of the MH4U monster `id`, or -1. */
+static int notes_order_position(MH4UCall *call, uint32_t id) {
+    for (uint32_t i = 0; i < MONSTER_ORDER_ROWS; i++) {
+        if (host->read8(call, MONSTER_ORDER_TABLE + i * 8u) == id) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+/* Fills the page object with the registered permanent ids on the runtime's `page` (0-based)
+ * and, with `set_text`, sets their names through the game's own text widgets: the reset
+ * 0x0061a1a8, then one set-and-advance per entry from the widget list's head, exactly what
+ * 0x0061df4c does. Returns the number of entries. */
+static uint32_t notes_build_page(MH4UCall *call, uint32_t page, int set_text) {
+    uint32_t ids[NOTES_PAGE_MAX];
+    uint32_t count = 0;
+    const uint32_t first = page * NOTES_PAGE_MAX;
+    for (uint32_t i = 0; i < NOTES_PAGE_MAX && first + i < MHUC_MONSTER_COUNT; i++) {
+        const uint32_t id = mhuc_monster_ids[first + i].id;
+        if (id < MHUC_MONSTER_FIRST) {
+            continue;
+        }
+        ids[count] = id;
+        host->write32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_ENTRIES + count * 4u, id);
+        count++;
+    }
+    host->write32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_COUNT, count);
+    if (!set_text || !count) {
+        return count;
+    }
+    host->call(call, NOTES_WIDGET_RESET, 0, 0, 0);
+    const uint32_t box = host->alloc(call, 16, 4);
+    if (!box) {
+        return count;
+    }
+    const uint32_t head = host->read32(call, NOTES_TEXT_HEAD + NOTES_TEXT_HEAD_AT);
+    host->call(call, NOTES_TEXT_STRUCT, box, head, 0);
+    for (uint32_t i = 0; i < count; i++) {
+        host->call(call, NOTES_TEXT_SET_NAME, box, ids[i], 0);
+        const uint32_t next = host->alloc(call, 8, 4);
+        if (!next) {
+            break;
+        }
+        host->call(call, NOTES_TEXT_ADVANCE, next, box, 0);
+        host->write32(call, box, host->read32(call, next));
+        host->write32(call, box + 4u, host->read32(call, next + 4u));
+        host->free(call, next);
+    }
+    host->free(call, box);
+    return count;
+}
+
+/* The page init: the game sets MH4U's ceil(visible/8) at +0x1f7 of the UI object; the
+ * runtime adds the pages its ids need after it. */
+static void notes_pages_reader(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    const uint32_t ui = host->reg(call, 0);
+    host->call_original(call);
+    const uint32_t own = (MHUC_MONSTER_COUNT + NOTES_PAGE_MAX - 1u) / NOTES_PAGE_MAX;
+    if (ui) {
+        const uint32_t pages = host->read8(call, ui + NOTES_PAGE_COUNT_AT);
+        notes_mh4u_pages = pages;
+        notes_pages_known = 1;
+        if (own) {
+            host->write8(call, ui + NOTES_PAGE_COUNT_AT, pages + own);
+        }
+        if (!info->seen_new) {
+            info->seen_new = 1;
+            char line[180];
+            snprintf(line, sizeof line, "notes list: MH4U's %u page(s) unchanged; the mod's %u "
+                     "page(s) of %d id(s) follow", (unsigned)pages, (unsigned)own,
+                     MHUC_MONSTER_COUNT);
+            say(MH4U_LOG_INFO, line);
+        }
+    }
+}
+
+/* The page builder: a page MH4U's rows cover runs unchanged; a page after them is filled
+ * from the registry. */
+static void notes_walk_reader(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    const uint32_t page = host->reg(call, 0);
+    const uint32_t own = (MHUC_MONSTER_COUNT + NOTES_PAGE_MAX - 1u) / NOTES_PAGE_MAX;
+    const uint32_t base = notes_page_count(call);
+    if (!own || page < base || page - base >= own) {
+        host->call_original(call);
+        return;
+    }
+    for (uint32_t i = 0; i < NOTES_PAGE_MAX; i++) {
+        host->write32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_ENTRIES + i * 4u, 0xffffffffu);
+    }
+    const uint32_t count = notes_build_page(call, page - base, 1);
+    if (!count) {
+        host->call_original(call);
+        return;
+    }
+    note_own(info, mhuc_monster_ids[(page - base) * NOTES_PAGE_MAX].id);
+    host->skip_original(call);
+}
+
+/* The detail: a page slot that is a registered id is the ported id; run the game's detail
+ * for its stand-in's order position, then set the two text objects to the ported id so the
+ * message getters answer its own name and notes. An MH4U position runs unchanged. */
+static void notes_detail_reader(MH4UCall *call, void *user) {
+    HookInfo *info = user;
+    const uint32_t slot = host->reg(call, 0);
+    int which = -1;
+    const MhucMonsterId *row = lookup(slot, &which);
+    if (!row || which < 0 || which >= MHUC_MONSTER_COUNT) {
+        host->call_original(call);
+        return;
+    }
+    const uint32_t id = row->id;
+    const int position = notes_order_position(call, row->stand_in);
+    if (position >= 0) {
+        host->set_reg(call, 0, (uint32_t)position);
+        host->call_original(call);
+    } else {
+        host->skip_original(call);
+    }
+    host->call(call, NOTES_TEXT_SET_NAME, NOTES_UI_TEXT_NAME, id, 0);
+    host->call(call, NOTES_TEXT_SET_NOTES, NOTES_UI_TEXT_NOTES, id, 0);
+    note_own(info, id);
+}
+
+/* The list's P1 line: without opening the notes screen, build the runtime's first page in
+ * the page object and read it back. Restores the page object afterwards, so the game's own
+ * list state is left as it was. */
+static void self_test_notes(MH4UCall *call) {
+    char line[400], ids[160];
+    size_t used = 0;
+    const uint32_t base = notes_page_count(call);
+    if (!notes_pages_known) {
+        say(MH4U_LOG_WARNING, "self-test: the notes list: the order table isn't up");
+        return;
+    }
+    uint32_t saved_count = host->read32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_COUNT);
+    uint32_t saved[NOTES_PAGE_MAX];
+    for (uint32_t i = 0; i < NOTES_PAGE_MAX; i++) {
+        saved[i] = host->read32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_ENTRIES + i * 4u);
+    }
+    const uint32_t count = notes_build_page(call, 0, 0);
+    int wrong = 0;
+    ids[0] = '\0';
+    for (uint32_t i = 0; i < count; i++) {
+        const uint32_t slot = host->read32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_ENTRIES + i * 4u);
+        const int n = snprintf(ids + used, sizeof ids - used, "%sid %u", i ? ", " : "",
+                               (unsigned)slot);
+        if (n < 0 || (size_t)n >= sizeof ids - used) {
+            break;
+        }
+        used += (size_t)n;
+        if (slot != mhuc_monster_ids[i].id) {
+            wrong = 1;
+        }
+    }
+    for (uint32_t i = 0; i < NOTES_PAGE_MAX; i++) {
+        host->write32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_ENTRIES + i * 4u, saved[i]);
+    }
+    host->write32(call, NOTES_PAGE_OBJECT + NOTES_PAGE_COUNT, saved_count);
+    if (count != MHUC_MONSTER_COUNT || wrong) {
+        snprintf(line, sizeof line, "self-test: the notes list: page %u has %u of %d id(s)%s",
+                 (unsigned)base, (unsigned)count, MHUC_MONSTER_COUNT,
+                 wrong ? ", WRONG slot(s)" : "");
+        say(MH4U_LOG_WARNING, line);
+        return;
+    }
+    snprintf(line, sizeof line, "self-test: the notes list: MH4U's own pages pass through; "
+             "the runtime's page adds %s with their own name and notes", ids);
+    say(MH4U_LOG_INFO, line);
+}
+
 /* Log what the readers answer, without a monster to load: the mapping itself, the paths the
  * built resource records name, the path the stand-in's data comes from, and the pool lent to
  * a synthetic quest. The hooks use the same records, so this shows what they will do for 124
@@ -1553,6 +1803,7 @@ static void self_test(MH4UCall *call) {
     }
     self_test_pool(call);
     self_test_text(call);
+    self_test_notes(call);
 }
 
 static int first_frame = 1;
@@ -1608,6 +1859,9 @@ static const MhucHook hooks[] = {
     {"uc_questTask", "0x0065bcd0", quest_task_reader, NULL},
     {"aQuest::endSequence", "0x0065a378", quest_end_reader, NULL},
     {"uc_dataPath", "0x00b7300c", data_path_builder, &h_datapath},
+    {"notesList::pages", "0x006191f8", notes_pages_reader, &h_notes_pages},
+    {"notesList::page", "0x0061df4c", notes_walk_reader, &h_notes_walk},
+    {"notesList::detail", "0x006234b4", notes_detail_reader, &h_notes_detail},
 };
 
 /* The id layer's hooks, in the order this file registers them. mod.json names the same set

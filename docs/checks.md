@@ -520,8 +520,8 @@ registry has no row from 256 up and the pool is exercised through a registry fix
 
 | Check | What | Pass |
 |---|---|---|
-| P1 | the runtime's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, its name and notes text from `text/monster_text.bin` and the three message getters answering it, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
-| P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
+| P1 | the runtime's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, its name and notes text from `text/monster_text.bin` and the three message getters answering it, the Hunter's Notes list's own page for the registered ids after MH4U's pages, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
+| P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the Hunter's Notes list shows each ported id's row with its name and its own notes page, and MH4U's own rows and pages are as before; the quest plays, and a quest with MH4U's own monster plays as before |
 
 P1, headless:
 
@@ -533,7 +533,7 @@ P1, headless:
    runtime/text/monster_text.bin"` and `tools/check_text.py --mod "<that file>"`. Build the
    code library with the mod on:
    `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`. The
-   build reports 52 hook points: the base 32 and the runtime's 20 new names,
+   build reports 56 hook points: the base 32 and the runtime's 24 new names,
    `QuestFlow::startQuest` being in both.
 2. For the pool's lines, use the registry fixture instead of the shipped registry: copy the
    mod, write the copy's headers from `tests/fixtures/registry-pooled.csv`
@@ -549,7 +549,9 @@ P1, headless:
    id 124 -> "Rathian", N UTF-16 unit(s)` line and a notes line per registered id, one
    `self-test: id 124's getters answer its own record; ids 0..123 pass through` per id (the
    getters are called through the game's own entry points), one `self-test: message tables:
-   id 1 answers the game's own format; ids 0..123 pass through`; one `self-test: id 124 resource record at <address>, built from
+   id 1 answers the game's own format; ids 0..123 pass through`; one `self-test: the notes
+   list: MH4U's own pages pass through; the runtime's page adds id 124, id 125, id 126,
+   id 127 with their own name and notes`; one `self-test: id 124 resource record at <address>, built from
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
    record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, camera,
    tail; keeps stand-in 1's paths for motions 5, mef, sound, cmd, efl` line; one for 125
@@ -584,7 +586,9 @@ P1, headless:
 
 P2, in game: needs the ported files (#48, #49) and a quest that names id 124
 ([quests.md](quests.md)), for the pool a pooled monster's row, files and a quest that names
-its registry id (256), and its headless prerequisite is P4. Not done.
+its registry id (256), and its headless prerequisite is P4. It also opens the Hunter's Notes:
+each ported id's row appears after MH4U's own pages with its name, its own notes page and its
+own getters' text, and MH4U's own rows and pages are as before. Not done.
 
 Status: P1 run on 2026-11-25, USA v1.3.0 update, the code library built with the mod's 16 hook
 points (the two quest hooks among them), headless runner. The runs:
@@ -629,11 +633,22 @@ points (the two quest hooks among them), headless runner. The runs:
   0..123 pass through`; and `self-test: the pool 224..255 is unused: no pooled monster id is
   registered`. The self-test logged at 3.22 s, when MH4U's message tables were up; the plugin
   now waits for `load_text`'s result before running it.
+- **Four registered ids with the notes-list hooks (4 permanent, 0 pooled):** pass. The code
+  library was built with the runtime's 25 hook names (56 hook points, the base 32 and the
+  runtime's 24 new names), with the mod's text table in its folder. The log had the ready
+  line, the 124 to 127 records and reader lines as in the run above; `text: 4 of 4
+  entry(ies) from text/monster_text.bin; every registered id has a name and notes`; and
+  `self-test: the notes list: MH4U's own pages pass through; the runtime's page adds id 124,
+  id 125, id 126, id 127 with their own name and notes`. No `isn't a hook point` line
+  appeared. The notes screen was not opened, so its page count, the runtime page's widgets
+  and its detail page are P2's.
 
 The name/notes message getters and the text table were in the run above: the code library
 has the mod's 19 hook names (50 hook points with the mod alone, 54 with the three plugins) and
 `text/monster_text.bin` was built from the dumps (4 entries) and passed `tools/check_text.py
---mod`. The Python side is checked without the game: the message tables by LM1 (specs/lmd.md).
+--mod`. The notes-list run then rebuilt the library with the mod's 25 hook names (56 hook
+points) and the same text table. The Python side is checked without the game: the message
+tables by LM1 (specs/lmd.md).
 
 No `isn't a hook point` line appeared in any run. P2 is not done; until it is, whether the
 files a port does not ship are tolerated as missing is unverified.

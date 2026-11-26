@@ -17,7 +17,9 @@
 
 #include "mh4u_plugin.h"
 
-#define FAKE_MEM_SIZE (1u << 24)
+/* Guest memory covers the game's own addresses the id layer reads: the notes list's
+ * monsterListOrder (0x00df35b0) and its page object (0x01090868). The heap still starts low. */
+#define FAKE_MEM_SIZE (1u << 25)
 #define FAKE_HEAP_AT  0x00080000u
 #define FAKE_STUB_SIZE 384u
 
