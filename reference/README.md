@@ -967,6 +967,48 @@ ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214))
 five ids translated; their per-move rows are in
 [checks.md](../docs/checks.md#the-ported-moves-check-r2p).
 
+#### Category 13, part 3 (#229): the unit and what is blocked
+
+Category 13's last slice reimplements three ids in the 3U module's `cat13c.c`. 13/7 and 13/9
+are inline case blocks that start a motion and then fall into the base-class handler
+`0x00858b6c`, which #216 translated for 0/3 and the module exports as
+`mhuc_3u_base_0_3`; 13/9 is one of the 17 ids MH4U has no action for, so this is its own
+handler. 13/8's case block tail-calls the unit `0x0069031c`, the class's largest at `0xa58`
+bytes in the function table (its last state runs past that recorded size, to `0x00690e0c`,
+and all seventeen states are translated). MH4U's own 13/8 handler is `0x006dc274`: it has
+three states and starts motion `0x13` at 114.0, where the source's first state starts its own
+`0x1a` at 0.0. R1's pair for 13/8 is that different animation, and the port plays the
+source's.
+
+| 3U ids | MH3U unit | What the port runs |
+|---|---|---|
+| 13/7 | block `0x00699bf8` | the one-shot byte every frame; state 0 the data float, the fall, motion 0x1a at 0.0 and the blocked aim calls; state 1 `0x00858b6c` every frame |
+| 13/8 | `0x0069031c` | seventeen states: the data float and fall, motions 0x1a, 0x1f, 0x20, 0x1b, 0x1c and 0x3d at 0.0, 30.0 and 10.0, and 0xdb/0xce/0xcf (MH4U `0x213`/`0x206`/`0x207`), the 78.0 and 74.0 queries, the `0x15a`/`0x280`/`0x3ee`/`0x434`/`0x468`/`0x506` distance gates, and state 16's 86.0/204.0 queries with the timer advanced by the frame delta |
+| 13/9 | block `0x00699c8c` | state 0 the data float, the fall, motion 0x1a at 0.0 and the blocked aim calls; state 1 the finish flag, then `0x00858b6c` |
+
+**The field-map rows.** The slice adds none: it reads the map's state byte `+0x5` ->
+`+0x144`, the timer `+0x28`/`+0x2c` -> `+0x1d4` (MH4U keeps one value) and the frame delta
+through 3U's work+0x30, which is this+0x14. 3U's saved `+0x2c` is read only by the blocked
+`0x005aef18` gate.
+
+**The calls still blocked.** They are in [the 28 with no MH4U
+counterpart](#the-28-with-no-mh4u-counterpart), named once in the module's log and recorded
+in the runtime's README's category-13 section:
+
+- **`0x005bf66c`, `0x005bf77c`, `0x005bf7bc`, `0x005c0614`, `0x005c34c0`, `0x005c3f88`,
+  `0x005c6938` and `0x005c7270` (#55)** are the aim-point and trajectory helpers. MH4U's own
+  13/8 handler (`0x006dc274`) calls none of them and spawns a factory shell (`0x00661bc4`)
+  instead, which the port does not put in their place. The source's points and trajectories
+  are not built, and the distance gates are taken as the source's nonzero path so the move
+  cannot stall.
+- **`0x00161798`, `0x0016052c` and `0x005aef18` (#55)** are 13/8's state-16 effects, skipped.
+- **The motion start's fifth stack argument** (1 in 13/8's states 3, 12 and 13) has no place
+  in MH4U's `0x0094e318`; the source's r3 is dead in its callee and is not carried either.
+
+The ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the
+three ids translated; their per-move rows are in
+[checks.md](../docs/checks.md#the-ported-moves-check-r2p).
+
 ### The 17 ids MH4U has no action for
 
 16 of the 17 reach the same handler function as a shared MH4U action, so that shared action's
@@ -977,8 +1019,10 @@ with the same handler. Every one of the 17 is reimplemented from MH3U's handler 
 and the ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks
 each translated. 0/4 is done: it shares 0/0's handler, translated with category 0 in #216 along
 with the three base-class handlers 0/2, 0/3 and 0/6 reach. 11/5, 11/15, 11/26 and 11/28 are
-done with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225).
-The other 12 are still owed.
+done with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225),
+and 13/9 with category 13's part 3 in
+[#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229). The other 11 are still
+owed.
 
 The page records, per id, the shared MH4U action with the same handler and every other one
 with the same source handler. Where the source's case block picks a variant, the evidence
@@ -1001,7 +1045,7 @@ names it; what a move plays is her own handler, and R2p's in-game check settles 
 | 11/15 | 11/0 | — | tail match: the wrapper calls 11/0's handler 0x0084d864; its r3 is the action index. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
 | 11/26 | 11/0 | — | as 11/15: the same wrapper, r3 = 0x1a. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
 | 11/28 | 11/0 | — | as 11/15: the same wrapper, r3 = 0x1c. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
-| 13/9 | 0/3 | 3/10, 13/7 | body match; 13/9's case block calls 0x0083cbf4 like 0/3's |
+| 13/9 | 0/3 | 3/10, 13/7 | body match; 13/9's case block calls 0x0083cbf4 like 0/3's. Translated with category 13's part 3 in [#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229) |
 
 "Body match" is the source game reaching the same handler function for the missing id and the
 shared one; "tail match" is a short wrapper ending on the shared handler. R1 confirms the

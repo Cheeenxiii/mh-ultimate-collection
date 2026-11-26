@@ -53,6 +53,7 @@ that held them before.
 | `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
 | `src/monsters/rathian-3u/cat8.c` | category 8's family: id `8` and the three class helpers its handler reaches (#225) |
 | `src/monsters/rathian-3u/cat11.c` | category 11's family: `11/0`, `11/5`, `11/15`, `11/26`, `11/28`, the shared wrapper `0x00687e88` and the base-class handler `0x0084d864` (#225) |
+| `src/monsters/rathian-3u/cat13c.c` | category 13's part 3's family (#229): `13/7`, `13/8`'s seventeen states and `13/9`, and the reuses of cat0.c's `mhuc_3u_base_0_3` |
 | `src/monsters/rathian-3u/cat7c.c` | category 7 part 3's family (#223): 36 ids on six handler units, the ids R1 could not resolve and three MH4U has no action for |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
@@ -66,6 +67,7 @@ that held them before.
 | `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
 | `tests/rathian-3u/cat8.c` | category 8's fake-host test: id 8's three states, the 300.0/38.0 aim, the 12.0/50.0 test, the 90.0 timer and motion `0xca`, and the four blocked calls' log lines; `make test` builds `tests/family-cat8` |
 | `tests/rathian-3u/cat11.c` | category 11's fake-host test: the five ids' shared-handler calls, 11/28's 45.0/0.5 step and its three open items' log lines; `make test` builds `tests/family-cat11` |
+| `tests/rathian-3u/cat13c.c` | category 13 part 3's fake-host test: 13/7's and 13/9's block-to-base-handler paths and 13/8's seventeen states' frame values and call order; `make test` discovers it and builds `tests/family-cat13c` |
 | `tests/rathian-3u/cat7c.c` | category 7 part 3's fake-host test: the six units' call sequences and all 36 ids' dispatch; `make test` builds `tests/family-cat7c` |
 | `tests/rathian-gu/host.h` | what the GU module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-gu/cat17.c` | category 17's fake-host test: the 0-2 no-op and the base update; `make test` discovers it and builds `tests/family-gu-cat17` |
@@ -1167,6 +1169,70 @@ The source's motion numbers are converted when the handler is written: MH3U's
   and `0x92e408` returns its ratio in s0. 7/31 computes the same ratio from the distance call
   the function itself makes (`0x5858f4`), clamped to [0, 3.8] over 450.0; the engine call
   itself is not made. A new guest call that returns s0 after three floats would close it.
+
+### 3U Rathian's module: category 13, part 3
+
+Category 13's last slice is `cat13c.c`, issue
+[#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229): three ids. 13/7 and
+13/9 are inline case blocks, not units: each starts its motion and then falls into the
+base-class handler `0x00858b6c`, which cat0.c exports as `mhuc_3u_base_0_3` (decision 0002's
+second amendment: a base-class handler is port code too, so it is reused, not replaced). 13/9
+is one of the 17 ids MH4U has no action for, so this is its own handler. 13/8's case block
+tail-calls the unit `0x0069031c`, the class's largest at `0xa58` bytes in the function table;
+its last state runs on past that recorded size, to `0x00690e0c`, and all seventeen states are
+translated. R1 found 13/8 starts a different animation from MH4U's version: MH4U's own 13/8
+handler `0x006dc274` starts motion `0x13` at 114.0, while the source's first state starts its
+own `0x1a` at 0.0; with her own handler the port plays hers.
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 13/7 | its block `0x00699bf8` | the one-shot byte every frame; state 0: state 1, the data float and the fall, motion 0x1a at 0.0, the blocked `0x005bf77c`/`0x005bf7bc` aim calls; state 1: `0x00858b6c` (cat0.c's `mhuc_3u_base_0_3`) every frame |
+| 13/8 | unit `0x0069031c` | seventeen states: state 0 the data float, the fall, motion 0x1a at 0.0 and `0x005bf7bc`/`0x005c0614`; state 1 the `0x005c6938` gate (taken as nonzero) and motion 0x1a; state 2 the flag into state 3 and motion 0x1a; state 3 the 78.0 query and motion 0x3d at 30.0; state 4 the `0x280` gate and motion 0x1f; states 5 and 6 the flag and motions 0x20 and 0x1f; state 7 the 74.0 query and motion 0x3d at 10.0; state 8 the `0x3ee` gate, motion 0xdb (MH4U `0x213`) and `0x005bf7bc`; state 9 the `0x434` gate and motion 0x1b; state 10 the `0x468` gate and motion 0xce (`0x206`); state 11 the flag and motion 0xcf (`0x207`); state 12 the `0x506` gate, motion 0xcf at 20.0 and `0x005bf77c`; states 13 and 14 the flag and motions 0x1b at 7.0 and 0.0; state 15 the flag, motion 0x1c and the timer cleared; state 16 the 86.0/204.0 queries, the blocked effect calls and the timer advanced by the frame delta |
+| 13/9 | its block `0x00699c8c` | state 0: state 1, the data float and the fall, motion 0x1a at 0.0, the blocked `0x005bf77c`/`0x005bf7bc` aim calls; state 1: the finish flag, then `0x00858b6c` (cat0.c's `mhuc_3u_base_0_3`) |
+
+The motions are MH3U's `file * 100 + slot` written as MH4U's `file << 8 | slot`: 0x1a, 0x1f,
+0x20, 0x1b, 0x1c and 0x3d are file 0, and 0xdb, 0xce and 0xcf are file 2's slots 0x13, 0x06
+and 0x07, so MH4U sees `0x213`, `0x206` and `0x207`. The source's motion start passes a fifth
+stack argument (1 in 13/8's states 3, 12 and 13, 0 through its `0x00828828` veneer), which
+MH4U's `0x0094e318` does not take; it is logged once and not carried. The source's r3 (its own
+start's first float) is dead in its callee and is not carried either.
+
+**The field-map rows.** The slice adds no confirmed row: it reads the map's state byte
+`+0x5` -> `+0x144`, the timer `+0x28`/`+0x2c` -> `+0x1d4` (MH4U keeps one value, so 13/8's
+state-16 accumulation writes the one field), and the frame delta the source reaches through
+3U's work+0x30 is this+0x14. The source's saved `+0x2c` is read only by the blocked
+`0x005aef18` gate.
+
+**The engine calls this slice adds**, each MH4U's counterpart at the same point:
+
+| MH4U | 3U | What |
+|---|---|---|
+| `0x0093d870` / `0x0092e99c` | `0x00852324` / `0x00844124` | 13/7's, 13/8's and 13/9's data float and fall |
+| `0x0094e318` | `0x00828828` | the motions (the source's r2 is the speed, MH4U's s0) |
+| `0x0091aae4` | `0x0083336c` | 13/8's 78.0, 74.0 and 86.0/204.0 per-mode queries |
+| `0x00b05da4` | `0x0083cbf4` | the finish flags |
+| `0x00922ca0` | `0x0083d18c` | 13/7's one-shot byte |
+
+**What it does not carry.** The calls are named once in the log and recorded in the
+[reference](../reference/README.md#category-13-part-3-229-the-unit-and-what-is-blocked) and in
+the family's self-test:
+
+- **`0x005bf66c`, `0x005bf77c`, `0x005bf7bc`, `0x005c0614`, `0x005c34c0`, `0x005c3f88`,
+  `0x005c6938` and `0x005c7270` (#55)** are the aim-point and trajectory helpers of 13/7,
+  13/8 and 13/9. They are in the 28 with no MH4U counterpart; MH4U's own 13/8 handler
+  (`0x006dc274`) calls none of them and spawns a factory shell (`0x00661bc4`) instead, which
+  the port does not put in their place. The source's points and trajectories are therefore
+  not built, and `0x005c6938`'s distance gates are taken as the source's nonzero path so a
+  move cannot stall.
+- **`0x00161798`, `0x0016052c` and `0x005aef18` (#55)** are 13/8's state-16 effects: the
+  object forward, the uEffect039 spawns and their two-float gate, which has no MH4U field
+  pair. They are named and skipped; the state still advances its timer.
+
+The family's fake-host test is `tests/rathian-3u/cat13c.c`. The module's ready line sums the
+families' counts — `ready: translating 164 of 3U Rathian's 191 actions on monster 125` with
+cat0, cat1, cat2_9, cat3, cat3b, cat7a, cat7b, cat7c, cat8, cat11, cat13a and this slice —
+and the family's self-test logs the three ids, the field rows and the blocked calls. The 125
+quest's run reuses check T1c; the per-move rows are #116's.
 
 ## What it hooks
 
