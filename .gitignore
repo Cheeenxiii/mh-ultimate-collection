@@ -26,3 +26,8 @@ __pycache__/
 mods/*/tests/test_runtime
 mods/*/tests/test_module
 mods/*/tests/test_rathian_3u
+mods/*/tests/test_family_discovery
+
+# The generated family list and the discovery test's directory (mods/)
+mods/*/src/monsters/*/families.h
+mods/*/tests/family-probe/
