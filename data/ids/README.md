@@ -186,9 +186,11 @@ the game reads it.
   structure can hold if it is.
 - The name and notes texts are messages named by the id (`emName`, `emExp`): a ported id needs
   a message of its own in the mod's text. The plugin answers the three message getters with the
-  mod's table ([the notes source](#the-notes-source)); the Hunter's Notes list row is not
-  answered yet, so the text exists for an id the UI already shows but a ported monster is not
-  added to the list itself.
+  mod's table ([the notes source](#the-notes-source)), and it hooks the Hunter's Notes list's
+  page init, page builder and detail: a ported id gets a page of its own after MH4U's own
+  pages, with the same name and notes its getters answer, while ids 0 to 123 keep the game's
+  rows and pages
+  ([the runtime's README](../mods/uc_runtime/README.md#the-hunters-notes-list)).
 
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|

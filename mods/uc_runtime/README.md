@@ -18,8 +18,8 @@ below). The runtime wraps the readers of the id-indexed tables and answers a reg
 the MH4U monster's rows the registry names as its stand-in, except its resource record, which it
 builds for the ported id from the kinds of file the port ships; ids 0 to 123 go to the game's
 function unchanged, so MH4U's own monsters are untouched. The readers, the resource-record
-builder, the pool, the text tables and the self-test moved here unchanged from the plugin that
-held them before.
+builder, the pool, the text tables, the notes list and the self-test moved here from the plugin
+that held them before.
 
 ## Layout
 
@@ -27,7 +27,7 @@ held them before.
 |---|---|
 | `src/runtime.c` | the plugin entry point and the one hook table: it registers the id layer's hooks and frame call, then the module side's |
 | `src/runtime.h` | what the entry point and the parts share: the hook type, the id layer's calls, the registry-id lookup and the module side's calls |
-| `src/ids.c` | the id layer: the readers, the resource-record builder, the id pool, the name and notes text and the self-test |
+| `src/ids.c` | the id layer: the readers, the resource-record builder, the id pool, the name and notes text, the notes list and the self-test |
 | `src/ids.h` | generated from `data/ids/registry.csv` by `tools/check_ids.py --write`; do not edit |
 | `src/module.c` | the machinery every module shares: the factory association, the action dispatcher, the state slots, the guest call and the guest stubs |
 | `src/module.h` | the module interface: `MhucModuleOps`, `MhucState`, the guest call, the accessors, the motion encoder and the log |
@@ -655,11 +655,34 @@ getters return nothing for them). The notes' language is the source game's: MH3U
 English, MHXX JPN gives Japanese until the port reads MHGU's English text. A GU monster's
 English notes are therefore still content work, not this plugin's.
 
+## The Hunter's Notes list
+
+MH4U's Hunter's Notes list is built from `monsterListOrder` (`0x00df35b0`): 124 rows of 8
+bytes, byte 0 the monster id and +4 the message index of its name. The page builder
+(`0x0061df4c`) takes a page in r0 and fills the page object at `0x01090868` (+0x30 the number
+of entries on the page, +0x34 eight order positions, -1 for an empty slot); the page init
+(`0x006191f8`) sets the page count at +0x1f7 of the notes UI object it gets in r0, and the
+detail (`0x006234b4`) takes an order position and shows the id in that row through the message
+getters. A row is listed when its name index is set in the bitset of the current message
+string table, the same check the position getter makes for one id; rows 91 to 123 have no
+name index, so the game's own count is at most 12 pages.
+
+A ported id has no row, so the runtime wraps the page init and the builder: the init gets
+`ceil(registered/8)` pages after MH4U's own, and the builder fills those pages from the
+registry, setting each name through the game's own text widgets. The page slots are the
+registered ids. The detail hook maps such a slot to its stand-in's order position, runs the
+game's detail for that position (the page, the widgets and the transition), and then sets the
+name and notes objects to the ported id, whose message getters above answer its own text.
+Every page before the runtime's is MH4U's own and runs unchanged, so ids 0 to 123 keep their
+rows and pages; nothing is written to the game's tables. The runtime's hook names are
+`notesList::pages`, `notesList::page` and `notesList::detail` (`mod.json` gives their USA
+v1.3.0 addresses, as the project's tables have no names for them).
+
+The row's text is the text table's (above): a GU monster's row shows the registry's name and
+the source game's notes, Japanese until MHGU's English text is read.
+
 ## What it does not do yet
 
-- **The Hunter's Notes list** that walks all 124 rows (`0x0061df4c`) and the notes list's sort.
-  Only the position lookup (`0x0061dc58`) is answered, so the textual getters above answer an
-  id the UI already shows, but a ported monster is not added to the Notes list itself.
 - **The data path** stays the stand-in's until the ports ship MH4U-format `.emd`/`.etd`.
 - **The pool's real path.** No pooled monster ships and no quest names one yet, so the quest
   start and end hooks have only run against the synthetic `.mib` of check P1; a real quest with
@@ -740,7 +763,7 @@ marked present so the state 0 preload loads its enemy data`, then `quest task: m
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest; then each module's self-test. The check in [checks.md](../../docs/checks.md#uc-runtime) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, the notes list's own page for the registered ids, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest; then each module's self-test. The check in [checks.md](../../docs/checks.md#uc-runtime) uses it. |
 | `monster` | `124` | The id a module's ready line names. A module answers the registry id it was built for, so this no longer chooses another monster (the old plugin's `monster = 1` translated her actions onto MH4U's Rathian; a module cannot, see [what it does not do yet](#what-it-does-not-do-yet)); the setting is kept so an old `config.ini` still loads, and the runtime warns when it names no module. |
 
 ## The check
