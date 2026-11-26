@@ -665,6 +665,55 @@ takes MH4U's work+0x27c; and the category-11 shared handler's list is MH4U's 0x0
 list MH4U's own category-11 case passes). The category-11 tail's work+0x1 (MH4U work+0x1c8,
 unverified) and this+0x1a64 (work+0x1c) stay open.
 
+#### The category 7, part 4 units (#224)
+
+#224 translates sixteen of her flight ids on nine handler units and one inline case block. Three
+units are shared and take a variant in `r1`; the inline block passes fixed arguments into
+`0x00697888`, the same unit category 7's part 3 reaches through the `0x00686bcc` stub.
+
+| 3U ids | Handler | Arguments | What the handler does |
+|---|---|---|---|
+| 7/45 | `0x00697e78` | r1 = 0 | two states: mode 3, motion `0x38` at 6.0 and the shell (0, 0x1e); then the 50.0 gate, the curves `0x00c4ecf8`/`0x00c4ed20`, the vertical clamp to [-300.0, 0.0], the advance and 0/6's base handler |
+| 7/58 | `0x00697ff0` | — | two states: mode 0, motion `0xdb` at 4.0; then the 4.0 and 108.0 gates with the effect spawns and 0/2's base handler |
+| 7/66 | `0x00698144` | — | five states: mode 0, motion `0xdd` at 4.0; three (3-mode) gates at 0.0/60.0, 140.0/160.0 and 200.0/220.0 with 0x842a7c and the 0x5b turn, each followed by a (0-mode) gate at 116.0/168.0/226.0 and the effect setups 0xaab/0x11c7/0x18e4; then 0/2's base handler |
+| 7/67, 7/69, 7/70 | `0x00698408` | r1 = 0, 1, 2 | two states: mode 3, motion `0xde` at 4.0; then the 0x80 turn, the table samples, the 90.0/130.0/120.0/120.0 gates, the bias at the target line's +0x60, aim A, the advance, the vertical limit and the 80.0 gate with its 0x38e turn, then mode 0 and motion `0xdc` |
+| 7/68 | `0x006986b8` | — | three states: mode 1, motion `0xdf` at 6.0 and the shell (0, 0x24); the same sample/bias/advance as 7/67; then the 30.0 gate, 0x00839598 (blocked, taken nonzero), the per-part byte and the request for 8/0 or 1/3 |
+| 7/71 | `0x00698c48` | — | four states: mode 0, motion `0xdb` at 4.0; the 0x222 turn and the 40.0 and 108.0 gates with the effect setup 0x11c7; then 0/2's base handler |
+| 7/74, 7/90, 7/91 | `0x00698db8` | r1 = 0, 1, 2 | eight states: the 0x20 part flag, mode 0, motion `0xdd` at 4.0; the 116.0/168.0/186.0 gates and motion `0xde`/`0xe1`/`0xe3` by the variant; the 0x222 turn, 0x842a7c and the flag; motion `0xcd` at 0.0, or the 398.31 fall, motion `0xe2`/`0xe4` and the 0x26 group; state 5's motion `0xce` at 6.0 and the 0x83c6cc aims; state 6's `0x00c4ee30` curve, the 16.0 gate, the height check and motion `0xcf`, or the variant 1/2 path's 64.0 gate, `0x00c4ef98` and (3, 120.0, 184.0) gate; state 7's flight byte and 0/2's base handler |
+| 7/75, 7/94 | `0x00829c88` (base class) | r1 = 0, 1 | five states: the data float and its fall, motion `0x3d` at 6.0 and the rate at target z + 500.0; the two-joint turn 0x100/0x100, the 30.0 gate, aim A z 5.0, aim B z 3.0 and the -850.0 turn point; the data float, the turn and the 0x80 point turn with aim A z clamped at 70.0, then motion `0x2d`; the 0x200 and 0x600 turns, the 30.0 gate, aim B z -6.8/-3.2 and the 0.0 floor; the request for 7/0x54 or 7/0x60 |
+| 7/76, 7/95 | `0x006993fc` | r1 = 0, 1 | five states: the 0x20 part flag, mode 3, motion `0xd1` at 6.0; the 0x200 turn, the 50.0 gate, aim B z 3.0, the 0.0 turn point and the (0, 0xe, 3) group; the 0x83c6cc vertical (-200.0 clamp), the aim advance (110.0 clamp) and motion `0xd0`; the -200.0 speed, the zero point turn, 0x842a7c, 0x82d278 and the stall; 0x82d430, the flag and the request for 7/0x54 or 7/0x60 |
+| 7/81 | the inline `0x00686bb8` into `0x00697888` | r1 = 1, r2 = 0, r3 = 2, stack 0 | four states: the 0x20 part flag, the data float and its fall, motion `0xdb` at 6.0, the 0x2b group and the timer `(int16)(20.0 / this+0x29c)`; the flight byte, 0x842a7c, the (2, 80.0) gate and the 0x300 turn, the (3, 60.0, 100.0) trajectory (rate, angle, x/z distance, 30.0 floor), the timer countdown and the (1, 150.0) gate; the flag, mode 3 and motion `0x1b`; the -5.0 vertical step (halved to -2.5), the -75.0 clamp and 0/6's base handler |
+
+**The fields this slice adds to the map:**
+
+| MH3U | MH4U | role | how |
+|---|---|---|---|
+| work+0x940 (u16) | work+0x51c (u16) | the state word 7/74's state 4 copies to the target line's +0x6a | the 7/74 pair (`0x00698db8` / `0x006e43c4`); the source's u16 at +0x940 is the same word the 0/2 pair maps at +0x941 |
+| this+0x27c | this+0x294 | the third curve sample's speed (7/68) | the field translation of this+0x278 -> this+0x290, read at the same step |
+| this+0x284 | this+0x29c | the rate that divides 7/81's wait timer | 7/81's inline block, alongside this+0x278 -> this+0x290 |
+| this+0x1e70+0x60 | `*(this+0x8d88)+0x60` | the aim bias float 7/67 and 7/68 advance by the frame delta | the 7/67/7/68 pairs; the struct's +0x60 is not read by an MH4U pair, so the port guards the pointer and records it unverified |
+| work+0x30 (pointer) | this+0x14 | the frame delta the 7/81 timer subtracts | MH4U has no pointer field; the delta is the enemy's own |
+
+**The calls #55 still blocks**, each named in the log and skipped: `0x00842a7c` (the attack/hit
+resolution, 7/66, 7/67, 7/74, 7/76 and 7/81), `0x0083c6cc` (a float from the source's block,
+7/74, 7/76 and 7/81, taken as 0.0), `0x00839598` (7/68's signed byte at +0xef, taken nonzero),
+the effect setup `0x00688a20`/`0x00688870` with its `0x00199d00`/`0x00829950`/`0x0063cabc`
+callees and the `0x0015f410`/`0x00164f08` factories (7/58, 7/66, 7/71 and 7/74), the table
+interpolation `0x00584760` on the samples `0x00c4d4fc`/`0x00c4d508`/`0x00c4d514` (7/67 and
+7/68) and `0x0083c6e0` on 7/74's `0x00c4ef98`, and 7/76's `0x0082d430`/`0x0082d278` on the
+action data at `0x00b0b210`.
+
+**The curves MH4U also has** are passed as MH4U's own: 3U's `0x00c4ecf8` and `0x00c4ed20` are
+MH4U's `0x00fd18f0` and `0x00fd1918` word for word, and 7/74's `0x00c4ee30` is `0x00fd1a28`
+(20 words compared). No MH4U table with 7/67's, 7/68's or 7/74's remaining samples was found.
+
+The source's own helpers translated with the handlers are `0x006872ec` (the enemy-data kind and
+the mode pick the -14/-15/-10/-7 value for `0x8345f8`, MH4U's `0x0091b7b0`) and `0x00697888`
+for the inline block's fixed arguments. `0x8310f0` is the work+0x3c4 write the other slices
+record; `0x839968` is MH4U's `0x0091b3bc`; `0x82cee4`'s advance is MH4U's `0x009114d4` on the
+turn slot's address. Every `0x8357b0` rate is halved and every `0x833b2c` step is halved, as
+the other slices record.
+
 #### Flight: the fields category 7's handlers read
 
 The 24 pairs cover 7/0, 7/1, 7/4–7/9, 7/12, 7/16–7/25, 7/31, 7/33, 7/34, 7/36, 7/38–7/45,

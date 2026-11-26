@@ -50,6 +50,7 @@ that held them before.
 | `src/monsters/rathian-3u/cat3b.c` | category 3's part 2's family: `3/6`, `3/7`, `3/8`, `3/12`, `3/13`, `3/16` to `3/21`, `3/24`, `3/25`, `3/27` to `3/29`, and 3/8's base-class handler (#220) |
 | `src/monsters/rathian-3u/cat7a.c` | category 7's first family (#221): `7/0`, `7/1`, `7/2`, `7/4`, `7/5`, `7/6`, `7/7`, `7/8`, `7/10`, `7/11`, `7/12`, `7/15`, `7/16`, `7/19`, `7/20`, `7/32`, `7/34`, `7/42`, `7/61`, `7/77`, `7/85`, and the calls still blocked |
 | `src/monsters/rathian-3u/cat7b.c` | category 7 part 2's family (#222): `7/3`, `7/9`, `7/13`, `7/14`, `7/17`, `7/18`, `7/21`, `7/30`, `7/41`, `7/43`, `7/44`, `7/53`, `7/54`, `7/55`, `7/56`, `7/72`, `7/73`, `7/78`, `7/80`, `7/83`, `7/88`, `7/89`, on the units 0x00694474, 0x00694f4c, 0x006956e8, 0x00695e68 and 0x00696408 |
+| `src/monsters/rathian-3u/cat7d.c` | category 7 part 4's family (#224): `7/45`, `7/58`, `7/66`, `7/67` to `7/71`, `7/74` to `7/76`, `7/81`, `7/90`, `7/91`, `7/94` and `7/95`, plus the flight attack `0x00697888` the inline block reaches |
 | `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
 | `src/monsters/rathian-3u/cat8.c` | category 8's family: id `8` and the three class helpers its handler reaches (#225) |
 | `src/monsters/rathian-3u/cat11.c` | category 11's family: `11/0`, `11/5`, `11/15`, `11/26`, `11/28`, the shared wrapper `0x00687e88` and the base-class handler `0x0084d864` (#225) |
@@ -63,6 +64,7 @@ that held them before.
 | `tests/rathian-3u/cat3b.c` | category 3's part 2's fake-host test: the sixteen ids' frames and call order and the two blocked calls' log lines; `make test` builds `tests/family-cat3b` |
 | `tests/rathian-3u/cat7a.c` | category 7 part 1's fake-host test: every id's and variant's call sequence; `make test` discovers it and builds `tests/family-cat7a` |
 | `tests/rathian-3u/cat7b.c` | category 7 part 2's fake-host test: every id's and variant's call sequence and frame values; `make test` discovers it and builds `tests/family-cat7b` |
+| `tests/rathian-3u/cat7d.c` | category 7 part 4's fake-host test: the sixteen ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat7d` |
 | `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
 | `tests/rathian-3u/cat8.c` | category 8's fake-host test: id 8's three states, the 300.0/38.0 aim, the 12.0/50.0 test, the 90.0 timer and motion `0xca`, and the four blocked calls' log lines; `make test` builds `tests/family-cat8` |
 | `tests/rathian-3u/cat11.c` | category 11's fake-host test: the five ids' shared-handler calls, 11/28's 45.0/0.5 step and its three open items' log lines; `make test` builds `tests/family-cat11` |
@@ -1167,6 +1169,68 @@ The source's motion numbers are converted when the handler is written: MH3U's
   and `0x92e408` returns its ratio in s0. 7/31 computes the same ratio from the distance call
   the function itself makes (`0x5858f4`), clamped to [0, 3.8] over 450.0; the engine call
   itself is not made. A new guest call that returns s0 after three floats would close it.
+
+### 3U Rathian's module: category 7, part 4
+
+Category 7's fourth slice is `cat7d.c`, issue [#224](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/224):
+nine handler units and one inline case block on sixteen ids. Three units are shared and take a
+variant in `r1`; the inline block passes fixed arguments (r1 = 1, r2 = 0, r3 = 2, the fifth
+argument 0) into `0x00697888`, the flight attack category 7's part 3 also reaches through the
+`0x00686bcc` stub. It reuses `cat0.c`'s `mhuc_3u_base_0_2` and `mhuc_3u_base_0_6`.
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 7/45 | `0x00697e78`, r1 = 0 | state 0 mode 3, the part step, motion 0x38 at 6.0, the aim cleared, the speed 0.0 and the shell (0, 0x1e); state 1 the 50.0 gate (a failed one turns at 0x100, halved to 0x80), MH4U's own curves 0x00fd18f0 and 0x00fd1918, the vertical clamp to [-300.0, 0.0], the position advance, the flag and 0/6's base handler |
+| 7/58 | `0x00697ff0` | state 0 mode 0, the part step and motion 0xdb at 4.0; state 1 the 4.0 and 108.0 gates with the source's effect spawns, then the flag and 0/2's base handler |
+| 7/66 | `0x00698144` | state 0 mode 0, the part step and motion 0xdd at 4.0; states 1 to 3 the (3, 0.0, 60.0), (3, 140.0, 160.0) and (3, 200.0, 220.0) gates, each with the blocked 0x842a7c and the 0x5b turn (halved to 0x2d), then the (0, 116.0), (0, 168.0) and (0, 226.0) gates and the effect setups 0xaab/0x11c7/0x18e4; state 4 the flag and 0/2's base handler |
+| 7/67, 7/69, 7/70 | `0x00698408`, r1 = 0, 1, 2 | state 0 mode 3, the part step, the aim cleared, the speed 0.0 and motion 0xde at 4.0; state 1 the 0x80 turn, the blocked 0x842a7c and the MH3U table samples, the 90.0/130.0/120.0/120.0 gates, the bias on the target line's +0x60, aim A, the advance, the vertical limit and the 80.0 gate with its 0x38e turn, then mode 0 and motion 0xdc |
+| 7/68 | `0x006986b8` | state 0 mode 1, the part step, motion 0xdf at 6.0, the shell (0, 0x24), the aim cleared, the flight byte and the line's +0x60 cleared; state 1 the same samples, bias, aim, advance and 80.0 gate, then mode 0 and motion 0xdc; state 2 the 30.0 gate, the blocked 0x839598 (taken nonzero), the per-part byte and the request for 8/0, or 1/3 for 0xff |
+| 7/71 | `0x00698c48` | state 0 mode 0, the part step and motion 0xdb at 4.0; state 1 the 0x222 turn (halved to 0x111) and the 40.0 gate; state 2 the 108.0 gate and the effect setup 0x11c7; state 3 the flag and 0/2's base handler |
+| 7/74, 7/90, 7/91 | `0x00698db8`, r1 = 0, 1, 2 | the eight-state flight attack: the 0x20 part flag, mode 0 and motion 0xdd at 4.0; the 116.0/168.0/186.0 gates and motion 0xde/0xe1/0xe3 by the variant; the 0x222 turn, the blocked 0x842a7c and the flag; then motion 0xcd at 0.0, or the 398.31 fall, motion 0xe2/0xe4 and the 0x26 group; state 5's motion 0xce at 6.0, the 7 group and the two blocked 0x83c6cc aims; state 6's MH4U curve 0x00fd1a28, the 16.0 gate, the height check, the flag, mode 0, motion 0xcf, the 0x16 group and the flight byte (the variants take the 64.0 gate, the blocked MH3U curve and the (3, 120.0, 184.0) gate instead); state 7's flight byte, the flag and 0/2's base handler |
+| 7/75, 7/94 | the base-class `0x00829c88`, r1 = 0, 1 | state 0 the data float and its fall, motion 0x3d at 6.0, the rate at target z + 500.0 and the sub-state cleared; state 1 sub 0 the two-joint turn at 0x100/0x100, the 30.0 gate, the aim cleared, aim A z 5.0, aim B z 3.0 and the turn point at -850.0, sub 1 the data float, the turn, the 0x80 point turn and aim A z clamped at 70.0, then the flag and motion 0x3e at 6.0; state 2 the flight byte, the 0x200 turn and the point turn (a miss takes the data float and the 70.0 clamp), then motion 0x2d, aim A y -10.0 and aim B z -3.2; state 3 the 0x600 turn, sub 0's 30.0 gate and aim B z -6.8, sub 1's data float and the 0.0 floor; state 4 the request for 7/0x54 (7/75) or 7/0x60 (7/94) |
+| 7/76, 7/95 | `0x006993fc`, r1 = 0, 1 | the 0x20 part flag, mode 3, the part step, motion 0xd1 at 6.0 and the timer cleared; state 1 sub 0 the 0x200 turn, the 50.0 gate, the aim cleared, aim B z 3.0, the 0.0 turn point and the (0, 0xe, 3) group, sub 1 the blocked 0x83c6cc's 0.0 vertical step, the -200.0 clamp, the aim advance, aim A z clamped at 110.0, then the flag and motion 0xd0 at 6.0; state 2 the -200.0 speed, the aim advance, the 110.0 clamp and the zero point turn, then state 3, the blocked 0x842a7c and 0x82d278 and the stall flag; state 3 the blocked 0x82d430, the flag, the part step and the request for 7/0x54 or 7/0x60 |
+| 7/81 | the inline `0x00686bb8` into `0x00697888` | state 0 the 0x20 part flag, the data float and its fall, the part step, motion 0xdb at 6.0, the 0x2b group, the aim cleared and the timer `(int16)(20.0 / this+0x29c)`; state 1 the flight byte, the blocked 0x842a7c, the (2, 80.0) gate and its 0x300 turn (halved to 0x180), the (3, 60.0, 100.0) gate and its trajectory (rate, angle, x/z distance and 30.0 floor), the timer countdown and the (1, 150.0) gate with the state-2 timer; state 2 the flag, mode 3 and motion 0x1b at 6.0; state 3 the -5.0 vertical step (halved to -2.5), the -75.0 clamp, the flag and 0/6's base handler |
+
+The source's own helper `0x006872ec` (the enemy-data kind and the mode pick -14, -15/-10,
+-10/-7 or -14/-7) is translated as the part step before `0x8345f8`, MH4U's `0x0091b7b0`, and
+`0x00697888` is translated for the inline block's fixed arguments. `0x8310f0` has no MH4U
+function: the port writes work+0x3c4. `0x839968` (clear aim A and vector B) is MH4U's
+`0x0091b3bc`, the one MH4U's own 7/45 handler calls (the 73's `0x0096e164` clears a different
+block). A turn rate is halved for MH4U's `0x0091db4c`, `0x0092fc84` and `0x0092dccc` (3U's
+`0x8392d8` halves it in its body); `0x82cee4`'s advance is MH4U's `0x009114d4` on the turn
+slot's address (work+0x1a8), and the vertical steps are halved (`0x00915d44` has no 0.5 factor).
+The source's `0x00828828` takes its speed in `r2` (the worker's stack argument becomes the
+motion's first float); its `r3` is the worker's other blend input, which MH4U's wrapper has no
+place for, so the port passes the source's r2 and leaves the rest at 0.0.
+
+The MH3U curves whose data MH4U also has are passed as MH4U's own: `0x00c4ecf8` and
+`0x00c4ed20` are `0x00fd18f0` and `0x00fd1918` word for word, and 7/74's `0x00c4ee30` is
+`0x00fd1a28` (20 words compared). No MH4U table with 7/67's and 7/68's three samples
+(`0x00c4d4fc`, `0x00c4d508`, `0x00c4d514`) or 7/74's `0x00c4ef98` was found.
+
+**The calls #55 still blocks**, each named in the log and skipped:
+
+- **`0x00842a7c`** (7/66, 7/67, 7/74, 7/76 and 7/81): the attack/hit resolution, one of #55's
+  28 with no MH4U counterpart.
+- **`0x0083c6cc`** (7/74, 7/76 and 7/81): a float from the source's block, taken as 0.0; 7/81's
+  state-2 timer guards the division so a zero divisor gives 0.0 rather than a trap.
+- **`0x00839598`** (7/68): the signed byte at 3U work+0xef; the nonzero path is taken, so the
+  action requests 8/0 or 1/3 instead of stalling.
+- **The effect setup** (`0x0015f410`/`0x00164f08`, and `0x00688a20`/`0x00688870` with their
+  `0x00199d00`/`0x00829950`/`0x0063cabc` callees; 7/58, 7/66, 7/71 and 7/74): MH4U's effect
+  factory takes its own setup block and no counterpart for the chain was found, so the moves
+  play without those effects.
+- **The table interpolation on MH3U data** (`0x00584760` on 7/67's and 7/68's samples and
+  `0x0083c6e0` on 7/74's `0x00c4ef98`): the lookups are taken as 0.0, so the aim the samples
+  build keeps the source's frame values with the missing data at zero.
+- **7/76's `0x0082d430` and `0x0082d278`**: their argument is a pointer into MH3U's own action
+  data (`0x00b0b210`), which the port does not carry.
+
+The family's fake-host test is `tests/rathian-3u/cat7d.c`. The module's ready line sums the
+families' counts — `ready: translating 177 of 3U Rathian's 191 actions on monster 125` with
+every family merged so far — and the family's self-test logs the nine units, the inline block,
+the field-map rows it reads and the calls still blocked. The 125 quest's run reuses check T1c;
+the per-move rows are #116's.
 
 ## What it hooks
 
