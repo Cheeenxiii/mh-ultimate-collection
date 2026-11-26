@@ -1576,6 +1576,15 @@ void mhuc_ids_frame(MH4UCall *call, void *user) {
     }
 }
 
+/* The registry id a factory id names: the id itself for a permanent registered id, or the
+ * pooled registry id a lent byte answers for; 0 for MH4U's own ids and free pool bytes. The
+ * module dispatcher calls this at uEnemyFactory::create, before the factory's id is rewritten
+ * to the stand-in. */
+uint32_t mhuc_ids_registry_id(uint32_t id) {
+    const MhucMonsterId *row = lookup(id, NULL);
+    return row ? row->id : 0;
+}
+
 /* Hook name, address (USA v1.3.0), the reader's shape and its log label. */
 static const MhucHook hooks[] = {
     {"uEnemyFactory::create", "0x006901f4", argument_reader, &h_factory},

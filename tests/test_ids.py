@@ -174,11 +174,14 @@ def test_the_module_table_has_one_entry_per_registered_id(tmp_path, capsys):
     registry = tmp_path / "registry.csv"
     header = tmp_path / "ids.h"
     modules = tmp_path / "modules.h"
+    module_dir = tmp_path / "monsters"
+    module_dir.mkdir()
     write_registry(registry, [row(124), row(125, key="rathian-3u"), row(256, key="pooled")])
-    args = ["--registry", str(registry), "--header", str(header), "--modules-header", str(modules)]
+    args = ["--registry", str(registry), "--header", str(header), "--modules-header", str(modules),
+            "--module-dir", str(module_dir)]
     assert check_ids.main(args + ["--write"]) == 0
     text = modules.read_text()
-    # The permanent ids first, then the pooled ones; a placeholder per registered id.
+    # The permanent ids first, then the pooled ones; a row per registered id, 0 without a module.
     assert "#define MHUC_MODULE_COUNT 3" in text
     assert '{124, "rathian-gu", 0},' in text
     assert '{125, "rathian-3u", 0},' in text
@@ -189,6 +192,48 @@ def test_the_module_table_has_one_entry_per_registered_id(tmp_path, capsys):
     modules.write_text(text.replace("{256, \"pooled\", 0},", ""))
     assert check_ids.main(args) == 1
     assert "modules.h isn't what the registry generates" in capsys.readouterr().out
+
+
+def test_a_monster_module_gives_its_row_the_module_ops(tmp_path):
+    registry = tmp_path / "registry.csv"
+    header = tmp_path / "ids.h"
+    modules = tmp_path / "modules.h"
+    module_dir = tmp_path / "monsters"
+    module_dir.mkdir()
+    (module_dir / "rathian-gu.c").write_text(
+        "const struct MhucModuleOps mhuc_module_rathian_gu = {0};\n", encoding="utf-8")
+    write_registry(registry, [row(124), row(125, key="rathian-3u")])
+    args = ["--registry", str(registry), "--header", str(header), "--modules-header", str(modules),
+            "--module-dir", str(module_dir)]
+    assert check_ids.main(args + ["--write"]) == 0
+    text = modules.read_text()
+    assert "extern const struct MhucModuleOps mhuc_module_rathian_gu;" in text
+    assert '{124, "rathian-gu", &mhuc_module_rathian_gu},' in text
+    assert '{125, "rathian-3u", 0},' in text
+
+
+def test_a_module_file_without_a_registry_row_is_refused(tmp_path, capsys):
+    registry = tmp_path / "registry.csv"
+    module_dir = tmp_path / "monsters"
+    module_dir.mkdir()
+    (module_dir / "giadrome-gu.c").write_text("int not_a_module;\n", encoding="utf-8")
+    write_registry(registry, [row(124)])
+    args = ["--registry", str(registry), "--header", str(tmp_path / "ids.h"),
+            "--modules-header", str(tmp_path / "modules.h"), "--module-dir", str(module_dir)]
+    assert check_ids.main(args) == 1
+    assert "giadrome-gu.c is a module with no monster row in the registry" in capsys.readouterr().out
+
+
+def test_a_module_file_must_export_its_symbol(tmp_path, capsys):
+    registry = tmp_path / "registry.csv"
+    module_dir = tmp_path / "monsters"
+    module_dir.mkdir()
+    (module_dir / "rathian-gu.c").write_text("int not_a_module;\n", encoding="utf-8")
+    write_registry(registry, [row(124)])
+    args = ["--registry", str(registry), "--header", str(tmp_path / "ids.h"),
+            "--modules-header", str(tmp_path / "modules.h"), "--module-dir", str(module_dir)]
+    assert check_ids.main(args) == 1
+    assert "doesn't export mhuc_module_rathian_gu" in capsys.readouterr().out
 
 
 def test_the_registry_gives_giadrome_the_slots_it_borrows():

@@ -34,4 +34,18 @@ void mhuc_ids_start(const MH4UPluginHost *host);
 /* The id layer's per-frame work, registered by the runtime (src/ids.c). */
 void mhuc_ids_frame(MH4UCall *call, void *user);
 
+/* The registry id a factory id names: the id itself for a permanent registered id, or the
+ * pooled registry id a lent byte answers for; 0 for MH4U's own ids and free pool bytes. The
+ * module dispatcher needs it at uEnemyFactory::create, where a quest's lent byte is what the
+ * game passes. */
+uint32_t mhuc_ids_registry_id(uint32_t id);
+
+/* The module side (src/module.c, src/monsters/<key>.c): its two hooks (the factory
+ * association and the action dispatcher), its start and its first-frame self-test. The
+ * runtime registers the module hooks after the id layer's, so the factory association runs
+ * first and sees the ported id before the id layer rewrites it. */
+const MhucHook *mhuc_modules_hooks(size_t *count);
+int mhuc_modules_start(const MH4UPluginHost *host);
+void mhuc_modules_frame(MH4UCall *call, void *user);
+
 #endif

@@ -6,10 +6,9 @@
 #include <stdint.h>
 
 /* One ported monster in the runtime's table: the registry id, the registry key, and the
- * monster's C module. The registry gives the first two and tools/check_ids.py writes the
- * row, so a registered monster has an entry and a module has the id that names it; issue
- * #215 fills the `ops` of each monster whose code lands. Until then it is 0 and the
- * runtime answers the id with its id layer alone. */
+ * monster's C module (src/monsters/<key>.c, its interface in src/module.h).
+ * tools/check_ids.py writes the row: `ops` is the module when that file exists, and 0
+ * for a data-only port whose actions stay with the game. */
 struct MhucModuleOps;
 typedef struct MhucModule {
     uint32_t id;                      /* its registry id */
@@ -17,10 +16,12 @@ typedef struct MhucModule {
     const struct MhucModuleOps *ops;  /* its code, or 0 while it has none */
 } MhucModule;
 
+extern const struct MhucModuleOps mhuc_module_rathian_gu;
+
 #define MHUC_MODULE_COUNT 4
 
 static const MhucModule mhuc_modules[MHUC_MODULE_COUNT] = {
-    {124, "rathian-gu", 0},  /* Rathian */
+    {124, "rathian-gu", &mhuc_module_rathian_gu},  /* Rathian */
     {125, "rathian-3u", 0},  /* Rathian */
     {126, "giadrome-gu", 0},  /* Giadrome */
     {127, "great-wroggi-3u", 0},  /* Great Wroggi */
