@@ -1205,7 +1205,8 @@ without a module fall through). Deleting the factory association fails the routi
 `the module's monster didn't run 3/98 (0 calls, 1 original, 0 skipped)`. Changing 3/98's `6.0`
 to `5.0` fails it with the motion line; making 17/3 a no-op (`index > 3`) fails it with 17/3's
 line; giving 4/27 the fast turn step fails it with the turn line; changing 8/0's motion speed
-`4.0` to `5.0` fails it with 8/0's line (the checks in `tests/test_module.c`). Proofs of the
+`4.0` to `5.0` fails it with 8/0's line (the shell checks in `tests/test_module.c` and the
+family checks in `tests/rathian-gu/`). Proofs of the
 last four were run when the plugin was translated (#139-#142); this session proved the routing
 and re-ran the suite.
 
