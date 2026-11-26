@@ -38,10 +38,10 @@ table entries (256 in every file read). MH4U's loader requires version 4 (`cmp r
 
 MH3U registers `rCameraList` (class id `0x39c52040`, `reference/games/mh3u/mt_classes.tsv`) but
 its 3DS RomFS holds no file of that class: a scan of all 6,141 files and all 85 monster arcs
-finds none (check C1). Its only camera resources are `rDemoCamera` cutscene cameras
+finds none (check C1). The only camera files in its RomFS are `rDemoCamera` cutscene cameras
 (`arc/cam/dcm_NNN.arc`, 80 in the RomFS, each an ARC holding `camera\dcmNNN`); they belong to
-cutscenes, not to a monster (check C3, [below](#mh3u-at-mh4us-camera-moments-check-c3)). **A 3U
-port has no source camera to convert.**
+cutscenes, and one monster loads one (Nibelsnarf, check C4). **A 3U port has no source camera to
+convert.**
 
 ## Header
 
@@ -165,7 +165,7 @@ RevilLib's own arithmetic (`Evaluate`), not a simple little-endian split.
   (`notes/registry.md`), which is MHGU's layout; MHXX's own manifest was not read here.
 - **MH3U.** Nothing to point at: the 3U monster archive holds one ARC of the monster's files and
   no `rCameraList` entry (check C1). Its cutscene cameras are `rDemoCamera` files shared by
-  quests.
+  quests and demos; one monster, Nibelsnarf, loads its own from its class (check C4).
 
 ## What a converter must produce
 
@@ -191,14 +191,15 @@ The two Rathians' lists show what staying by id means: they share ids 0, 1, 2, 4
 MH4U's own has 9, 10, 12 to 14 and 16 to 20 as well, and MHXX's has 40 to 44 and 50 to 53. A port that runs
 MH4U's shared handlers posts MH4U's event ids, so an id the port's list lacks does nothing
 (check C1; the wiring is #48's). A 3U port cannot convert a camera at all, because the source
-has none; it keeps MH4U's stand-in camera (its record's path is the stand-in's) or would need
-one authored, which is content work and not a conversion.
+has none; decision 0014 settles that it keeps MH4U's stand-in camera (its record's path is the
+stand-in's), authors none, and adds no cut-in.
 
-## MH3U at MH4U's camera moments (check C3)
+## MH3U at MH4U's camera moments (checks C3 and C4)
 
-The question the open decision turns on is whether MH3U gives the same feeling as MH4U at the
-moments a per-monster list serves. The answer has two halves: what MH4U's list holds, read from
-the files, and what MH3U has at the same moment, read from its files and code.
+The question decision [0014](../docs/decisions.md#0014-a-3u-monster-ships-no-camera) settles is
+whether MH3U gives the same feeling as MH4U at the moments a per-monster list serves. The answer
+has two halves: what MH4U's list holds, read from the files (C3), and what MH3U's code does at
+the same moment (C4).
 
 ### MH4U: the moments and what posts them
 
@@ -292,10 +293,12 @@ of thousands of units, so they are read as **world-space** values; MH4U's target
 near the origin, so those are read as **monster-relative** (both readings **unverified**).
 
 **What plays a DCM.** The demo system loads one by id: `0x257470` formats the path
-`camera\dcm%03d`, and its callers include the demo loader `0x8861cc` (C3). The 3U
-Rathian code block (`0x686000` to `0x69b000`) makes 343 engine calls, and a reachability walk
-over the call graph from that block finds no path to `0x257470` or to the demo loader
-`0x8861cc`: a monster action cannot play a DCM. So a DCM is a cutscene camera (C3).
+`camera\dcm%03d`. Its six callers (C4) are the character code `0x00191290`, the quest/event code
+`0x00605970`, `0x00616b04` and `0x00624e8c`, the demo loader `0x008861cc`, and `uEm047`'s
+resource-loading method `0x007e0750`. The last is Nibelsnarf's setup, not an action handler: it
+loads the demo event `event\de043\de043_em047_00` with DCM 79, its cutscene camera. So a DCM is
+a cutscene camera, and the only monster class that loads one does so for its demo event, not for
+a fight action (C4).
 
 ### Per moment: MH3U has nothing to compare
 
@@ -312,21 +315,54 @@ For every other monster the same holds where the source action sets differ: MH4U
 list is one continuous shot keyed to a monster action; MH3U's 80 cameras are world-space
 cutscene sequences of 0 to 2,900 frames (median 1,355) and 9° to 87° fov-like angles, and the
 3U Rathian block checked does not reach them. **The files cannot compare the framing of a moment, because MH3U
-has no camera at that moment.** Whether MH3U instead moves the normal player camera there is for
-the in-game watch: its monster code reaches no demo camera (C3), and MH3U has no file of the
-per-monster class for such an event to post into (C1).
+has no camera at that moment.** The code reading answers the other half (C4): no monster action
+calls a camera class's method or plays a DCM, so at those moments MH3U shows the normal player
+camera, as it does everywhere in a fight.
 
-### What the maintainer has to watch
+### What 3U's monster code does with the camera (check C4)
 
-- **MH4U.** Force 1/15, 1/21, 1/23 and 1/24 on MH4U's Rathian (C2's mechanism) and watch the
-  four framings above: the 121-frame pair, the locked-off 411, and the 293-frame drop. Then
-  find the action that posts one of the twelve unnamed ids (C2's rule: the handler's
-  `bl 0x00934544` names it) and watch that too.
-- **MH3U.** Play the same actions on 3U Rathian (the GDB-stub tool `reference/force_action.py`)
-  and the monster's intro cutscene; look for a cut, a zoom or a locked-off shot. If 3U never
-  cuts, the faithful result at that moment is **no cut-in**, and keeping MH4U's list would add
-  one 3U never had; if 3U's intro camera gives the same feeling, a DCM tells the maintainer what
-  to aim for but cannot be copied in, since it is cutscene data in world space.
+The search asked whether a monster action, the AI or the player camera class receives a camera
+request, and read the answer from the code rather than from the missing file.
+
+- **The camera classes' own methods.** The vtable table recovered from the MH3U code
+  (`reference/mt_vtables.py`) gives sCamera's six methods, uCamera's two, uGameCamera's five,
+  sGameCamera's eight, and the methods of uFreeCamera, uMotionCamera, uOrthoCamera,
+  uCameraEffect, rDemoCamera and rStageCamera. The Ghidra export's call graph has 15 calls to
+  those methods. Their callers are the camera classes themselves, the code at `0x00191290`, the
+  code at `0x00605970`, `0x00616b04` and `0x00624e8c`, and the demo system `0x008861cc` and
+  `0x0088664c`. Only one caller is a monster class's camera request
+  (below). A wider scan of every slot in those vtables adds one more monster call, `uEnemy`'s
+  `0x0085e80c` to `0x00685140`, a rotation-matrix helper the camera effect class carries too; it
+  computes the enemy's orientation, not a camera.
+- **The one monster-class camera request.** `uEm047` (MH3U em047, Nibelsnarf) has a
+  resource-loading method `0x007e0750` that loads the demo event `event\de043\de043_em047_00`
+  and DCM 79 (`camera\dcm%03d`): a cutscene camera for its demo event. The class's action
+  inventory at `0x007de644` has 63 actions on 17 handler units, and this method is none of them.
+  It is the only monster class that calls the DCM formatter at all, and it does so at setup, not
+  from an action.
+- **The action handlers.** A reachability walk over the call graph from every function in the 3U
+  Rathian's block (`0x00686000` to `0x0069b000`, her 66 handler units among them; 581 functions
+  reached) finds no camera class's method and no DCM formatter. No other monster class appears
+  among the camera-method callers above.
+- **The AI.** MH3U's EMC scripts start native actions (`00 cat num`); an action's camera side is
+  its handler, and the handlers reach none. [emc](emc.md) documents no camera opcode (what each
+  opcode does is unverified, so this bounds rather than proves).
+- **The player camera class.** uGameCamera, MH3U's in-game camera, takes no request from a
+  monster: its methods' callers are the game's camera, player and quest code, never a monster
+  class. The camera in a fight is the normal player camera, driven by input and the game's own
+  modes.
+
+So a 3U monster's action, and the AI that picks it, does not cut, zoom or lock off the camera.
+Nibelsnarf's DCM 79 is the one exception, and it belongs to its cutscene, not to a fight. What
+the search cannot see: function-pointer calls the export does not resolve (the resource system
+calls a class's load through its vtable), a write straight into a camera object reached some
+other way, and the EMC opcodes' meanings.
+
+### The in-game half
+
+The maintainer waived the in-game camera tests on 2026-11-26: the code reading above is the
+evidence, and no comparison run is planned. 3U's camera in a fight is the normal player camera,
+as the code says; there is no test this repository schedules for it.
 
 ## Checks
 
@@ -341,13 +377,13 @@ per-monster class for such an event to post into (C1).
   gaps sum to frame count − 1, and every rotation key is a unit quaternion within 0.03 after its
   bounds block. `camera.to_mhxx(camera.from_mhxx(file)) == file` for every MHXX file; running
   the version 5 to 4 conversion and reading it back holds the same invariants.
-- **C2 (open, in game):** the ported Rathian's cut-in camera plays. `mhuc convert monster`
-  writes a ported id's own camera into its arc for a row that lists `camera` (124 does, and
-  the game_files test checks the entry against MHXX's own list). Spawn the id in a quest and
-  force an action whose handler posts a camera event (the handler's `bl 0x00934544` names the
-  id): the view frames the monster with the source game's camera, not MH4U Rathian's.
-  Procedure in [docs/checks.md](../docs/checks.md#a-ported-cameras-cut-in-c2); needs #144's
-  quest-load proof and a run in the game.
+- **C2 (code side pass; visual check waived, 2026-11-26):** the ported camera's cut-in. For a
+  GU id, `mhuc convert monster` writes the converted list at the record's path: 124's row lists
+  `camera`, and the game_files test compares the entry with MHXX's own list. The in-game visual
+  check is waived by the maintainer (2026-11-26, decision 0014), so it is not run. For a 3U id,
+  C2 does not apply: 0014 keeps the stand-in's camera path, no 3U row lists `camera`, and the
+  code check is C4. Procedure in
+  [docs/checks.md](../docs/checks.md#a-ported-cameras-cut-in-c2).
 - **C3 (done, MH4U USA v1.3.0 code and MH3U USA RomFS):** the moments above were read as
   follows. MH4U's list: the camera reader over `enemy\em001\mot\e001_cam` in
   `data/em001.arc` gives the 16 records and the fields of the table. MH4U's posting code:
@@ -360,7 +396,13 @@ per-monster class for such an event to post into (C1).
   `mhuc romfs list <MH3U romfs.bin>` gives 80 `arc/cam/dcm_NNN.arc`; reading one ARC and its
   one entry gives class `0x08f105e6`, magic `DCM\0`, version 3, and a key array of
   `0x10 + count × 0x30` bytes; the same read over all 80 fits that size, has 56,515 keys, every
-  key's time >= the previous, 77 files ending with 0xffffffff. MH3U's demo loader: a Ghidra
-  export of MH3U USA has `0x8861cc` calling `0x257470` (the `camera\dcm%03d` formatter), and
-  the 3U Rathian block `0x686000` to `0x69b000` has 343 callgraph edges, and a reachability
-  walk from it finds no path to `0x257470` or `0x8861cc`.
+  key's time >= the previous, 77 files ending with 0xffffffff.
+- **C4 (done, MH3U USA code):** the camera-request search above. Procedure: read the camera
+  classes' method lists from the MH3U vtable table recovered by `reference/mt_vtables.py`, cross
+  a Ghidra export of MH3U USA's call graph for calls to them, and classify the callers; walk the
+  call graph from the 3U Rathian block `0x00686000` to `0x0069b000`; list uEm047's actions with
+  `reference/monster_actions.py list --game mh3u --exheader <MH3U exheader> --code <MH3U
+  code.bin> --dispatcher 0x007de644 --range 0x7dc000 0x7e2000`; read `0x007e0750`'s resource
+  strings and `0x00257470`'s callers. The result: 15 calls to camera methods, one from a monster
+  class (`0x007e0750`), which loads the `de043_em047_00` event and DCM 79 and is not an action
+  handler; no path from the 3U Rathian block to a camera method or the DCM formatter.

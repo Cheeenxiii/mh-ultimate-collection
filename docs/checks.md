@@ -757,36 +757,31 @@ MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an 
 number; a ported monster brings its source game's list, converted to MH4U's version 4, in its
 arc at `enemy\emNNN\mot\eNNN_cam` (the `camera` kind in [data/ids](../data/ids/README.md)).
 124's row lists `camera`, and `mhuc convert monster --id 124` writes MHXX em001's own list
-there. This check needs that arc, the runtime's record built with the camera bit (P1), and a
-quest that spawns the id (#144).
+there. The code side needs that arc and the runtime's record built with the camera bit (P1);
+the in-game half would need a quest that spawns the id (#144), and is waived below.
 
 1. Run `mhuc convert monster --id 124 --romfs <MHXX RomFS> --mh4u-romfs <MH4U RomFS> --out
    <mod folder>` on the player's dumps: its `data/em124.arc` holds `enemy\em124\mot\e124_cam`,
    the LCM 4 conversion of `enemy\em001\em001_00\mot\em001_00_cam` (the game_files test
    `test_convert_monster_ships_the_gu_rathians_mhxx_camera` checks the entry against MHXX's
    list). Regenerate `mods/uc_runtime/src/ids.h` and rebuild the code library (P1 step 1).
-2. Force an action whose handler posts a camera event: MH4U's camera event is `0x00934544`
-   (USA v1.3.0), and a handler's call to it names the event id it posts. `mods/force_action`
-   (R1p) plays the chosen action; the converted list keeps the source's event ids, and Rathian's
-   shared ids include 0, 1, 2, 4, 5 and 8, so an event MH4U's own Rathian posts is in it.
-3. Pass: the view cuts to the source game's framing of the monster (MHXX's cut-in camera), not
-   MH4U Rathian's, and the P1 log's line for 124 names `e124_cam` among the record's own paths.
-   Fail: the framing is MH4U Rathian's (the record kept the stand-in's `e001_cam`), or the load
-   stops at the camera path.
+2. The visual half — force an action whose handler posts a camera id (MH4U's event is
+   `0x00934544`, and the handler's call names the id), and see whether the view cuts to MHXX's
+   framing of the monster rather than MH4U Rathian's — is **waived by the maintainer
+   (2026-11-26)**. No in-game camera check is planned; this paragraph records what the waiver
+   covers, not a step to run.
 
-**For #234, the same procedure on both games.** MH4U's Rathian posts camera ids 0, 1, 2 and 5
-at actions 1/23, 1/24, 1/15 and 1/21 ([specs/camera.md](../specs/camera.md), check C3). Force
-those four in MH4U and write down what the view does at each (a cut in, a zoom, a locked-off
-shot, nothing). Then force the same action ids on 3U Rathian in MH3U (`reference/force_action.py`)
-and watch the monster's intro cutscene, and write down whether the view cuts, zooms or locks off
-at all. Pass (for the comparison): MH3U does something at the moment and it can be described
-next to MH4U's framing. Fail (for the comparison): MH3U shows the normal player camera, in which
-case no MH3U camera exists at that moment.
+**A 3U id is outside C2.** Decision [0014](decisions.md#0014-a-3u-monster-ships-no-camera)
+keeps the stand-in's camera path for a ported 3U id and no 3U row of `data/ids/registry.csv`
+lists `camera`; the camera code check for a 3U monster is C4 in
+[specs/camera.md](../specs/camera.md#mh3u-at-mh4us-camera-moments-checks-c3-and-c4), and no
+in-game run is planned for it either.
 
 Code side: pass (2026-11-26). 124's registry row lists `camera`, `mhuc convert monster --id 124`
 writes the converted list at the record's path, `tests/test_with_game_files.py` checks the
 entry against MHXX's own list, and the archive no longer carries the stand-in's `e001_cam`.
-Status: open; the in-game run is the maintainer's and waits for #144's quest-load proof.
+Status: closed (2026-11-26). Code side pass; the visual check is waived by the maintainer, so
+no in-game run is planned and #144's quest-load proof is no longer needed for it.
 
 ## A ported effect at the source frame (E1)
 
