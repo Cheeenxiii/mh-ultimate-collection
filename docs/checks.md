@@ -1073,9 +1073,9 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --game mh3u --exheader <exheader
     --code <code.bin> --dispatcher 0x00687d30 --range 0x686000 0x69b000
 ```
 
-Last result (2026-11-26): pass. 191 actions; blocks 191/191, handlers 182/191 (the other 9
-are inline), first motions 132/191; translated 0, pending 191. Changing a ledger motion makes
-it exit 1 and name the id.
+Last result (2026-11-26, issue #216): pass. 191 actions; blocks 191/191, handlers 182/191
+(the other 9 are inline), first motions 132/191; translated 6 (0/0, 0/1, 0/2, 0/3, 0/4 and
+0/6), pending 185. Changing a ledger motion makes it exit 1 and name the id.
 
 T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
 the 12/1-3 blocks, 4/27-32's states, 8/0's three states and category 17's no-op and
@@ -1088,10 +1088,24 @@ line; giving 4/27 the fast turn step fails it with the turn line; changing 8/0's
 last four were run when the plugin was translated (#139-#142); this session proved the routing
 and re-ran the suite.
 
+The 3U module's half is `tests/test_rathian_3u.c`, for issue #216. Last result (2026-11-26):
+pass. It checks the factory association for 125 and that an MH4U id and a registered id
+without a module fall through; that an id the slice does not carry (`1/0`) is logged once and
+left to MH4U's dispatcher; and the six ids' call sequences — 0/0 and 0/4's 150.0 delay and
+countdown, 0/1's inline delay, 0/2's mode and three-way state test, 0/3's data record and fall
+rate, 0/6's vertical step and -75.0 clamp, and the three base handlers' `0x009167b4`,
+`0x0094f408`, `0x00b05da4`, `0x0093d870`, `0x0092e99c`, `0x0068882c` and `0x0090ef74` calls,
+with the setter's fifth stack argument. Breaking the 0/2 base handler's sub-state choice
+(`index = 2` to `0`) fails it with `0/0 state 1 doesn't start the sub-state 2 action`, plus the
+0/1 and 0/2 fall-through lines; reverting makes it pass.
+
 T1c: a headless run of the code library built with the runtime, with `selftest = 1`. The log
-must have the runtime's ready line, the GU module's ready line
-(`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`), its self-test
-line and the guest stubs' address; the runner must exit 0. The build has to add the runtime's
+must have the runtime's ready line, each module's ready and self-test lines and the guest
+stubs' address; the runner must exit 0. The GU module's ready line is
+`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`; the 3U module's
+is `ready: translating 6 of 3U Rathian's 191 actions on monster 125`, with its self-test's
+`selftest: 6 of the 191 actions`, `field map anchors` and `selftest: open: 0x008412cc` lines.
+The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
 runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
 ABI 4's merge into the fork and refused the runtime, so rebuild its `mh4u_runner` target from
@@ -1110,6 +1124,13 @@ side is R2p.
 That "no pending slice" covers only the 13 MHXX-only ids; under decision 0002's 2026-11-26
 amendment her own handler runs for every action id, shared ids included, so 12/0 is not MH4U's
 to keep and the set the self-test counts stays open until the GU module's shared-id work.
+
+The 3U module's run (2026-11-26, USA v1.3.0, the runtime on the session's shared code library,
+the 125 quest's route, `--ms 150000`): pass, exit 0. The log has `ready: translating 6 of 3U
+Rathian's 191 actions on monster 125`, the `selftest: 6 of the 191 actions`, `selftest: field
+map anchors` and `selftest: open: 0x008412cc` lines, then quest 10212's `id 125 -> stand-in 1
+marked present` and `data resource: id 125 -> its own archive`; the runtime's own self-test
+and the GU module's lines are in it too.
 
 ## Floats through a guest stub (T0)
 

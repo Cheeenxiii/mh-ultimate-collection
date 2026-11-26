@@ -2,7 +2,8 @@
 
 The mod's one native plugin ([decision 0013](../../docs/decisions.md#0013-one-runtime-for-the-mods-native-code)).
 It holds the id layer that gives a ported monster its own id, and one C module per ported
-monster for its actions; GU Rathian's module was the first. Its `mod.json` names one fixed hook
+monster for its actions; GU Rathian's module was the first, and 3U Rathian's module its first
+slice of her 191 ids. Its `mod.json` names one fixed hook
 list, so a new monster rebuilds this library and redeploys the mod, while the game's code
 library stays as it is.
 
@@ -32,6 +33,7 @@ held them before.
 | `src/module.h` | the module interface: `MhucModuleOps`, `MhucState`, the guest call, the accessors, the motion encoder and the log |
 | `src/modules.h` | generated from the registry and the module files: one row per registered id, with the monster's `ops` or 0 for a data-only port; do not edit |
 | `src/monsters/rathian-gu.c` | GU Rathian's module: her translated MHXX-only actions, the first real module |
+| `src/monsters/rathian-3u.c` | 3U Rathian's module: category 0 (`0/0`, `0/1`, `0/2`, `0/3`, `0/4`, `0/6`) and the three base handlers they reach, the first slice of her 191 ids |
 | `tests/fake_host.c`, `tests/fake_host.h` | the fake host every test runs on: guest memory, the heap, `call`/`call2` and the guest stubs, the hooks, the registers and the log |
 | `tests/test_runtime.c` | the id layer on the fake host (`make test`) |
 | `tests/test_module.c` | the module's routing and its translated actions' call sequences on the fake host (`make test`) |
@@ -69,10 +71,11 @@ The runtime does the rest once for every module:
   changes, and `changed` says when that happened (the module logs the action then). The runtime
   keeps eight slots.
 - **the guest call.** `mhuc_call2` is ABI 4's `call2` (r0-r3, the floats s0/s1, the s0 return);
-  `mhuc_call` and `mhuc_call_f` spell the arguments out. Two calls ABI 4 cannot make run on one
-  guest stub from the game's heap: `mhuc_call_s2` (a third float, s2) and `mhuc_read_s` (the
-  caller's s0-s3, which a hook cannot read). `mhuc_stubs` allocates that block, `mhuc_scratch`
-  gives 16 bytes of guest memory to an engine function that fills a point.
+  `mhuc_call` and `mhuc_call_f` spell the arguments out. Three calls ABI 4 cannot make run on
+  guest stubs from the game's heap: `mhuc_call_s2` (a third float, s2), `mhuc_call5` (a fifth
+  argument on the stack, which MH4U's action setter takes), and `mhuc_read_s` (the caller's
+  s0-s3, which a hook cannot read). `mhuc_stubs` allocates that block, `mhuc_scratch` gives 16
+  bytes of guest memory to an engine function that fills a point.
 - **the accessors.** `mhuc_work` (the work block at `*(enemy + 0xe28)`), `mhuc_category` and
   `mhuc_index` (its `+0x1ca`/`+0x1cb`), `mhuc_object` (a pointer field of the monster, such as
   the target line at `+0x8d88`), the read/write and float helpers, and `MHUC_MOTION(file, slot)`
@@ -98,8 +101,9 @@ readers answer its id. That is what keeps the code library's hook list fixed.
 
 ### A worked example: GU Rathian's module
 
-`src/monsters/rathian-gu.c` is the first module and the template. Its `dispatch` is the shape
-every module uses:
+`src/monsters/rathian-gu.c` is the first module and the template; `src/monsters/rathian-3u.c`
+is the second, and the one whose handlers read the source's state byte. Its `dispatch` is the
+shape every module uses:
 
 ```c
 static int dispatch(MH4UCall *call, uint32_t enemy) {
@@ -304,7 +308,94 @@ The port runs code that is not recompiled in Azahar's interpreter (`port/src/arm
 stub's literals can be rewritten per call. T0 in
 [checks.md](../../docs/checks.md#floats-through-a-guest-stub-t0) proves the stub in a headless
 run, and P4 proves ABI 4's `call2`. When the plugin API grows s2/s3 arguments, the s2 stub is
-replaced by the new call; the s0-s3 read still needs the `vmov` stub.
+replaced by the new call; the s0-s3 read still needs the `vmov` stub. `mhuc_call5`'s stub is the
+third: it pushes the fifth argument, calls the function with r0-r3 as they came, and returns
+its r0.
+
+### 3U Rathian's module: category 0
+
+MH3U's Rathian (USA, class `uEm002`) has 191 action ids, every one on her own code: the
+dispatcher (vtable slot 50, `0x00687d30`) switches on the category byte and each category on
+the index byte. `src/monsters/rathian-3u.c` is her module, the second in the runtime, and
+category 0 is its first slice (issue [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)):
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 0/0, 0/4 | handler `0x00699ad4` | state 0: state byte 1, mode 0, the block's 150.0 delay, the request for motion 1 at speed 10.0; state 1: count the delay down and, when spent, fall into 0/2's base handler |
+| 0/1 | its inline case block (`0x006916b4`) | state 0: state byte 1, mode 0, the request for motion 2 at 10.0; state 1: the finish flag, then 0/2's base handler |
+| 0/2 | base handler `0x0082d1cc` | state 0: state byte 1, mode 0, the request for motion `0x11` at 6.0; state 1: the finish flag, then the base handler: mode 0, the state test, the action start |
+| 0/3 | base handler `0x00858b6c` | state 0: state byte 1, the data record's float, the fall it advances (which also sets mode 1), the request for motion `0x1a` at 6.0; state 1: the finish flag, then the base handler: the record's `+0x64`, the rate, mode 1, the action start |
+| 0/6 | base handler `0x0082b7dc` | state 0: state byte 1, mode 3, the vertical step and its -75.0 clamp, the request for motion `0x1b` at 6.0; state 1: the vertical step, the finish flag, then the base handler: mode 3 and the action start |
+
+The three base handlers are the port's own code under decision 0002's second 2026-11-26
+amendment. Later slices reuse them: `0x0082d1cc` for 1/10 and 2/13, `0x00858b6c` for 3/10,
+13/7 and 13/9.
+
+**The field map.** MH3U keeps the work block at `*(this+0x1a48)`, MH4U at `*(this+0xe28)`.
+Each row is an offset in MH4U's block and the 3U offset it stands for, with how it was found
+(the paired function that reads both, or MH4U's own handler for the same action):
+
+| MH4U | 3U | What | How |
+|---|---|---|---|
+| `+0x144` | `+0x5` | the action's state byte, shared by category 0's six ids | the field map recorded for [#251](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/251); `0x0090ef74` resets it at the action start |
+| `+0x145`, `+0x146` | `+0x6`, `+0x7` | the action's next two state bytes | the field map recorded for [#251](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/251); `0x0090ef74` resets them too |
+| `+0x1c8` | `+0xdc` | the mode byte | `0x0082fe88`/`0x009167b4` stores it at both offsets (map pair) |
+| `+0x1ca` | `+0xdf` | the current category | the dispatcher reads both at the same place (`0x0082d1cc`/`0x00911b48`, `0x00858b6c`/`0x0094dc84`, `0x0082b7dc`/`0x00955970`) |
+| `+0x1cb` | `+0xe0` | the current index | the dispatcher reads both |
+| `+0x1dc` | `+0xf2` | "the action was set" | the three handler pairs store 1 there at the same point |
+| `+0x51c` | `+0x941` | the state the 0/2 base handler tests | the `0x0082d1cc`/`0x00911b48` pair (MH4U's `0x0092e960` reads `+0x51c`) |
+| `+0x1b4` bit `0x40` | `+0x8c` bit `0x40` | the same state's second test | the same pair; MH4U's base handler tests `+0x1b4` |
+| `+0x34c` | `+0x381` | the other state byte the 0/2 base handler tests | the same pair |
+| `+0x1c0` | `+0x3` | the data record lookup's id | the `0x00a33b50`/`0x0068882c` pair (the 0/3 handler pair reads it) |
+| `+0x797e` | `+0xa` | the data record lookup's index | the same pair (`0x00a33b50` takes the block's `+0xa`) |
+| `+0x64` (record) | `+0x70` (record) | the action data's float | the `0x00852324`/`0x0093d870` pair and the 0/3 base-handler pair |
+| `+0x1b8`, `+0x1bc` | `+0x90`, `+0x94` | the fall rate and its second factor | the `0x00844124`/`0x0092e99c` pair (map, same body, offsets translated) |
+| `+0x19c` | `+0x3c` | the fall height the data float advances | the same pair |
+| `+0x180` | `+0x68` | the vertical value 0/6 advances | the `0x00833b2c`/`0x00915d44` pair |
+| `+0x1c7` | `+0xd9` | `0x00833b2c`'s "applied" byte | the same pair |
+| `+0x1d4` | `+0x28` | 0/0's 150.0 delay | MH4U's own category-0 handler (`0x006dc454`) stores its delay there and calls `0x00b0704c`, which the source's inline subtraction stands for |
+
+The #251 map covers the state, mode, category and record-key rows; the record's `+0x64`
+and the fall rate come from the [#253 helper map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054); `+0x180` and `+0x1c7` are read off the
+`0x00833b2c`/`0x00915d44` pair, and `+0x1d4` off MH4U's own 0/0. 0/0's `+0x28`/`+0x30` (the
+delay and the frame delta it subtracts) are not in either table: MH4U's own 0/0 shows the
+delay at `+0x1d4` and the countdown worker reads the frame delta at `this+0x14`, so the module
+uses those.
+
+**The engine calls.** Each row is the MH4U function the module calls, the 3U function it stands
+for, and how the counterpart was established:
+
+| MH4U | 3U | What | How |
+|---|---|---|---|
+| `0x009167b4` | `0x0082fe88` | the mode/state setter | map, same body (the 73) |
+| `0x0094f408` | `0x0082a878` | set the next motion/state (r1, s0, s1) | the same call in the paired handlers (the 73); MH4U's own 0/0 and 0/1 pass the same ids and 10.0 |
+| `0x00b05da4` | `0x0083cbf4` | the action's finish flag | the same call in the paired handlers (the 73) |
+| `0x00915d44` | `0x00833b2c` | advance the vertical value by s0 * delta | the same call in a paired handler (the 73); `+0x68`/`+0x180` and `+0xd9`/`+0x1c7` agree |
+| `0x0093d870` | `0x00852324` | the action data's float | the 73 and the same field |
+| `0x0092e99c` | `0x00844124` | advance the fall by s0, set mode 1 | map, same body (the 73), offsets translated |
+| `0x0068882c` | `0x00a33b50` | the monster's data record | the same call in the 0/3 handler pair (the [#253 map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054)) |
+| `0x0090ef74` | `0x00827d54` | start an action | the same call in the three handler pairs (the [#253 map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054)), with one more stack argument |
+| `0x00b0704c` | `0x008a78ec`'s body | count a float down by the frame delta | MH4U's own 0/0 handler |
+
+Three things are not translated yet:
+
+- **The source's `0x008412cc`.** The three base handlers call it before the action start: it
+  looks the current action up in a list of `{category, index, s16 value}` entries from the
+  source's action table and applies the value. MH4U has no function for it (the [#253 map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054)), and
+  the list is the source's data, which the port does not carry. MH4U's own action setter
+  `0x0090ef74` takes a per-action value as a fifth, stack argument; the module passes MH4U's
+  own value there (the same one MH4U's 0/2, 0/3 and 0/6 handlers pass), and logs the open item
+  once. Whether the two are the same step is #55's in-game trace to settle.
+- **`0x00833b2c`'s factor.** 3U's helper halves its argument before adding it to the block's
+  vertical value; MH4U's `0x00915d44` does not. The module passes the source's -5.0 halved
+  (-2.5), so the step applied is the source's. The source's own -5.0 is in the module's
+  comment.
+- **0/0's second delay field.** The source keeps the old delay at `+0x2c`; MH4U's countdown
+  worker keeps one value, so the port keeps `+0x1d4` only.
+
+The module's ready line is `ready: translating 6 of 3U Rathian's 191 actions on monster 125`,
+and its self-test logs the six ids, the three base handlers' engine calls and the open item.
+The 125 quest's run is check T1c.
 
 ## What it hooks
 
@@ -550,6 +641,14 @@ English notes are therefore still content work, not this plugin's.
 - **The GU module's shared ids and 12/0.** Decision 0002's 2026-11-26 amendment owes her own
   handler for every action, shared ids included. This move carries only the twelve translated
   MHXX-only actions; 12/0 and the shared ids still run MH4U's dispatcher.
+- **The rest of the 3U module's 191 ids.** Only category 0 (six ids) and its three base
+  handlers run; the other 185 ids are still owed, one family per slice
+  ([#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217) to
+  [#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229)) and action 4's
+  ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)). An id this slice
+  does not carry goes to MH4U's dispatcher and is logged once, so a forced id that does
+  nothing says so. The source's `0x008412cc` per-action value step is the one item the
+  category-0 slice leaves open (#55).
 - **`monster` no longer chooses another monster.** A module answers its registry id, so the old
   plugin's `monster = 1` (translate GU Rathian's actions onto MH4U's Rathian) is gone. The
   setting is kept for old config files and warns when it names no module; whether a module can

@@ -439,7 +439,10 @@ settled the three matches: each pair calls its helper at the same point with the
 arguments, and the 73 already maps 0x0082fe88 there. 0x008412cc is the one helper of the
 set MH4U does not have as its own function; whether MH3U's step is folded into MH4U's
 0x0090ef74 (which takes one more argument than 0x00827d54) is what an in-game trace of an
-MH4U Rathian at 0/2, 0/3 or 0/6 would settle (#55).
+MH4U Rathian at 0/2, 0/3 or 0/6 would settle (#55). [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)
+translates category 0 without its own 0x008412cc call: the module passes MH4U's own per-action
+value to 0x0090ef74's stack argument and logs the open item. 0x00833b2c halves its argument and
+MH4U's 0x00915d44 does not, so the module passes -5.0 halved.
 
 ### A 3U Rathian's moves
 
@@ -478,7 +481,8 @@ with the same handler. Every one of the 17 is reimplemented from MH3U's handler 
 (0002's 2026-11-26 amendment), in the 3U module
 ([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)), family by family,
 and the ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks
-each translated.
+each translated. 0/4 is done: it shares 0/0's handler, translated with category 0 in #216 along
+with the three base-class handlers 0/2, 0/3 and 0/6 reach. The other 16 are still owed.
 
 The page records, per id, the shared MH4U action with the same handler and every other one
 with the same source handler. Where the source's case block picks a variant, the evidence
@@ -486,7 +490,7 @@ names it; what a move plays is her own handler, and R2p's in-game check settles 
 
 | 3U id | MH4U action with the same handler | other MH4U actions with the same body | evidence |
 |---|---|---|---|
-| 0/4 | 0/0 | — | body match: 0/0 and 0/4 are the same handler; R1 cannot compare (neither starts a constant motion); 0/0's case block is inline |
+| 0/4 | 0/0 | — | body match: 0/0 and 0/4 are the same handler; R1 cannot compare (neither starts a constant motion); 0/0's case block is inline. Translated with category 0 in [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216) |
 | 7/64 | 7/35 | 7/46, 7/47, 7/48, 7/62, 7/63, 7/65 | body match: 7/35 to 7/65 are one handler; R1 starts the same constant motion on all seven |
 | 7/87 | 7/92 | 7/96, 7/37, 7/84, 7/86 | body match: same handler through 0x00686bcc; R1 records no constant motion to compare; 7/37, 7/84 and 7/86 are inline in MH4U |
 | 7/93 | 7/92 | 7/96, 7/37, 7/84, 7/86 | as 7/87: 7/93 reaches 0x00686bcc through the same code |

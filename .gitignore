@@ -25,3 +25,4 @@ __pycache__/
 # The runtime test binaries (mods/)
 mods/*/tests/test_runtime
 mods/*/tests/test_module
+mods/*/tests/test_rathian_3u

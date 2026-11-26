@@ -16,7 +16,7 @@ LDLIBS ?= -lm
 TARGET := $(if $(filter Darwin,$(shell uname -s)),uc_runtime.dylib,uc_runtime.so)
 SOURCES := src/runtime.c src/ids.c src/module.c $(wildcard src/monsters/*.c)
 HEADERS := src/runtime.h src/module.h src/ids.h src/modules.h
-TESTS := tests/test_runtime tests/test_module
+TESTS := tests/test_runtime tests/test_module tests/test_rathian_3u
 
 all: $(TARGET)
 
@@ -26,10 +26,11 @@ $(TARGET): $(SOURCES) $(HEADERS)
 # The id layer's and the modules' behaviour, on a fake host: the hooks the runtime asks for, a
 # registered id answered with its stand-in, an MH4U id passed through, the factory association,
 # the action routing, and the translated actions' call sequences (tests/test_runtime.c,
-# tests/test_module.c, both on tests/fake_host.c).
+# tests/test_module.c and tests/test_rathian_3u.c, all on tests/fake_host.c).
 test: $(TESTS)
 	./tests/test_runtime
 	./tests/test_module
+	./tests/test_rathian_3u
 
 tests/test_runtime: $(SOURCES) $(HEADERS) tests/fake_host.c tests/fake_host.h tests/test_runtime.c
 	$(CC) $(CFLAGS) -I$(FORK)/include -Isrc tests/fake_host.c tests/test_runtime.c $(SOURCES) \
@@ -37,6 +38,10 @@ tests/test_runtime: $(SOURCES) $(HEADERS) tests/fake_host.c tests/fake_host.h te
 
 tests/test_module: $(SOURCES) $(HEADERS) tests/fake_host.c tests/fake_host.h tests/test_module.c
 	$(CC) $(CFLAGS) -I$(FORK)/include -Isrc tests/fake_host.c tests/test_module.c $(SOURCES) \
+		-o $@ $(LDLIBS)
+
+tests/test_rathian_3u: $(SOURCES) $(HEADERS) tests/fake_host.c tests/fake_host.h tests/test_rathian_3u.c
+	$(CC) $(CFLAGS) -I$(FORK)/include -Isrc tests/fake_host.c tests/test_rathian_3u.c $(SOURCES) \
 		-o $@ $(LDLIBS)
 
 clean:

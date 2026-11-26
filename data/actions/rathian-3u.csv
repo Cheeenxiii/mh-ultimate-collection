@@ -4,12 +4,12 @@
 # numbers only, no game data: `translated` means the port runs it, `pending` means it
 # is still owed (no id is left to an MH4U handler).
 # action,block,handler,first_motion,status
-0/0,0x006917e0,0x00699ad4,,pending
-0/1,0x006916b4,,,pending
-0/2,0x00691710,0x0082d1cc,,pending
-0/3,0x00691774,0x00858b6c,,pending
-0/4,0x006917e0,0x00699ad4,,pending
-0/6,0x006917f0,0x0082b7dc,,pending
+0/0,0x006917e0,0x00699ad4,,translated
+0/1,0x006916b4,,,translated
+0/2,0x00691710,0x0082d1cc,,translated
+0/3,0x00691774,0x00858b6c,,translated
+0/4,0x006917e0,0x00699ad4,,translated
+0/6,0x006917f0,0x0082b7dc,,translated
 1/0,0x006864d0,0x00692834,,pending
 1/1,0x00686384,,,pending
 1/2,0x006863e0,,,pending

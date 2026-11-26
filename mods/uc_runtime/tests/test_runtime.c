@@ -91,16 +91,19 @@ int main(void) {
     assert(fake_mem_read8(work + 0x1c0u) == 125);
     assert(fake_log_contains("drop records: id 125 -> stand-in 1"));
 
-    /* The generated table names the modules: 124's code is in src/monsters/rathian-gu.c, the
-     * other registered ids have none and their actions stay with the game. */
+    /* The generated table names the modules: 124's code is in src/monsters/rathian-gu.c and
+     * 125's in src/monsters/rathian-3u.c; the other registered ids have none and their actions
+     * stay with the game. */
     assert(MHUC_MODULE_COUNT == 4);
     assert(mhuc_modules[0].id == MHUC_MONSTER_ID_RATHIAN_GU);
     assert(mhuc_modules[0].ops != NULL);
-    for (int i = 1; i < MHUC_MODULE_COUNT; i++) {
+    assert(mhuc_modules[1].id == MHUC_MONSTER_ID_RATHIAN_3U);
+    assert(mhuc_modules[1].ops != NULL);
+    for (int i = 2; i < MHUC_MODULE_COUNT; i++) {
         assert(mhuc_modules[i].ops == NULL);
     }
 
     printf("ok: %d hooks, id 124 answered with stand-in 1, id 1 passed through, and the module "
-           "table names one module\n", fake_hook_count);
+           "table names two modules\n", fake_hook_count);
     return 0;
 }
