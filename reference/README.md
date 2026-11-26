@@ -664,6 +664,47 @@ are in [Flight](#flight-the-fields-category-7s-handlers-read). The ledger
 ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the 21 ids
 translated; their per-move rows are in [checks.md](../docs/checks.md#the-ported-moves-check-r2p).
 
+#### Category 13, part 1 (#227): the five units and what is blocked
+
+Category 13's first slice reimplements five units on five ids. The category entry
+`0x00699b78` switches on the index and tail-calls each unit; the units ignore the case
+block's registers. The port reads MH4U's own handler for the same action for the field
+offsets and the call sites; under decision 0002's amendment it still runs the source's
+handler.
+
+| 3U ids | MH3U unit | MH4U's own handler | What the port runs |
+|---|---|---|---|
+| 13/0 | `0x0068eabc` | `0x006db3dc` | the data float and the fall, motion 0x1a at 10.0, the 300.0 timer, then the 3500/2000 height branches and the 0x180 turn into 13/1 |
+| 13/1 | `0x0068eca4` | `0x006db540` | four states: motion 0x3d at 6.0; the aim step, the heading and pitch turns, motion 0x3e at 6.0 and the -2500.0 blend; the landing step and motion 0x2d at 6.0 or the 130.0 aim clamp; the 30.0 query and the flag into 0/3's base handler or 13/2 |
+| 13/2 | `0x0068f0fc` | `0x006db948` | mode 3, motion 0xc8 at 20.0, the (0, 0xb) tail, the distance/450 target-line factor and `0x00948548`; the two value curves, the halved vertical step and the -50.0 speed floor, motion 0xdc; the target loop into 13/3 or 1/3 |
+| 13/3 | `0x0068f424` | `0x006dbbe4` | mode 0 and the 300.0/38.0 aim into `0x00948674`; the 12.0/50.0 query, the 38 - (speed - 12) aim range and the 0.5 position advance, motion 0xca at 4.0; the target loop into 13/4 or 2/6 |
+| 13/4 | `0x0068f66c` | `0x006dbd8c` | mode 0, motion 0xcb at 4.0, the 4.0 timer, then the timer crossing test and the 1000/200 order step into 13/2 |
+
+**The calls still blocked or not carried.** They are named in the module's log and recorded
+in its README's category-13 section:
+
+- **`0x00a347bc` and `0x00843c20` (#55)** are 13/0's, 13/1's and 13/2's entry gate: the
+  uCharacter table lookup of 3U work+0xda, which has no MH4U offset, and the scale/one-shot
+  pair behind its 0xc result. The port takes the source's non-0xc path; 13/0's second lookup
+  and its `+0xaea` selector go with it.
+- **`0x00839598` and `0x00835f10` (#55)** are 13/2's and 13/3's state-2 target loop: the
+  signed work+0xef byte and the uEm066 position helper. The port takes the byte's nonzero
+  path and the helper's result as 0, so the source's failure request runs.
+- **`0x0085162c` and `0x00829620` (#55)** are 13/4's entry and per-frame helper; both are
+  skipped.
+- **13/3's action-start record `0x00b0b0e8`** is the source's data, not carried, so its
+  setup `0x0082d278` and leaf `0x0082d430` are not called.
+- **`0x0084512c`** is not reached by these five units (it is 8/0's `0x006870f4`); the issue's
+  list groups it with 13/1, whose source does not call it.
+
+The two field-map rows the units read are earlier slices': `+0xdb` -> `+0x14c` and `+0x7c9`
+-> `+0x3c4`. 3U's `+0x1c`, `+0xda` and `+0xaea` stay unmapped ([What is not mapped](#what-is-not-mapped)).
+13/2's two value curves 0x00c4edb8 and 0x00c4ee00 were compared key by key with MH4U's own
+0x00fd19b0 and 0x00fd19f8 and are equal, so MH4U's evaluator reads MH4U's tables. The
+ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the
+five ids translated; their per-move rows are in
+[checks.md](../docs/checks.md#the-ported-moves-check-r2p).
+
 ### The 17 ids MH4U has no action for
 
 16 of the 17 reach the same handler function as a shared MH4U action, so that shared action's
