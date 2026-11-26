@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Check the translated-action ledger in data/actions/ against MHXX's recompiled module.
+"""Check the action ledgers in data/actions/ against the source game's code.
 
-Each row records one action MH4U has no handler for: the case block, the handler unit, the
-first motion constant the handler starts, and whether the port translates it, leaves it to an
-MH4U handler, or still owes it. The tool walks the module's action dispatcher
-(reference/monster_actions.py) and compares. It prints counts and ids only.
+Each row records one action: the case block, the handler unit, the first motion constant the
+handler starts, and whether the port translates it, leaves it to an MH4U handler, or still
+owes it. The tool walks the source game's action dispatcher (reference/monster_actions.py),
+takes the first motion each handler starts (reference/monster_motions.py, check R1), and
+compares. It prints counts and ids only.
 
-Usage:
-    check_actions.py --module roEm001.cro --crs static.crs [--ledger data/actions/rathian-gu.csv]
-
-The module is MHXX v1.4's roEm001.cro and the CRS the static executable it imports from (from
-the player's own dump). Exit status 1 on a mismatch.
+The GU ledger is checked against MHXX v1.4's `roEm001.cro` and the `static.crs` it imports
+from; the 3U ledger against MH3U USA's `code.bin` and its `exheader.bin`. Exit status 1 on a
+mismatch.
 """
 from __future__ import annotations
 
@@ -22,12 +21,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "reference"))
 
-import cro  # noqa: E402
-import monster_actions as actions  # noqa: E402
+import monster_motions as motions  # noqa: E402
 
-MOTION = 0x008EB108          # MHXX's motion-start wrapper (docs/checks.md, R1)
 MODULE_BASE = 0x02000000
-DISPATCHER = 0x02009704
+DISPATCHER = 0x02009704      # MHXX's action dispatcher, in a module loaded at MODULE_BASE
+MOTION = {"mhxx": 0x008EB108, "mh3u": 0x00828828}   # the motion-start wrapper (docs/checks.md, R1)
+LEDGER = {"mhxx": "rathian-gu.csv", "mh3u": "rathian-3u.csv"}
+# A 3U id is never left to an MH4U handler: no shared action runs a source handler it lacks.
+STATUSES = {"mhxx": ("translated", "mh4u", "pending"), "mh3u": ("translated", "pending")}
+STATUS_LABEL = {"translated": "translated", "mh4u": "MH4U's own", "pending": "pending"}
 
 
 def read_ledger(path: str) -> list[dict]:
@@ -45,52 +47,14 @@ def read_ledger(path: str) -> list[dict]:
     return rows
 
 
-def first_motion(code: actions.Code, handler: int) -> int | None:
-    """The first constant in r1 passed to the motion wrapper, as R1 defines it."""
-    regs: dict[str, int | None] = {}
-    for i in code.insns(handler, 400):
-        from capstone.arm import ARM_OP_IMM, ARM_OP_REG
-        m = i.mnemonic
-        if m in ("mov", "ldr", "ldrlo") and len(i.operands) >= 2 and i.operands[0].type == ARM_OP_REG \
-                and i.reg_name(i.operands[0].reg) == "r1":
-            if i.operands[1].type == ARM_OP_IMM:
-                regs["r1"] = i.operands[1].imm
-            elif m.startswith("ldr") and "[pc" in i.op_str:
-                try:
-                    off = int(i.op_str.split("#")[-1].rstrip("]"), 0)
-                    regs["r1"] = code.word(i.address + 8 + off)
-                except ValueError:
-                    regs["r1"] = None
-            else:
-                regs["r1"] = None
-        if m in ("bl", "b") and i.operands and i.operands[0].type == ARM_OP_IMM:
-            target = i.operands[0].imm
-            if code.veneer(target) == MOTION:
-                return regs.get("r1")
-        if (m.startswith("pop") and "pc" in i.op_str) or (m == "bx" and i.op_str != "r1"):
-            break
-    return None
+def check(rows: list[dict], inventory: dict, motion_of, statuses: tuple[str, ...]):
+    """Compare ledger rows with a dispatcher's inventory: (problems, checked, counts).
 
-
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--module", required=True, help="MHXX v1.4's roEm001.cro")
-    ap.add_argument("--crs", required=True, help="the static executable's CRS")
-    ap.add_argument("--ledger", default=os.path.join(ROOT, "data", "actions", "rathian-gu.csv"))
-    ap.add_argument("--base", type=lambda s: int(s, 0), default=MODULE_BASE)
-    a = ap.parse_args()
-    with open(a.crs, "rb") as f:
-        crs = cro.Cro(f.read())
-    with open(a.module, "rb") as f:
-        ld = cro.load(f.read(), a.base, cro.static_segments(crs))
-    lo, hi = ld.text
-    code = actions.Code(ld.image, a.base, lo, hi)
-    inventory = {(x.cat, x.idx): x for x in actions.inventory(code, a.base + (DISPATCHER - MODULE_BASE))}
-    rows = read_ledger(a.ledger)
-
+    `motion_of(action)` returns the first constant motion the inventory's handler starts.
+    """
     problems = []
     checked = {"block": 0, "handler": 0, "motion": 0}
-    counts = {"translated": 0, "mh4u": 0, "pending": 0}
+    counts = {s: 0 for s in statuses}
     for row in rows:
         action = inventory.get((row["cat"], row["idx"]))
         if action is None:
@@ -106,14 +70,72 @@ def main() -> int:
                 problems.append(f"{row['action']}: handler {got}, ledger 0x{row['handler']:08x}")
         if row["motion"] is not None:
             checked["motion"] += 1
-            got = first_motion(code, action.handler or action.block)
+            got = motion_of(action)
             if got != row["motion"]:
                 got_s = "none" if got is None else f"0x{got:x}"
                 problems.append(f"{row['action']}: first motion {got_s}, ledger 0x{row['motion']:x}")
-        counts[row["status"]] = counts.get(row["status"], 0) + 1
-    print(f"{len(rows)} actions: blocks {checked['block']}/{len(rows)}, "
-          f"handlers {checked['handler']}/{len(rows)}, first motions {checked['motion']}/{len(rows)}; "
-          f"translated {counts['translated']}, MH4U's own {counts['mh4u']}, pending {counts['pending']}")
+        if row["status"] not in statuses:
+            problems.append(f"{row['action']}: status {row['status']}, not one of {', '.join(statuses)}")
+        else:
+            counts[row["status"]] += 1
+    return problems, checked, counts
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description=__doc__.splitlines()[0],
+        epilog="A 3U ledger status is `translated` or `pending`; the GU ledger also allows "
+               "`mh4u`. Exit status 1 on a mismatch.")
+    ap.add_argument("--game", choices=("mhxx", "mh3u"), default="mhxx",
+                    help="the source game's code format (default: mhxx)")
+    ap.add_argument("--module", help="MHXX v1.4's roEm001.cro (--game mhxx)")
+    ap.add_argument("--crs", help="the static executable's CRS (--game mhxx)")
+    ap.add_argument("--base", type=lambda s: int(s, 0), default=MODULE_BASE,
+                    help=f"where the module is loaded, --game mhxx (default: 0x{MODULE_BASE:08x})")
+    ap.add_argument("--exheader", help="MH3U USA's exheader.bin (--game mh3u)")
+    ap.add_argument("--code", help="MH3U USA's code.bin (--game mh3u)")
+    ap.add_argument("--dispatcher", type=lambda s: int(s, 0),
+                    help="the action dispatcher's address (--game mh3u needs it: 0x00687d30; "
+                         f"default for --game mhxx: 0x{DISPATCHER:08x} + the module base)")
+    ap.add_argument("--range", type=lambda s: int(s, 0), nargs=2, metavar=("LO", "HI"),
+                    help="the monster's own code in code.bin (--game mh3u needs it)")
+    ap.add_argument("--functions",
+                    help="a functions.tsv bounding each handler's scan; defaults to the game's table")
+    ap.add_argument("--ledger", help="the ledger to check; defaults to the game's in data/actions/")
+    a = ap.parse_args()
+
+    if a.game == "mh3u":
+        missing = [f"--{name}" for name, value in
+                   (("exheader", a.exheader), ("code", a.code), ("dispatcher", a.dispatcher),
+                    ("range", a.range)) if value is None]
+        if missing:
+            ap.error("--game mh3u needs " + ", ".join(missing))
+    elif a.module is None or a.crs is None:
+        ap.error("--game mhxx needs --module and --crs")
+
+    if a.game == "mhxx":
+        dispatcher = a.dispatcher if a.dispatcher is not None else a.base + (DISPATCHER - MODULE_BASE)
+    else:
+        dispatcher = a.dispatcher
+    ledger = a.ledger or os.path.join(ROOT, "data", "actions", LEDGER[a.game])
+
+    import monster_actions  # the fork import only matters when a dump is read
+    code, table, entries = motions.load(a)
+    inventory = {(x.cat, x.idx): x for x in monster_actions.inventory(code, dispatcher)}
+    if entries is not None:
+        entries |= {x.handler for x in inventory.values() if x.handler}
+        entries |= {x.fn for x in inventory.values() if x.fn}
+
+    def motion_of(action):
+        handler = action.handler if action.kind == "tail" else None
+        return motions.motion_for(code, handler, table, entries, MOTION[a.game])["motion"]
+
+    rows = read_ledger(ledger)
+    problems, checked, counts = check(rows, inventory, motion_of, STATUSES[a.game])
+    n = len(rows)
+    summary = ", ".join(f"{STATUS_LABEL[s]} {counts[s]}" for s in STATUSES[a.game])
+    print(f"{n} actions: blocks {checked['block']}/{n}, handlers {checked['handler']}/{n}, "
+          f"first motions {checked['motion']}/{n}; {summary}")
     for p in problems:
         print(f"  {p}", file=sys.stderr)
     return 1 if problems else 0
