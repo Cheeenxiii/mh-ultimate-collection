@@ -2,10 +2,9 @@
 """Check the action ledgers in data/actions/ against the source game's code.
 
 Each row records one action: the case block, the handler unit, the first motion constant the
-handler starts, and whether the port translates it, leaves it to an MH4U handler, or still
-owes it. The tool walks the source game's action dispatcher (reference/monster_actions.py),
-takes the first motion each handler starts (reference/monster_motions.py, check R1), and
-compares. It prints counts and ids only.
+handler starts, and whether the port translates it or still owes it. The tool walks the source
+game's action dispatcher (reference/monster_actions.py), takes the first motion each handler
+starts (reference/monster_motions.py, check R1), and compares. It prints counts and ids only.
 
 The GU ledger is checked against MHXX v1.4's `roEm001.cro` and the `static.crs` it imports
 from; the 3U ledger against MH3U USA's `code.bin` and its `exheader.bin`. Exit status 1 on a
@@ -27,9 +26,10 @@ MODULE_BASE = 0x02000000
 DISPATCHER = 0x02009704      # MHXX's action dispatcher, in a module loaded at MODULE_BASE
 MOTION = {"mhxx": 0x008EB108, "mh3u": 0x00828828}   # the motion-start wrapper (docs/checks.md, R1)
 LEDGER = {"mhxx": "rathian-gu.csv", "mh3u": "rathian-3u.csv"}
-# A 3U id is never left to an MH4U handler: no shared action runs a source handler it lacks.
-STATUSES = {"mhxx": ("translated", "mh4u", "pending"), "mh3u": ("translated", "pending")}
-STATUS_LABEL = {"translated": "translated", "mh4u": "MH4U's own", "pending": "pending"}
+# Each game runs its own handler for every action id (decision 0002's 2026-11-26 amendment),
+# so no id is left to an MH4U handler and `mh4u` is not a status.
+STATUSES = {"mhxx": ("translated", "pending"), "mh3u": ("translated", "pending")}
+STATUS_LABEL = {"translated": "translated", "pending": "pending"}
 
 
 def read_ledger(path: str) -> list[dict]:
@@ -84,8 +84,8 @@ def check(rows: list[dict], inventory: dict, motion_of, statuses: tuple[str, ...
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
-        epilog="A 3U ledger status is `translated` or `pending`; the GU ledger also allows "
-               "`mh4u`. Exit status 1 on a mismatch.")
+        epilog="A ledger status is `translated` or `pending`; any other status, `mh4u` "
+               "included, is refused. Exit status 1 on a mismatch.")
     ap.add_argument("--game", choices=("mhxx", "mh3u"), default="mhxx",
                     help="the source game's code format (default: mhxx)")
     ap.add_argument("--module", help="MHXX v1.4's roEm001.cro (--game mhxx)")
