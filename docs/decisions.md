@@ -444,15 +444,35 @@ The facts and options it was chosen from, as the open entry held them:
 | One plugin per source game | matches the content's own game; a fix touches one library | the id/action order remains; a monster rebuilds its game's plugin; two libraries to keep in step |
 | One plugin per monster over a shared source | the most isolation: a broken monster cannot take another's code down | a hook change and a game code-library rebuild per monster, a chain step per monster, and the shared source is duplicated into each library |
 
-## Open
+### 0014. A 3U monster ships no camera
 
-### A 3U monster's camera, when MH3U ships none
+Settled by the maintainer on 2026-11-26.
+
+A 3U monster ships no camera. The port converts none, authors none, and adds no cut-in for it. A
+ported 3U id's resource record keeps the stand-in's camera path (MH4U's own
+`enemy\emNNN\mot\eNNN_cam`), and no 3U row of `data/ids/registry.csv` lists `camera` in its
+`files` column. MH4U's camera framework stays as the base game plays it; a 3U monster in a
+fight is followed by the normal player camera, as it is in 3U.
+
+The maintainer's criterion (2026-11-26): the port is for a faithful match in feeling for the
+player, so the choice between keeping MH4U's camera and carrying 3U's depends on whether MH3U
+gives the same feeling at the same moment. He waived the in-game camera tests the same day: if
+3U is globally the same normal camera, that is fine. The code reading settles it
+([specs/camera.md](../specs/camera.md), check C4): MH3U has no per-monster camera list; no
+monster action calls a camera class's own method; the AI starts actions, and those reach none;
+and the only monster-triggered camera is Nibelsnarf's cutscene camera (its demo event and DCM 79), not a fight
+action. So at MH4U's camera moments a 3U monster is followed by the normal player camera; adding
+MH4U's cut-in would add a camera 3U never had.
+
+The facts and options it was chosen from, as the open entry held them:
 
 MH3U's monster archives hold no `rCameraList` (checked against all 6,141 files and all 85 monster arcs; [specs/camera.md](../specs/camera.md), check C1), so a ported 3U monster has no per-monster camera of its own. The only camera files in MH3U's RomFS are `rDemoCamera` cutscene cameras (`arc/cam/dcm_NNN.arc`, 80 in the RomFS), which belong to cutscenes. MH4U instead has a per-monster list (`enemy\emNNN\mot\eNNN_cam`, version 4) whose cameras the monster's actions post by id — cut-ins, mounts, pins and kill cameras — and #143 answers a ported id's record with the stand-in's while the port ships none. MHXX's lists are version 5, and `mhuc convert camera` writes MH4U's version (C1).
 
 The two games' mechanisms and files therefore differ. The maintainer's criterion (2026-11-26): the port is for a faithful match in feeling for the player, so the question is whether MH3U's camera behaviour gives the same feeling as MH4U's at the same moment, even where the code and data differ; [#234](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/234) compares them per moment on the real files.
 
-[#234](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/234)'s comparison ([specs/camera.md](../specs/camera.md), check C3) found that the file question and the moment question have different answers. MH4U's list is one continuous shot per id, posted by `uEnemy`'s `0x00934544` with the id its action code chooses; MH4U Rathian's own code posts ids 0, 1, 2 and 5 at actions 1/23, 1/24, 1/15 and 1/21; the other twelve records in her list have no posting site in her own actions (six are posted by other monsters' handlers, six by no type-4 site found; another event type may play those; unverified). MH3U has neither a per-monster camera file nor a per-monster camera event of MH4U's kind: its 80 `rDemoCamera` cameras are loaded by the demo system (`0x8861cc` through the `camera\dcm%03d` formatter `0x257470`), no path from 3U Rathian's handlers reaches the DCM formatter, and the four MH4U action ids do not exist in MH3U's dispatcher (category 1 stops at 1/14). So at those moments MH3U has no camera to compare: its cameras are world-space cutscene sequences of 0 to 2,900 frames and 9° to 87° fov-like angles, against MH4U's monster-relative single shots of 80 to 601 frames. What the player actually sees in MH3U there — the normal player camera, or a code-driven move — is left to the in-game watch ([checks.md](checks.md#a-ported-cameras-cut-in-c2)): force the same action in both games and watch for a cut, a zoom or a locked-off shot.
+[#234](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/234)'s comparison ([specs/camera.md](../specs/camera.md), check C3) found that the file question and the moment question have different answers. MH4U's list is one continuous shot per id, posted by `uEnemy`'s `0x00934544` with the id its action code chooses; MH4U Rathian's own code posts ids 0, 1, 2 and 5 at actions 1/23, 1/24, 1/15 and 1/21; the other twelve records in her list have no posting site in her own actions (six are posted by other monsters' handlers, six by no type-4 site found; another event type may play those; unverified). MH3U has neither a per-monster camera file nor a per-monster camera event of MH4U's kind: its 80 `rDemoCamera` cameras are loaded by the demo system (`0x8861cc` through the `camera\dcm%03d` formatter `0x257470`), no path from 3U Rathian's handlers reaches the DCM formatter, and the four MH4U action ids do not exist in MH3U's dispatcher (category 1 stops at 1/14). So at those moments MH3U has no camera to compare: its cameras are world-space cutscene sequences of 0 to 2,900 frames and 9° to 87° fov-like angles, against MH4U's monster-relative single shots of 80 to 601 frames.
+
+The code reading ([specs/camera.md](../specs/camera.md), check C4) found no camera request from a monster action: the camera classes' own methods are called from the player, quest, camera and demo code; a reachability walk from all monster-class code reaches none of them; the AI starts actions, and those reach none; and the only monster-triggered camera is Nibelsnarf's setup method `0x007e0750`, which loads its demo event `de043_em047_00` and DCM 79 — a cutscene camera, not a fight action. What 3U shows at MH4U's moments is therefore the normal player camera.
 
 | Option | Gives | Costs |
 |---|---|---|
@@ -461,6 +481,12 @@ The two games' mechanisms and files therefore differ. The maintainer's criterion
 | Author one from MH4U's own camera for the same monster, recorded in the [authored register](sources.md#authored-register) | the cut-ins frame the monster | authored data, not from MH3U; rule 2 allows it where no source exists, and it must be recorded |
 | Reuse the GU version's camera (MHXX's `em001`) | a real source game's camera for the same monster | 3U's cut-ins follow MHXX's framing |
 
-Open until #234's comparison says which option keeps the feeling; the maintainer settles it.
+The first option is taken: the record keeps the stand-in's list, and the port adds no camera
+event of its own. There is no 3U framing at the moment to carry (option 2); an authored camera
+would add a cut-in 3U never had (option 3); MHXX's camera is a third game's (option 4).
+
+## Open
+
+No open decisions.
 
 A new structural question goes here, with its facts and options, until the maintainer settles it.
