@@ -1019,7 +1019,7 @@ def test_every_mh4u_motion_effect_record_is_laid_out(dump):
 
 
 def test_every_mh3u_effect_sequence_header_is_laid_out(dump):
-    """check FX2: MH3U's ESQ header holds six non-decreasing section offsets inside every file."""
+    """check FX2: MH3U's ESQ header holds seven non-decreasing section offsets inside every file."""
     entries, failures = 0, []
     for _name, label, data in _effect_entries(dump, "mh3u", ("rEffectSequence",)):
         entries += 1
@@ -1029,6 +1029,106 @@ def test_every_mh3u_effect_sequence_header_is_laid_out(dump):
             failures.append(f"{label}: {e}")
     assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
     assert entries == 44
+
+
+def _motion_frames(entries) -> dict[int, list[int | None]]:
+    """A monster archive's motion lists' frame counts, keyed by the file number in the stem."""
+    out: dict[int, list[int | None]] = {}
+    for e in entries:
+        if e.type_id != classid.class_id("rMotionList"):
+            continue
+        stem = e.path.replace("\\", "/").rsplit("/", 1)[-1]
+        _version, animations = lmt.read(e.data)
+        out[int(stem.rsplit("_", 1)[-1]) // 100] = [a.frames if a else None for a in animations]
+    return out
+
+
+def test_every_mh3u_effect_sequence_event_names_an_animation_frame(dump):
+    """check FX5: an ESQ event's +0x00 is MH3U's motion index (file * 100 + slot) and +0x04 a frame
+    inside that animation. Events whose animation slot the archive leaves empty are counted, not
+    failed: a monster's ESQ can name a motion list shared from another monster's archive. The seven
+    events outside their animation are em066's and em067's motion 85 frame 193 (its animation has
+    139 frames) and em072's motion 34 frame 53 (43 frames), recorded as the check's open
+    exceptions."""
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    files = events = padding = placed = unread = 0
+    outside = []
+    failures = []
+    for f in image.files():
+        if not MONSTER_ARCHIVES["mh3u"].search(f.path):
+            continue
+        entries = arc.read(image.read(f)).entries
+        motions = _motion_frames(entries)
+        for e in entries:
+            if e.type_id != classid.class_id("rEffectSequence"):
+                continue
+            files += 1
+            try:
+                sequence = mef.read_esq(e.data)
+            except mef.MefError as error:
+                failures.append(f"{f.path}:{e.path}: {error}")
+                continue
+            for event in sequence.events():
+                events += 1
+                if event.motion == 0 and event.frame == 0.0:
+                    padding += 1
+                    continue
+                number, slot = divmod(event.motion, 100)
+                frames = motions.get(number)
+                if frames is None or slot >= len(frames) or frames[slot] is None:
+                    unread += 1
+                    continue
+                placed += 1
+                if not 0 <= event.frame < frames[slot]:
+                    outside.append((f.path, event.motion, event.frame, frames[slot]))
+    assert not failures, f"{len(failures)} files not read, first: {failures[:3]}"
+    assert {(path.rsplit("/", 1)[-1], motion, frame, count) for path, motion, frame, count in outside} == \
+        {("em066.arc", 85, 193.0, 139), ("em067.arc", 85, 193.0, 139), ("em072.arc", 34, 53.0, 43)}, outside
+    assert (files, events, padding, placed, unread, len(outside)) == (44, 8092, 49, 7983, 60, 7)
+
+
+def test_every_mhxx_psl_descriptor_names_its_animations_frame_count(dump):
+    """check FX6: a PSL descriptor's first word is the frame count of the animation in the slot the
+    descriptor sits at. A PSL whose motion list isn't in the same archive is counted, not failed."""
+    image = romfs.open_image(dump("mhxx", "romfs.bin"))
+    files = slots = descriptors = placed = unread = shared = 0
+    failures = []
+    for f in image.files():
+        if not MONSTER_ARCHIVES["mhxx"].search(f.path):
+            continue
+        entries = arc.read(image.read(f)).entries
+        motions = {}
+        for e in entries:
+            if e.type_id == classid.class_id("rMotionList"):
+                stem = e.path.replace("\\", "/").rsplit("/", 1)[-1]
+                _version, animations = lmt.read(e.data)
+                motions[stem] = [a.frames if a else None for a in animations]
+        for e in entries:
+            if e.type_id != classid.class_id("rProofEffectMotSequenceList"):
+                continue
+            files += 1
+            try:
+                sequence = mef.read_psl(e.data)
+            except mef.MefError as error:
+                failures.append(f"{f.path}:{e.path}: {error}")
+                continue
+            slots += len(sequence.slots)
+            descriptors += len(sequence.descriptors)
+            stem = e.path.replace("\\", "/").rsplit("/", 1)[-1]
+            frames = motions.get(stem)
+            if frames is None:
+                shared += len(sequence.descriptors)
+                continue
+            for descriptor in sequence.descriptors:
+                if descriptor.slot >= len(frames) or frames[descriptor.slot] is None:
+                    unread += 1
+                    continue
+                placed += 1
+                if descriptor.frames != frames[descriptor.slot]:
+                    failures.append(f"{f.path}:{e.path}: slot {descriptor.slot}'s {descriptor.frames} "
+                                    f"frames, the animation's {frames[descriptor.slot]}")
+    assert not failures, f"{len(failures)} descriptors wrong, first: {failures[:3]}"
+    assert (files, slots, descriptors, placed, unread, shared) == (507, 18831, 8129, 7980, 39, 110)
 
 
 def test_every_mhxx_motion_effect_and_proof_effect_list_is_laid_out(dump):
