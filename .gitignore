@@ -28,6 +28,7 @@ mods/*/tests/test_module
 mods/*/tests/test_rathian_3u
 mods/*/tests/test_family_discovery
 
-# The generated family list and the discovery test's directory (mods/)
+# The generated family list, the family test programs and the discovery directories (mods/)
 mods/*/src/monsters/*/families.h
-mods/*/tests/family-probe/
+mods/*/tests/family-*
+mods/*/tests/probe-tests/

@@ -1121,22 +1121,30 @@ line; giving 4/27 the fast turn step fails it with the turn line; changing 8/0's
 last four were run when the plugin was translated (#139-#142); this session proved the routing
 and re-ran the suite.
 
-The 3U module's half is `tests/test_rathian_3u.c`, for issue #216. Last result (2026-11-26):
-pass. It checks the factory association for 125 and that an MH4U id and a registered id
-without a module fall through; that an id the slice does not carry (`1/0`) is logged once and
-left to MH4U's dispatcher; and the six ids' call sequences — 0/0 and 0/4's 150.0 delay and
-countdown, 0/1's inline delay, 0/2's mode and three-way state test, 0/3's data record and fall
-rate, 0/6's vertical step and -75.0 clamp, and the three base handlers' `0x009167b4`,
-`0x0094f408`, `0x00b05da4`, `0x0093d870`, `0x0092e99c`, `0x0068882c` and `0x0090ef74` calls,
-with the setter's fifth stack argument. Breaking the 0/2 base handler's sub-state choice
-(`index = 2` to `0`) fails it with `0/0 state 1 doesn't start the sub-state 2 action`, plus the
-0/1 and 0/2 fall-through lines; reverting makes it pass.
+The 3U module's tests are `tests/test_rathian_3u.c` (the shell: the factory association for
+125, the routing, the ready line and the self-test) and one program per action family under
+`tests/rathian-3u/` (category 0's is `cat0.c`), for issue #216; `make test` discovers the
+family tests from the directory (issue #268). Last result (2026-11-26): pass. The shell test
+checks that 125 runs the module, that an MH4U id and a registered id without a module fall
+through, that an id the slice does not carry (`1/0`) is logged once and left to MH4U's
+dispatcher, and the ready and self-test lines. The family tests check the six ids' call
+sequences — 0/0 and 0/4's 150.0 delay and countdown, 0/1's inline delay, 0/2's mode and
+three-way state test, 0/3's data record and fall rate, 0/6's vertical step and -75.0 clamp,
+and the three base handlers' `0x009167b4`, `0x0094f408`, `0x00b05da4`, `0x0093d870`,
+`0x0092e99c`, `0x0068882c` and `0x0090ef74` calls, with the setter's fifth stack argument.
+Breaking the 0/2 base handler's sub-state choice (`index = 2` to `0`) fails `tests/family-cat0`
+with `0/0 state 1 doesn't start the sub-state 2 action`, plus the 0/1 and 0/2 fall-through
+lines; reverting makes it pass.
 
 The family list's discovery is `tests/test_family_discovery.c`, for issue #265: it puts a probe
 family the module does not ship in a directory of its own, has `tools/gen_families.py` write
 its list (the build's step), and calls the entry the list found; it fails with `the generated
-list doesn't name the probe family` when the generator leaves the file out. Last result
-(2026-11-26): pass.
+list doesn't name the probe family` when the generator leaves the file out.
+
+The family tests' discovery is `make test`'s `test-family-discovery`, for issue #268: it puts a
+probe family test in a directory of its own and has the wildcard's list build and run it; when
+the wildcard leaves the file out, `test-family-tests` fails with `no family tests in
+tests/probe-tests`. Last result (2026-11-26): pass.
 
 T1c: a headless run of the code library built with the runtime, with `selftest = 1`. The log
 must have the runtime's ready line, each module's ready and self-test lines and the guest
