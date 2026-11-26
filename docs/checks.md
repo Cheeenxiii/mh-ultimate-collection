@@ -1132,6 +1132,12 @@ with the setter's fifth stack argument. Breaking the 0/2 base handler's sub-stat
 (`index = 2` to `0`) fails it with `0/0 state 1 doesn't start the sub-state 2 action`, plus the
 0/1 and 0/2 fall-through lines; reverting makes it pass.
 
+The family list's discovery is `tests/test_family_discovery.c`, for issue #265: it puts a probe
+family the module does not ship in a directory of its own, has `tools/gen_families.py` write
+its list (the build's step), and calls the entry the list found; it fails with `the generated
+list doesn't name the probe family` when the generator leaves the file out. Last result
+(2026-11-26): pass.
+
 T1c: a headless run of the code library built with the runtime, with `selftest = 1`. The log
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is

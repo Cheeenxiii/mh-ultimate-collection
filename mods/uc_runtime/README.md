@@ -33,7 +33,12 @@ held them before.
 | `src/module.h` | the module interface: `MhucModuleOps`, `MhucState`, the guest call, the accessors, the motion encoder and the log |
 | `src/modules.h` | generated from the registry and the module files: one row per registered id, with the monster's `ops` or 0 for a data-only port; do not edit |
 | `src/monsters/rathian-gu.c` | GU Rathian's module: her translated MHXX-only actions, the first real module |
-| `src/monsters/rathian-3u.c` | 3U Rathian's module: category 0 (`0/0`, `0/1`, `0/2`, `0/3`, `0/4`, `0/6`) and the three base handlers they reach, the first slice of her 191 ids |
+| `src/monsters/rathian-3u.c` | 3U Rathian's module: the shared entry (the factory association's dispatch, the pending log, the ready line and the self-test) and the loop over the generated family list |
+| `src/monsters/rathian-3u/family.h` | the family interface: `MhucFamily` (a name, the ids it carries, a dispatch entry, a self-test) and the three base handlers `cat0.c` exports for the slices that reuse them |
+| `src/monsters/rathian-3u/cat0.c` | category 0's family: `0/0`, `0/1`, `0/2`, `0/3`, `0/4`, `0/6` and the three base handlers they reach, the first slice of her 191 ids |
+| `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
+| `tests/test_rathian_3u.c` | the 3U module's routing and category 0's call sequences on the fake host (`make test`) |
+| `tests/test_family_discovery.c` | a family file added to a directory, discovered and routed with no other edit (`make test`) |
 | `tests/fake_host.c`, `tests/fake_host.h` | the fake host every test runs on: guest memory, the heap, `call`/`call2` and the guest stubs, the hooks, the registers and the log |
 | `tests/test_runtime.c` | the id layer on the fake host (`make test`) |
 | `tests/test_module.c` | the module's routing and its translated actions' call sequences on the fake host (`make test`) |
@@ -41,8 +46,10 @@ held them before.
 ## The module interface
 
 A ported monster's action code is one C file, `src/monsters/<key>.c`, where `<key>` is its
-registry key, compiled into the runtime. It exports one `const MhucModuleOps`
-([src/module.h](src/module.h)):
+registry key, compiled into the runtime. A monster with many action ids puts its families in a
+directory `src/monsters/<key>/`, one file per family, and the build discovers them (see
+[Adding a family](#adding-a-family-an-action-slice)); the module file keeps what every family
+shares. The module exports one `const MhucModuleOps` ([src/module.h](src/module.h)):
 
 ```c
 typedef struct MhucModuleOps {
@@ -98,6 +105,35 @@ readers answer its id. That is what keeps the code library's hook list fixed.
    symbol, so the C build can't silently lose it.
 3. `make`, then redeploy the mod. The runtime's `mod.json` and its hook list do not change, so
    the game's code library is not built again.
+
+### Adding a family (an action slice)
+
+A monster whose ids are ported in slices, as the 3U Rathian's ten action families are (#217 to
+#229, and action 4's #136), keeps one C file per family under `src/monsters/<key>/`. A slice
+adds **one file and nothing shared**:
+
+1. Write `src/monsters/rathian-3u/<family>.c` with the slice's handlers. It includes
+   `family.h` and exports one `const MhucFamily mhuc_3u_family_<family>` (the file's stem with
+   every non-alphanumeric byte replaced by `_`):
+   ```c
+   static int dispatch_cat0(MH4UCall *call, uint32_t enemy, uint32_t work, int category,
+                            int index);
+   static void self_test_cat0(MH4UCall *call);
+   const MhucFamily mhuc_3u_family_cat0 = { "cat0", 6, dispatch_cat0, self_test_cat0 };
+   ```
+   `dispatch` gets the MH4U work block and the action pair and returns 1 when it ran the pair,
+   0 so the module tries the next family. `translated` is the number of ids the family carries,
+   which the ready line sums. `self_test` logs the family's self-test lines (NULL for none).
+   The three base handlers category 0 reaches are exported from `cat0.c` and declared in
+   `family.h`; a family whose source falls into one (1/10 and 2/13 run 0/2's, 3/10, 13/7 and
+   13/9 run 0/3's) calls it from its own `dispatch` and returns 1.
+2. Mark the slice's ids in [data/actions/rathian-3u.csv](../../data/actions/README.md).
+3. `make`. The Makefile runs `tools/gen_families.py` over the directory and writes the
+   generated `families.h`; the module's dispatch tries the families in it. Nothing else is
+   edited: no list, no dispatch, no other family.
+4. `make test` and the headless check T1c. `tests/test_family_discovery.c` builds a directory
+   with a probe family the module does not ship, generates its list, and calls the entry the
+   list found; it is the same step a slice takes.
 
 ### A worked example: GU Rathian's module
 
@@ -316,8 +352,12 @@ its r0.
 
 MH3U's Rathian (USA, class `uEm002`) has 191 action ids, every one on her own code: the
 dispatcher (vtable slot 50, `0x00687d30`) switches on the category byte and each category on
-the index byte. `src/monsters/rathian-3u.c` is her module, the second in the runtime, and
-category 0 is its first slice (issue [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)):
+the index byte. `src/monsters/rathian-3u.c` is her module, the second in the runtime: the
+shared entry (the factory association's dispatch, the pending log, the ready line and the
+self-test) and the loop over the family list the build generates from
+`src/monsters/rathian-3u/`. Category 0's family is `cat0.c`, the first slice (issue
+[#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)); the ten family
+slices (#217 to #229, and action 4's #136) add one file each. Category 0's family runs:
 
 | Id | Source | What the module runs |
 |---|---|---|
@@ -664,8 +704,10 @@ make test   # the id layer and the modules on a fake host, with no game
 
 It builds against the engine fork's `include/mh4u_plugin.h`; `make FORK=/path/to/fork` uses
 another checkout. `src/ids.h` and `src/modules.h` are generated, not edited: run `python3
-tools/check_ids.py --write` after changing the registry. Licence: GPL-3.0-or-later, like the
-rest of the mod.
+tools/check_ids.py --write` after changing the registry. Each monster's family list
+(`src/monsters/<key>/families.h`) is generated at build time by `tools/gen_families.py`; it is
+not committed, and adding a family file is what makes the next `make` rewrite it. Licence:
+GPL-3.0-or-later, like the rest of the mod.
 
 ## Install
 

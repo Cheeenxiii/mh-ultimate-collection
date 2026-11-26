@@ -1,114 +1,40 @@
 /*
- * rathian-3u.c: the 3U Rathian's own actions, run on MH4U's uEnemy.
+ * rathian-3u.c: 3U Rathian's module, the home of her action families.
  *
- * MH3U's Rathian (USA, class uEm002) has 191 action ids, all of them on her own code: the
- * dispatcher (vtable slot 50, 0x00687d30) switches on the category byte and each category on
- * the index byte. This module runs her own handlers, reimplemented on MH4U's uEnemy, with
- * MH4U's engine functions at their counterparts and the source's frame values and call order
- * (decision 0002's 2026-11-26 amendment). It carries the first slice, category 0:
+ * The module runs her own handlers, reimplemented on MH4U's uEnemy with MH4U's engine
+ * functions and the source's frame values and call order (decision 0002's 2026-11-26
+ * amendment). Her 191 action ids are ported in slices, one action family per file under
+ * src/monsters/rathian-3u/: cat0.c holds category 0's six ids and the three base handlers they
+ * reach. The ten slice issues (#217 to #229, and action 4's #136) each add one file there and
+ * edit nothing else.
  *
- *   0/0, 0/4  handler 0x00699ad4: sets mode 0 and a 150.0 delay, then falls into 0/2.
- *   0/1       the category-0 case block itself (no handler): the same delay, into 0/2.
- *   0/2       the base-class handler 0x0082d1cc: mode 0, a state test, the action start.
- *   0/3       the base-class handler 0x00858b6c: the data record's +0x64, the fall rate,
- *             mode 1, the action start.
- *   0/6       the base-class handler 0x0082b7dc: mode 3 and its case block's vertical step,
- *             then the action start.
+ * This file holds what every family shares: the factory association's entry (the runtime calls
+ * `dispatch` for the monster it recorded as id 125), the pending log, the ready line and the
+ * self-test that calls each family's. The family list is not written here: the build discovers
+ * the files in src/monsters/rathian-3u/ with tools/gen_families.py and writes the generated
+ * families.h, which this file includes. A family file exports one `const MhucFamily`
+ * (family.h), and its `dispatch` returns 1 when it ran the pair or 0 to let the next family
+ * try. A pair no family carries goes to MH4U's dispatcher once and is logged, so a forced id
+ * that does nothing says so.
  *
- * Decision 0002's second amendment makes the three base handlers the port's own code too.
- * Later slices reuse them for 1/10 and 2/13 (0x0082d1cc) and 3/10, 13/7 and 13/9
- * (0x00858b6c), so they are written once here.
- *
- * The work block: MH3U keeps it at *(this+0x1a48), MH4U at *(this+0xe28). Every offset below is
- * MH4U's; the header of the runtime's README carries the field map and how each offset was
- * found. The action's state byte is the game's own (MH4U work+0x144), not a module slot,
- * because the source's category-0 case blocks share it across the six ids and the action
- * start resets it (3U work+5/6/7, MH4U +0x144/0x145/0x146).
- *
- * What is not translated yet, and why (recorded in the runtime's README):
- *   - 0x008412cc, the per-action value applier the three base handlers call. MH4U has no
- *     function for it (#253), and the list it reads is the source's action table, which the
- *     port does not carry. MH4U's own action setter 0x0090ef74 takes a per-action value as a
- *     fifth, stack argument; the module passes MH4U's own value there (the same one MH4U's
- *     0/2, 0/3 and 0/6 handlers pass). Whether the two are the same step is #55's in-game
- *     trace to settle; the module logs the open item once.
- *   - 3U 0x00833b2c halves its argument before adding it to the block's vertical value;
- *     MH4U's 0x00915d44 does not. The module passes the source's -5.0 halved (-2.5) so the
- *     applied step stays the source's.
- *   - The source's 0/0 keeps a second copy of the delay at work+0x2c; MH4U's countdown
- *     helper keeps one value, so the port keeps that one.
+ * Adding a slice: write src/monsters/rathian-3u/<family>.c with its handlers and its
+ * `const MhucFamily mhuc_3u_family_<family>`, and mark its ids in data/actions/rathian-3u.csv.
+ * Nothing else changes; `make` regenerates the list. The runtime's README has the family
+ * interface, the field map and the engine-call map.
  *
  * Settings (the runtime's mod.json "config", the player's config.ini over it):
- *   selftest  "1": log what this module carries, its field map and what it leaves out
+ *   selftest  "1": log this module's families and each family's self-test
  *
  * Licence: GPL-3.0-or-later.
  */
 #include <stdint.h>
 
 #include "../module.h"
+#include "rathian-3u/families.h"
 
-/* The MH4U work block *(enemy + 0xe28), its offsets, and the 3U offset each stands for. */
-#define WORK_STATE        0x0144u  /* 3U +0x5:  the action's state byte, shared by category 0 */
-#define WORK_CATEGORY     0x01cau  /* 3U +0xdf: the current category */
-#define WORK_MODE         0x01c8u  /* 3U +0xdc: the mode byte */
-#define WORK_SET          0x01dcu  /* 3U +0xf2: "the action was set" */
-#define WORK_COUNTDOWN    0x01d4u  /* 3U +0x28: the 0/0 delay (MH4U's own 0/0 uses it) */
-#define WORK_VERTICAL     0x0180u  /* 3U +0x68: the vertical step 0/6 advances */
-#define WORK_0_2_STATE    0x051cu  /* 3U +0x941: the state the 0/2 base handler tests */
-#define WORK_FLAGS        0x01b4u  /* 3U +0x8c: its bit 0x40 */
-#define WORK_OTHER_STATE  0x034cu  /* 3U +0x381: the other state byte */
-#define WORK_KIND         0x01c0u  /* 3U +0x3: the data record's kind/id */
-#define WORK_DATA_INDEX   0x797eu  /* 3U +0xa: the data record's index */
-#define WORK_RATE         0x01b8u  /* 3U +0x90: the fall rate */
-#define WORK_RATE_2       0x01bcu  /* 3U +0x94: its second factor */
-#define WORK_POS_Y        0x019cu  /* 3U +0x3c: the fall height the data float advances */
-#define WORK_APPLIED      0x01c7u  /* 3U +0xd9: 0x00833b2c's "applied" byte */
-
-/* The MH4U engine functions this slice calls, and the 3U function each stands for. */
-#define FN_MODE        0x009167b4u /* [0x0082fe88] the mode/state setter */
-#define FN_REQUEST     0x0094f408u /* [0x0082a878] set the next motion/state (r1, s0, s1) */
-#define FN_FLAG        0x00b05da4u /* [0x0083cbf4] the action's finish flag */
-#define FN_VERTICAL    0x00915d44u /* [0x00833b2c] advance the vertical value by s0 * delta */
-#define FN_DATA_FLOAT  0x0093d870u /* [0x00852324] the action data's float, returned in s0 */
-#define FN_APPLY_FALL  0x0092e99cu /* [0x00844124] advance the fall by s0, then set mode 1 */
-#define FN_DATA_GET    0x0068882cu /* [0x00a33b50] the monster's data record */
-#define FN_SET_ACTION  0x0090ef74u /* [0x00827d54] start an action (the fifth argument is
-                                    * the per-action value, on the stack) */
-#define FN_COUNTDOWN   0x00b0704cu /* the source's 0/0 inlines 0x008a78ec's subtraction */
-
-/* The globals MH4U's own 0/2, 0/3 and 0/6 handlers use: the data table the record lookup
- * starts from, and the signed byte the action setter takes as its per-action value. */
-#define DATA_TABLE_GLOBAL  0x00f32004u
-#define ACTION_EXTRA_GLOBAL 0x00fb6b7cu
-
-/* The source's request ids (its r1), kept as the source asks for them. All are below 100,
- * i.e. motion file 0's slots, and the two games number file 0 the same (MH3U's
- * file * 100 + slot is MH4U's file << 8 | slot for file 0), so no motion translation is
- * needed here; a request into another file would be MH4U's form of the same slot. */
-#define REQUEST_0_0 0x01u
-#define REQUEST_0_1 0x02u
-#define REQUEST_0_2 0x11u
-#define REQUEST_0_3 0x1au
-#define REQUEST_0_6 0x1bu
-
-/* The source's frame values. 0/0's delay is 150.0 (the float at 0x00699b74); the request's
- * third and fourth arguments are 0xa/0 or 6/0, which MH4U's helper takes as s0/s1. 0/6's
- * vertical step is -5.0, halved because 3U's helper halves it and MH4U's does not. */
-#define DELAY_0_0      150.0f
-#define REQUEST_SPEED  10.0f
-#define FALL_RATE       6.0f
-#define VERTICAL_STEP  (-2.5f)  /* the source's -5.0, halved as 3U's 0x00833b2c does */
-#define VERTICAL_CLAMP (-75.0f)
-#define VERTICAL_CLAMP_BITS 0xc2960000u
-#define CATEGORY_NONE 0x0bu       /* the category the three base handlers refuse */
-
-#define DATA_RECORD_FLOAT 0x64u   /* 3U's record+0x70 */
-#define ACTION_KIND       2u      /* the kind byte the three base handlers pass */
-
-/* ── the pending log ─────────────────────────────────────────────────────────────────── */
-/* An id this slice does not carry goes to MH4U's dispatcher and is logged once, so a forced
- * id that does nothing says so. */
-#define PENDING_SEEN 128
+/* An id no family carries goes to MH4U's dispatcher and is logged once, so a forced id that
+ * does nothing says so. */
+#define PENDING_SEEN 256
 static uint16_t pending_seen[PENDING_SEEN];
 static int pending_count;
 
@@ -123,194 +49,12 @@ static void log_pending_once(int category, int index) {
         pending_seen[pending_count++] = pair;
     }
     mhuc_logf(MH4U_LOG_INFO,
-              "pending action %d/%d: this slice does not carry it, MH4U's dispatcher runs it",
-              category, index);
+              "pending action %d/%d: no family carries it, MH4U's dispatcher runs it", category,
+              index);
 }
 
-/* ── the translated handlers ────────────────────────────────────────────────────────── */
-
-/* The action start all three base handlers end with: 0x00827d54(this, 0, index, 2). MH4U's
- * setter 0x0090ef74 takes one more argument than 3U's, a per-action signed byte from a global
- * on the stack; it is the same value MH4U's own 0/2, 0/3 and 0/6 handlers pass. The source's
- * 0x008412cc applier is the open item above. */
-static int applier_logged;
-
-static void set_action(MH4UCall *call, uint32_t enemy, uint32_t index) {
-    if (!applier_logged) {
-        applier_logged = 1;
-        mhuc_log(MH4U_LOG_INFO,
-                 "the source's per-action value step (0x008412cc) is not carried: MH4U's "
-                 "setter 0x0090ef74 takes its per-action value as a stack argument, and the "
-                 "module passes MH4U's own; #55's trace settles whether they are one step");
-    }
-    const int8_t extra = (int8_t)mhuc_read8(
-        call, mhuc_read32(call, ACTION_EXTRA_GLOBAL) + 0x2fu);
-    mhuc_call5(call, FN_SET_ACTION, enemy, 0u, index, ACTION_KIND, (uint32_t)(int32_t)extra);
-}
-
-/* 3U 0x0082d1cc, 0/2's base handler, which 0/0, 0/1 and 0/2 fall into.
- *   0: mode 0; the state byte and the flags pick the start's index: 2 when the state is 2 or
- *      3 and bit 0x40 is set, else 1 when the other state byte is 1, else 0; unless the
- *      category is 0xb, the per-action value and the action start; then the set byte.
- */
-static void run_0_2_base(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    mhuc_call(call, FN_MODE, enemy, 0u, 0u, 0u);
-    const int state = (int)mhuc_read8(call, work + WORK_0_2_STATE);
-    const uint32_t flags = mhuc_read32(call, work + WORK_FLAGS);
-    uint32_t index;
-    if ((state == 2 || state == 3) && (flags & 0x40u)) {
-        index = 2u;
-    } else if (mhuc_read8(call, work + WORK_OTHER_STATE) == 1u) {
-        index = 1u;
-    } else {
-        index = 0u;
-    }
-    if (mhuc_read8(call, work + WORK_CATEGORY) != CATEGORY_NONE) {
-        set_action(call, enemy, index);
-    }
-    mhuc_write8(call, work + WORK_SET, 1u);
-}
-
-/* 3U 0x00699ad4, 0/0 and 0/4.
- *   0: state 1, mode 0, the 150.0 delay, the request for 1 (speed 10.0);
- *   1: count the delay down; when it is spent, fall into 0/2's base handler.
- */
-static void run_0_0_4(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    const int state = (int)mhuc_read8(call, work + WORK_STATE);
-    if (state == 0) {
-        mhuc_write8(call, work + WORK_STATE, 1u);
-        mhuc_call(call, FN_MODE, enemy, 0u, 0u, 0u);
-        mhuc_put_f32(call, work + WORK_COUNTDOWN, DELAY_0_0);
-        mhuc_call_f(call, FN_REQUEST, enemy, REQUEST_0_0, 0u, 0u, REQUEST_SPEED, 0.0f, NULL);
-    } else if (state == 1) {
-        if (!mhuc_call(call, FN_COUNTDOWN, enemy, work + WORK_COUNTDOWN, 0u, 0u)) {
-            return;
-        }
-        run_0_2_base(call, enemy, work);
-    }
-}
-
-/* 3U's 0/1 case block (0x006916b4, inline).
- *   0: state 1, mode 0, the request for 2 (speed 10.0);
- *   1: wait for the finish flag, then fall into 0/2's base handler.
- */
-static void run_0_1(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    const int state = (int)mhuc_read8(call, work + WORK_STATE);
-    if (state == 0) {
-        mhuc_write8(call, work + WORK_STATE, 1u);
-        mhuc_call(call, FN_MODE, enemy, 0u, 0u, 0u);
-        mhuc_call_f(call, FN_REQUEST, enemy, REQUEST_0_1, 0u, 0u, REQUEST_SPEED, 0.0f, NULL);
-    } else if (state == 1) {
-        if (mhuc_call(call, FN_FLAG, enemy, 0u, 0u, 0u)) {
-            run_0_2_base(call, enemy, work);
-        }
-    }
-}
-
-/* 3U's 0/2 case block (0x00691710).
- *   0: state 1, mode 0, the request for 0x11 (speed 6.0);
- *   1: wait for the finish flag, then 0x0082d1cc.
- */
-static void run_0_2(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    const int state = (int)mhuc_read8(call, work + WORK_STATE);
-    if (state == 0) {
-        mhuc_write8(call, work + WORK_STATE, 1u);
-        mhuc_call(call, FN_MODE, enemy, 0u, 0u, 0u);
-        mhuc_call_f(call, FN_REQUEST, enemy, REQUEST_0_2, 0u, 0u, FALL_RATE, 0.0f, NULL);
-    } else if (state == 1) {
-        if (mhuc_call(call, FN_FLAG, enemy, 0u, 0u, 0u)) {
-            run_0_2_base(call, enemy, work);
-        }
-    }
-}
-
-/* 3U 0x00858b6c, 0/3's base handler.
- *   The data record's +0x64 float; while the mode is 0 or 3, the fall height advances by it
- *   times the block's rate; mode 1; unless the category is 0xb, the per-action value and the
- *   action start; then the set byte.
- */
-static void run_0_3_base(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    const uint32_t table = mhuc_read32(call, DATA_TABLE_GLOBAL);
-    const uint32_t record = mhuc_call(call, FN_DATA_GET, table,
-                                      mhuc_read8(call, work + WORK_KIND),
-                                      mhuc_read8(call, work + WORK_DATA_INDEX), 0u);
-    const float data = mhuc_f32(call, record + DATA_RECORD_FLOAT);
-    const int mode = (int)mhuc_read8(call, work + WORK_MODE);
-    if (mode == 0 || mode == 3) {
-        const float rate = mhuc_f32(call, work + WORK_RATE) *
-                           mhuc_f32(call, work + WORK_RATE_2);
-        mhuc_put_f32(call, work + WORK_POS_Y,
-                     mhuc_f32(call, work + WORK_POS_Y) + data * rate);
-    }
-    mhuc_call(call, FN_MODE, enemy, 1u, 0u, 0u);
-    if (mhuc_read8(call, work + WORK_CATEGORY) != CATEGORY_NONE) {
-        set_action(call, enemy, 3u);
-    }
-    mhuc_write8(call, work + WORK_SET, 1u);
-}
-
-/* 3U's 0/3 case block (0x00691774).
- *   0: state 1, the data record's float (0x00852324), the fall it advances (0x00844124, which
- *      also sets mode 1), the request for 0x1a (speed 6.0);
- *   1: wait for the finish flag, then 0x00858b6c.
- */
-static void run_0_3(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    const int state = (int)mhuc_read8(call, work + WORK_STATE);
-    if (state == 0) {
-        mhuc_write8(call, work + WORK_STATE, 1u);
-        float data = 0.0f;
-        mhuc_call_f(call, FN_DATA_FLOAT, enemy, 0u, 0u, 0u, 0.0f, 0.0f, &data);
-        mhuc_call_f(call, FN_APPLY_FALL, enemy, 0u, 0u, 0u, data, 0.0f, NULL);
-        mhuc_call_f(call, FN_REQUEST, enemy, REQUEST_0_3, 0u, 0u, FALL_RATE, 0.0f, NULL);
-    } else if (state == 1) {
-        if (mhuc_call(call, FN_FLAG, enemy, 0u, 0u, 0u)) {
-            run_0_3_base(call, enemy, work);
-        }
-    }
-}
-
-/* The vertical step and the lower clamp 3U's 0/6 case block makes before its request and its
- * flag test: 0x00833b2c(-2.5), then if the value's bits are above -75.0's, set -75.0. */
-static void step_0_6_vertical(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    mhuc_call_f(call, FN_VERTICAL, enemy, 0u, 0u, 0u, VERTICAL_STEP, 0.0f, NULL);
-    if (mhuc_read32(call, work + WORK_VERTICAL) > VERTICAL_CLAMP_BITS) {
-        mhuc_put_f32(call, work + WORK_VERTICAL, VERTICAL_CLAMP);
-    }
-}
-
-/* 3U 0x0082b7dc, 0/6's base handler: mode 3, then unless the category is 0xb, the per-action
- * value and the action start; then the set byte. */
-static void run_0_6_base(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    mhuc_call(call, FN_MODE, enemy, 3u, 0u, 0u);
-    if (mhuc_read8(call, work + WORK_CATEGORY) != CATEGORY_NONE) {
-        set_action(call, enemy, 6u);
-    }
-    mhuc_write8(call, work + WORK_SET, 1u);
-}
-
-/* 3U's 0/6 case block (0x006917f0).
- *   0: state 1, mode 3, the vertical step, the request for 0x1b (speed 6.0);
- *   1: the vertical step, then wait for the finish flag, then 0x0082b7dc. */
-static void run_0_6(MH4UCall *call, uint32_t enemy, uint32_t work) {
-    const int state = (int)mhuc_read8(call, work + WORK_STATE);
-    if (state == 0) {
-        mhuc_write8(call, work + WORK_STATE, 1u);
-        mhuc_call(call, FN_MODE, enemy, 3u, 0u, 0u);
-        step_0_6_vertical(call, enemy, work);
-        mhuc_call_f(call, FN_REQUEST, enemy, REQUEST_0_6, 0u, 0u, FALL_RATE, 0.0f, NULL);
-    } else if (state == 1) {
-        step_0_6_vertical(call, enemy, work);
-        if (mhuc_call(call, FN_FLAG, enemy, 0u, 0u, 0u)) {
-            run_0_6_base(call, enemy, work);
-        }
-    }
-}
-
-/* ── the dispatch entry and the module's hooks ────────────────────────────────────────── */
-
-/* Called for every action of the monster the runtime recorded as this module's registry id.
- * The six category-0 ids run their handlers; any other id is still owed, so it goes to MH4U's
- * dispatcher once and is logged. */
+/* The module's dispatch entry. The runtime recorded the enemy at the factory and calls this
+ * for each action; the family list is the one the build discovered. */
 static int dispatch(MH4UCall *call, uint32_t enemy) {
     const uint32_t work = mhuc_work(call, enemy);
     if (!work) {
@@ -318,52 +62,44 @@ static int dispatch(MH4UCall *call, uint32_t enemy) {
     }
     const int category = mhuc_category(call, work);
     const int index = mhuc_index(call, work);
-    if (category == 0) {
-        switch (index) {
-        case 0: case 4: run_0_0_4(call, enemy, work); return 1;
-        case 1: run_0_1(call, enemy, work); return 1;
-        case 2: run_0_2(call, enemy, work); return 1;
-        case 3: run_0_3(call, enemy, work); return 1;
-        case 6: run_0_6(call, enemy, work); return 1;
-        default: break;
+    for (unsigned i = 0; i < MHUC_3U_FAMILY_COUNT; i++) {
+        const MhucFamily *family = mhuc_3u_families[i];
+        if (family && family->dispatch &&
+            family->dispatch(call, enemy, work, category, index)) {
+            return 1;
         }
     }
     log_pending_once(category, index);
     return 0;
 }
 
-/* The module's ready line: the slice it carries, on its registry id (125). The "monster"
- * setting belongs to the runtime's warning, not to this line, because a module answers the
- * registry id it was built for (decision 0013). */
+/* The module's ready line: the ids the families carry, out of the source's 191, on the id it
+ * answers. Each family declares its own count, so a slice's file is the only one that names
+ * it. */
 static void start(void) {
+    unsigned translated = 0;
+    for (unsigned i = 0; i < MHUC_3U_FAMILY_COUNT; i++) {
+        if (mhuc_3u_families[i]) {
+            translated += mhuc_3u_families[i]->translated;
+        }
+    }
     mhuc_logf(MH4U_LOG_INFO,
-              "ready: translating 6 of 3U Rathian's 191 actions on monster %u",
+              "ready: translating %u of 3U Rathian's 191 actions on monster %u", translated,
               (unsigned)MHUC_MONSTER_ID_RATHIAN_3U);
 }
 
-/* The self-test the headless check reads: the six ids, the three base handlers and their MH4U
- * counterparts, the field map's anchors, and the open item. */
+/* The self-test the headless check reads: the families the build discovered, then each
+ * family's own lines, then the runtime's stubs. */
 static void self_test(MH4UCall *call) {
-    mhuc_log(MH4U_LOG_INFO,
-             "selftest: 6 of the 191 actions: 0/0 and 0/4 <- 0x00699ad4 (mode 0, a 150.0 "
-             "delay, falls into 0/2); 0/1 <- its inline case block (the same delay); 0/2 <- "
-             "0x0082d1cc (mode 0, the state test at +0x51c/+0x1b4/+0x34c, the action start); "
-             "0/3 <- 0x00858b6c (the record's +0x64, the rate at +0x1b8/+0x1bc, mode 1, the "
-             "action start); 0/6 <- 0x0082b7dc (mode 3, the vertical step at +0x180, the "
-             "action start)");
     mhuc_logf(MH4U_LOG_INFO,
-              "selftest: the base handlers are port code (0002's second amendment); their "
-              "engine calls are MH4U's: mode 0x%08x, request 0x%08x, flag 0x%08x, data "
-              "0x%08x, vertical 0x%08x, set action 0x%08x",
-              (unsigned)FN_MODE, (unsigned)FN_REQUEST, (unsigned)FN_FLAG,
-              (unsigned)FN_DATA_GET, (unsigned)FN_VERTICAL, (unsigned)FN_SET_ACTION);
-    mhuc_log(MH4U_LOG_INFO,
-             "selftest: field map anchors: *(this+0x1a48) -> *(this+0xe28), +0xdf/+0xe0 -> "
-             "+0x1ca/+0x1cb, +0x5 -> +0x144, +0xdc -> +0x1c8, +0xf2 -> +0x1dc, +0x3/+0xa -> "
-             "+0x1c0/+0x797e, +0x68 -> +0x180");
-    mhuc_log(MH4U_LOG_INFO,
-             "selftest: open: 0x008412cc's per-action value is MH4U's setter's stack argument "
-             "for now (#55); 0x00833b2c's 0.5 factor is passed halved (-2.5)");
+              "selftest: %u family file(s) discovered from src/monsters/rathian-3u/",
+              (unsigned)MHUC_3U_FAMILY_COUNT);
+    for (unsigned i = 0; i < MHUC_3U_FAMILY_COUNT; i++) {
+        const MhucFamily *family = mhuc_3u_families[i];
+        if (family && family->self_test) {
+            family->self_test(call);
+        }
+    }
     const uint32_t stubs = mhuc_stubs(call);
     if (stubs) {
         mhuc_logf(MH4U_LOG_INFO,
