@@ -48,6 +48,8 @@ that held them before.
 | `src/monsters/rathian-3u/cat7a.c` | category 7's first family (#221): `7/0`, `7/1`, `7/2`, `7/4`, `7/5`, `7/6`, `7/7`, `7/8`, `7/10`, `7/11`, `7/12`, `7/15`, `7/16`, `7/19`, `7/20`, `7/32`, `7/34`, `7/42`, `7/61`, `7/77`, `7/85`, and the calls still blocked |
 | `src/monsters/rathian-3u/cat7b.c` | category 7 part 2's family (#222): `7/3`, `7/9`, `7/13`, `7/14`, `7/17`, `7/18`, `7/21`, `7/30`, `7/41`, `7/43`, `7/44`, `7/53`, `7/54`, `7/55`, `7/56`, `7/72`, `7/73`, `7/78`, `7/80`, `7/83`, `7/88`, `7/89`, on the units 0x00694474, 0x00694f4c, 0x006956e8, 0x00695e68 and 0x00696408 |
 | `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
+| `src/monsters/rathian-3u/cat8.c` | category 8's family: id `8` and the three class helpers its handler reaches (#225) |
+| `src/monsters/rathian-3u/cat11.c` | category 11's family: `11/0`, `11/5`, `11/15`, `11/26`, `11/28`, the shared wrapper `0x00687e88` and the base-class handler `0x0084d864` (#225) |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
 | `tests/rathian-3u/host.h` | what the 3U module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
@@ -57,6 +59,8 @@ that held them before.
 | `tests/rathian-3u/cat7a.c` | category 7 part 1's fake-host test: every id's and variant's call sequence; `make test` discovers it and builds `tests/family-cat7a` |
 | `tests/rathian-3u/cat7b.c` | category 7 part 2's fake-host test: every id's and variant's call sequence and frame values; `make test` discovers it and builds `tests/family-cat7b` |
 | `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
+| `tests/rathian-3u/cat8.c` | category 8's fake-host test: id 8's three states, the 300.0/38.0 aim, the 12.0/50.0 test, the 90.0 timer and motion `0xca`, and the four blocked calls' log lines; `make test` builds `tests/family-cat8` |
+| `tests/rathian-3u/cat11.c` | category 11's fake-host test: the five ids' shared-handler calls, 11/28's 45.0/0.5 step and its three open items' log lines; `make test` builds `tests/family-cat11` |
 | `tests/rathian-gu/host.h` | what the GU module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-gu/cat17.c` | category 17's fake-host test: the 0-2 no-op and the base update; `make test` discovers it and builds `tests/family-gu-cat17` |
 | `tests/rathian-gu/act3_98.c` | action 3/98's fake-host test: its three states and the motions `0x101`/`0x104`; `make test` builds `tests/family-gu-act3_98` |
@@ -528,8 +532,8 @@ Three things are not translated yet:
 
 The module's ready line sums the families' `translated` counts: `ready: translating 6 of 3U
 Rathian's 191 actions on monster 125` after #216, 22 after #220, 37 after #217, 58 after
-#221, 63 after #227, 85 after #222 and 100 after #219. Its self-test logs each family's ids,
-engine calls and open items. The 125 quest's run is check T1c.
+#221, 63 after #227, 85 after #222, 100 after #219 and 106 after #225. Its self-test logs
+families' ids, engine calls and open items. The 125 quest's run is check T1c.
 
 #### Category 3's part 1 (#219)
 
@@ -636,6 +640,60 @@ Two calls #55 still blocks are reached and each is logged once per action:
   source's nonzero path and ends the action in 0/3's base handler, so the move cannot stall.
 
 The family's fake-host test is `tests/rathian-3u/cat3b.c`.
+
+#### Categories 8 and 11 (#225)
+
+`cat8.c` translates her one category-8 id on its handler `0x00687074`, whose MH4U action pair
+is MH4U's own 8/0 handler `0x006e9770`. Under 0002's amendment the port runs the source's
+handler with the source's values, all three of MH4U's own 8/0 values replaced where 3U's
+differ: the aim at 300.0/38.0, the distance test at 12.0/50.0, a 90.0 timer, motion `0xca` at
+90.0, the hit check at 300.0/0.0/150.0, then the request for 9/1 or 2/6.
+
+| State | What the module runs |
+|---|---|
+| 0 | state byte 1, sub-state 0, mode 0, the action-start data setup (`0x00911c0c` with MH4U's list and the fifth stack argument), the aim (`0x00948674`) at 300.0/38.0, then the blocked `0x00257628` |
+| 1 | the 12.0/50.0 distance test (`0x0091aae4`, r1 = 3); when it holds, the position advance by 0.5 (`0x00955440`) and the action-start leaf (`0x0092f6e8`); on the finish flag, state 2, the 90.0 timer at work+0x1d4 and motion `0xca` at 90.0 (`0x0094e318`) |
+| 2 | the countdown (`0x00b0704c`) with the timer clamped at 0; the blocked `0x00839598` (taken nonzero); the hit check (`0x009122fc`, 300.0/0.0/150.0) or 2/6 when it fails; the blocked `0x0084512c` (taken nonzero); the tail flag 3, the part step and the request for 9/1 |
+
+3U's motion call also passes r2 = 4, which MH4U's wrapper `0x0094e318` fixes at 0 before its
+own player; the port goes through that wrapper, so the source's r2 is left out and the motion
+number and speed are the source's.
+
+Three calls into her class's own helpers are translated with the MH4U functions MH4U's own
+8/0 and 9/0 handlers call at the same points: `0x0068d070` (the aim) is `0x00948674`;
+`0x00687ae0` (the hit check) is `0x009122fc`; and `0x0068d940` (the part/effect step) is the
+block `0x0092e960`, then `0x00944c34` at -900.0 or `0x0091b7b0` at 0x32, then `0x0093b9ec`,
+whose input is `(int16)(work+0x3ec x 0.015)` (3U work+0x7fc, the same count). `0x0083c7a0`'s
+inner guard `0x008532a0` has no confirmed MH4U counterpart; the accumulator runs without it, as
+it does in MH4U's own handlers (`0x0093b9ec` is MH4U's own 9/0 call; its 8/0 uses `0x0093ba88`,
+the same clamp with its delta step).
+
+`cat11.c` translates her five category-11 ids. Every case block passes a source list, a mode in
+r2 and the action index in r3 to the shared handler `0x008326dc` (a veneer to `0x008326e0`),
+then falls into the base-class handler `0x0084d864`. MH4U's counterpart of the shared handler
+is `0x00919788`, which MH4U's own category-11 case (`0x006e9d9c`) runs with its own list
+`0x00fd2360` and the same mode; the source's r3 is ignored by `0x008326e0`. The source's lists
+(`0x00c4d800` for 11/0, `0x00c4d818` for 11/5, `0x00c4d850` for 11/15, `0x00c4d868` for
+11/26 and `0x00c4d880` for 11/28) are her data and are not carried, so the port passes MH4U's
+own list. 11/5 is the one id that passes mode 1; the other four pass mode 0.
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 11/0 | wrapper `0x00687e6c`, shared handler `0x008326e0` | `0x00919788` with MH4U's list and mode 0, then `0x0084d864`, which returns at its index test |
+| 11/5 | wrapper `0x00687e7c`, mode 1 | `0x00919788` with MH4U's list and mode 1, then the same tail |
+| 11/15, 11/26 | wrappers `0x00687e98`, `0x00687ea8`, mode 0 | `0x00919788` with mode 0, then the same tail |
+| 11/28 | wrapper `0x00687eb8`, mode 0 | `0x00919788` with mode 0, then `0x0084d864`'s own branch: the index 0x1c and mode gates, the blocked `0x00a37b3c` (taken nonzero), the 45.0/0.5 step on this+0x1a64, and the blocked `0x008477bc` above 45.0 |
+
+The base-class handler `0x0084d864` is reimplemented here under 0002's second amendment. Only
+11/28 goes past its first test; the other four ids end after the shared handler. Three parts of
+11/28's branch have no mapped MH4U field or counterpart and are named in the module's log:
+`0x00a37b3c` (bit 4 of the halfword at this+0x22e) is left out and its nonzero path taken;
+this+0x1a64 (3U work+0x1c) has no confirmed MH4U offset, so the port keeps it at MH4U's
+work+0x1c as a stopgap; `0x008477bc` (the record's +0xa0 effect/attack step) is left out, so
+the step above 45.0 does nothing.
+
+The two families' fake-host tests are `tests/rathian-3u/cat8.c` and
+`tests/rathian-3u/cat11.c`. Neither family falls into category 0's three base handlers.
 
 ### 3U Rathian's module: category 7, part 1
 
