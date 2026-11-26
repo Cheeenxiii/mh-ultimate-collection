@@ -340,10 +340,11 @@ request, and read the answer from the code rather than from the missing file.
   inventory at `0x007de644` has 63 actions on 17 handler units, and this method is none of them.
   It is the only monster class that calls the DCM formatter at all, and it does so at setup, not
   from an action.
-- **The action handlers.** A reachability walk over the call graph from every function in the 3U
-  Rathian's block (`0x00686000` to `0x0069b000`, her 66 handler units among them; 581 functions
-  reached) finds no camera class's method and no DCM formatter. No other monster class appears
-  among the camera-method callers above.
+- **The action handlers.** A reachability walk over the call graph from every function in the
+  monster classes' code region (`0x00680000` to `0x0087ffff`, 1,997 starting functions, 6,724
+  reached) finds no camera class's method; the only camera resource it reaches is the DCM
+  formatter, through `0x007e0750`. The same walk from the 3U Rathian's block alone (`0x00686000`
+  to `0x0069b000`, her 66 handler units among them; 581 functions reached) finds neither.
 - **The AI.** MH3U's EMC scripts start native actions (`00 cat num`); an action's camera side is
   its handler, and the handlers reach none. [emc](emc.md) documents no camera opcode (what each
   opcode does is unverified, so this bounds rather than proves).
@@ -400,9 +401,11 @@ as the code says; there is no test this repository schedules for it.
 - **C4 (done, MH3U USA code):** the camera-request search above. Procedure: read the camera
   classes' method lists from the MH3U vtable table recovered by `reference/mt_vtables.py`, cross
   a Ghidra export of MH3U USA's call graph for calls to them, and classify the callers; walk the
-  call graph from the 3U Rathian block `0x00686000` to `0x0069b000`; list uEm047's actions with
+  call graph from the monster class region `0x00680000` to `0x0087ffff` and from the 3U Rathian
+  block `0x00686000` to `0x0069b000`; list uEm047's actions with
   `reference/monster_actions.py list --game mh3u --exheader <MH3U exheader> --code <MH3U
   code.bin> --dispatcher 0x007de644 --range 0x7dc000 0x7e2000`; read `0x007e0750`'s resource
   strings and `0x00257470`'s callers. The result: 15 calls to camera methods, one from a monster
   class (`0x007e0750`), which loads the `de043_em047_00` event and DCM 79 and is not an action
-  handler; no path from the 3U Rathian block to a camera method or the DCM formatter.
+  handler; no path from the monster region or the 3U Rathian block to a camera method, and none
+  to the DCM formatter except through `0x007e0750`.
