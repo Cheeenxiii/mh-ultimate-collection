@@ -1141,7 +1141,7 @@ state machines against a fake host, and the module's self-test in a headless run
 
 | Check | What | Pass |
 |---|---|---|
-| T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) against MHXX v1.4's `roEm001.cro`, and [data/actions/rathian-3u.csv](../data/actions/rathian-3u.csv) against MH3U USA's `code.bin` | every row's case block, handler unit and first motion constant match the source dispatcher; counts and ids only |
+| T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) against MHXX v1.4's `roEm001.cro`, and [data/actions/rathian-3u.csv](../data/actions/rathian-3u.csv) against MH3U USA's `code.bin` | every row's case block, handler unit and first motion constant match the source dispatcher, and a status is `translated` or `pending`; counts and ids only |
 | T1b | `make -C mods/uc_runtime test` | the module's routing and its call sequences and frame values match the source's order, and a changed value fails it |
 | T1c | a headless run of the code library built with the runtime | the log has the runtime's ready line, the GU module's ready and self-test lines and the float stubs' address; the runner exits 0 |
 | T1d | the in-game per-move check | R2p |
@@ -1152,10 +1152,12 @@ T1a: MHXX v1.4's `roEm001.cro` and its `static.crs` come from the player's own d
 MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <static.crs>
 ```
 
-Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (category 17 has
-none), first motions 9/13; translated 12 (3/98, 12/1-3, 4/27-32, 8/0 and category
-17), MH4U's own 1 (12/0), pending 0. Changing a ledger motion makes it exit 1 and name the
-id.
+Last result (2026-11-26, issue #272): pass. 301 actions; blocks 301/301, handlers 274/301
+(the other 27 are 24 inline, 2 jump and 1 none), first motions 178/301; translated 12
+(3/98, 12/1-3, 4/27-32, 8/0 and category 17), pending 289. 12/0 is `pending`: under decision
+0002's 2026-11-26 amendment she runs her own handler for every id, and 12/0's is still owed,
+so `mh4u` is not a status of this ledger. Changing a ledger motion or a status makes it exit
+1 and name the id.
 
 T1a also checks the 3U ledger against MH3U USA's `code.bin` and its `exheader.bin`:
 
