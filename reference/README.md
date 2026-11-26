@@ -588,6 +588,83 @@ curve is MH4U's own 3/6 curve `0x00fd18a0`, whose keys were compared key by key 
 `0x00c4eca8` and are equal, so MH4U's evaluator `0x00922250` reads the converted curve and no
 3U data is carried.
 
+#### The category 8 and 11 units (#225)
+
+#225 translates her one category-8 id and her five category-11 ids. 8's handler is her own
+`0x00687074`; it is the action-pair of MH4U's own 8/0 handler `0x006e9770`, whose frame values
+differ (MH4U's 180.0 timer, 4.0 motion speed and 0x403 motion against 3U's 90.0, 90.0 and
+0xca), so the port runs the source's. Category 11's case blocks are five short wrappers into
+the shared handler `0x008326dc`/`0x008326e0`, then the base-class handler `0x0084d864`.
+
+| 3U id | Case block | Handler | What the handler does |
+|---|---|---|---|
+| 8 | `0x00687db4` (index 0) | `0x00687074` | three states: mode 0 and the action-start data setup, then the aim at 300.0/38.0; the 12.0/50.0 distance test, the position advance and the action-start leaf, then the finish flag, a 90.0 timer and motion 0xca at 90.0; the countdown, the hit check at 300.0/0.0/150.0, the part step, then 9/1 or 2/6 |
+| 11/0 | `0x00687e6c` | wrapper `0x00687e88`, `0x008326e0`, `0x0084d864` | the shared handler with mode 0; the base-class tail returns at its index test |
+| 11/5 | `0x00687e7c` | as 11/0 | the shared handler with mode 1 |
+| 11/15 | `0x00687e98` | as 11/0 | the shared handler with mode 0 |
+| 11/26 | `0x00687ea8` | as 11/0 | the shared handler with mode 0 |
+| 11/28 | `0x00687eb8` | as 11/0 | the shared handler with mode 0, then the base-class tail's own branch: the index 0x1c and mode gates, a bit test, and the 45.0/0.5 height step |
+
+The calls, with MH4U's counterpart and how it was established (all but the blocked ones are in
+the handler pairs' call alignment, 8/0's, 9/0's and 11/0's):
+
+| MH3U | MH4U | What |
+|---|---|---|
+| 0x0082fe88 | 0x009167b4 | 8: the mode/state setter (map, the 73) |
+| 0x0082d278 | 0x00911c0c | 8: the action-start data setup; its fifth argument is on the stack (the runtime's `call5`) |
+| 0x0068d070 | 0x00948674 | 8: the aim at the target, at 300.0/38.0 (the call MH4U's own 8/0 makes at the same point) |
+| 0x0083336c | 0x0091aae4 | 8: the 12.0/50.0 distance test |
+| 0x0082b268 | 0x00955440 | 8: the position advance (the source's 1.0 becomes 0.5) |
+| 0x0082d430 | 0x0092f6e8 | 8: the action-start leaf, with MH4U's own list |
+| 0x0083cbf4 | 0x00b05da4 | 8: the finish flag |
+| 0x00828828 | 0x0094e318 | 8: motion 0xca at 90.0 (`file << 8 \| slot`) |
+| inline | 0x00b0704c | 8: the 90.0 timer's countdown |
+| 0x00687ae0 | 0x009122fc | 8: the hit check at 300.0/0.0/150.0 (the call MH4U's own 8/0 and 9/0 make at the same point) |
+| 0x00844100 | 0x0092e960 | 8: the part step's state test |
+| 0x00853b98 | 0x00944c34 | 8: the rate accumulator, at -900.0 |
+| 0x008345f8 | 0x0091b7b0 | 8: the part step, at 0x32 |
+| 0x0083c7a0 | 0x0093b9ec | 8: the clamped accumulator; its input is `(int16)(work+0x3ec x 0.015)`. MH4U's own 9/0 calls it; its 8/0 uses 0x0093ba88, the same clamp with its delta step |
+| 0x0082a06c | 0x0094ef64 | 8: the request for 9/1 or 2/6 |
+| 0x008326dc | 0x00919788 | 11: the shared handler, with MH4U's own list 0x00fd2360 and the source's mode in r2 |
+
+**What is blocked.** 8 reaches four of #55's nineteen, each left out and logged once:
+
+- **`0x00853c70`**, every frame at entry: sets the halfword at 3U work+0x89c to 2. The halfword
+  has no mapped MH4U offset.
+- **`0x00839598`**, state 2's gate: the signed byte at 3U work+0xef. The port takes the
+  source's nonzero path so the action cannot stall (as 3/8 does).
+- **`0x0084512c`**, the target's part/action check: it walks the monster list, reads +0xd5c and
+  picks an entry by the byte at work+0x2b6. The port takes its nonzero path, so the hit sets
+  the tail flag and asks for 9/1.
+- **`0x00257628`**, state 0's last step: sets a byte on the object at a global's +0x14. The
+  port ends state 0 after the aim without it.
+
+**One argument with no MH4U place.** 3U's motion start passes r2 = 4 to `0x00828828` (it
+reaches the animation player `0x00198688` as its fifth argument). MH4U's wrapper
+`0x0094e318` fixes r2 at 0 before its own player, so the port starts the motion through that
+wrapper and the source's r2 has nowhere to go; the motion number and the 90.0 speed are the
+source's.
+
+The source's action-start lists (`0x00b0b0e8` for 8, `0x00c4d800`/`0x00c4d818`/... for the
+category-11 ids) are her data and are not carried; the port passes MH4U's own lists
+(`0x00e094d8` for 8, `0x00fd2360` for 11), the same substitution the category 0 base handlers
+make for the action setter's per-action value (#55's open item).
+
+**Category 11's own open items.** `0x0084d864` is base-class code reimplemented under 0002's
+second amendment; only 11/28 goes past its first test. Three parts of that branch have no
+mapped MH4U field or counterpart, and the module logs each once: `0x00a37b3c` (bit 4 of the
+halfword at this+0x22e) is left out and its nonzero path taken; this+0x1a64 (the float at 3U
+work+0x1c) has no confirmed MH4U offset, so the port keeps it at MH4U's work+0x1c as a
+stopgap; and `0x008477bc` (the record's +0xa0 effect/attack step, which runs above 45.0) is
+left out. The 45.0 ceiling and the 0.5 step are the source's.
+
+The field map's new rows: 8's count at 3U work+0x7fc is MH4U's work+0x3ec (the 0.015 x count
+step is the same in MH4U's own 8/0 and 9/0 handlers, and 0x0083c7a0/0x0093b9ec are the same
+clamped accumulator as 0x008515a8/0x0093b9f8); 3U work+0x2b6 (the hit check's target index)
+takes MH4U's work+0x27c; and the category-11 shared handler's list is MH4U's 0x00fd2360 (the
+list MH4U's own category-11 case passes). The category-11 tail's work+0x1 (MH4U work+0x1c8,
+unverified) and this+0x1a64 (work+0x1c) stay open.
+
 #### Flight: the fields category 7's handlers read
 
 The 24 pairs cover 7/0, 7/1, 7/4–7/9, 7/12, 7/16–7/25, 7/31, 7/33, 7/34, 7/36, 7/38–7/45,
@@ -803,7 +880,9 @@ with the same handler. Every one of the 17 is reimplemented from MH3U's handler 
 ([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)), family by family,
 and the ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks
 each translated. 0/4 is done: it shares 0/0's handler, translated with category 0 in #216 along
-with the three base-class handlers 0/2, 0/3 and 0/6 reach. The other 16 are still owed.
+with the three base-class handlers 0/2, 0/3 and 0/6 reach. 11/5, 11/15, 11/26 and 11/28 are
+done with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225).
+The other 12 are still owed.
 
 The page records, per id, the shared MH4U action with the same handler and every other one
 with the same source handler. Where the source's case block picks a variant, the evidence
@@ -822,10 +901,10 @@ names it; what a move plays is her own handler, and R2p's in-game check settles 
 | 10/4 | 10/7 | — | as 10/0 |
 | 10/5 | 10/7 | — | as 10/0 |
 | 10/6 | 10/7 | — | as 10/0 |
-| 11/5 | 11/0 | — | body match; its case block passes r2 = 1, which is MH4U 11/1's mode, and 11/0 is the shared action with the same handler |
-| 11/15 | 11/0 | — | tail match: the wrapper calls 11/0's handler 0x0084d864; its r3 is the action index |
-| 11/26 | 11/0 | — | as 11/15: the same wrapper, r3 = 0x1a |
-| 11/28 | 11/0 | — | as 11/15: the same wrapper, r3 = 0x1c |
+| 11/5 | 11/0 | — | body match; its case block passes r2 = 1, which is MH4U 11/1's mode, and 11/0 is the shared action with the same handler. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
+| 11/15 | 11/0 | — | tail match: the wrapper calls 11/0's handler 0x0084d864; its r3 is the action index. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
+| 11/26 | 11/0 | — | as 11/15: the same wrapper, r3 = 0x1a. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
+| 11/28 | 11/0 | — | as 11/15: the same wrapper, r3 = 0x1c. Translated with category 11 in [#225](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/225) |
 | 13/9 | 0/3 | 3/10, 13/7 | body match; 13/9's case block calls 0x0083cbf4 like 0/3's |
 
 "Body match" is the source game reaching the same handler function for the missing id and the
