@@ -20,12 +20,14 @@ its data class `cMhMotionEffectData` `0x61aeb049`, size `0x58`), MH3U's and MHXX
 `reference/games/*/mt_classes.tsv` (`rEffectSequence` `0x525bbf16`, `0x68`;
 `rProofEffectMotSequenceList` `0x254309c9`, `0x68`). The paths are the games' own resource paths:
 the MH4U records' data, MH3U's `code.bin` format strings and the MHXX archives. The containers
-below are our own reading, checked on real files (FX1 to FX9), with MH4U's loaders
+below are our own reading, checked on real files (FX1 to FX11), with MH4U's loaders
 read for what the file has to satisfy: `rMhMotionEffect`'s load at `0x398f94` (vtable slot 11) and
 `cMhMotionEffect`'s serializer at `0x390ccc`, and MH3U's ESQ loader at `0x3b30cc`. The MEF record
-fields are ours and are **not understood** beyond the key the loader itself uses, and the ESQ
-event's effect parameters and the PSL body are not either: a converter must not map them until a
-check pins their meaning.
+fields are placed from MH4U's own spawn and getter; the effect the record plays is not a field but
+a (base, sub) pair the spawn derives from the record's type, time and bone through the tables
+[MH4U's spawn tables](#mh4us-spawn-tables) lays out (FX10). The ESQ event's effect parameters and
+the PSL body are still not placed: a converter must not map them until a check pins their
+meaning.
 
 ## How a record names them
 
@@ -101,8 +103,119 @@ duplicate would leave one record unreachable.
   path (`0x391c84`), the bone and the time go to the effect's creation (`0x390c48`, `0x391c80`),
   the flags become the object's flag word (`0x392058`), the three vectors are copied
   (`0x392064`), and the mask bit picks which of the monster's four effect slots the record may
-  use. The effect itself is derived: the spawn reads the type's base from the u16 table at
-  `0xeede7c` and the time's entry from `0xeedde98` through `0x390c48`/`0x390ef8`.
+  use. The effect itself is derived through the tables below.
+
+## MH4U's spawn tables
+
+The spawn does not read an effect id from the record. It computes a **(base, sub)** pair from the
+type (`+0x03`), time (`+0x06`) and bone (`+0x08`), and the pair indexes a table of
+`effect\efl\...` resource paths. The tables are in `.data`; four readers do the work, and the
+spawn's own switch on the type is the jump table at `0x391c94`.
+
+| Table | Address | Shape | Read by | Entries |
+|---|---|---|---|---|
+| base by type | `0xeede7c` | u16, one per type | the spawn, `0x391cd4` | 14, types 0 to 13 |
+| time table by type | `0xeede98` | u32, one per type, a pointer or 0 | `0x390c48` | 15, types 0 to 14 |
+| a type's time table | the pointer | 8-byte records (u32 time, u32 joint table), ended by time `0xFFFFFFFF` | `0x390c48` | 174 records over the 8 types that have one |
+| type 4's time table | `0xeed988` | u32, one per time | `0x390c48`, `0x390ca4` | 13, times 0 to 12 |
+| base remap of types 5, 11 and 12 | `0xeed9bc`, `0xeedc0c`, `0xeede0c` | 8-byte records (u32 time, u32 base), ended by time `0xFFFFFFFF` | the spawn, `0x391d24`/`0x391d38` | 73, 63 and 13 records |
+| joint segment table | a record's second word | 8-byte records (u32 key, u32 value), ended by key `0xFFFFFFFF` | `0x390ef8` | 1 to 10 records each, 187 tables |
+| paths by base | `0xef895c` | u32, one per base, a pointer to an array | `0xc0a2a8` | 283, bases 0 to 282 |
+| a base's path array | the pointer | u32 pointers to NUL-terminated paths, 0-terminated | `0xc0a2a8` | 0 to 172 per base |
+
+Every row above is verified by FX10 against the image; what is a reading and not a check is what the
+effect manager does with the path (step 5) and what the group names below mean.
+
+**The arithmetic**, in the order the spawn and its readers do it:
+
+1. **type → base.** `u16[type]` is the base (`0x391ce8`), masked to a byte at `0x391d78`.
+   Types 5, 11 and 12 are the exception: the spawn maps the time through the type's own remap
+   table first (`0x390ef8` with the table at `0xeed9bc`/`0xeedc0c`/`0xeede0c`) and uses the result
+   as the base. Type 4 is the other exception: the base is `(u16[4] + time) & 0xFFFF`, then masked
+   to a byte.
+2. **type, time → joint table.** Type 4 indexes `0xeed988` with the time (`0x390ca4`); a 0 pointer
+   there means no effect. Any other type reads its time table and needs a record whose first word
+   is the time *exactly*; a terminator or a missing key means no effect.
+3. **joint → sub.** `0x390ef8` takes the last segment record whose key is `<= joint` (the bone's
+   low byte, `0x391c88`), writes `u16(joint + value - key)` to its out pointer, and returns
+   success only when that value is below the *next* record's value (the terminator's value is the
+   last bound). A joint outside every segment, or a wrapped u16, means no effect.
+4. **base, sub → path.** `0xc0a2a8` reads `paths[base]`, then that array's `[sub]`, and gets a
+   NUL-terminated path string. Both indexes are masked to a byte by the spawn (`0x391d74`).
+   The game does **not** bound-check `sub` against the array's own length: it reads the word after
+   an array's last entry if a sub points there.
+5. **path → effect.** That path goes to the effect manager's method at its vtable `+0x38`, called
+   with a context (`0x10e75f0`), the path and 1; the call returns the effect object the spawn
+   fills. What the manager does with the path — load an `rEffectList` and start its effect — is a
+   reading, not placed.
+
+**What an entry names.** Every path in the table is an `rEffectList` (`efl`) resource path of the
+form `effect\efl\...\..._NNN`. The base selects a group and the sub picks the file in it. The
+groups are the game's own: base 0 `cm` (common effects), base 1 `qe`, base 2 `lb`, the `wp` (weapon)
+entries, base 17 `otomo`, bases 18 to 91 the monsters (`em`), the `npc` and `event`
+entries (109 and up), and the 20 `st` entries (stages); 73 entries have no path. A group can
+span two monster files: base 19 holds both `em001` and `em002`, which share the class `uEm002`.
+Type 5's remap table maps the time to bases 18 to 91, so a type-5 record's time selects the
+monster's group and its bone selects the file.
+A base holds 0 to 172 paths (2,899 in all).
+
+**Bounds and dead reads** (checked, FX10): the base table holds 14 entries, so type 14's base read
+(`0xeede7c + 28`) lands in the time-table pointer array and gives `0xd568`; type 14 has no time
+table, so the spawn then returns without an effect and the bad base is never used. Type 4's time
+table holds 13 entries but records' times reach 122; type 4 occurs in no record, so that read is
+dead too. The base index is masked to a byte, so bases 256 to 282 cannot be reached by any record;
+no base entry is null.
+
+**What MH4U's own records reach** (FX10, all 150 monster-archive MEF entries and 6,216 records):
+only types 0, 1 and 5 occur. Type 0's times are 0 and 7 (base 0, common effects), type 1's are 3,
+6, 8, 13 and 14 (base 1), and type 5's are 73 values in the remap table's key set (bases 18 to
+91). 6,205 records resolve through the five steps to one of 842 distinct paths; every one of them
+has a sub inside its base array's own length. The other 11 records, in em020, em027, em031,
+em082, em096 and em103, pass steps 1 and 2 but their bone's joint falls outside the segment
+table's mapped range, so the spawn returns with no effect: MH4U's data itself has 11 records that
+play nothing.
+
+## Carrying a source effect into the tables
+
+A ported monster's effect needs its own path in this table and a record that reaches it. Neither
+needs a change to MH4U's code. The cheapest way is to make an unused type's chain the port's own.
+
+**The chain to take.** Type 2 is used by no MH4U record (types 0, 1 and 5 only, FX10), its base
+`u16[2] = 2` is reached from type 2 alone (the type base table gives 0, 1, 2, 3, 4, 17, 19, 109,
+111 and 174, and the type 5/11/12 remaps give 18 to 91 and 111 to 187), and base 2's 61 paths are
+`lb` effects no record reaches. So the port can own the whole type-2 chain without touching
+anything MH4U plays:
+
+1. its own **path array**: u32 pointers to NUL-terminated `effect\efl\em\emNNN\...` paths it
+   ships, 0-terminated;
+2. its own **time table**: 8-byte (u32 time, u32 segment table) records, `0xFFFFFFFF`-ended, one
+   per effect group it carries;
+3. its own **segment tables**: 8-byte (u32 joint, u32 sub) records, `0xFFFFFFFF`-ended, the
+   terminator's value the bound (step 3 above);
+4. two `.data` writes: `0xeede98 + 4*2` (the type-2 time-table pointer) and `0xef895c + 4*2`
+   (base 2's path-array pointer). Both are writable and both are the values a plugin installs at
+   boot; nothing in the fork changes.
+
+The converter then writes each carried effect's MEF record with **type 2** at `+0x03`, the group's
+**time key** at `+0x06`, and a **bone** whose low byte its segment table maps to the sub it wants
+at `+0x08`; `+0x00` to `+0x02`, the flags, the `s16` and the three vectors are the source event's
+own, as far as the placed correspondence goes ([What a converter does](#what-a-converter-does)).
+`data/effectmap` therefore carries a source effect's `(time, bone)` rather than a target id, which
+is the schema question decision 0015 leaves open.
+
+**What it takes, and what it costs.**
+
+| Path | Takes | Gives | Costs |
+|---|---|---|---|
+| The two-write overlay above | an unused type's chain (type 2 or 3), the port's arrays and paths | all of MH4U's tables stay as they are; two u32 writes; no code edit, no fork change | one effect group space per unused type; the port's arrays live in its allocation and must be ready before the first spawn |
+| Grow the base table | a spare base slot | a new base id | none is spare: the index is a byte and all 283 entries (0 to 255 reachable) are non-null, so a new base needs the spawn's mask widened — a code change |
+| Replace the spawn (decision 0012) | a plugin hook on `0x391b28` with its own C, written from the decompiled original | any type/time/bone numbering, any table layout, no `.data` writes | the spawn's other work too — slot selection, flags, vectors, the four effect slots — must be reimplemented, and a hook change rebuilds the game's code library |
+
+The overlay is the cheapest and the one the worked case uses. Its one open link is the path: the
+manager is handed an `effect\efl\...` string and must resolve it to the port's own arc. Whether a
+path under a ported id's number (`effect\efl\em\em125\em125_000`) loads from the port's own
+`data/em125.arc` is **unverified**; the alternative is to point base 2's paths at paths MH4U's
+RomFS already holds and overwrite those resources in the mod, which changes MH4U's own effects.
 
 ## MH3U ESQ
 
@@ -223,6 +336,55 @@ leaves empty (FX6).
   the descriptor table's 16-byte end minus 4; every later list follows its predecessor and the last
   is inside the file.
 
+## A 3U effect's assets
+
+Carrying an effect means carrying the resources its effect list names, not just the list. In all
+three games an `rEffectList` (EFL) is one effect: its header's counts describe the effect's emitters
+and its block holds the paths of the model and textures that effect uses ([efl](efl.md)). So the
+asset set of one source effect is:
+
+| Asset | 3U path (the block's strings) | MH4U path the pipeline expects | Class and version |
+|---|---|---|---|
+| the effect list | `effect\efl\em\emNNN\emNNN_NNN` | `effect\efl\em\emNNN\emNNN_NNN` | `rEffectList`; EFL version `0x30110616` in MH3U, `0x30111104` in MH4U |
+| the effect model | `effect\mod\em\emNNN\emNNN_NNN` | `effect\base\em\emNNN\...` | `rModel`, MOD version `0xE6` in both (the word after it is the bone count: 44 in 3U's effect model, 43 in MH4U's) |
+| its materials | (inside the model) | same | `rMaterial`, MRL version `0x20` in both; the shader-package ids are converted by [mfx](mfx.md) (X3) |
+| its textures | `@effect\tex\em\emNNN\emNNN_NNN_BM` and the plain path | `@effect\base\..._BM`/`_BM_NOMIP` and the plain path | `rTexture`, TEX version `0x200000a5` (25 of 3U Rathian's 24 entries) or `0x201b00a5` in both |
+| the effect's animation | not placed | `effect\base\em\emNNN\mot\...` | `rEffectAnim` (EAN), version `0x20100924` in both |
+
+The paths in the second and third columns are the games' own strings, read from their code and their
+EFL blocks; the classes and versions are read from the real archive entries of both games' `em001`
+(a check, not a claim about every file).
+
+The path conventions are the games' own. MH3U's code formats the list's and the model's paths from
+the monster number and an index (`effect\efl\em\em%03d\em%03d_%03x` at `0xb01978`,
+`effect\mod\em\em%03d\em%03d_%03x` at `0xb0199c`), and its EFL blocks name textures under
+`effect\tex`; MH4U's code has no `effect\mod` or `effect\tex` string and puts both under
+`effect\base`, with the effect animation under `...\mot\...`. MH3U's code has no
+`effect\base`.
+
+**The worked case: 3U Rathian's fireball.** Her archive (`/arc/enemy/em001.arc`) holds 19
+`rEffectList`, 13 `rEffectAnim`, 3 `rMaterial`, 3 `rModel`, 24 `rTexture` and 1 `rEffectSequence`;
+MH4U's `/data/em001.arc` holds 26, 1, 3, 3, 7 and 2 `rMhMotionEffect`. Her ESQ has only four
+non-padding events: motion 70 at frames 25 and 70, type 36, effect id 338 in section 0 and 379 in
+section 1, with `+0x38` 0 or 32 and `+0x3A` 0. Motion 70 is her motion list 0's last animation
+(123 frames), and no action of hers starts it as its first motion. What is **not placed** is which
+of the 19 effect lists those two ids name: MH3U's spawn puts the event's `+0x3A` through its type
+mapper (`0x83de40`, which rewrites `+0x38` to 7 and `+0x3A` to the mapped id — 24 for id 379, and
+it leaves id 338 unmapped) and then through `0x338b7c`, which returns a per-monster effect index
+(7 for the unmapped path, `63 + a byte` for the mapped one); `0x334840` looks the `+0x0A` id up in
+the monster's loaded effect lists. So the fireball's asset set is one of those 19 lists plus what
+its block names, and whether motion 70 is the fireball is also unverified: her fireball *shot* is
+spawned by her shell classes (`uShellEmBase00`, the setup block MH4U lacks), not by the ESQ.
+
+**What `mhuc` does with them today.** `efl.from_mh3u` rewrites the version word and carries the
+block unchanged ([efl](efl.md), EF3): the block's `effect\mod` and `effect\tex` paths stay 3U
+paths, so a converted list would name resources MH4U does not have. `mod`, `mrl` and `tex` convert
+the model, its materials and its textures (the shader ids through [mfx](mfx.md)); there is no
+reader for `rEffectAnim` (EAN) in `src/mhuc`, so nothing checks or rewrites the effect's
+animation. A port of an effect therefore needs three things the converter does not do yet: rewrite
+the block's paths, carry the EAN (the version is already MH4U's), and split the effect list into
+its own arc at the path the port's spawn table names.
+
 ## What a converter does
 
 The converters are `src/mhuc/formats/mef.py` and, for the effect-id map, `src/mhuc/effectmap.py`
@@ -238,12 +400,13 @@ The converters are `src/mhuc/formats/mef.py` and, for the effect-id map, `src/mh
 The refusal is deliberate. Writing a MEF today would carry guesses into a port:
 
 - **The effect identity is derived, not stored.** MH4U's record has no effect-id field: the
-  spawn (`0x391b28`) takes the record's type (`+0x03`) and time (`+0x06`), reads the type's base
-  from the u16 table at `0xeede7c` and the time's entry from `0xeedde98` through `0x390c48`, and
-  asks the manager for that effect. A conversion therefore needs a source id -> target
-  `(type, time)` map, not a source -> target id map: `data/effectmap`'s `source,target` columns
-  must become `source,type,time` (or the converter must invert the two tables, which are in
-  MH4U's code as game data). That is a schema change to the effect-id tables and an open decision.
+  spawn (`0x391b28`) takes the record's type (`+0x03`), time (`+0x06`) and bone (`+0x08`) through
+  the tables [above](#mh4us-spawn-tables) and asks the manager for the path they name. A carried
+  effect therefore needs a record with the port's own type/time/bone and the port's own tables
+  installed ([Carrying a source effect](#carrying-a-source-effect-into-the-tables)); `to_mh4u`
+  cannot write it without them. `data/effectmap`'s rows must carry the source effect's
+  `(type, time, bone)` — or the port's group key and joint — rather than a target id, which is the
+  schema change decision 0015 leaves open.
 - **The ESQ's parameters are placed, but not their target fields.** Both games' spawns take three
   vectors in the same order, and the ESQ event's s16 `+0x0C` is the same kind of value as the MEF
   record's s16 `+0x0A` (each game's spawn passes it to its effect object), so the vectors and the
@@ -315,3 +478,31 @@ source scalar -> target scalar correspondence for the ESQ, and the PSL list layo
   four PSLs whose motion list is not in the same archive; of the other 8,019, 7,980 equal their
   animation's frame count and 39 sit at a slot the archive leaves empty. No descriptor's frame
   count differs from the animation in its slot.
+
+- **FX10 (done, 2026-11-26).** The spawn tables' shape and every MEF record's resolution:
+  `MH4U_FORK=… python3 reference/spawn_tables.py --exheader <MH4U v1.3.0 exheader.bin> --code
+  <code.bin> --romfs <romfs.bin> --records`, run under the workspace's heavy lock because the
+  record pass reads every monster archive. Procedure: read the five tables at `0xeede7c`,
+  `0xeede98`, `0xeed988` and `0xef895c` and the type 5/11/12 remap tables, walk each base's path
+  array, then read all 150 MEF entries of MH4U's monster archives and resolve every record's
+  `(type, time, bone)` through steps 1 to 4 of [MH4U's spawn tables](#mh4us-spawn-tables); then
+  `--cross-check` runs the spawn's own code (`0x391c74` to `0x391d88`, with the real `0x390c48`,
+  `0x390ef8` and `0xc0a2a8` and only the effect manager's method stubbed) under Unicorn on a
+  sample and compares base, sub and path with the model. Result: 14 base entries; 15 type
+  pointers, non-null for types 0, 1, 2, 5, 7, 11, 12 and 13, holding 174 (time, joint-segment)
+  records; type 4's table 13 entries; the type 5/11/12 remaps 73, 63 and 13 records; 283 base
+  entries, 2,899 path pointers, 73 non-null entries with no path; 6,216 records, 6,205 resolved
+  to 842 distinct paths, 0 with a sub past its base array's length, and 11 with no effect
+  (em020, em027, em031, em082, em096 and em103, failing the joint segment remap). The cross-check
+  agrees with the model on 696 of 696 samples, types 0 to 14, including the types with no time
+  table and the type-4 table's edge.
+- **FX11 (done, 2026-11-26; the in-game half is the maintainer's).** The addition path runs on
+  MH4U's own spawn: `MH4U_FORK=… python3 reference/spawn_tables.py --exheader … --code … --probe
+  2 0 0 --add`. Procedure: write the port's path array, time table and segment table into the
+  emulator's memory, patch `0xeede98 + 4*2` and `0xef895c + 4*2` to point at them, and run the
+  spawn's code on a record with type 2, time 0 and bone 0. Result: the code computes base 2 and
+  sub 0 and asks the effect manager for `effect\efl\em\em125\em125_000` — the port's own path —
+  while the same probe without `--add` gives the `lb000_000` path base 2 held. Two `.data` writes,
+  no code edit. What the check does not cover: that the manager resolves the port's path to its
+  own arc (unverified, [above](#carrying-a-source-effect-into-the-tables)), and the visual watch
+  ([docs/checks.md](../docs/checks.md#a-ported-effect-at-the-source-frame-e1)).
