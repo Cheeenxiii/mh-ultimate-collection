@@ -2,11 +2,12 @@
 
 MH4U ships them as `rMhMotionEffect` (magic `MEF\\0`, extension `mef`), MH3U as
 `rEffectSequence` (`ESQ\\0`, `esq`) and MHXX as `rProofEffectMotSequenceList` (`PSL\\0`, `psl`);
-`specs/mef.md` lays the three out. The MEF record fields are unplaced, so a record is handed back
-as bytes with `u8`/`u16`/`u32`/`f32` helpers instead of names a converter could mistake for
-meanings. An ESQ event's motion index and frame and a PSL descriptor's frame count are placed and
-checked (FX5, FX6); what an event does and what a PSL list holds are not, so the converter still
-refuses to write an MH4U MEF from them.
+`specs/mef.md` lays the three out. The MEF record's fields are placed from MH4U's own spawn
+(`0x391b28`) and getter (`0x391904`), but the record carries no effect id: the spawn derives the
+effect from the record's type and time through per-type tables, so a converter needs a
+source-to-(type, time) map. An ESQ event's fields and a PSL descriptor's words are placed too
+(FX5 to FX9). What is not placed is the PSL lists' contents, so `to_mh4u` still refuses to write
+an MH4U MEF from either source game.
 """
 from __future__ import annotations
 
@@ -29,7 +30,8 @@ ESQ_SECTION_STRIDE = {0: 0x3C, 1: 0x3C, 2: 0x3C, 3: 0x0C, 4: 0x3C, 5: 0x10}
 PSL_MAGIC = b"PSL\0"
 PSL_VERSION = 2
 PSL_HEADER = 0x08
-PSL_DESCRIPTOR = 0x10
+PSL_DESCRIPTOR = 0x10          # every descriptor sits 16 bytes after the last
+PSL_DESCRIPTOR_SIZE = 0x0C     # its own three words; the fourth 16-byte slot is the list's first word
 
 
 class MefError(ValueError):
@@ -92,8 +94,9 @@ class EsqEvent:
 
     The motion index and frame are placed and checked (FX5): MH3U numbers a motion as
     `file * 100 + slot`, the same number its motion lists and action inventory use, and the frame
-    is inside that animation for all but seven events (FX5 records them). What the rest of the
-    entry means is not placed, so `raw` keeps it.
+    is inside that animation for all but seven events (FX5 records them). The other fields are
+    placed from the player (`0x332e8c`) and its spawn (`0x333a00`) in specs/mef.md; `raw` keeps
+    them for a converter and for the fields FX8 leaves unverified.
     """
     section: int          # which of the four 0x3C-byte sections the event is in
     motion: int
@@ -156,17 +159,16 @@ def read_esq(data: bytes) -> Esq:
 
 @dataclass(frozen=True)
 class PslDescriptor:
-    """One slot's 0x10-byte PSL descriptor (specs/mef.md, "MHXX PSL").
+    """One slot's 12-byte PSL descriptor, every 16 bytes (specs/mef.md, "MHXX PSL").
 
-    `frames` is the frame count of the animation in the motion list's slot `slot`, placed by FX6.
-    The other three words are unverified: `flags`, `offset` (the slot's effect list, see the spec)
-    and `field_0c`.
+    `frames` is the frame count of the animation in the motion list's slot `slot` (FX6); `flags` is
+    `0x00200000` or `0x01200000`; `offset` is the file offset of the slot's effect list, in slot
+    order and strictly increasing, the first at the end of the last descriptor's 12 bytes (FX9).
     """
     slot: int
     frames: int
     flags: int
     offset: int
-    field_0c: int
 
 
 @dataclass(frozen=True)
@@ -180,6 +182,18 @@ class Psl:
         """The file again: the header and slot table from its fields and the rest unchanged."""
         return (PSL_MAGIC + struct.pack("<HH", self.version, len(self.slots))
                 + struct.pack(f"<{len(self.slots)}I", *self.slots) + self.body)
+
+    def lists(self) -> tuple[tuple[int, int, int], ...]:
+        """Each slot's effect list as (slot, start, end), in slot order; the last ends at the file's end.
+
+        The list contents are not laid out (specs/mef.md#mhxx-psl); only their boundaries are.
+        """
+        size = PSL_HEADER + 4 * len(self.slots) + len(self.body)
+        out = []
+        for i, descriptor in enumerate(self.descriptors):
+            end = self.descriptors[i + 1].offset if i + 1 < len(self.descriptors) else size
+            out.append((descriptor.slot, descriptor.offset, end))
+        return tuple(out)
 
 
 def read_psl(data: bytes) -> Psl:
@@ -201,31 +215,45 @@ def read_psl(data: bytes) -> Psl:
         expected = first + seen * PSL_DESCRIPTOR
         if offset != expected:
             raise MefError(f"slot descriptor {offset:#x} isn't at {expected:#x}")
-        if offset + PSL_DESCRIPTOR > len(data):
+        if offset + PSL_DESCRIPTOR_SIZE > len(data):
             raise MefError(f"slot descriptor {offset:#x} runs past the file's {len(data):#x} bytes")
-        frames, flags, list_offset, field_0c = struct.unpack_from("<4I", data, offset)
-        descriptors.append(PslDescriptor(slot, frames, flags, list_offset, field_0c))
+        frames, flags, list_offset = struct.unpack_from("<3I", data, offset)
+        descriptors.append(PslDescriptor(slot, frames, flags, list_offset))
         seen += 1
+    if descriptors:
+        first_list = first + PSL_DESCRIPTOR * (len(descriptors) - 1) + PSL_DESCRIPTOR_SIZE
+        if descriptors[0].offset != first_list:
+            raise MefError(f"the first effect list starts at {descriptors[0].offset:#x}, not "
+                           f"{first_list:#x} after the last descriptor")
+        previous = descriptors[0].offset
+        for descriptor in descriptors[1:]:
+            if descriptor.offset <= previous:
+                raise MefError(f"effect list {descriptor.offset:#x} doesn't follow {previous:#x}")
+            previous = descriptor.offset
+        if descriptors[-1].offset > len(data):
+            raise MefError(f"effect list {descriptors[-1].offset:#x} is past the file's {len(data):#x} bytes")
     return Psl(version, slots, tuple(descriptors), data[PSL_HEADER + 4 * count:])
 
 
 # What a source game's motion effect still lacks before it can be written as MH4U's. The first
-# item is the blocker: MH4U's loader (0x398f94) builds a u16 lookup table from each record's
-# +0x04, but nothing read yet says what the table is looked up by, and a record the game never
-# looks up never plays its effect.
-UNVERIFIED = ("the record key at +0x04 is a unique u16 the loader indexes the records by, but what "
-              "looks it up (an action, a motion or an animation event id) is unverified; the source's "
-              "motion and frame are placed (FX5) but its effect id, bone, placement and flags are not, "
-              "and no MEF record field beyond +0x04 is placed")
+# item is the blocker: MH4U's record has no effect id (the spawn derives it from the type and the
+# time), so the effectmap needs a source-to-(type, time) row before a record can name an effect.
+UNVERIFIED = ("MH4U's record has no effect id: its spawn (0x391b28) derives the effect from the "
+              "record's type (+0x03) and time (+0x06) through the per-type tables at 0xeede7c and "
+              "0xeedde98, so a conversion needs a source-to-(type, time) map, and data/effectmap's "
+              "rows don't carry those values yet; the ESQ's scalars have no placed target fields, and "
+              "the PSL lists are not laid out")
 
 
 def to_mh4u(data: bytes, game: str, effectmap=None) -> bytes:
     """A source game's motion effect as MH4U's MEF.
 
     MH4U's own file round-trips. MH3U's ESQ and MHXX's PSL are read and checked, then refused:
-    their records' fields are not placed, so a converter written from them would carry guesses,
-    not effects. `effectmap` (an `mhuc.effectmap.EffectMap`) is where the source-to-MH4U effect
-    ids will come from once the fields are placed; it is not used until then.
+    MH4U's record has no effect-id field (the spawn derives the effect from the record's type and
+    time), the ESQ's scalars have no placed target fields, and the PSL lists are not laid out, so a
+    converter written from them would carry guesses, not effects. `effectmap` (an
+    `mhuc.effectmap.EffectMap`) is where the source-to-(type, time) rows will come from; it is not
+    used until then.
     """
     if game == "mh4u":
         return read_mef(data).to_bytes()

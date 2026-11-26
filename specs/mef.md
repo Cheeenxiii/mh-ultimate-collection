@@ -20,7 +20,7 @@ its data class `cMhMotionEffectData` `0x61aeb049`, size `0x58`), MH3U's and MHXX
 `reference/games/*/mt_classes.tsv` (`rEffectSequence` `0x525bbf16`, `0x68`;
 `rProofEffectMotSequenceList` `0x254309c9`, `0x68`). The paths are the games' own resource paths:
 the MH4U records' data, MH3U's `code.bin` format strings and the MHXX archives. The containers
-below are our own reading, checked on real files (FX1, FX2, FX3, FX5, FX6), with MH4U's loaders
+below are our own reading, checked on real files (FX1 to FX9), with MH4U's loaders
 read for what the file has to satisfy: `rMhMotionEffect`'s load at `0x398f94` (vtable slot 11) and
 `cMhMotionEffect`'s serializer at `0x390ccc`, and MH3U's ESQ loader at `0x3b30cc`. The MEF record
 fields are ours and are **not understood** beyond the key the loader itself uses, and the ESQ
@@ -48,35 +48,40 @@ The whole file is a 0x0C-byte header and a flat array of records; there is no he
 
 ### Record (0x48 bytes)
 
-The field meanings are unverified. The Name column says only what the value range allows, and every
-range is the one FX1 found across all 6,216 records; a name in parentheses is a guess, not a fact.
+Each field below is read by MH4U's own effect code: the spawn at `0x391b28` (called when a motion
+list's event fires) and the placement getter at `0x391904` it and the monster's parts call. A field
+the spawn never reads is `unverified`. FX7 checks every record's fields stay in the ranges those
+readers allow.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u8 | 0 to 31; (an animation slot) is the guess | unverified | ours; FX1 |
-| +0x01 | u8 | 0 to 2 | unverified | ours; FX1 |
-| +0x02 | u8 | 0 or 1 | unverified | ours; FX1 |
-| +0x03 | u8 | 0, 1 or 5 | unverified | ours; FX1 |
-| +0x04 | u16 | record key: unique within its file, 0 to 4505; the loader indexes the records by it (`0x398f94`). What the game looks it up by is unverified | verified | ours, MH4U loader `0x398f94`; FX3 |
-| +0x06 | u16 | 0 to 122, (a frame) is the guess | unverified | ours; FX1 |
-| +0x08 | u16 | 0 to 210, (a bone) is the guess | unverified | ours; FX1 |
-| +0x0A | u16 | `0xFFFF` or a small number | unverified | ours; FX1 |
-| +0x0C | u16 | 0 to 4641, 0 in 5 records; (an effect id) is the guess | unverified | ours; FX1 |
-| +0x0E | u16 | 0, 32 or 64 | unverified | ours; FX1 |
-| +0x10 | u32 | `0xFFFFFFFF` or 0 to 4; (a link or index) is the guess | unverified | ours; FX1 |
-| +0x14 | f32 | finite; a value in a 4-value group with +0x18, +0x1C and +0x20 | unverified | ours; FX1 |
-| +0x18 | f32 | finite, as +0x14 | unverified | ours; FX1 |
-| +0x1C | f32 | finite, as +0x14 | unverified | ours; FX1 |
-| +0x20 | f32 | finite, as +0x14 | unverified | ours; FX1 |
-| +0x24 | u32 | always 0 | verified | ours; FX1 |
-| +0x28 | f32 | finite; a value in a 3-value group with +0x2C and +0x30 | unverified | ours; FX1 |
-| +0x2C | f32 | finite, as +0x28 | unverified | ours; FX1 |
-| +0x30 | f32 | finite, as +0x28 | unverified | ours; FX1 |
-| +0x34 | u32 | always 0 | verified | ours; FX1 |
-| +0x38 | f32 | finite; the first of three equal-typed values at +0x38, +0x3C and +0x40 | unverified | ours; FX1 |
-| +0x3C | f32 | finite, as +0x38 | unverified | ours; FX1 |
-| +0x40 | f32 | finite, as +0x38 | unverified | ours; FX1 |
-| +0x44 | u32 | always 0 | verified | ours; FX1 |
+| +0x00 | u8 | spawn filter bit: the spawn tests `[monster+0x30] & (1 << this)` (`0x391a54`); 0 to 31 | verified | ours, spawn `0x391b28`; FX7 |
+| +0x01 | u8 | spawn slot mode: 0, 1 or 2; it picks the record's slot among four (`0x391ecc`) | verified | ours, spawn `0x391b28`; FX7 |
+| +0x02 | u8 | spawn attach mode: 0 or 1; it is written to the spawn object's `+0x118` (`0x39224c`) | verified | ours, spawn `0x391b28`; FX7 |
+| +0x03 | u8 | effect type: 0 to 14, the spawn's switch (`0x391c84`, jump table `0x391c94`); only 0, 1 and 5 occur | verified | ours, spawn `0x391b28`; FX7 |
+| +0x04 | u16 | record key: unique within its file, 0 to 4505; the loader indexes the records by it (`0x398f94`), and the lookup `0x398f48` returns the record for a key | verified | ours, MH4U loader `0x398f94` and lookup `0x398f48`; FX3 |
+| +0x06 | u16 | time/index into the per-type spawn table: the spawn passes it to `0x390c48`, which maps it through the entry table at `0xeede98`; 0 to 122 | verified | ours, spawn `0x391b28`; FX7 |
+| +0x08 | u16 | bone: its low byte is passed to the effect spawn as the joint argument (`0x391c80`); the high byte is 0 in every record | verified | ours, spawn `0x391b28`; FX7 |
+| +0x0A | s16 | passed to the spawn object's method at its vtable's +0x48 (`0x3920c0`); -1 to 243 | verified | ours, spawn `0x391b28`; FX7 |
+| +0x0C | u16 | flags, low half: the spawn tests the 32-bit word at +0x0C (`0x392058`), whose low bits are 0x2 to 0x8000 | verified | ours, spawn `0x391b28`; FX7 |
+| +0x0E | u16 | flags, high half: bits 0x10000 to 0x200000; 0, 4, 8, 16, 32, 36 or 64, so the word's set bits stay inside 0x7C1EFF | verified | ours, spawn `0x391b28`; FX7 |
+| +0x10 | u32 | spawn mask bit: `0xFFFFFFFF` (no mask) or 0 to 7; the spawn tests `[monster+0x30] & (1 << this)` (`0x391fac`) | verified | ours, spawn `0x391b28`; FX7 |
+| +0x14 | f32 | finite; the getter and the spawn never read it | unverified | ours; FX1, FX7 |
+| +0x18 | f32 | position: the first of the three vectors the getter reads and the spawn copies to the spawn object's `+0x278` (`0x392064`); -4,400 to 7,000 | verified | ours, getter `0x391904`, spawn `0x391b28`; FX7 |
+| +0x1C | f32 | position, as +0x18 | verified | ours; FX7 |
+| +0x20 | f32 | position, as +0x18 (the vector's w is 1.0) | verified | ours; FX7 |
+| +0x24 | u32 | always 0 (a spacer before the second vector) | verified | ours; FX1, FX7 |
+| +0x28 | f32 | rotation: the second vector, copied to the spawn object's `+0x288`; -220 to 225 | verified | ours, getter `0x391904`, spawn `0x391b28`; FX7 |
+| +0x2C | f32 | rotation, as +0x28 | verified | ours; FX7 |
+| +0x30 | f32 | rotation, as +0x28 (the vector's w is 1.0) | verified | ours; FX7 |
+| +0x34 | u32 | always 0 (a spacer before the third vector) | verified | ours; FX1, FX7 |
+| +0x38 | f32 | scale: the third vector, copied to the spawn object's `+0x298`; -1.25 to 10.0 | verified | ours, getter `0x391904`, spawn `0x391b28`; FX7 |
+| +0x3C | f32 | scale, as +0x38 | verified | ours; FX7 |
+| +0x40 | f32 | scale, as +0x38 (the vector's w is 1.0) | verified | ours; FX7 |
+| +0x44 | u32 | always 0 | verified | ours; FX1, FX7 |
+
+The record carries **no effect id**: the spawn computes the effect from +0x03 and +0x06. What the
+getter's vectors are called comes from their ranges; the spawn only copies them.
 
 ## How MH4U reads it
 
@@ -85,8 +90,19 @@ reads the count and copies each 0x48-byte file record unchanged to `+0x08` of a
 `cMhMotionEffectData` object. It then builds a table at the resource's `+0x80`: one u16 entry per
 value from 0 to the largest record key, holding the record's index, with `0xFFFF` for a key no
 record has; `+0x84` holds that length. The table is why the keys must be unique within a file; a
-duplicate would leave one record unreachable. What the game passes as the lookup key, and what
-every other record field means, is not read yet.
+duplicate would leave one record unreachable.
+
+- **The lookup** (`0x398f48`) takes a key and returns the record or 0: it compares the key with
+  `+0x84`, reads the u16 at `+0x80 + 2*key`, rejects `0xFFFF`, checks the array at `+0x7c` and
+  returns its entry (`+0x70` holds the array's length).
+- **The two files.** The event player picks the record's file by key: a key below 2000 is looked
+  up in the first file and one from 2000 up in the second (`0x390be4`: `key - 0x7d0 < 0x1b58`).
+- **The spawn** (`0x391b28`) reads the record's fields into an effect object: the type selects a
+  path (`0x391c84`), the bone and the time go to the effect's creation (`0x390c48`, `0x391c80`),
+  the flags become the object's flag word (`0x392058`), the three vectors are copied
+  (`0x392064`), and the mask bit picks which of the monster's four effect slots the record may
+  use. The effect itself is derived: the spawn reads the type's base from the u16 table at
+  `0xeede7c` and the time's entry from `0xeedde98` through `0x390c48`/`0x390ef8`.
 
 ## MH3U ESQ
 
@@ -110,23 +126,47 @@ The sizes say which sections share an entry size (all 44 files):
 | Section | Entry size | Contents |
 |---|---|---|
 | 0, 1, 2, 4 | 0x3C | the motion-effect events, below; 8,092 in the 44 files |
-| 3 | 0x0C | unplaced |
-| 5 | 0x10 | unplaced |
+| 3 | 0x0C | the per-motion records the dispatch table selects (`0x332f18`: entry `(base + i) * 3 * 4`) |
+| 5 | 0x10 | the per-motion dispatch table, below |
 | 6 | — | a fixed 0x258 bytes, mostly `0xFF`; unplaced |
 
-What separates the four event sections is unverified: they may be the four event groups MH4U's
-motion lists carry. The sizes are FX2's; the event contents are FX5's.
+The player `0x332e8c` reads section 5 as a **per-motion dispatch table**: each 0x10-byte entry
+holds five `(base u16, count u8)` pairs — bases at `+0x00`, `+0x02`, `+0x04`, `+0x06` and `+0x08`,
+counts at `+0x0A` to `+0x0E`. The current motion selects the entry through the u16 table at section
+0 (`0x332eb8`: a 16-bit table indexed by the motion index, plus a second table at +0x30 for indices
+from 1000 up), and the entry's pairs select records from sections 3 and 4. Which pair is used
+depends on the monster's state (`+0x12` and the bits at `0x332f50`/`0x332f5c`). What separates the
+four event sections is still unverified: they may be the four event groups MH4U's motion lists
+carry. The sizes are FX2's; the dispatch is the player's, `0x332e8c`.
 
 ### Event (0x3C bytes)
 
-The motion and the frame are placed and checked; the rest of the entry is the effect's parameters
-and is not.
+The events are the records the player copies to its stack and hands to the monster's spawn. Every
+field below is read by `0x332e8c` or the spawn it calls (`0x332d8c` → `0x333a00`); the type mapper
+`0x83de40` rewrites the last two words at run time. FX8 checks the ranges.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| +0x00 | u32 | motion index: `file * 100 + slot`, MH3U's numbering (`reference/monster_motions.py`), the file being the monster's motion list 0, 1, 2… | verified | ours; FX5 |
-| +0x04 | f32 | frame in that animation; inside it for 7,976 of the 7,983 events whose animation the archive has, with 7 outside (FX5) | verified | ours; FX5 |
-| +0x08 | bytes[0x34] | the effect's parameters: eight u16 at +0x08, four 4-byte values at +0x18, four at +0x28 and a u32 at +0x38; **no field is placed** | unverified | ours; FX2 tallies the ranges, FX5 reads them |
+| +0x00 | u32 | motion index: `file * 100 + slot`, MH3U's numbering (`reference/monster_motions.py`), the file being the monster's motion list 0, 1, 2… | verified | ours, player `0x332e8c`; FX5 |
+| +0x04 | f32 | frame in that animation; inside it for 7,976 of the 7,983 events whose animation the archive has, with 7 outside (FX5) | verified | ours, player `0x332e8c`; FX5 |
+| +0x08 | u16 | effect type: 3, 35 or 36; the type mapper switches on it (`0x83de40`, where 35 and 36 are 0x23 and 0x24) | verified | ours, mapper `0x83de40`; FX8 |
+| +0x0A | u16 | effect id in MH3U's own space, 0 to 1313: the spawn resolves the effect asset from it (`0x338b7c`); the mapper rewrites it into +0x38/+0x3A | verified | ours, spawn `0x333a00`; FX8 |
+| +0x0C | s16 | passed to the spawn and stored as a float in the spawn object's `+0x238` (`0x333a00`); 0 to 255 | verified | ours, spawn `0x333a00`; FX8 |
+| +0x0E | u8 | stored in the spawn object's `+0x2BC`; 0 to 2 | verified | ours, spawn `0x333a00`; FX8 |
+| +0x0F | u8 | stored in the spawn object's `+0x2BD`; 0 to 3 | verified | ours, spawn `0x333a00`; FX8 |
+| +0x10 | u16 | a spawn argument; 0 to 36,901, and no reader use is placed | unverified | ours, spawn `0x333a00`; FX8 |
+| +0x12 | u16 | spawn path flag: 0, 1 or 2; nonzero makes the player call the monster's own spawn at vtable +0x9C instead of `0x332d8c` (`0x3330bc`) | verified | ours, player `0x332e8c`; FX8 |
+| +0x14 | f32 | position: the first of the three vectors the spawn copies to the spawn object's `+0x240` (`0x333a00`); -500 to 2,300 | verified | ours, spawn `0x333a00`; FX8 |
+| +0x18 | f32 | position, as +0x14 | verified | ours; FX8 |
+| +0x1C | f32 | position, as +0x14 | verified | ours; FX8 |
+| +0x20 | f32 | rotation: the second vector, copied to the spawn object's `+0x250`; -220 to 190 (one entry has a large negative value) | verified | ours, spawn `0x333a00`; FX8 |
+| +0x24 | f32 | rotation, as +0x20 | verified | ours; FX8 |
+| +0x28 | f32 | rotation, as +0x20 | verified | ours; FX8 |
+| +0x2C | f32 | scale: the third vector, copied to the spawn object's `+0x260`; -2.8 to 13.4 | verified | ours, spawn `0x333a00`; FX8 |
+| +0x30 | f32 | scale, as +0x2C | verified | ours; FX8 |
+| +0x34 | f32 | scale, as +0x2C | verified | ours; FX8 |
+| +0x38 | u16 | the effect id the type mapper writes at run time (`0x83de40`); the file carries a default, 32 in almost every event and 21 in the rest | unverified | ours; FX8 |
+| +0x3A | u16 | the subtype the type mapper writes at run time; the file's value is 0 in almost every event, up to 120 in the rest | unverified | ours; FX8 |
 
 An all-zero event is padding at the end of its section (49 across the 44 files). An event whose
 motion slot the monster's own archive leaves empty is not padding: 60 of the 8,043 nonzero events
@@ -136,26 +176,52 @@ count the frame is past (FX5).
 ## MHXX PSL
 
 One per motion list. A file with no effects is 8 bytes: magic, version and a slot count of 0
-(seventeen do). Otherwise the header holds one u32 per animation slot, then one 0x10-byte descriptor
-for each slot that has effects, in slot order. The descriptors are at
-`align(0x08 + 4*n*, 0x10) + 0x10*k*`.
+(seventeen do). Otherwise the header holds one u32 per animation slot, then one 12-byte descriptor
+every 16 bytes for each slot that has effects, in slot order. The descriptors are at
+`align(0x08 + 4*n*, 0x10) + 0x10*k*`; the lists start 4 bytes before the descriptor table's
+16-byte end, because the last descriptor has no padding after its 12 bytes.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
-| 0x00 | char[4] | magic `PSL\0` | verified | ours; FX2 (507 entries) |
+| 0x00 | char[4] | magic `PSL\\0` | verified | ours; FX2 (507 entries) |
 | 0x04 | u16 | version, 2 in every file | verified | ours; FX2 |
 | 0x06 | u16 | slot count *n* | verified | ours; FX2 |
 | 0x08 | u32[*n*] | one offset per slot; slot 0's is 0 in every file, a slot with no effects is 0, and the *k*-th nonzero offset is `align(0x08 + 4*n*, 0x10) + 0x10*k*` (18,831 slots, 8,129 descriptors) | verified | ours; FX2 |
 | descriptor +0x00 | u32 | the frame count of the animation in the slot the descriptor sits at | verified | ours; FX6 |
-| descriptor +0x04 | u32 | `0x00200000` or `0x01200000`; unplaced | unverified | ours; FX2 |
-| descriptor +0x08 | u32 | the slot's effect list, a value that grows within the file; the list's layout is not placed | unverified | ours; FX2 |
-| descriptor +0x0C | u32 | 0 in most descriptors, a small value in others; unplaced | unverified | ours; FX2 |
-| end | bytes | the per-slot effect lists the third value points at; not laid out | unverified | ours; FX2 |
+| descriptor +0x04 | u32 | `0x00200000` (8,117 descriptors) or `0x01200000` (12); the player's use is not read | verified | ours; FX9 |
+| descriptor +0x08 | u32 | the file offset of the slot's effect list: strictly increasing, the first at the last descriptor's end, the last inside the file | verified | ours; FX9 |
+| end | bytes | the per-slot effect lists: each runs from its offset to the next descriptor's, the last to the file's end; their contents are not laid out (an array of 0x10-byte records at the end of some lists is visible but not placed) | unverified | ours; FX9 |
 
 One hundred and ten descriptors are in four PSLs whose motion list isn't in the same archive, so
 their frame count has no local animation to compare with; of the 8,019 that do, 7,980 name an
 animation in their slot and its frame count is that animation's, and 39 name a slot the archive
 leaves empty (FX6).
+
+- **FX7 (done, 2026-11-26).** The record fields MH4U's spawn and getter read stay in their readers'
+  ranges: `MHUC_DUMPS=… python3 -m pytest -q -m game_files -k consumer`. Procedure: read every
+  `rMhMotionEffect` entry of MH4U's monster archives and check each record's `+0x00` to `+0x10`,
+  the three vectors and the zero fields against the ranges and masks the spawn (`0x391b28`) and
+  getter (`0x391904`) allow. Result: 150 entries, 6,216 records; `+0x00` <= 31, `+0x01` <= 2,
+  `+0x02` <= 1, `+0x03` 0, 1 or 5, `+0x06` <= 122, `+0x08`'s high byte 0 in every record, `+0x0A`
+  -1 to 243; the 32-bit word at `+0x0C` sets only bits inside `0x7C1EFF`; `+0x10` is `0xFFFFFFFF`
+  or 0 to 7; `+0x24`, `+0x34` and `+0x44` are 0; the vectors are finite, the first from -4,400 to
+  7,000, the second -220 to 225 and the third -1.25 to 10.0.
+- **FX8 (done, 2026-11-26).** The ESQ event fields the player and spawn read stay in their readers'
+  ranges: `MHUC_DUMPS=… python3 -m pytest -q -m game_files -k consumer`. Procedure: read every ESQ
+  of MH3U's monster archives, take each non-padding 0x3C event and check its scalars against the
+  player (`0x332e8c`), spawn (`0x332d8c`/`0x333a00`) and mapper (`0x83de40`) uses. Result: 8,092
+  events, 49 padding; `+0x08` is 3, 35 or 36; `+0x0A` <= 1313; `+0x0C` <= 255; `+0x0E` 0 to 2;
+  `+0x0F` 0 to 3; `+0x12` 0 to 2; `+0x38` 0, 21 or 32; the three vectors are finite, the first
+  -500 to 2,300, the second -220 to 190 (one entry has a large negative value) and the third -2.8
+  to 13.4.
+- **FX9 (done, 2026-11-26).** A PSL descriptor is three words every 16 bytes and its list starts
+  where the slot order puts it: `MHUC_DUMPS=… python3 -m pytest -q -m game_files -k
+  descriptor_and_list`. Procedure: read every PSL of MHXX's monster archives, check each
+  descriptor's flags, and check its list starts after the last descriptor's 12 bytes and the lists
+  run in slot order to the file's end. Result: 507 PSLs, 18,831 slots, 8,129 descriptors; every
+  descriptor's flags are `0x00200000` (8,117) or `0x01200000` (12); every first list starts at
+  the descriptor table's 16-byte end minus 4; every later list follows its predecessor and the last
+  is inside the file.
 
 ## What a converter does
 
@@ -165,70 +231,40 @@ The converters are `src/mhuc/formats/mef.py` and, for the effect-id map, `src/mh
 | Conversion | Carried | Skipped or refused |
 |---|---|---|
 | MEF (MH4U) -> MEF: `read_mef(...).to_bytes()`, `to_mh4u(data, "mh4u")` | every byte: the header from its fields, the records unchanged | nothing |
-| ESQ (MH3U) -> its own form: `read_esq(...).to_bytes()`, `read_esq(...).events()` | the header, seven section offsets and body unchanged; each event's motion and frame read | nothing (round trip only; what an event does is not placed) |
-| PSL (MHXX) -> its own form: `read_psl(...).to_bytes()` | the header, slot table, descriptors and body unchanged; each descriptor's frame count read | nothing (round trip only; what a list holds is not placed) |
-| ESQ or PSL -> MEF: `to_mh4u(data, "mh3u"\|"mhxx")` | the source's container is read and checked, and the motion and frame of each event are placed | **refused**: no MEF record field beyond the key is placed, and the source's effect id, bone, placement and flags are not, so a record written today would carry guesses |
+| ESQ (MH3U) -> its own form: `read_esq(...).to_bytes()`, `read_esq(...).events()` | the header, seven section offsets and body unchanged; each event's fields read | nothing (round trip only) |
+| PSL (MHXX) -> its own form: `read_psl(...).to_bytes()`, `read_psl(...).descriptors`, `.lists()` | the header, slot table, descriptors and body unchanged; each descriptor's frame count, flags and list offset read | nothing (round trip only) |
+| ESQ or PSL -> MEF: `to_mh4u(data, "mh3u"\|"mhxx")` | the source's container and fields are read and checked | **refused**: the target effect is not a field (it is derived from the type and the time), and the source scalars' correspondence is not placed |
 
-The refusal is deliberate: a MEF whose keys don't match the game's lookup cannot play effects, and
-a record whose other fields guess would play the wrong effect at the wrong place, so writing one
-would carry guesses into a port. What has to be read to lift it:
+The refusal is deliberate. Writing a MEF today would carry guesses into a port:
 
-- **the key's namespace.** The keys are the ids the motion lists' event blocks remap to: in
-  `em001_0.lmt` 10 of the 11 nonzero remap ids of its four event groups are keys of
-  `em001_0.mef`, and in `em015_0.lmt` 24 of 25 are keys of `em015_0.mef`. The MEF also has keys
-  no shipped motion list names, so code can trigger a record too. **MH3U's and MHXX's motion
-  lists carry no such ids** (every MH3U v66 event is one zero-bits event per group and MHXX's
-  remaps are zero), so a port that keeps the source's animations has to write the event entries
-  itself, with ids of its own, and key the MEF to them. That makes the converter a writer of
-  both the MEF and the ported LMT's event blocks, not of the MEF alone. The samples above are
-  not a full check; FX4 would be.
-- **the source's effect parameters.** The ESQ event's motion and frame are placed (FX5), and a PSL
-  descriptor's frame count (FX6), but neither file's effect id, bone, placement, scale or flags is:
-  0x34 bytes of the 0x3C-byte ESQ event and the whole body of a PSL file remain unplaced. The
-  loaders (`0x3b30cc` MH3U, `0x6eb318` MHXX v1.4) only relocate the offsets.
-- **MH4U's record fields.** Only `+0x04` is placed (the key, [above](#how-mh4u-reads-it)); what
-  `+0x00` to `+0x03`, `+0x06`, `+0x08`, `+0x0A`, `+0x0C`, `+0x0E`, `+0x10` and the three float
-  groups mean is unverified, so the effect id, the bone, the frame and the placement have no
-  target field.
-- **the source fields' readers.** A linear code pass found where the source resources are loaded but
-  not where their fields are read. MH3U loads the ESQ with `0x8475fc` (15 per-class setup callers
-  between `0x69a930` and `0x821d88`), stores it at the monster's `+0x1a68`, and `0x8fca78` puts it
-  in the class resource array at `+0x24d8`; the factory is `0xa1a544`. MHXX's PSL loader is
-  `0x6eb318`, its factory `0xabf6b4`, and the per-monster setups `0x2ddcf8`, `0x2ddfc0`,
-  `0x3248d0`, `0x4037ac` and `0x8aa090` load it beside `cMhEffectSequence` (`0xd740e0`). No
-  instruction reads `[x+0x1a68]` or a `0x24d8` displacement directly, and the PSL factory has no
-  direct caller. A pointer-table pass then placed the class methods: MH3U's `rEffectSequence`
-  vtable is `0xb6e9a8`, the factory `0xa1a544` sits at slot `0xb6f3e0` and the loader `0x3b30cc` at
-  slot `0xb58044`, and the factory's objects use vtable `0xb575e8`. MHXX's resource vtable is
-  `0xd0d5e8` (the factory `0xabf6b4` in its slot 2, `0xd0d5f0`) and the objects it makes use vtable
-  `0xcf64c0`, whose slot 11 is the loader `0x6eb318` (`0xcf64ec`). All of those methods are
-  lifecycle, serializer and helper code; none reads the slot table, the descriptors or the
-  0x3C-byte ESQ entries. The field readers are therefore not class methods: the next targets are
-  the manager the path loader calls (MH3U global `0xca8980`, MHXX `0xd3b0d0`) and the class
-  resource-array setup `0x8fca78` on MH3U's side, then whatever reads those array entries - the
-  array base is computed, so that needs a data-flow pass or an in-game trace.
-- **the source fields' readers.** A linear code pass found where the source resources are loaded but
-  not where their fields are read. MH3U loads the ESQ with `0x8475fc` (15 per-class setup callers
-  between `0x69a930` and `0x821d88`), stores it at the monster's `+0x1a68`, and `0x8fca78` puts it
-  in the class resource array at `+0x24d8`; the factory is `0xa1a544`. MHXX's PSL loader is
-  `0x6eb318`, its factory `0xabf6b4`, and the per-monster setups `0x2ddcf8`, `0x2ddfc0`,
-  `0x3248d0`, `0x4037ac` and `0x8aa090` load it beside `cMhEffectSequence` (`0xd740e0`). No
-  instruction reads `[x+0x1a68]` or a `0x24d8` displacement directly, and the PSL factory has no
-  direct caller. A pointer-table pass then placed the class methods: MH3U's `rEffectSequence`
-  vtable is `0xb6e9a8`, the factory `0xa1a544` sits at slot `0xb6f3e0` and the loader `0x3b30cc` at
-  slot `0xb58044`, and the factory's objects use vtable `0xb575e8`. MHXX's resource vtable is
-  `0xd0d5e8` (the factory `0xabf6b4` in its slot 2, `0xd0d5f0`) and the objects it makes use vtable
-  `0xcf64c0`, whose slot 11 is the loader `0x6eb318` (`0xcf64ec`). All of those methods are
-  lifecycle, serializer and helper code; none reads the slot table, the descriptors or the
-  0x3C-byte ESQ entries. The field readers are therefore not class methods: the next targets are
-  the manager the path loader calls (MH3U global `0xca8980`, MHXX `0xd3b0d0`) and the class
-  resource-array setup `0x8fca78` on MH3U's side, then whatever reads those array entries - the
-  array base is computed, so that needs a data-flow pass or an in-game trace.
-- **the effect-id map.** Each record's effect id is a game's own id space. `data/effectmap` holds
-  the source-to-MH4U rows (empty until the maintainer's dumps and a check fill them), and
-  `mhuc.effectmap.EffectMap.check` refuses a conversion that meets an id they don't name. The
-  effect assets an id names (the monster's `effect/base/...`) must be converted with it.
-- **the two files.** MH4U's record names two MEF paths; which records go in which is unverified.
+- **The effect identity is derived, not stored.** MH4U's record has no effect-id field: the
+  spawn (`0x391b28`) takes the record's type (`+0x03`) and time (`+0x06`), reads the type's base
+  from the u16 table at `0xeede7c` and the time's entry from `0xeedde98` through `0x390c48`, and
+  asks the manager for that effect. A conversion therefore needs a source id -> target
+  `(type, time)` map, not a source -> target id map: `data/effectmap`'s `source,target` columns
+  must become `source,type,time` (or the converter must invert the two tables, which are in
+  MH4U's code as game data). That is a schema change to the effect-id tables and an open decision.
+- **The ESQ's parameters are placed, but not their target fields.** Both games' spawns take three
+  vectors in the same order, and the ESQ event's s16 `+0x0C` is the same kind of value as the MEF
+  record's s16 `+0x0A` (each game's spawn passes it to its effect object), so the vectors and the
+  s16 are the natural correspondence — but no check compares a source effect with a target
+  record, so this is a reading, not verified. The other source scalars — the type `+0x08`, the id
+  `+0x0A`, the bytes `+0x0E`/`+0x0F` and the flag `+0x12` — have no placed counterpart: the
+  target's `+0x00`, `+0x01`, `+0x02`, `+0x03`, `+0x06`, `+0x08` and flags are set by MH4U's spawn
+  for reasons the source does not express the same way.
+- **The PSL's lists are not laid out.** A descriptor's frame count, flags and list offset are
+  placed (FX6, FX9), but the bytes of the per-slot lists are not: the 0x10-byte records visible at
+  the end of a list are not placed, so no PSL event can be read, let alone written as a MEF.
+- **The key's namespace** is still the LMT event's, and MH3U's and MHXX's motion lists carry no
+  such ids (every MH3U v66 event is one zero-bits event per group and MHXX's remaps are zero), so a
+  port writes the event entries itself and keys the MEF to them ([specs/lmt.md](lmt.md), FX4 is
+  the full pass).
+- **The two files.** A key below 2000 is looked up in the first MEF and one from 2000 up in the
+  second (the player, `0x390be4`), so a converter must split the records by key.
+
+What is left for `to_mh4u`: the effectmap's target `(type, time)` rows for the source ids, the
+source scalar -> target scalar correspondence for the ESQ, and the PSL list layout. Until then
+`to_mh4u` raises with the reason, and no port ships `mef` or `efl`.
 
 ## Checks
 
@@ -246,15 +282,16 @@ would carry guesses into a port. What has to be read to lift it:
   file and non-decreasing with five files repeating one offset, every section a whole number of
   its entry size, every seventh section `0x258` bytes; 507 PSL entries with 18,831 slots and
   8,129 descriptors, every version 2, slot 0's offset 0 in every file, every nonzero slot offset
-  where the slot order puts it, seventeen 8-byte files with no slots. The section contents are
-  FX5's; the descriptors are FX6's.
+  where the slot order puts it, seventeen 8-byte files with no slots. The sections are FX5's and
+  FX8's, the descriptors FX6's and FX9's.
 - **FX3 (done, 2026-11-25).** Every MEF file's record keys are unique, which the loader's
   key-to-record table needs, and the largest is 4505 (a u16's range is what the table holds).
   Procedure: read all 96 distinct MEF resource paths of MH4U's monster archives
   (`MHUC_DUMPS=… python3 -m pytest -q -m game_files -k effects_round_trip` plus the unit tests)
   and take the u16 at `+0x04` of every record; no file repeats a key, and the keys span 0 to 4505.
-  The loader's use of the key is read from `0x398f94`, not checked in game; what it is looked up
-  by stays unverified.
+  The loader's use of the key is read from `0x398f94` and the lookup from `0x398f48`; the player
+  passes a u16 key (`0x390be4`/`0x391a28`), and the data match says the motion list's event remap
+  id is that key (FX4 is the full pass).
 - **FX4 (open).** The motion lists' event remap ids are the MEF keys: every nonzero remap id of a
   motion list's four event groups should have a record in that list's MEF. Sample so far:
   `em001_0` 10 of 11, `em015_0` 24 of 25. A full pass reads every MH4U monster arc's motion lists

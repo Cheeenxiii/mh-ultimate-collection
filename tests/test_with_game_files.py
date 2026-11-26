@@ -1125,6 +1125,102 @@ def test_every_mh3u_effect_sequence_event_names_an_animation_frame(dump):
     assert (files, events, padding, placed, unread, len(outside)) == (44, 8092, 49, 7983, 60, 7)
 
 
+def test_every_mh4u_motion_effect_record_field_is_in_its_consumers_range(dump):
+    """check FX7: the fields MH4U's MEF spawn (0x391b28) and placement getter (0x391904) read
+    are in the ranges those readers allow, and the fields the spec calls zero are zero."""
+    entries = records = 0
+    failures = []
+    flags_mask = 0x7C1EFF
+    for _name, label, data in _effect_entries(dump, "mh4u", ("rMhMotionEffect",)):
+        entries += 1
+        for record in mef.read_mef(data).records:
+            records += 1
+            s16 = struct.unpack_from("<h", record.raw, 0xA)[0]
+            if record.u8(0) > 31:
+                failures.append(f"{label}: +0x00 {record.u8(0)} isn't a bit index")
+            if record.u8(1) > 2 or record.u8(2) > 1:
+                failures.append(f"{label}: +0x01/+0x02 mode out of range")
+            if record.u8(3) not in (0, 1, 5):
+                failures.append(f"{label}: +0x03 type {record.u8(3)}")
+            if record.u16(6) > 122:
+                failures.append(f"{label}: +0x06 {record.u16(6)}")
+            if record.u16(8) >> 8:
+                failures.append(f"{label}: +0x08's high byte {record.u16(8) >> 8} isn't 0")
+            if not -1 <= s16 <= 243:
+                failures.append(f"{label}: +0x0A {s16}")
+            if record.u32(0xC) & ~flags_mask:
+                failures.append(f"{label}: flags {record.u32(0xC):#x} outside {flags_mask:#x}")
+            if record.u32(0x10) not in (0xFFFFFFFF, 0, 1, 2, 3, 4, 5, 6, 7):
+                failures.append(f"{label}: +0x10 mask {record.u32(0x10):#x}")
+            if any(record.u32(at) for at in (0x24, 0x34, 0x44)):
+                failures.append(f"{label}: a zero field at +0x24/+0x34/+0x44 isn't 0")
+            floats = [record.f32(at) for at in (0x18, 0x1C, 0x20, 0x28, 0x2C, 0x30, 0x38, 0x3C, 0x40)]
+            if not all(math.isfinite(value) for value in floats):
+                failures.append(f"{label}: a vector isn't finite")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (entries, records) == (150, 6216)
+
+
+def test_every_mh3u_effect_sequence_event_field_is_in_its_consumers_range(dump):
+    """check FX8: the scalars the ESQ player (0x332e8c) and spawn (0x333a00) read are in their
+    readers' ranges, the file's +0x38/+0x3A are the placeholders the type mapper overwrites, and
+    the three vectors are finite."""
+    entries = events = padding = 0
+    failures = []
+    for _name, label, data in _effect_entries(dump, "mh3u", ("rEffectSequence",)):
+        entries += 1
+        for event in mef.read_esq(data).events():
+            events += 1
+            if event.motion == 0 and event.frame == 0.0:
+                padding += 1
+                continue
+            raw = event.raw
+            effect_type, = struct.unpack_from("<H", raw, 0x08)
+            if effect_type not in (3, 35, 36):
+                failures.append(f"{label}: type {effect_type}")
+            if struct.unpack_from("<H", raw, 0x0A)[0] > 1313:
+                failures.append(f"{label}: effect id {struct.unpack_from('<H', raw, 0x0A)[0]}")
+            if struct.unpack_from("<H", raw, 0x0C)[0] > 255:
+                failures.append(f"{label}: +0x0C out of range")
+            if raw[0x0E] not in (0, 1, 2) or raw[0x0F] not in (0, 1, 3):
+                failures.append(f"{label}: +0x0E/+0x0F {raw[0x0E]}/{raw[0x0F]}")
+            if struct.unpack_from("<H", raw, 0x12)[0] > 2:
+                failures.append(f"{label}: +0x12 flag out of range")
+            if struct.unpack_from("<H", raw, 0x38)[0] not in (0, 21, 32):
+                failures.append(f"{label}: +0x38 {struct.unpack_from('<H', raw, 0x38)[0]}")
+            floats = [struct.unpack_from("<f", raw, at)[0]
+                      for at in (0x14, 0x18, 0x1C, 0x20, 0x24, 0x28, 0x2C, 0x30, 0x34)]
+            if not all(math.isfinite(value) for value in floats):
+                failures.append(f"{label}: a vector isn't finite")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (entries, events, padding) == (44, 8092, 49)
+
+
+def test_every_mhxx_motion_effect_sequence_descriptor_and_list_is_laid_out(dump):
+    """check FX9: a PSL descriptor is three words every 16 bytes, its flags are one of the two
+    values, and its list starts where the slot order puts it, after the last descriptor."""
+    files = slots = descriptors = lists = 0
+    failures = []
+    for _name, label, data in _effect_entries(dump, "mhxx", ("rProofEffectMotSequenceList",)):
+        files += 1
+        try:
+            parsed = mef.read_psl(data)
+        except mef.MefError as error:
+            failures.append(f"{label}: {error}")
+            continue
+        slots += len(parsed.slots)
+        descriptors += len(parsed.descriptors)
+        for descriptor in parsed.descriptors:
+            if descriptor.flags not in (0x00200000, 0x01200000):
+                failures.append(f"{label}: slot {descriptor.slot}'s flags {descriptor.flags:#x}")
+        for slot, start, end in parsed.lists():
+            lists += 1
+            if not 0 < start < end <= len(data):
+                failures.append(f"{label}: slot {slot}'s list {start:#x}..{end:#x} of {len(data):#x}")
+    assert not failures, f"{len(failures)} problems, first: {failures[:3]}"
+    assert (files, slots, descriptors, lists) == (507, 18831, 8129, 8129)
+
+
 def test_every_mhxx_psl_descriptor_names_its_animations_frame_count(dump):
     """check FX6: a PSL descriptor's first word is the frame count of the animation in the slot the
     descriptor sits at. A PSL whose motion list isn't in the same archive is counted, not failed."""
