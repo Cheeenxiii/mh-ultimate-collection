@@ -153,7 +153,7 @@ RevilLib's own arithmetic (`Evaluate`), not a simple little-endian split.
 
 - **MH4U.** `enemyResourceIndex[id]` is a 0x2c-byte record of eleven path pointers; `+0x08` is
   the camera, one path (`enemy\emNNN\mot\eNNN_cam`), class `rCameraList` ([reference](../reference/README.md#mh4u-monster-tables),
-  [mods/monster_ids](../mods/monster_ids/README.md#the-resource-record)). The id in the file's
+  [mods/uc_runtime](../mods/uc_runtime/README.md#the-resource-record)). The id in the file's
   table is the **camera event's id**, not the monster id: an action posts camera event N and
   the manager takes record N. The port's `files` kind `camera` makes #143's record builder
   rewrite the path's id token to the ported id.

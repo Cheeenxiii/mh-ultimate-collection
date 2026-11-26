@@ -405,12 +405,12 @@ Settled by the maintainer on 2026-11-26.
 
 **One native runtime, a module per monster.** Every part of the mod's native code lives in one plugin, the runtime: the id and registry readers, the resource records, the ported monsters' action code, and the hooks for text, sound and quests as they come. A ported monster is a C module with its generated tables in that library; its RomFS files stay a data-only mod folder that `mhuc convert monster` writes. The runtime's `mod.json` names one fixed set of hooks, so the game's code library is built again for a hook change only, not for each monster: adding or fixing a monster rebuilds the runtime's library and redeploys the mod, and the game's code library stays as it is. A module is enabled by its registry row (or a setting); the mod order no longer decides which code answers a monster.
 
-Why now: the 3U Rathian's own handlers are about to be written (0002's amendment), and written per monster they would set the layout for every later monster. The plugins today are one per purpose (`mods/monster_ids`) and one per monster's actions (`mods/rathian_actions`), and the build merges the enabled mods' hooks into the game's code library: a new plugin adds hooks, so a new monster would recompile the game. The id layer and the action code also have to be ordered in the chain, because the ported monster's factory id is visible only before `mods/monster_ids` rewrites it.
+Why now: the 3U Rathian's own handlers are about to be written (0002's amendment), and written per monster they would set the layout for every later monster. The plugins were one per purpose (an id plugin) and one per monster's actions (`mods/rathian_actions`), and the build merges the enabled mods' hooks into the game's code library: a new plugin adds hooks, so a new monster would recompile the game. The id layer and the action code also have to be ordered in the chain, because the ported monster's factory id is visible only before the id layer rewrites it.
 
 What the runtime holds:
 
-- **one dispatcher hook**: it finds a ported monster at `uEnemyFactory::create` (the work block's id byte is the stand-in's, [mods/monster_ids](../mods/monster_ids/README.md)), looks its module up by registry id, and runs the module's action handler; every other monster goes to the game's dispatcher unchanged;
-- **the id layer** and the resource records built from `data/ids/registry.csv`, today in `mods/monster_ids`;
+- **one dispatcher hook**: it finds a ported monster at `uEnemyFactory::create` (the work block's id byte is the stand-in's, [the runtime](../mods/uc_runtime/README.md)), looks its module up by registry id, and runs the module's action handler; every other monster goes to the game's dispatcher unchanged;
+- **the id layer** and the resource records built from `data/ids/registry.csv`, today in `mods/uc_runtime`;
 - **the shared machinery**: ABI 4's `call2`, the per-monster state slots and the fake-host test harness, written once instead of per monster;
 - **one module table** generated from the registry, so a build fails when a registered monster has no module, or a module a registered id.
 

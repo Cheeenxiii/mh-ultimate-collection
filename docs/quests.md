@@ -207,7 +207,7 @@ For a converted MHXX quest the id changes on the source side: Giadrome's `em034`
 
 Giaprey are a small monster MH4U does not have ([overlap.md](../data/catalog/overlap.md): "Small monsters to add"), and this milestone ports the large monster only. So **MH4U's Jaggi (id 56) stand in for the pack**: the two area-2 Felyne groups become Jaggi groups. Porting Giaprey is left to a task of its own.
 
-While Giadrome's own files are incomplete, its registry row's stand-in does the work: **MH4U's Great Jaggi (id 15)**, as [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161) records. Every kind of file the port does not ship yet — sound, effects, camera, `.emd`/`.etd` data and the motion slots it keeps — comes from Great Jaggi, and each kind it ships from its own folder ([monster_ids](../mods/monster_ids/README.md)). The first quest's rank, stat rows and texts stay 10210's as placeholders; it is not shipped, and the first shipped quest is a converted MHXX one.
+While Giadrome's own files are incomplete, its registry row's stand-in does the work: **MH4U's Great Jaggi (id 15)**, as [#161](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/161) records. Every kind of file the port does not ship yet — sound, effects, camera, `.emd`/`.etd` data and the motion slots it keeps — comes from Great Jaggi, and each kind it ships from its own folder ([the runtime](../mods/uc_runtime/README.md)). The first quest's rank, stat rows and texts stay 10210's as placeholders; it is not shipped, and the first shipped quest is a converted MHXX one.
 
 
 ## The MHXX converter

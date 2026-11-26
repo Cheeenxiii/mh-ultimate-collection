@@ -4,7 +4,7 @@ MH4U loads a monster's own files from two places:
 
 - `data/emNNN.arc`, whose name the game builds from the monster id (`snprintf("data\\em%03d")`);
 - the paths its resource record lists (reference/README.md#mh4u-monster-tables), which
-  `mods/monster_ids` builds for a ported id: for each kind of file the port ships it rewrites
+  the runtime builds for a ported id: for each kind of file the port ships it rewrites
   the stand-in's path to the port's id, and for the kinds it doesn't ship it keeps the
   stand-in's path (data/ids/README.md, the `files` column).
 
@@ -19,7 +19,7 @@ ship (`enemy\\em001\\...`), and MH4U resolves those in the archive the data path
 the port's own `/data/emNNN.arc`. The archive is therefore made self-sufficient: the stand-in's
 `data/emNNN.arc` is read from MH4U's RomFS and each entry the record keeps is copied into the
 port's archive under its original path. A record path then resolves from the one archive the
-game opens, and `mods/monster_ids` no longer maps a ported id's data path to the stand-in's.
+game opens, and the runtime no longer maps a ported id's data path to the stand-in's.
 
 The kinds it produces, and how:
 

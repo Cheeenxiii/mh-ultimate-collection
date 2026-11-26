@@ -1,5 +1,10 @@
 /*
- * monster_ids.c: answers MH4U's monster-id-indexed tables for the ported monsters' ids.
+ * ids.c: the runtime's id layer, answering MH4U's monster-id-indexed tables for the ported
+ * monsters' ids.
+ *
+ * The mod's native code is one plugin, the runtime, a module per ported monster
+ * (docs/decisions.md#0013): src/runtime.c is the plugin entry point and this file is the id
+ * layer it registers, with src/modules.h the table its modules will fill (#215).
  *
  * MH4U looks a monster up by id in tables that have 124 rows (0 to 123):
  * reference/README.md#mh4u-monster-tables lists them. Ids from 124 up come from the mod's
@@ -77,8 +82,8 @@
  *     where `enemyDataPaths` begins.
  *
  * The data path (`enemyDataPathIndex`, 0x00efc268) still answers with the stand-in's: the
- * ports ship no MH4U-format `.emd`/`.etd` yet (mods/monster_ids/README.md), so the stand-in's
- * data row is what loads their monster data.
+ * ports ship no MH4U-format `.emd`/`.etd` yet (../README.md), so the stand-in's data row is
+ * what loads their monster data.
  *
  * The enemy data's preload. Before the area exists, the quest task (0x0065bcd0) fills a
  * 124-byte presence array at +0xd4 from the quest's monster set and, in state 0, loads the
@@ -116,7 +121,7 @@
  *             through, and a pooled id lent and answered by a synthetic quest; for a headless
  *             check (docs/checks.md)
  *
- * Build: cc -shared -fPIC -I<fork>/include src/monster_ids.c -o monster_ids.so
+ * Build: make, in the runtime's folder (src/runtime.c and src/ids.c).
  * Licence: GPL-3.0-or-later.
  */
 #include <stddef.h>
@@ -127,6 +132,7 @@
 
 #include "ids.h"
 #include "mh4u_plugin.h"
+#include "runtime.h"
 
 /* A monster's data block is at this+0xe28, and its id at +0x1c0 (reference/README.md). */
 #define ENEMY_WORK 0xe28u
@@ -1552,7 +1558,9 @@ static void self_test(MH4UCall *call) {
 static int first_frame = 1;
 static int logged;
 
-static void frame(MH4UCall *call, void *user) {
+/* Once a frame: build the resource records and load the text; run the self-test once when
+ * the setting asks for it. runtime.c registers this as the runtime's frame call. */
+void mhuc_ids_frame(MH4UCall *call, void *user) {
     (void)user;
     if (!first_frame && logged) {
         return;
@@ -1569,12 +1577,7 @@ static void frame(MH4UCall *call, void *user) {
 }
 
 /* Hook name, address (USA v1.3.0), the reader's shape and its log label. */
-static const struct {
-    const char *hook;
-    const char *address;
-    MH4UHookFn fn;
-    HookInfo *info;
-} hooks[] = {
+static const MhucHook hooks[] = {
     {"uEnemyFactory::create", "0x006901f4", argument_reader, &h_factory},
     {"enemyData::load", "0x00689490", argument_reader, &h_load},
     {"enemyData::get", "0x0068882c", argument_reader, &h_data},
@@ -1598,10 +1601,17 @@ static const struct {
     {"uc_dataPath", "0x00b7300c", data_path_builder, &h_datapath},
 };
 
-MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint32_t abi) {
-    if (abi < 1 || plugin_host->size < offsetof(MH4UPluginHost, alloc)) {
-        return 0;
-    }
+/* The id layer's hooks, in the order this file registers them. mod.json names the same set
+ * (build_game.py needs the names, not their order); the runtime registers them and a monster
+ * module adds none, which is what keeps the game's code library's hook list fixed
+ * (docs/decisions.md#0013). */
+const MhucHook *mhuc_ids_hooks(size_t *count) {
+    *count = sizeof hooks / sizeof hooks[0];
+    return hooks;
+}
+
+/* Takes the host and reads the id layer's settings. Called once by the runtime's init. */
+void mhuc_ids_start(const MH4UPluginHost *plugin_host) {
     host = plugin_host;
 #if MHUC_MONSTER_COUNT + MHUC_POOLED_MONSTER_COUNT < 1
 #error "the registry has no ported monster id: nothing to answer"
@@ -1609,32 +1619,4 @@ MH4U_PLUGIN_EXPORT int mh4u_plugin_init(const MH4UPluginHost *plugin_host, uint3
     pool_clear();
     const char *test = host->config(host, "selftest");
     selftest = test && strcmp(test, "1") == 0;
-    int missing = 0;
-    for (size_t i = 0; i < sizeof hooks / sizeof hooks[0]; i++) {
-        if (!host->hook(host, hooks[i].hook, hooks[i].fn, hooks[i].info)) {
-            char line[200];
-            snprintf(line, sizeof line, "%s (0x%s) isn't a hook point: the code library needs "
-                     "building with this mod", hooks[i].hook, hooks[i].address);
-            say(MH4U_LOG_ERROR, line);
-            missing++;
-        }
-    }
-    if (missing == (int)(sizeof hooks / sizeof hooks[0])) {
-        return 0;
-    }
-    if (missing) {
-        say(MH4U_LOG_WARNING, "some readers aren't hook points: the code library needs rebuilding "
-                              "with this mod; the rest answer");
-    }
-    if (!host->on_frame(host, frame, NULL)) {
-        say(MH4U_LOG_WARNING, "no frame call point: the self-test can't run");
-    }
-    char line[256];
-    snprintf(line, sizeof line, "ready: answering MH4U's monster tables and name/notes message "
-             "getters for %d permanent and %d pooled id(s), %u and up, lending %u..%u per quest, "
-             "with the files each port ships and the stand-in's for the rest",
-             MHUC_MONSTER_COUNT, MHUC_POOLED_MONSTER_COUNT, (unsigned)MHUC_MONSTER_FIRST,
-             (unsigned)MHUC_MONSTER_POOL_FIRST, (unsigned)MHUC_MONSTER_POOL_LAST);
-    say(MH4U_LOG_INFO, line);
-    return 1;
 }

@@ -132,8 +132,9 @@ def test_only_motions_takes_a_value():
 def test_the_header_carries_the_kinds_each_port_ships(tmp_path):
     registry = tmp_path / "registry.csv"
     header = tmp_path / "ids.h"
+    modules = tmp_path / "modules.h"
     write_registry(registry, [row(124), row(125, key="rathian-3u", files="model,motions=0-2,tail")])
-    args = ["--registry", str(registry), "--header", str(header)]
+    args = ["--registry", str(registry), "--header", str(header), "--modules-header", str(modules)]
     assert check_ids.main(args + ["--write"]) == 0
     text = header.read_text()
     assert "#define MHUC_FILES_MODEL 0x0001u" in text
@@ -149,8 +150,9 @@ def test_the_header_carries_the_kinds_each_port_ships(tmp_path):
 def test_the_header_the_registry_generates_has_both_arrays(tmp_path, capsys):
     registry = tmp_path / "registry.csv"
     header = tmp_path / "ids.h"
+    modules = tmp_path / "modules.h"
     write_registry(registry, [row(124), row(125, key="rathian-3u"), row(256, key="pooled")])
-    args = ["--registry", str(registry), "--header", str(header)]
+    args = ["--registry", str(registry), "--header", str(header), "--modules-header", str(modules)]
     assert check_ids.main(args + ["--write"]) == 0
     text = header.read_text()
     assert "MHUC_MONSTER_ID_RATHIAN_GU 124" in text
@@ -162,10 +164,31 @@ def test_the_header_the_registry_generates_has_both_arrays(tmp_path, capsys):
             "MHUC_FILES_TAIL | MHUC_FILES_CMD},") in text
     assert "MHUC_MONSTER_ID_POOLED 256" in text
     assert check_ids.main(args) == 0
-    # A stale header is refused, so the plugin can never build from another id set.
+    # A stale header is refused, so the runtime can never build from another id set.
     header.write_text(text.replace("124", "126"))
     assert check_ids.main(args) == 1
     assert "isn't what the registry generates" in capsys.readouterr().out
+
+
+def test_the_module_table_has_one_entry_per_registered_id(tmp_path, capsys):
+    registry = tmp_path / "registry.csv"
+    header = tmp_path / "ids.h"
+    modules = tmp_path / "modules.h"
+    write_registry(registry, [row(124), row(125, key="rathian-3u"), row(256, key="pooled")])
+    args = ["--registry", str(registry), "--header", str(header), "--modules-header", str(modules)]
+    assert check_ids.main(args + ["--write"]) == 0
+    text = modules.read_text()
+    # The permanent ids first, then the pooled ones; a placeholder per registered id.
+    assert "#define MHUC_MODULE_COUNT 3" in text
+    assert '{124, "rathian-gu", 0},' in text
+    assert '{125, "rathian-3u", 0},' in text
+    assert '{256, "pooled", 0},' in text
+    assert text.index('"rathian-gu"') < text.index('"rathian-3u"') < text.index('"pooled"')
+    # The runtime checks this count against ids.h, so a missing or extra row must be caught.
+    assert check_ids.main(args) == 0
+    modules.write_text(text.replace("{256, \"pooled\", 0},", ""))
+    assert check_ids.main(args) == 1
+    assert "modules.h isn't what the registry generates" in capsys.readouterr().out
 
 
 def test_the_registry_gives_giadrome_the_slots_it_borrows():

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check data/ids/registry.csv and keep the plugin's generated header in step with it.
+"""Check data/ids/registry.csv and keep the runtime's generated headers in step with it.
 
 The registry is the one file that records every id a ported content takes
 (docs/decisions.md#0003-id-allocation-and-mod-saves). It is a CSV with one row per id:
@@ -10,7 +10,7 @@ The registry is the one file that records every id a ported content takes
               range and rules added here first.
 - `id`        the id in MH4U. Monsters start at 124 (MH4U uses 0 to 123). 124 to 223 are
               permanent; a monster ported after that range is full takes an id from 256 up,
-              which the plugin lends a byte of 224 to 255 to for each quest that names it.
+              which the runtime lends a byte of 224 to 255 to for each quest that names it.
               224 to 255 are therefore not registry ids.
 - `key`       the content's name in the registry, lowercase with hyphens, unique.
 - `source_game`, `source_key`  where the content comes from: mh4u, mh3u, mhxx or mhgu and its
@@ -20,7 +20,7 @@ The registry is the one file that records every id a ported content takes
               ships this content's own rows (0 to 123).
 - `files`     the kinds of file the port ships, comma-separated: model, motions, camera,
               tail, mef, sound, cmd, efl (the resource record's path kinds). The record the
-              plugin builds rewrites the id token only in these kinds' paths; the rest keep
+              runtime builds rewrites the id token only in these kinds' paths; the rest keep
               the stand-in's path, because the game does not tolerate a missing file. A kind
               covers every path in its group, except motions, which takes the motion-list slots
               shipped, as a slot or a range: `motions=0-4` or `motions=0,2,3,4`. A slot it does
@@ -30,13 +30,15 @@ The registry is the one file that records every id a ported content takes
 Rules checked: each id is inside its kind's range and unique, permanent monster ids are
 consecutive from 124 (every permanent id up to the highest one used needs a row in each table;
 pooled ids may skip), each key, source game and source key is valid, `files` names known kinds
-once each and gives `motions` slots in 0..5, and every line of the plugin's header is the one
-this file generates.
+once each and gives `motions` slots in 0..5, and every line of the runtime's generated headers
+is the one this file writes.
 
-`--write` writes the header. The header is checked in, so a wrong or stale one fails the
-check: run `check_ids.py --write` after editing the registry, never edit the header.
+`--write` writes the runtime's two generated headers: `src/ids.h` (the id tables and the file
+kinds) and `src/modules.h` (the module table, one entry per registered id, which issue #215
+fills with each monster's code). They are checked in, so a wrong or stale one fails the check:
+run `check_ids.py --write` after editing the registry, never edit them.
 
-Usage: check_ids.py [--registry PATH] [--header PATH] [--write]
+Usage: check_ids.py [--registry PATH] [--header PATH] [--modules-header PATH] [--write]
 """
 from __future__ import annotations
 
@@ -48,11 +50,12 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(ROOT, "data", "ids", "registry.csv")
-HEADER = os.path.join(ROOT, "mods", "monster_ids", "src", "ids.h")
+HEADER = os.path.join(ROOT, "mods", "uc_runtime", "src", "ids.h")
+MODULES_HEADER = os.path.join(ROOT, "mods", "uc_runtime", "src", "modules.h")
 
 COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "files", "notes")
 SOURCE_GAMES = ("mh4u", "mh3u", "mhxx", "mhgu")
-# The resource record's path kinds, in the record's field order (mods/monster_ids/README.md):
+# The resource record's path kinds, in the record's field order (mods/uc_runtime/README.md):
 # MH4U loads one path per kind, and a port ships some of them. A kind it does not ship keeps
 # the stand-in's path, because a missing file stops the load (#143).
 FILE_KINDS = ("model", "motions", "camera", "tail", "mef", "sound", "cmd", "efl")
@@ -354,11 +357,78 @@ def render_header(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def render_modules(rows: list[dict[str, str]]) -> str:
+    """The runtime's module table for the registry's monster ids.
+
+    One entry per registered id, in the registry's order (the permanent ids first, then the
+    pooled ones). Issue #215 fills each entry's `ops` with the monster's C module; until a
+    monster has one, the entry is a placeholder and the runtime answers the id from the id
+    layer alone. Generating the table from the registry keeps the two in step: a registered
+    monster has a row here, and a module has the row that names it.
+    """
+    monsters = [r for r in rows if r["kind"] == "monster"]
+    permanent = sorted((r for r in monsters if int(r["id"], 0) <= PERMANENT_LAST),
+                       key=lambda r: int(r["id"], 0))
+    pooled = sorted((r for r in monsters if int(r["id"], 0) > PERMANENT_LAST),
+                    key=lambda r: int(r["id"], 0))
+    monsters = permanent + pooled
+    lines = [
+        "/* Generated from data/ids/registry.csv by tools/check_ids.py --write.",
+        " * Do not edit: edit the registry and run the tool. Licence: GPL-3.0-or-later. */",
+        "#ifndef MHUC_MODULES_H",
+        "#define MHUC_MODULES_H",
+        "",
+        "#include <stdint.h>",
+        "",
+        "/* One ported monster in the runtime's table: the registry id, the registry key, and the",
+        " * monster's C module. The registry gives the first two and tools/check_ids.py writes the",
+        " * row, so a registered monster has an entry and a module has the id that names it; issue",
+        " * #215 fills the `ops` of each monster whose code lands. Until then it is 0 and the",
+        " * runtime answers the id with its id layer alone. */",
+        "struct MhucModuleOps;",
+        "typedef struct MhucModule {",
+        "    uint32_t id;                      /* its registry id */",
+        "    const char *key;                  /* its registry key */",
+        "    const struct MhucModuleOps *ops;  /* its code, or 0 while it has none */",
+        "} MhucModule;",
+        "",
+        f"#define MHUC_MODULE_COUNT {len(monsters)}",
+        "",
+    ]
+    if monsters:
+        lines.append("static const MhucModule mhuc_modules[MHUC_MODULE_COUNT] = {")
+        for row in monsters:
+            lines.append(f"    {{{int(row['id'], 0)}, \"{row['key']}\", 0}},"
+                         f"  /* {row['name']} */")
+        lines.append("};")
+    else:
+        lines.append("/* Empty: a dummy entry keeps the array valid C. */")
+        lines.append("static const MhucModule mhuc_modules[1] = {{0, 0, 0}};")
+    lines += [
+        "",
+        "/* The module for `id`, or 0 when the id has none. */",
+        "static inline const MhucModule *mhuc_module_for(uint32_t id) {",
+        "    for (unsigned i = 0; i < MHUC_MODULE_COUNT; i++) {",
+        "        if (mhuc_modules[i].id == id) {",
+        "            return &mhuc_modules[i];",
+        "        }",
+        "    }",
+        "    return 0;",
+        "}",
+        "",
+        "#endif",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--registry", default=REGISTRY)
     ap.add_argument("--header", default=HEADER)
-    ap.add_argument("--write", action="store_true", help="write the plugin's header from the registry")
+    ap.add_argument("--modules-header", default=MODULES_HEADER)
+    ap.add_argument("--write", action="store_true",
+                    help="write the runtime's generated headers from the registry")
     args = ap.parse_args(argv)
 
     rows, problems = read_registry(args.registry)
@@ -369,20 +439,23 @@ def main(argv: list[str] | None = None) -> int:
         print("the registry is wrong; ids are permanent once shipped (docs/decisions.md#0003)", file=sys.stderr)
         return 1
     header = render_header(rows)
+    modules = render_modules(rows)
     if args.write:
-        os.makedirs(os.path.dirname(os.path.abspath(args.header)), exist_ok=True)
-        with open(args.header, "w", encoding="utf-8", newline="") as f:
-            f.write(header)
-        print(f"wrote {os.path.relpath(args.header, ROOT)}")
+        for path, text in ((args.header, header), (args.modules_header, modules)):
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                f.write(text)
+            print(f"wrote {os.path.relpath(path, ROOT)}")
         return 0
-    on_disk = ""
-    if os.path.exists(args.header):
-        with open(args.header, encoding="utf-8", newline="") as f:
-            on_disk = f.read()
-    if on_disk != header:
-        print(f"{os.path.relpath(args.header, ROOT)} isn't what the registry generates: "
-              "run tools/check_ids.py --write")
-        return 1
+    for path, text in ((args.header, header), (args.modules_header, modules)):
+        on_disk = ""
+        if os.path.exists(path):
+            with open(path, encoding="utf-8", newline="") as f:
+                on_disk = f.read()
+        if on_disk != text:
+            print(f"{os.path.relpath(path, ROOT)} isn't what the registry generates: "
+                  "run tools/check_ids.py --write")
+            return 1
     monsters = [r for r in rows if r["kind"] == "monster"]
     permanent = [int(r["id"], 0) for r in monsters if int(r["id"], 0) <= PERMANENT_LAST]
     pooled = [int(r["id"], 0) for r in monsters if int(r["id"], 0) > PERMANENT_LAST]
