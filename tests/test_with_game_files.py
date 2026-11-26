@@ -155,6 +155,7 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
     names = [n for n in ("system", "user1", "user2", "user3") if os.path.exists(os.path.join(folder, n))]
     assert names, "no save file found"
     characters = 0
+    completed_flags, completed_prefixes, partial_flags = [], [], []
     for name in names:
         with open(os.path.join(folder, name), "rb") as f:
             original = f.read()
@@ -177,8 +178,16 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
                 held |= {slot["item"] for slot in pouch if slot["item"]}
             assert all((plain[save.ITEM_FLAGS_AT + (i >> 3)] >> (i & 7)) & 1 for i in held), \
                 f"{name}: an item id the save holds has no flag bit"
+            # S8: the 64 bytes at 0x11E are a flag array separate from the 12 bytes before them.
+            flags = plain[save.QUEST_FLAGS_AT:save.QUEST_FLAGS_AT + save.QUEST_FLAGS_SIZE]
+            prefix = plain[save.QUEST_FLAGS_PREFIX_AT:save.QUEST_FLAGS_AT]
             candidate = data["quest_lists"]["candidate_clear_flags"]
-            assert 0 <= candidate["set_bits"] <= 512, name
+            assert candidate["set_bits"] == sum(bin(b).count("1") for b in flags), name
+            if candidate["set_bits"] == 8 * save.QUEST_FLAGS_SIZE:
+                completed_flags.append(flags)
+                completed_prefixes.append(prefix)
+            else:
+                partial_flags.append(flags)
             characters += 1
         else:
             assert not save.system_problems(plain), name
@@ -186,6 +195,22 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
             assert system["word_0x38"] == 1, name
             assert system["character_0x3c"] in (None, 0, 1, 2), name
     assert characters >= 1, "no character save found"
+    if completed_flags:
+        assert all(f == b"\xff" * save.QUEST_FLAGS_SIZE for f in completed_flags), \
+            "a completed save does not set all 512 flag bits"
+    assert len(set(completed_flags)) == min(1, len(completed_flags)), \
+        "the completed saves' flag arrays differ, so a set bit cannot be a quest clear"
+    assert len(set(completed_prefixes)) == len(completed_prefixes), \
+        "two saves with the same flag array share their 12-byte prefix, so it would belong to the array"
+    if len(completed_prefixes) >= 2:
+        differing = sum(a != b for a, b in zip(completed_prefixes[0], completed_prefixes[1], strict=True))
+        assert differing >= 11, \
+            f"the two completed saves' prefixes differ in {differing} of 12 bytes, so the prefix is not per-character"
+    full = completed_flags[0] if completed_flags else None
+    for flags in partial_flags:
+        if full is not None:
+            assert all((flags[i] & ~full[i]) == 0 for i in range(save.QUEST_FLAGS_SIZE)), \
+                "a partial save sets a flag bit that a completed save does not"
 
 
 def test_clean_mh4u_saves_leave_the_file_byte_for_byte_and_reencrypt_to_it(dump):

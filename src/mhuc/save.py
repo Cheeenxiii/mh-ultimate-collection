@@ -72,8 +72,9 @@ WEAPON_USAGE_NAMES = ("great_sword", "sns", "hammer", "lance", "hbg", "lbg", "lo
 BRIGADE_POINTS_AT = 0xE8A0
 ITEM_FLAGS_AT = 0xF220          # one bit per item id (2,176 bits); meaning unverified (specs/save.md)
 ITEM_FLAGS_SIZE = 272
-QUEST_FLAGS_AT = 0x11E          # 512 bits; candidate for the village quest clear list, unproved
+QUEST_FLAGS_AT = 0x11E          # 512 flag bits, bit 0 first; what they index is unknown (specs/save.md)
 QUEST_FLAGS_SIZE = 64
+QUEST_FLAGS_PREFIX_AT = 0x0112  # the 12-byte field just before the flags; per-character, unknown
 SHARP_ARENA_AT = 0x131A4        # the arena leaderboard block (specs/save.md); partly mapped
 
 # The converter's bounds: what MH4U itself can have written. MH4U's item ids end at 1,936 (itemName has
@@ -88,7 +89,8 @@ BLOCKS = (
     ("profile", 0x0000, PROFILE_SIZE),
     ("equipped", EQUIPPED_AT, EQUIPPED_SIZE),
     ("equipped_indices", EQUIPPED_INDEX_AT, 14),
-    ("unknown_0x0112", 0x0112, 0x4C),
+    ("unknown_0x0112", 0x0112, 12),
+    ("quest_flags", 0x011E, 64),
     ("item_box", ITEM_BOX_AT, ITEM_BOX_COUNT * 4),
     ("equipment_box", EQUIPMENT_BOX_AT, EQUIPMENT_BOX_COUNT * EQUIPMENT_SIZE),
     ("unknown_0xB05E", 0xB05E, 0xAE6),
@@ -265,10 +267,12 @@ def guild_card(data: bytes) -> dict:
 
 
 def quest_lists(data: bytes) -> dict:
-    """The per-category quest completion counts, and the unproved candidate for the per-quest clear list.
+    """The per-category quest completion counts, and the unproved 512-bit flag array after them.
 
-    The 512 bits at 0x11E are all set in the completed saves and partly set in the mid-game one, but no
-    check proves what they index, so they are reported as a candidate, not as cleared quests (specs/save.md).
+    The 64 bytes at 0x11E are a flag array (bit 0 the low bit of the first byte): all 512 bits are set in
+    the completed saves and 51 in the mid-game one, but no check proves what the indices mean. The game's
+    character-creation code clears the array and sets a bit per index, so the bits are flags; whether they
+    are quest clears, story flags or something else is unknown (specs/save.md).
     """
     _check_size(data, CHARACTER_SIZE, "character save")
     counts = {name: _u16(data, QUEST_COUNTS_AT + 2 * i) for i, name in enumerate(QUEST_COUNT_NAMES)}
@@ -347,7 +351,7 @@ def clean_character(data: bytes) -> tuple[bytes, dict]:
     Only the structures whose layout is mapped are cleaned: an item-box or pouch slot whose id is above
     MH4U's item list is emptied, and a guild-quest slot that names a monster above MH4U's last id is zeroed
     whole (MH4U wrote neither record, and a quest short one monster is not one MH4U wrote either). The
-    unknown blocks, the item flags and the quest-clear candidate stay as they are because their meaning is
+    unknown blocks, the item flags and the 512-bit flag array stay as they are because their meaning is
     unmapped, and a `system` save is refused for the same reason: its DLC/quest registration is not mapped.
     """
     _check_size(data, CHARACTER_SIZE, "character save")
