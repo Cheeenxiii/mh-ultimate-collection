@@ -38,9 +38,10 @@ table entries (256 in every file read). MH4U's loader requires version 4 (`cmp r
 
 MH3U registers `rCameraList` (class id `0x39c52040`, `reference/games/mh3u/mt_classes.tsv`) but
 its 3DS RomFS holds no file of that class: a scan of all 6,141 files and all 85 monster arcs
-finds none (check C1). Its cut-in cameras are `rDemoCamera` resources (`camera/dcm*`, 81 in the
-RomFS), which belong to cutscenes, not to a monster. **A 3U port has no source camera to
-convert.**
+finds none (check C1). Its only camera resources are `rDemoCamera` cutscene cameras
+(`arc/cam/dcm_NNN.arc`, 80 in the RomFS, each an ARC holding `camera\dcmNNN`); they belong to
+cutscenes, not to a monster (check C3, [below](#mh3u-at-mh4us-camera-moments-check-c3)). **A 3U
+port has no source camera to convert.**
 
 ## Header
 
@@ -187,11 +188,145 @@ must not be renumbered. The port's own converter (`mhuc convert monster`, #48's)
 #157).
 
 The two Rathians' lists show what staying by id means: they share ids 0, 1, 2, 4, 5 and 8,
-MH4U's own has 9, 10 and 12 to 20 as well, and MHXX's has 40 to 44 and 50 to 53. A port that runs
+MH4U's own has 9, 10, 12 to 14 and 16 to 20 as well, and MHXX's has 40 to 44 and 50 to 53. A port that runs
 MH4U's shared handlers posts MH4U's event ids, so an id the port's list lacks does nothing
 (check C1; the wiring is #48's). A 3U port cannot convert a camera at all, because the source
 has none; it keeps MH4U's stand-in camera (its record's path is the stand-in's) or would need
 one authored, which is content work and not a conversion.
+
+## MH3U at MH4U's camera moments (check C3)
+
+The question the open decision turns on is whether MH3U gives the same feeling as MH4U at the
+moments a per-monster list serves. The answer has two halves: what MH4U's list holds, read from
+the files, and what MH3U has at the same moment, read from its files and code.
+
+### MH4U: the moments and what posts them
+
+The list is served through one event, `uEnemy`'s `0x00934544`, called as
+`(this, camera id, 0xff)`; 113 of its 115 call sites pass 0xff as the third value, one passes
+100 and one takes it from the camera table the monster's data holds. The event passes the camera list the monster's resource holds at
+`[uEnemy+0xe28]+0x7eb8` and the id to the manager `0x00c0376c`, which looks type 4 up in the
+20-row, six-byte table at `0x00e04854` and takes record `id` from the list's table. Every
+record is a frame count and up to four tracks whose frame gaps always advance (C1); a cut would
+be a jump in a track's value, not a break in its time.
+
+A scan of USA v1.3.0's code for calls to `0x00934544` finds **115 sites in 82 functions**, all
+in monster classes' own code blocks. The ids are 0 to 8, 10, 13 to 15, 17, 22, 25 and 29 to 32;
+2 (25 sites), 3 (16) and 5 (13) are the most frequent. The id is the monster's action code's
+choice, so the same moment posts the same id for every monster that shares the handler.
+
+**MH4U's Rathian (`em001`).** Her list holds 16 records: ids 0, 1, 2, 4, 5, 8, 9, 10, 12, 13,
+14, 16, 17, 18, 19 and 20. Her own code posts four of them:
+
+| MH4U action | the code that posts it | camera id |
+|---|---|---|
+| 1/15 | handler `0x006deabc`, the path that sets state 0x144 to 1 | 2 |
+| 1/21 | the category-1 function `0x006e7e28` (the long case block) | 5 |
+| 1/23 | handler `0x006dfd54` with its first argument 0 | 0 |
+| 1/24 | handler `0x006dfd54` with its first argument 1 | 1 |
+
+The other twelve records have no type-4 posting site in her own code. Six of them are posted by
+other monsters' handlers (4, 8, 10, 13, 14 and 17) and six (9, 12, 16, 18, 19 and 20) are posted
+by no type-4 site found at all; another event type may play those, or nothing may, and the files
+do not say (**unverified**).
+
+### MH4U: the framing each record holds
+
+The three tracks read as two position tracks and a rotation track (C1's codecs). The first
+position track's values are hundreds to thousands of units from the origin and the second's
+stay around a few hundred, on the body; they are read as the camera **eye** and the look-at
+**target**. That reading is not in the source, so it is **unverified**; it matches the manager
+passing the first three tracks to one setter and the fourth block to another.
+
+| id | frames | aspect | fourth block (+0x08, +0x0c) | framing, from the two position tracks |
+|---|---|---|---|---|
+| 0 | 121 | 16:9 | 28, 0 | the eye swings round one side of the body while the target stays on it |
+| 1 | 121 | 16:9 | 28, 0 | the same 121-frame move to the other side |
+| 2 | 293 | 5:3 | 28, 42 | the eye holds far back while the target drops down the body |
+| 4 | 107 | 16:9 | 46, 0 | the eye closes on the target |
+| 5 | 411 | 16:9 | 18, 28 | locked off: neither the eye nor the target moves |
+| 8 | 601 | 5:3 | 55, 0 | the longest of the sixteen, and the widest with a target track |
+| 9 | 180 | 16:9 | 28, 22 | a far eye; the target crosses the body |
+| 10 | 80 | 16:9 | 40, 10 | the eye pulls back while the target moves |
+| 12 | 212 | 16:9 | 20, 0 | a far eye; the target crosses the body |
+| 13 | 168 | 16:9 | 20, 0 | as 12, from the other side |
+| 14 | 221 | 16:9 | 65, 0 | the target track has **0 keys**: the framing cannot be computed |
+| 16 | 154 | 16:9 | 30, 0 | a far eye; the target crosses the body |
+| 17 | 347 | 16:9 | 60, 0 | the target track has **0 keys**, as 14 |
+| 18 | 98 | 16:9 | 24, 0 | the farthest eye of the sixteen, pulling back |
+| 19 | 160 | 16:9 | 30, 0 | a far eye; the target crosses the body |
+| 20 | 333 | 16:9 | 44, 18 | the eye pulls back while the target moves |
+
+The fourth block's two values are the ones that "look like field-of-view degrees" above; their
+meaning stays **unverified**. The per-record checks are C3's procedure; the extracted values are
+not kept in this repository.
+
+### MH3U: its only camera files, and what they are
+
+MH3U ships no per-monster camera (C1). The only camera files in its RomFS are `rDemoCamera`: 80
+`arc/cam/dcm_NNN.arc` files (not 81), each ARC version 0x10 holding one `camera\dcmNNN` entry of
+class `0x08f105e6`. The entry is the DCM format decoded here.
+
+### rDemoCamera (DCM, MH3U)
+
+Magic `DCM\0`, version 3, a key count, then that many 0x30-byte keys. All 80 files fit this
+layout and every key's time is >= the previous one (C3).
+
+| Offset | Type | Name | Status | Source |
+|---|---|---|---|---|
+| 0x00 | char[4] | magic `DCM\0` | verified | check C3: all 80 files |
+| 0x04 | u32 | version 3 | verified | check C3: all 80 files |
+| 0x08 | u32 | key count | verified | check C3: file size = 0x10 + count × 0x30 in all 80 |
+| 0x0c | u32 | zero in all 80 | verified | check C3 |
+| key +0x00 | u32 | time-like value (frames assumed), never decreasing; 0xffffffff in the last key of 77 files | unverified | check C3: the values and their order were checked, the unit was not |
+| key +0x04 | f32 | fov-like angle, 9.08 to 86.83 over all keys; its name and meaning are unverified | unverified | check C3; `rDemoCamera::DemoCameraKeyData`'s property registration at `0x254104` names `time`, `fov`, `angZ`, `pos`, `tar` |
+| key +0x08 | f32 | angZ-like angle, -49.13 to 86.32; its name and meaning are unverified | unverified | check C3 |
+| key +0x0c | u32 | 0 in the early keys, small packed values in later ones | unverified | check C3 |
+| key +0x10 | f32 × 4 | a position (`pos`): x, y, z, 0; the name is unverified, the values are a vector | unverified | check C3 |
+| key +0x20 | f32 × 4 | a second position (`tar`): x, y, z, 0; the name is unverified, the values are a vector | unverified | check C3 |
+| key +0x30 | | the next key | verified | check C3 |
+
+The three one-key files (`dcm_015`, `dcm_069`, `dcm_070`) hold only a sentinel-like key; the
+other 77 end with time 0xffffffff and a zero `pos`/`tar` (C3). The keys' `pos` and `tar` run to tens
+of thousands of units, so they are read as **world-space** values; MH4U's target tracks stay
+near the origin, so those are read as **monster-relative** (both readings **unverified**).
+
+**What plays a DCM.** The demo system loads one by id: `0x257470` formats the path
+`camera\dcm%03d`, and its callers include the demo loader `0x8861cc` (C3). The 3U
+Rathian code block (`0x686000` to `0x69b000`) makes 343 engine calls, and a reachability walk
+over the call graph from that block finds no path to `0x257470` or to the demo loader
+`0x8861cc`: a monster action cannot play a DCM. So a DCM is a cutscene camera (C3).
+
+### Per moment: MH3U has nothing to compare
+
+| MH4U moment | MH4U camera | MH3U at the same action |
+|---|---|---|
+| 1/15 (id 2) | 293 frames, 5:3, fov-like 28→42, target drops | no such action: MH3U's category 1 stops at 1/14 (191 ids in all; [reference](../reference/README.md#a-3u-rathians-moves), `data/actions/rathian-3u.csv`); the nearest shared ids (1/9 etc.) play no demo camera (no handler in her block reaches the demo system) |
+| 1/21 (id 5) | 411 frames, locked off, 18→28 | no such action |
+| 1/23 (id 0) | 121 frames, 16:9, 28, one side | no such action |
+| 1/24 (id 1) | 121 frames, 16:9, 28, the other side | no such action |
+| ids 4, 8, 10, 13, 14 and 17 | 80 to 601 frames each | another monster's handler posts them, not one of her actions: the moment cannot be named; MH3U has no record for it |
+| ids 9, 12, 16, 18, 19 and 20 | 98 to 333 frames each | no type-4 posting site found; the moment cannot be named; MH3U has no record for it |
+
+For every other monster the same holds where the source action sets differ: MH4U's per-monster
+list is one continuous shot keyed to a monster action; MH3U's 80 cameras are world-space
+cutscene sequences of 0 to 2,900 frames (median 1,355) and 9° to 87° fov-like angles, and the
+3U Rathian block checked does not reach them. **The files cannot compare the framing of a moment, because MH3U
+has no camera at that moment.** Whether MH3U instead moves the normal player camera there is for
+the in-game watch: its monster code reaches no demo camera (C3), and the per-monster camera
+event MH4U uses has no MH3U counterpart (no file of the class, C1).
+
+### What the maintainer has to watch
+
+- **MH4U.** Force 1/15, 1/21, 1/23 and 1/24 on MH4U's Rathian (C2's mechanism) and watch the
+  four framings above: the 121-frame pair, the locked-off 411, and the 293-frame drop. Then
+  find the action that posts one of the twelve unnamed ids (C2's rule: the handler's
+  `bl 0x00934544` names it) and watch that too.
+- **MH3U.** Play the same actions on 3U Rathian (the GDB-stub tool `reference/force_action.py`)
+  and the monster's intro cutscene; look for a cut, a zoom or a locked-off shot. If 3U never
+  cuts, the faithful result at that moment is **no cut-in**, and keeping MH4U's list would add
+  one 3U never had; if 3U's intro camera gives the same feeling, a DCM tells the maintainer what
+  to aim for but cannot be copied in, since it is cutscene data in world space.
 
 ## Checks
 
@@ -213,3 +348,19 @@ one authored, which is content work and not a conversion.
   id): the view frames the monster with the source game's camera, not MH4U Rathian's.
   Procedure in [docs/checks.md](../docs/checks.md#a-ported-cameras-cut-in-c2); needs #144's
   quest-load proof and a run in the game.
+- **C3 (done, MH4U USA v1.3.0 code and MH3U USA RomFS):** the moments above were read as
+  follows. MH4U's list: the camera reader over `enemy\em001\mot\e001_cam` in
+  `data/em001.arc` gives the 16 records and the fields of the table. MH4U's posting code:
+  `reference/monster_actions.py list --game mh4u --exheader <MH4U exheader> --code <MH4U
+  code.bin> --range 0x6d4f80 0x6ec8e0 --dispatcher 0x006e9cac` lists her actions and handlers;
+  recompiling USA v1.3.0's code with the fork's tools names every call to `0x00934544` (115
+  sites in 82 functions, ids 0 to 8, 10, 13 to 15, 17, 22, 25 and 29 to 32), and disassembling
+  the original ARM at each site with capstone takes the id from the preceding `mov r1, #imm`
+  (or the register it names); four of the sites are in her own block and are the table's. MH3U:
+  `mhuc romfs list <MH3U romfs.bin>` gives 80 `arc/cam/dcm_NNN.arc`; reading one ARC and its
+  one entry gives class `0x08f105e6`, magic `DCM\0`, version 3, and a key array of
+  `0x10 + count × 0x30` bytes; the same read over all 80 fits that size, has 56,515 keys, every
+  key's time >= the previous, 77 files ending with 0xffffffff. MH3U's demo loader: a Ghidra
+  export of MH3U USA has `0x8861cc` calling `0x257470` (the `camera\dcm%03d` formatter), and
+  the 3U Rathian block `0x686000` to `0x69b000` has 343 callgraph edges, and a reachability
+  walk from it finds no path to `0x257470` or `0x8861cc`.
