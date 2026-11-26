@@ -441,6 +441,116 @@ set MH4U does not have as its own function; whether MH3U's step is folded into M
 0x0090ef74 (which takes one more argument than 0x00827d54) is what an in-game trace of an
 MH4U Rathian at 0/2, 0/3 or 0/6 would settle (#55).
 
+### The 3U work block on MH4U's layout
+
+The 3U module ([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) and the family slices translate MH3U's handlers, and those handlers read their state from the block at `*(this+0x1a48)`; MH4U's handlers read the same roles from `*(this+0xe28)`. This is the field map the port's C is written against: the fields category 0 touches first, then those the ground (category 3) and flight (category 7) handlers read, and the object fields outside the block. The other categories extend it per slice; [what is not mapped](#what-is-not-mapped) says where it stops.
+
+**How an offset was established.** Three sources, named per row:
+
+- **A handler pair.** `monster_actions.py pairs` gives **57 pairs** from the 174 action ids both dispatchers handle (MH3U 0x00687d30, 191 ids on 66 handlers; MH4U 0x006e9cac, 342 ids on 97 handlers). The two handlers' loads, stores and calls were read in program order and the sequences aligned: for a shared action the two call the same engine functions in the same order, so a field on one side sits at the point its counterpart sits on the other. The number is how many of the 57 pairs read or wrote the field at that offset; a role that one pair alone reports is marked *(1)*.
+- **A twin caller.** The engine functions in [The 73 with an MH4U counterpart](#the-73-with-an-mh4u-counterpart) were read the same way. Where a function reads field X at the point its MH4U counterpart reads Y, X and Y have the same role; where the pair is "same body" the reading is as strong as a handler pair's.
+- **A field translation.** Where a structure keeps its layout (a point's x, y, z; a pair of rates), one confirmed component carries the others, as [the GU port's tables](../mods/rathian_actions/README.md#427-32-one-handler-three-states) do for MHXX.
+
+A field only one source reports is **unverified** until a slice reads it; the rows say which. The 57 pairs by category: 7: 24, 3: 11, 13: 8, 1: 5, 2: 3, 9: 3, 8: 1, 0: 1, 11: 1. They cover 81 of the 94 category-7 ids and 28 of the 29 category-3 ids. Fifty-seven of the 66 3U handlers meet exactly one MH4U handler this way. Three serve ids MH4U splits across handlers (0x00858b6c for 0/3, 3/10 and 13/7; 0x00694180 for the 7/2 family; 0x006971c0 for the 7/35 family), so `pairs` leaves them out; six meet none (0x00699ad4 for 0/0, 0x0082d1cc for 0/2, 0x0082ef88 for category 10, 0x0083cc24 for 4/0, and the wrappers 0x00687e88 and 0x006956e8), mostly because MH4U's case is inline.
+
+#### The block pointer, the action pair and the handler's state
+
+| MH3U | MH4U | role | how |
+|---|---|---|---|
+| `*(this+0x1a48)` | `*(this+0xe28)` | the enemy's work block | both dispatchers load it this way (0x00687d30 holds 0x1a48 in a literal and does `ldr r1,[r1,r0]`; 0x006e9cac does `ldr r1,[r0,#0xe28]`), and every handler pair that reads the block at all loads it the same way in its first instructions |
+| work+0xdf | work+0x1ca | current category | both dispatchers read it and switch on ≤ 0xe; 4 twin callers read it where MH4U reads +0x1ca |
+| work+0xe0 | work+0x1cb | current index | the category-0 functions 0x0069166c / 0x006dc400 switch on it (≤ 7), read side by side |
+| work+0xe3 | work+0x1cf | "a pending action is waiting" | 0x0082a06c / 0x0094ef64, the request-next-action helper (same steps) |
+| work+0xe4 | work+0x1d0 | pending category | the same helper |
+| work+0xe5 | work+0x1d1 | pending index | the same helper |
+| work+0xee | work+0x1d8 | "the action was set immediately" | the same helper |
+| work+0xef | work+0x1d9 | the set-immediately mode byte | the same helper |
+| work+0xe1 | work+0x7993 | the tail flag: the next move | 2 pairs (8/0 and 9/0) |
+| work+0x5 | work+0x144 | the handler's state byte | read or written in 49 of the 57 pairs; every category-0 case block (0x006916b4 vs 0x006dc4c4, 0x00691710 vs 0x006dc520, …) |
+| work+0x6 | work+0x145 | its sub-state | 16 pairs |
+| work+0x7 | work+0x146 | a third sub-state (category 3) | 1 pair |
+| work+0xdc | work+0x1c8 | the monster's mode byte | 0/3's two handlers (0x00858b6c / 0x0094dc84, whose bodies `fnmap` pairs at 0.81) and the mode setters 0x0082fe88 / 0x009167b4 (same body) both compare it and store the new mode there |
+| work+0xf2 | work+0x1dc | "the action was set" flag | the 0/2 base-handler pair (0x0082d1cc / 0x00911b48) and the 0/6 pair |
+| work+0x381 | work+0x34c | the "other state" byte | the 0/2 base-handler pair, read side by side: 3U compares it to 1 where 0x00911b48 reads +0x34c |
+| work+0x941 | work+0x51c | the monster's state, 2 or 3 | the 0/2 base-handler pair, read side by side: 3U tests it inline, MH4U calls 0x0092e960, which tests +0x51c (the wrapper pair 0x00844100 / 0x0092e960) |
+| work+0x942 | work+0x51e | the byte after it | 1 twin (0x008345f8 / 0x0091b7b0); its role is unverified |
+| work+0x8c | work+0x1b4 | the action-active flag word, bit 0x40 | the 0/2 base-handler pair, read side by side (3U does `tst r1,#0x40` on it, MH4U on +0x1b4) |
+| work+0x3 | work+0x1c0 | the enemy-data key: MH4U's id byte | 3 pairs; the twins 0x0083db3c / 0x00923f90 and 0x00852324 / 0x0093d870 read it in r1 of the data lookup |
+| work+0xa | work+0x797e | the second key byte of the same lookup | the same twins, in r2 (MH4U addresses it as `0x797e + work`) |
+| work+0xdb | work+0x14c | a selector byte for a per-monster rate lookup | 3 pairs (3/6, 7/0, 7/13), but the two helpers it feeds (0x0064325c and 0x006c2854) are not each other's counterpart |
+
+#### The base handlers category 0 falls back to
+
+| 3U action | MH3U handler | MH4U counterpart | what the pair fixes |
+|---|---|---|---|
+| 0/2 | 0x0082d1cc | 0x00911b48, `uEnemy`'s base action update (vtable slot 89) | work+0x941/+0x51c, +0x8c/+0x1b4, +0xdf/+0x1ca, +0x381/+0x34c and +0xf2/+0x1dc; both call the mode setter (0x0082fe88 / 0x009167b4) with 0 and the action setter (0x00827d54 / 0x0090ef74) with r3 = 2 |
+| 0/3 | 0x00858b6c | 0x0094dc84, MH4U's idle | work+0x3/+0x1c0 and +0xa/+0x797e (the data lookup), +0xdc/+0x1c8, the rate pair +0x90/+0x1b8, position y +0x3c/+0x19c and +0xf2/+0x1dc |
+| 0/6 | 0x0082b7dc | 0x00955970 | work+0xdf/+0x1ca and +0xf2/+0x1dc; both set mode 3 and call the action setter with r3 = 2 |
+
+The first two counterparts are not `pairs` output: 0x00911b48 was found by reading the two side by side (same steps, same calls in the same order) and 0x0094dc84 by `fnmap`'s body match at 0.81 for the 0/3 handlers; 0x00955970 is 0/6's action pair. All three 3U handlers are the same code as their counterpart step for step; 0x0082d1cc is
+the one [decision 0002](../docs/decisions.md#0002-monsters-are-ported-onto-mh4us-engine)'s
+amendment covers as base-class code the port still reimplements.
+
+#### Ground: the fields category 3's handlers read
+
+The 11 pairs cover 3/0, 3/1, 3/2, 3/4, 3/5, 3/6, 3/7, 3/8, 3/11, 3/12 and 3/27, and through them
+their shared handlers reach 3/9, 3/13, 3/14, 3/16–3/25 and 3/29. The state and block-pointer
+rows above apply to every one of them.
+
+| MH3U | MH4U | role | how |
+|---|---|---|---|
+| work+0x38 / +0x3c / +0x40 | work+0x198 / +0x19c / +0x1a0 | position x, y, z (floats) | the twins 0x0082b268 / 0x00955440 and 0x0082cee4 / 0x00912288 (both add a speed vector to it), 5 readings each; x and z also in 0x0084704c / 0x00938748 |
+| work+0x84 | work+0x1ac | heading (float) | 2 pairs; 13 twin readings (0x008357b0 / 0x0091db4c and others) |
+| work+0x80 | work+0x1a8 | the turn slot before the heading | 3 twins; the 3U turn wrappers are handed its address and do not read it, while 0x0091b430's turn reads +4 of the address (the heading), so the slot's role is read side by side |
+| work+0x260 / +0x264 / +0x268 | work+0x160 / +0x164 / +0x168 | the aim point A (x, y, z) | 11 pairs on A.z and 4 on A.y; the twins 0x0082fc8c / 0x00916228, 0x0082b268 / 0x00955440 (advance position by A) and 0x0084704c / 0x00938748 |
+| work+0x270 / +0x274 / +0x278 | work+0x170 / +0x174 / +0x178 | the aim vector B (x, y, z) | 6 pairs on B.z; the twins 0x00834098 / 0x00916594 (advances A by B times the frame delta) and 0x0084704c / 0x00938748 |
+| work+0x288 / +0x28c / +0x290 | work+0x218 / +0x21c / +0x220 | the target point (x, y, z) | the twin 0x00847134 / 0x00938834 (the distance and angle to it), the 8/0 pair's aim call, and the layout |
+| work+0x68 | work+0x180 | the speed, accumulated from the frame delta | 5 pairs; the twins 0x00833b2c / 0x00915d44 and 0x00833d88 / 0x00916108 (`speed += rate × this+0x14`) |
+| work+0xd9 | work+0x1c7 | "the speed was set this frame" | the same two twins |
+| work+0x28 / +0x2c | work+0x1d4 | the frame timer and the value it was saved from | 2 and 6 pairs; MH4U counts it down with the helper 0x00b0704c (8/0) |
+| work+0x30 | — | the pointer to the frame delta the timer adds | unmapped: MH4U's helper takes the delta in s0 |
+| work+0x120 | work+0x624 | the vertical limit position y is clamped to | 1 pair; the wrappers 0x00839514 / 0x0091b430 both tail into a function that reads it (0x00839540 / 0x00922b34) |
+| work+0x3d0 | work+0x394 | a 0–1 rate advanced by the frame delta | 1 pair; the twins 0x00836c04 / 0x00918e48 (same body) and 0x0084e74c / 0x00935fb8 |
+| this+0x14 | this+0x14 | the frame delta (seconds) | 12 twins: every advance and every rate above multiplies by it |
+| this+0x278 | this+0x290 | a speed (float) | 3 pairs, and the twin 0x0083c6e0 / 0x00922250 |
+| this+0x284 | this+0x29c | a second speed | the twin 0x0083c6e0 / 0x00922250 (the same body reads both speeds) |
+| this+0x27c | this+0x294 | | 1 pair |
+
+#### Flight: the fields category 7's handlers read
+
+The 24 pairs cover 7/0, 7/1, 7/4–7/9, 7/12, 7/16–7/25, 7/31, 7/33, 7/34, 7/36, 7/38–7/45,
+7/58, 7/61, 7/66–7/71, 7/74–7/80, 7/84, 7/86–7/87, 7/90–7/91, 7/94–7/95 and 7/77, and through
+their shared handlers more of the 94. The flight handlers use the state, block-pointer,
+position, heading, point and speed rows above; what they add:
+
+| MH3U | MH4U | role | how |
+|---|---|---|---|
+| work+0x68 | work+0x180 | the speed accumulator | 5 pairs |
+| work+0x28 / +0x2c | work+0x1d4 | the frame timer | 2 / 6 pairs; 7/1 counts it down before the flight blend |
+| work+0x2b6 | work+0x278 or +0x27c | the part byte the hit check takes | 3 pairs each way: 3U passes one byte to 0x0084512c, MH4U passes two (+0x278, +0x27c) to 0x0092b2b0, so which one replies to it is not settled |
+| work+0x80 / +0x84 | work+0x1a8 / +0x1ac | the turn slot and the heading | 1 and 2 pairs |
+| work+0x2b4 | — | read 10 times by the category, no pair | unverified |
+| work+0xb81 | — | read 4 times, no pair | unverified |
+| work+0x260 / +0x264 / +0x268 | work+0x160 / +0x164 / +0x168 | the aim point A | 11 pairs on A.z; 8 twin readings |
+| work+0x270 / +0x278 | work+0x170 / +0x178 | the aim vector B | 6 pairs on B.z |
+| work+0x288 / +0x28c / +0x290 | work+0x218 / +0x21c / +0x220 | the target point | 1 twin and the 8/0 pair |
+| work+0x88 | work+0x1b0 | a u32 read as a size or radius | twin only (5 readings); the role is unverified |
+| this+0x1e70 | `*(this+0x8d88)` | the target-line struct's first float | 2 pairs (13/2 and 7/31). The layouts differ: 3U embeds the struct at this+0x1e70, MH4U reaches it through the pointer at this+0x8d88 |
+| this+0x1ed0 | `*(this+0x8d88)+0x60` | a float inside that struct, advanced by the frame delta | unverified: 3U reads it as this+0x1e70+0x60 (9 readings in 7/68), MH4U's struct is not read there by a pair |
+| this+0x27c | this+0x294 | | 1 pair |
+
+#### What is not mapped
+
+- **work+0x2b4** (10 readings, category 7) and **work+0xb81** (4 readings, category 7): no pair reads a role at one MH4U offset, and no twin.
+- **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where.
+- **work+0x11c** (category 3, "the fall or hold step is enabled"): MH4U's counterpart function tests two flags instead (+0x620 and +0x628); which of them replies to +0x11c is unsettled.
+- **work+0xf4** and **work+0x944** (a byte and a halfword, category 3), **work+0x1c, +0xda, +0xaea** (category 13), **work+0x2a8** (a float the category-2 handlers clamp; one pair reads +0x238 twice) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
+- **this+0x1a64** (a float the category-11 handler reads, 0x1c bytes past the block pointer), and **this+0x1ed0** as a field of its own rather than the target-line struct's +0x60: unverified.
+- **The categories without pairs:** category 4 (1 id) and category 10 (8 ids). Category 0 (1 of 5 ids), 11 (2 of 5), 1 (11 of 12), 2 (10 of 11) and 13 (8 of 10) are partly covered.
+- **A handler with no pair** is not evidence of a difference: an inline MH4U case (0/0, 0/1, 0/3) or a different unit leaves nothing to align, and the field still has to be read in the slice.
+
+The map extends per slice: a category's slice adds its rows here with the same three sources and its pair count.
+
 ### A 3U Rathian's moves
 
 The 3U port keeps the source's own animations and runs her own handler for every action id,
