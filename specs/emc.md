@@ -178,8 +178,10 @@ For an MH3U monster onto MH4U, the converter, in `mhuc` at build time:
 4. Change no action pair (`00 cat num`) and no script call (`14 nn`), and keep group 1's script
    order: `14 nn` indexes it. Groups 0 to 12 keep their order, so a state the source game
    selects by group number selects the same group here.
-5. Change no motion number: the EMC has none. An action's motion is the handler's (check R1),
-   and the port translates the number at run time ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)).
+5. Change no motion number: the EMC has none. An action's motion is the handler's (check R1);
+   the port's own handler passes MH4U's form of her animation
+   ([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)), and nothing
+   translates a number at run time.
 6. Install the result at the monster's `cmd` path (`enemy\emNNN\data\emNNN_cmd`) and add `cmd`
    to the id's `files` in [data/ids/registry.csv](../data/ids/registry.csv), so the resource
    record names it.
@@ -192,11 +194,13 @@ per-monster C, and one converter serves every 3U monster; a rewrite would reimpl
 conditions per monster and would still need each opcode's meaning. The price is the 15
 translated opcodes, whose extra or missing argument is unverified until R3 runs.
 
-**Action ids.** The scheme is shared: a pair is a category byte and an index byte, and a pair
-the two classes share runs MH4U's own handler. Cut with its table, 3U Rathian's EMC names 143
-actions. Of the 17 ids MH4U's `uEm001` lacks, it names `7/64` and category 4
-([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)): `7/64` goes through
-`mods/monster_actions` to `7/35`, and action 4 waits on
+**Action ids.** The scheme is shared: a pair is a category byte and an index byte, and every
+pair runs the source's own handler (decision 0002's 2026-11-26 amendment). Cut with its table,
+3U Rathian's EMC names 143 actions. Of the 17 ids MH4U's `uEm001` lacks, it names `7/64` and
+category 4 ([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)): `7/64`'s
+own handler is translated in a category-7 slice
+([#221](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/221) to
+[#224](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/224)), and action 4's is
 [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136). Until it lands, MH4U's
 own category-4 handler runs for the index the 3U script asks, which is a 3U argument MH4U reads
 as a case.
