@@ -37,25 +37,61 @@ def test_mef_refuses_another_version():
         mef.read_mef(bytes(data))
 
 
-def test_esq_reads_six_section_offsets_and_allows_an_empty_section():
-    data = mef.ESQ_MAGIC + struct.pack("<II", mef.ESQ_VERSION, mef.ESQ_HEADER) + \
-        struct.pack("<6I", 0x24, 0x30, 0x30, 0x40, 0x40, 0x50) + bytes(0x40)
-    parsed = mef.read_esq(data)
-    assert parsed.sections == (0x24, 0x30, 0x30, 0x40, 0x40, 0x50)
+ESQ_OFFSETS = (0x24, 0x60, 0x9C, 0xD8, 0xE4, 0x120, 0x130)
+
+
+def _esq(offsets: tuple[int, ...] = ESQ_OFFSETS, motion: int = 70, frame: float = 25.0) -> bytes:
+    """A synthetic ESQ: the 0x24 header, seven offsets and sections of each one's stride.
+
+    The seven sections are 0x3C, 0x3C, 0x3C, 0x0C, 0x3C, 0x10 and a fixed 0x258-byte tail (the
+    offsets above are those sections' starts). The first 0x3C-byte entry carries the motion and
+    frame under test.
+    """
+    total = ESQ_OFFSETS[6] + 0x258
+    body = bytearray(total - mef.ESQ_HEADER)
+    body[:mef.ESQ_ENTRY] = struct.pack("<If", motion, frame) + bytes(mef.ESQ_ENTRY - 8)
+    return (mef.ESQ_MAGIC + struct.pack("<I", mef.ESQ_VERSION)
+            + struct.pack("<7I", *offsets) + bytes(body))
+
+
+def test_esq_reads_seven_section_offsets_and_its_events_motion_and_frame():
+    parsed = mef.read_esq(_esq())
+    assert parsed.offsets == ESQ_OFFSETS
+    events = parsed.events()
+    assert len(events) == 1 + 1 + 1 + 1          # one 0x3C entry in each of sections 0, 1, 2 and 4
+    first = events[0]
+    assert (first.section, first.motion, first.frame) == (0, 70, 25.0)
+    assert all(event.motion == 0 and event.frame == 0.0 for event in events[1:])
+
+
+def test_esq_refuses_a_first_section_that_does_not_start_at_the_headers_end():
+    with pytest.raises(mef.MefError, match="section 0"):
+        mef.read_esq(_esq(offsets=(0x28, 0x60, 0x9C, 0xD8, 0xE4, 0x120, 0x130)))
 
 
 def test_esq_refuses_a_section_offset_that_moves_backwards():
-    data = mef.ESQ_MAGIC + struct.pack("<II", mef.ESQ_VERSION, mef.ESQ_HEADER) + \
-        struct.pack("<6I", 0x40, 0x30, 0x30, 0x40, 0x40, 0x50) + bytes(0x40)
     with pytest.raises(mef.MefError, match="section offset"):
-        mef.read_esq(data)
+        mef.read_esq(_esq(offsets=(0x24, 0x60, 0x50, 0xD8, 0xE4, 0x120, 0x130)))
+
+
+def test_esq_refuses_a_section_that_is_not_a_whole_number_of_entries():
+    with pytest.raises(mef.MefError, match="whole number"):
+        mef.read_esq(_esq(offsets=(0x24, 0x50, 0x9C, 0xD8, 0xE4, 0x120, 0x130)))
+
+
+def test_esq_refuses_a_tail_that_is_not_the_size_every_file_has():
+    with pytest.raises(mef.MefError, match="section 6"):
+        mef.read_esq(_esq()[:-1])
 
 
 def test_psl_reads_a_tiny_file_and_a_slot_table():
     assert mef.read_psl(mef.PSL_MAGIC + struct.pack("<HH", mef.PSL_VERSION, 0)).slots == ()
     table = struct.pack("<HH", mef.PSL_VERSION, 2) + struct.pack("<2I", 0, 0x10)
-    parsed = mef.read_psl(mef.PSL_MAGIC + table + bytes(0x10))
+    descriptor = struct.pack("<4I", 347, 0x200000, 0x80, 0)
+    parsed = mef.read_psl(mef.PSL_MAGIC + table + descriptor)
     assert parsed.slots == (0, 0x10)
+    assert [(d.slot, d.frames, d.flags, d.offset, d.field_0c) for d in parsed.descriptors] == \
+        [(1, 347, 0x200000, 0x80, 0)]
 
 
 def test_psl_refuses_a_descriptor_that_is_not_where_the_slot_order_puts_it():
@@ -102,8 +138,7 @@ def test_mef_round_trips_its_bytes():
 
 
 def test_esq_and_psl_round_trip_their_bytes():
-    esq = mef.ESQ_MAGIC + struct.pack("<II", mef.ESQ_VERSION, mef.ESQ_HEADER) + \
-        struct.pack("<6I", 0x24, 0x30, 0x30, 0x40, 0x40, 0x50) + bytes(0x40)
+    esq = _esq()
     assert mef.read_esq(esq).to_bytes() == esq
     tiny = mef.PSL_MAGIC + struct.pack("<HH", mef.PSL_VERSION, 0)
     assert mef.read_psl(tiny).to_bytes() == tiny
@@ -151,7 +186,5 @@ def test_effect_map_loads_a_table_and_names_every_unmapped_id(tmp_path):
 def test_mef_round_trips_an_mh4u_file_and_refuses_a_source_one():
     data = _mef(1)
     assert mef.to_mh4u(data, "mh4u") == data
-    esq = mef.ESQ_MAGIC + struct.pack("<II", mef.ESQ_VERSION, mef.ESQ_HEADER) + \
-        struct.pack("<6I", 0x24, 0x30, 0x30, 0x40, 0x40, 0x50) + bytes(0x40)
     with pytest.raises(mef.MefError, match="can't become an MH4U MEF yet"):
-        mef.to_mh4u(esq, "mh3u")
+        mef.to_mh4u(_esq(), "mh3u")
