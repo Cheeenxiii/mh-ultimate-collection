@@ -92,9 +92,11 @@ record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
 0 to 2. The motion-effect and effect-list formats the `mef` and `efl` kinds carry are laid out
 and checked on the three games' monster archives ([mef](../../specs/mef.md),
-[efl](../../specs/efl.md), checks FX1, FX2, FX5, FX6, EF1 and EF2); a source motion effect's
-motion and frame and a PSL descriptor's frame count are placed, but the effect parameters, MH4U's
-record fields and the effect list's block are not, so a port still ships neither kind.
+[efl](../../specs/efl.md), checks FX1, FX2, FX5 to FX9, EF1 and EF2); a source motion effect's
+motion, frame and parameters and a PSL descriptor's frame count, flags and list offset are placed,
+and MH4U's record fields too, but the effect identity is derived from the type and time, the
+effectmap's rows don't carry those two values yet, and the PSL lists and the effect list's block
+are not laid out, so a port still ships neither kind.
 
 A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the runtime's path map
 together; the generated header's `MHUC_FILES_*` bits and each row's `motion_mask` are what

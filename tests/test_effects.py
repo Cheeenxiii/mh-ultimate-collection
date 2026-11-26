@@ -84,20 +84,32 @@ def test_esq_refuses_a_tail_that_is_not_the_size_every_file_has():
         mef.read_esq(_esq()[:-1])
 
 
-def test_psl_reads_a_tiny_file_and_a_slot_table():
-    assert mef.read_psl(mef.PSL_MAGIC + struct.pack("<HH", mef.PSL_VERSION, 0)).slots == ()
+def _psl(frames: int = 347, flags: int = 0x200000, lists: bytes = bytes(12)) -> bytes:
+    """A synthetic PSL: two slots, one effect slot whose descriptor is at 0x10 and list at 0x1C."""
     table = struct.pack("<HH", mef.PSL_VERSION, 2) + struct.pack("<2I", 0, 0x10)
-    descriptor = struct.pack("<4I", 347, 0x200000, 0x80, 0)
-    parsed = mef.read_psl(mef.PSL_MAGIC + table + descriptor)
+    return (mef.PSL_MAGIC + table + struct.pack("<3I", frames, flags, 0x1C) + lists)
+
+
+def test_psl_reads_its_descriptor_and_list_boundaries():
+    assert mef.read_psl(mef.PSL_MAGIC + struct.pack("<HH", mef.PSL_VERSION, 0)).slots == ()
+    parsed = mef.read_psl(_psl())
     assert parsed.slots == (0, 0x10)
-    assert [(d.slot, d.frames, d.flags, d.offset, d.field_0c) for d in parsed.descriptors] == \
-        [(1, 347, 0x200000, 0x80, 0)]
+    assert [(d.slot, d.frames, d.flags, d.offset) for d in parsed.descriptors] == \
+        [(1, 347, 0x200000, 0x1C)]
+    assert parsed.lists() == ((1, 0x1C, len(_psl())),)
 
 
 def test_psl_refuses_a_descriptor_that_is_not_where_the_slot_order_puts_it():
     table = struct.pack("<HH", mef.PSL_VERSION, 2) + struct.pack("<2I", 0, 0x20)
     with pytest.raises(mef.MefError, match="descriptor"):
         mef.read_psl(mef.PSL_MAGIC + table + bytes(0x20))
+
+
+def test_psl_refuses_a_first_list_that_does_not_start_after_the_last_descriptor():
+    table = struct.pack("<HH", mef.PSL_VERSION, 2) + struct.pack("<2I", 0, 0x10)
+    data = mef.PSL_MAGIC + table + struct.pack("<3I", 347, 0x200000, 0x20) + bytes(0x10)
+    with pytest.raises(mef.MefError, match="first effect list"):
+        mef.read_psl(data)
 
 
 def _efl(version: int = 0x30111104, block: bytes = bytes(0x20)) -> bytes:
@@ -142,8 +154,7 @@ def test_esq_and_psl_round_trip_their_bytes():
     assert mef.read_esq(esq).to_bytes() == esq
     tiny = mef.PSL_MAGIC + struct.pack("<HH", mef.PSL_VERSION, 0)
     assert mef.read_psl(tiny).to_bytes() == tiny
-    table = struct.pack("<HH", mef.PSL_VERSION, 2) + struct.pack("<2I", 0, 0x10)
-    psl = mef.PSL_MAGIC + table + bytes(0x10)
+    psl = _psl(lists=bytes(12))
     assert mef.read_psl(psl).to_bytes() == psl
 
 
