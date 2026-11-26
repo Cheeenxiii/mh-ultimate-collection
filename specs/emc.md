@@ -126,7 +126,7 @@ because a case's value width and the else and end forms are the same in both gam
 | `0x2e` | `0x00951274` | selects a target point for the angle test | the fixed target | 0, verified |
 | `0x33` | `0x0095162c` | selects a target point, three of its fields | the fixed target's three fields | 0, verified |
 | `0x4b` | `0x009520d0` → `0x009412f4` | the branch index moves to the second argument; the added one indexes the state byte in each branch | branch index is the first argument, no state index | 0, verified |
-| `0x57` | `0x0095265c` | nothing: the byte is in the instruction but the handler never reads it (reserved) | — | 0 |
+| `0x57` | `0x0095265c` | nothing: the byte is in the instruction but the handler never reads it (reserved) | — | 0, unread |
 | `0x58` | `0x0095267c` | the block's comparison value | passes 0 as that value | 0, verified |
 | `0x6c` | `0x00952d40` | selects a target point; the two angle bounds follow it | the fixed target, bounds as two arguments | 0, verified |
 | `0x6d` | `0x00952e90` | indexes the state byte at work `+0x278 + n` | reads work `+0x2b4` | 0, verified |
