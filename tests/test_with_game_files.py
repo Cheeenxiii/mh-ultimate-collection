@@ -1658,9 +1658,14 @@ def test_mh3u_rathians_converted_emc_sits_at_her_ported_ids_cmd_path(dump):
     built = arc.read(mod.archive())
     cmd = [e for e in built.entries if e.type_name == "rEnemyCmd"]
     assert [e.path for e in cmd] == ["enemy\\em125\\data\\em125_cmd"]
-    before = next(e for e in arc.read(src).entries if e.type_name == "rEnemyCmd")
-    assert cmd[0].data == emc.convert(before.data, src_lens, dst_lens)
-    emc.cut(emc.parse(cmd[0].data)[1][0][0], dst_lens)
+    version, groups = emc.parse(cmd[0].data)
+    assert (version, len(groups)) == (emc.VERSION_MH4U, 23)
+    before = emc.parse(next(e for e in arc.read(src).entries if e.type_name == "rEnemyCmd").data)[1]
+    for group, source_group in zip(groups[:13], before, strict=True):
+        for script, source_script in zip(group, source_group, strict=True):
+            new_actions = {(i[1], i[2]) for i in emc.cut(script, dst_lens) if i[0] == 0x00}
+            old_actions = {(i[1], i[2]) for i in emc.cut(source_script, src_lens) if i[0] == 0x00}
+            assert new_actions == old_actions
 
 
 def test_the_three_games_material_signature_is_their_own_and_names_hash_to_their_records(dump):
