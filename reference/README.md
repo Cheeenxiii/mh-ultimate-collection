@@ -838,7 +838,7 @@ The procedure is enough to rewrite the scripts, which stay outside the repositor
 
 1. Read each game's own id-indexed monster-name table. MH3U's is `GUI/font/Monster_eng` in `/arc/ID/ID_gallery_eng.arc`: a GMD whose string N names id N (`mhuc gmd dump` reads an extracted `Monster_eng`). MH4U's is `eng/msg/emName_eng` in `/eng/data/core_common.arc`: an rLayoutMessage whose 123 messages are NUL-terminated UTF-16-LE strings in id order, the first being `No enemy`.
 2. For every name both tables hold, the pair with that name is a candidate; a name MH4U's table lacks has no pair. Read the tables' names and counts, never their bytes.
-3. Check each candidate with `mhuc monsterdata --mh4u data/em_data.arc --id <MH4U id> --mh3u arc/enemy/em<NNN>.arc`; its hitzone, part-table and attack-volume counts are the evidence in [MH3U's ids to MH4U's](#mh3u-ids-to-mh4us).
+3. Check each candidate with `mhuc monsterdata --mh4u data/em_data.arc --id <MH4U id> --mh3u arc/enemy/em<NNN>.arc`; its hitzone, part-table and attack-volume counts are the evidence in [MH3U's ids to MH4U's](#mh3us-ids-to-mh4us).
 4. Where a name repeats, compare every id that holds it. The base HP, the hitzone table and, between byte-identical `em_status` files, the body model's vertex and index counts say which id is which.
 
 ### Recompiling and testing a reference game
