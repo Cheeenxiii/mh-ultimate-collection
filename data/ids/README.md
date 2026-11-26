@@ -69,15 +69,14 @@ group of paths in the record:
 | `tail` | the tail model | yes | yes | no | no |
 | `mef` | the motion effects | no | no | no | no |
 | `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no | no |
-| `cmd` | the command/EMC | yes | no, until the EMC converter (a follow-up after #49) ships | no | no |
+| `cmd` | the command/EMC | yes | yes, converted from MH3U's EMC ([specs/emc.md](../../specs/emc.md), check A5) | no | no |
 | `efl` | the effect lists | no | no | no | no |
 
 124's `em124.arc` holds the model, five motion lists, her converted MHXX camera, the tail and
-the command; 125's holds
-the model, three motion lists, the tail and its converted sound set, but no command yet: the
-EMC converter that would give her MH3U's own script is a follow-up after #49
-([specs/emc.md](../../specs/emc.md#what-a-converter-must-do)), so her record keeps MH4U
-Rathian's script path; 126's holds
+the command; 125's holds the model, three motion lists, the tail, its converted sound set and
+her command converted from MH3U's EMC
+([specs/emc.md](../../specs/emc.md#what-a-converter-must-do), check A5), so her record names
+her own script path; 126's holds
 the model and four motion lists, borrowed from MHXX's em014 (Velocidrome) and shipped at the
 same slots 0, 2, 3 and 4 the source groups them in, so its record keeps the stand-in's paths
 for slots 1 and 5; 127's holds the model and three motion lists, its own MH3U lists at slots
@@ -109,12 +108,12 @@ namespace (`sound\se\em\emNNN\...`), so a port never shadows MH4U's own monster 
 port. [specs/sound.md](../../specs/sound.md) has the formats and the conversion, and check A1
 in [checks.md](../docs/checks.md#a-ported-monsters-own-voice-a1) the in-game listen.
 
-125's command would be her own AI script: MH3U's EMC is an older format, so a converter would
-rewrite it at build time (version, 23 group rows and the 15 opcodes whose argument count
-differs), [specs/emc.md](../specs/emc.md#what-a-converter-must-do). #159 recorded the method,
-but the 15 opcodes' added argument's meaning is unverified, so the converter is a follow-up
-after [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49); until it ships her
-row lists no `cmd` and MH4U's own script drives her.
+125's command is her own AI script: `mhuc convert monster` rewrites MH3U's EMC at build time
+(version `0x20120804`, 23 group rows and the 15 opcodes whose argument count differs), from the
+two games' instruction-length tables its `--mh3u-code`/`--mh4u-code` name
+([specs/emc.md](../specs/emc.md#what-a-converter-must-do), check A5). It refuses a file that
+uses `0x70`, whose added argument MH3U's evaluator computes, or a `0x67` whose dropped argument
+is not 0.
 
 ## Rules the tool checks
 
