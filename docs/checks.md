@@ -986,8 +986,7 @@ mods of this branch):
   in-game check; the headless run proves the map and the monster's factory line only.
 
 The harness is not specific to these two: any registered id can be written into the same quest in
-place and takes the same route. Giadrome (126) and Great Wroggi (127) have their records and
-stand-in 15; their load proof is #189's and has not been run.
+place and takes the same route; Giadrome's and Great Wroggi's quests are the check below.
 
 #### The GU profile's route
 
@@ -1028,6 +1027,41 @@ the recorded route no longer matches, and the counter presses then land before t
 there. The 124 archive's command slot carries the stand-in's `em001_cmd` (the row ships no
 `cmd`); with the converted MHXX EMC the load freezes after the factory line (P4's Result). The
 script and the screenshots stay outside the repository.
+
+#### Giadrome's and Great Wroggi's quests (P4, #189)
+
+The same harness starts the two MH4U-exclusive ports' first quests, built in place from the
+recipes ([quests.md](../docs/quests.md#where-a-ported-monster-fights-giadrome)): Giadrome's from
+10210 "Snow with Occasional Lagombi" (the Frozen Seaway; the wave's 47 becomes 126 and the main
+objective's target 47 becomes 126) and Great Wroggi's from 10110 "Field Trip" (the Ancestral
+Steppe; the wave's 15 becomes 127 and the sub-objective's target 15 becomes 127). Neither row
+ships `cmd`, so each keeps the stand-in's script (Great Jaggi, 15) and the load is what the check
+proves.
+
+- The recorded 3U route reaches 10210 in the same ★2 list as 10212: the base route selects
+  "Royal Assassination" and "Snow with Occasional Lagombi" is the next row, so one more DOWN at
+  46.75 s selects it.
+- 10110 is a ★1 quest and the recorded route stops at the ★2 board. The harness puts the recipe's
+  `.mib` in the route's 10212 slot with its quest id and rank set to 10212's (stars 2), so the row
+  keeps its place in the ★2 list; the map, areas and wave are the recipe's, and the quest is not
+  shipped (the first Wroggi quest is a converted MH3U one).
+- The profiles are a copy of the maintainer's save restored before each run (a profile that
+  already started a quest leaves the list's cursor on another row), the session's shared code
+  library (54 hook points) with the plugin list written for the runtime alone, and
+  `mods/uc_runtime` deployed.
+
+Result (2026-11-26, USA v1.3.0 update, headless runner, the P4 route and screenshot schedule):
+
+- **126: pass.** The log has `quest 10210: id 126 -> stand-in 15 marked present so the state 0
+  preload loads its enemy data`, `quest task: marked stand-in 15 present before the preload`,
+  `data path: id 15 is MH4U's own; passed through`, `data resource: id 126 -> its own archive`,
+  `resource load: id 126 -> its own record`, `effect lists: id 126 -> its own record` and
+  `factory: id 126 -> stand-in 15`; the map is drawn at about 128 s (the Frozen Seaway with the
+  hunter and the two Palicoes), the run exits 0 and logs no `HW.Memory UnmappedAccess`.
+- **127: pass.** The same lines with 127 (`quest 10212: id 127 -> stand-in 15 ...`); the map is
+  drawn by about 96 s (the Ancestral Steppe), exit 0 and no unmapped reads.
+
+The screenshots and the input scripts stay outside the repository.
 
 ## Calling the engine from a plugin (P3)
 
