@@ -93,11 +93,14 @@ int main(void) {
 
     /* The first frame runs the id layer's work, then the module's self-test. */
     fake_frame();
-    CHECK(fake_log_contains("ready: translating 12 of GU Rathian's 13 MHXX-only actions on "
-                            "monster 124"), "the module's ready line is missing");
+    /* The ready line's count follows the generated family list, so this test doesn't pin it:
+     * the sibling slices (#274, #275, ...) raise it and would otherwise each edit this file. */
+    CHECK(fake_log_contains("ready: translating ") &&
+          fake_log_contains("of GU Rathian's 301 actions on monster 124"),
+          "the module's ready line is missing");
     CHECK(fake_log_contains("family file(s) discovered from src/monsters/rathian-gu/"),
           "the self-test doesn't report the discovered families");
-    CHECK(fake_log_contains("selftest: 12 of the 13 actions"), "the self-test line is missing");
+    CHECK(fake_log_contains("of the 301 actions"), "the self-test line is missing");
     CHECK(fake_log_contains("selftest: float stubs at 0x"), "the float stubs' line is missing");
 
     /* ── routing: the module's own monster runs it; every other monster doesn't ── */

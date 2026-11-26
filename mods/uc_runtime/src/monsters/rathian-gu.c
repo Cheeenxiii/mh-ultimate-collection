@@ -1,19 +1,17 @@
 /*
  * rathian-gu.c: GU Rathian's module, the home of her action families.
  *
- * GU Rathian (MHXX v1.4, roEm001) has 13 action ids MH4U has no action for: 3/98, 4/27 to
- * 4/32, 8/0, 12/0 to 12/3 and category 17. This module carries the twelve that need new C:
- * 3/98 with the 12/1 to 12/3 chain around it, the six 4/27 to 4/32 ids that share handler
- * 0x0200e3b4, 8/0 with its combo tail, and category 17. 12/0 needs nothing: MH4U's own
- * category-12 case checks index 0 and runs its own handler 0x006d524c, the handler its shared
- * 3/2, 3/83 etc. use and the role pair of MHXX's 12/0. Under decision 0002's 2026-11-26
- * amendment her own handler for the shared ids is still owed; this step only moves the
- * translated actions, so 12/0 and the shared ids stay with the game for now.
+ * GU Rathian (MHXX v1.4, roEm001) has 13 action ids MH4U has no action for (3/98, 4/27 to
+ * 4/32, 8/0, 12/0 to 12/3 and category 17) and 273 shared ones. Decision 0002's 2026-11-26
+ * amendment makes every one of her 301 ids run her own handler, so the module carries the
+ * twelve MHXX-only ids that need new C (12/0 stays MH4U's own handler) and the shared ids as
+ * slices: category 1 and category 2 (with 9/3 and 9/4) so far.
  *
  * The handlers are ported in slices, one action family per file under
  * src/monsters/rathian-gu/: cat17.c holds category 17's gate and base update, act3_98.c
- * action 3/98, act12_1_3.c the 12/1 to 12/3 chain, act4_27_32.c the six 4/27 to 4/32 ids and
- * act8_0.c action 8/0. The coming slices add their own file there and edit nothing shared.
+ * action 3/98, act12_1_3.c the 12/1 to 12/3 chain, act4_27_32.c the six 4/27 to 4/32 ids,
+ * act8_0.c action 8/0, cat1.c category 1 and cat2.c category 2. The coming slices add their
+ * own file there and edit nothing shared.
  *
  * This file holds what every family shares: the factory association's entry (the runtime calls
  * `dispatch` for the monster it recorded as id 124), the action log, the ready line and the
@@ -94,10 +92,11 @@ static int dispatch(MH4UCall *call, uint32_t enemy) {
     return 0;
 }
 
-/* The module's ready line, at init: the same line the old plugin logged. The setting's id is
- * what the line names; the module answers its registry id whatever it says (the runtime warns
- * when the setting names no module). Each family declares its own count, so a slice's file is
- * the only one that names it. */
+/* The module's ready line, at init: the same line the old plugin logged, with the source's
+ * whole action set as the denominator since 0002's 2026-11-26 amendment makes every id hers.
+ * The setting's id is what the line names; the module answers its registry id whatever it
+ * says (the runtime warns when the setting names no module). Each family declares its own
+ * count, so a slice's file is the only one that names it. */
 static void start(void) {
     unsigned translated = 0;
     for (unsigned i = 0; i < MHUC_GU_FAMILY_COUNT; i++) {
@@ -115,7 +114,7 @@ static void start(void) {
         }
     }
     mhuc_logf(MH4U_LOG_INFO,
-              "ready: translating %u of GU Rathian's 13 MHXX-only actions on monster %d",
+              "ready: translating %u of GU Rathian's 301 actions on monster %d",
               translated, monster_id);
 }
 
@@ -125,14 +124,22 @@ static void self_test(MH4UCall *call) {
     mhuc_logf(MH4U_LOG_INFO,
               "selftest: %u family file(s) discovered from src/monsters/rathian-gu/",
               (unsigned)MHUC_GU_FAMILY_COUNT);
+    unsigned translated = 0;
+    for (unsigned i = 0; i < MHUC_GU_FAMILY_COUNT; i++) {
+        if (mhuc_gu_families[i]) {
+            translated += mhuc_gu_families[i]->translated;
+        }
+    }
     mhuc_logf(MH4U_LOG_INFO,
-              "selftest: 12 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and "
+              "selftest: %u of the 301 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and "
               "0x104), 12/1 <- 0x0201c1d0 + 0x020062d4, 12/2 <- 0x0201c228 + 0x0201041c->0x%08x, "
               "12/3 <- 0x0201c27c + 0x02010aec->0x%08x, 4/27-32 <- 0x0200e3b4 (3 states, motions "
               "0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0 <- 0x0201b460 (3 states, "
               "motion 0x403 at 4.0, 12.0/50.0, 300.0/38.0, 180.0, tail 9/1 or 2/6), 17 <- the "
-              "gate 0x008d5bd4 + MH4U's base update 0x%08x (slot 89, MHXX's slot 244)",
-              (unsigned)FN_HANDLER_3_12, (unsigned)FN_HANDLER_3_9, (unsigned)FN_BASE_UPDATE);
+              "gate 0x008d5bd4 + MH4U's base update 0x%08x (slot 89, MHXX's slot 244), and the "
+              "shared ids: category 1's twelve and category 2's thirty plus 9/3 and 9/4",
+              translated, (unsigned)FN_HANDLER_3_12, (unsigned)FN_HANDLER_3_9,
+              (unsigned)FN_BASE_UPDATE);
     mhuc_log(MH4U_LOG_INFO,
              "selftest: category 17 does nothing for indexes 0 to 2; 12/0 is MH4U's own "
              "category-12 handler 0x006d524c; 8/0's leaf 0x008c4184 is MH4U's 0x0092f6e8, "
