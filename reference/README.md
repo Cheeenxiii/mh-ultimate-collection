@@ -22,6 +22,7 @@ The scripts reuse the fork's recompiler. They find it in a sibling checkout name
 | `monster_motions.py` | lists the motion each of a monster's action handlers starts, and compares two games' action ids by it (check R1 in [docs/checks.md](../docs/checks.md#monster-actions); [3U Rathian's moves](#a-3u-rathians-moves)) |
 | `action_map.py` | joins two games' action and motion inventories: the MH4U handler each shared action id reaches, the ids only one game has, and the ids where the two sides' start motions differ (check R2 in [docs/checks.md](../docs/checks.md#the-shared-action-map-r2)) |
 | `monster_handlers.py` | the 3U Rathian's 17 ids MH4U has no action for: each handler's engine calls and MH4U counterpart (`worklist`), and the shared MH4U action with the same handler for each missing id, with the proof (`targets`; [The 17 ids MH4U has no action for](#the-17-ids-mh4u-has-no-action-for)) |
+| `monster_fields.py` | the fields two games' paired action handlers read: pairs the handlers by shared action, aligns their field reads/stores and calls, and prints each offset correspondence with its pair count (`map`); `check` re-derives the 3U field map's rows and fails where a count disagrees (procedure in [Extending the 3U field map](#extending-the-3u-field-map)) |
 | `monster_attack_records.py` | the in-image action-start record a 3U move passes (44 bytes) and the value curves, their MH4U counterparts rebuilt from MH3U's, and the comparison with MH4U's own records ([specs/actiondata.md](../specs/actiondata.md), checks N1 to N4) |
 | `monster_emc.py` | the native actions a monster's AI script starts (`00 cat num` in its rEnemyCmd), to tell an action the AI picks from one nothing reaches ([specs/emc.md](../specs/emc.md)) |
 | `monster_emc.py` | the native actions a monster's AI script starts (`00 cat num` in its rEnemyCmd), to tell an action the AI picks from one nothing reaches, and the script cut with a game's own instruction-length table (`--lens ... --check`, [specs/emc.md](../specs/emc.md), check A2) |
@@ -878,6 +879,37 @@ The procedure is enough to rewrite the scripts, which stay outside the repositor
 2. For every name both tables hold, the pair with that name is a candidate; a name MH4U's table lacks has no pair. Read the tables' names and counts, never their bytes.
 3. Check each candidate with `mhuc monsterdata --mh4u data/em_data.arc --id <MH4U id> --mh3u arc/enemy/em<NNN>.arc`; its hitzone, part-table and attack-volume counts are the evidence in [MH3U's ids to MH4U's](#mh3us-ids-to-mh4us).
 4. Where a name repeats, compare every id that holds it. The base HP, the hitzone table and, between byte-identical `em_status` files, the body model's vertex and index counts say which id is which.
+
+### Extending the 3U field map
+
+The field map ([The 3U work block on MH4U's layout](#the-3u-work-block-on-mh4us-layout)) starts
+from category 0 and covers what the ground and flight slices read. A new slice extends it with
+the same three sources, and `monster_fields.py` re-derives the rows so a hand edit cannot drift
+from the code.
+
+1. Build both inventories outside the repository: `python3 reference/monster_actions.py list
+   --game mh3u --exheader <work>/exheader.bin --code <work>/code.bin --dispatcher 0x00687d30
+   --range 0x686000 0x69b000 -o <work>/mh3u-actions.tsv`, and the same for MH4U's `uEm001`
+   (dispatcher `0x006e9cac`, range `0x6d4f80 0x6ec8e0`). Keep the TSVs out of the repository.
+2. `python3 reference/monster_fields.py map --a-inv <work>/mh3u-actions.tsv --b-inv
+   <work>/mh4u-actions.tsv --a-exheader ... --a-code ... --a-range 0x686000 0x69b000
+   --b-exheader ... --b-code ... --b-range 0x6d4f80 0x6ec8e0` prints every offset the 57
+   handler pairs and the 73's engine twins put together, with the number of pairs behind each,
+   and the offsets the handlers read that nothing pairs. A row with one pair and no twin is a
+   candidate, not a fact: read the two handlers at that point before recording it.
+3. For an offset the alignment cannot settle (the two handlers differ by a call, so their
+   field sequences shift: the base handlers of category 0 are the case), read the two
+   functions side by side and record the row with "read side by side" in its evidence.
+   `check` skips those rows and the ones marked "unverified" or whose structure differs.
+4. Add the row to the map with its role, its evidence kind and the pair count from step 2.
+5. `python3 reference/monster_fields.py check --page reference/README.md` with the same game
+   arguments re-derives every row and fails on a count that no longer matches; a row it cannot
+   derive is reported as skipped, so nothing is silently dropped. CI has no dumps, so this is
+   a local step, run before the slice's pull request.
+
+The tool reads the page's "73 with an MH4U counterpart" table for the twin functions, so that
+table is the only engine counterpart it trusts; a pair whose fields contradict the rest of the
+map is reported as misaligned and left out of the counts.
 
 ### Recompiling and testing a reference game
 
