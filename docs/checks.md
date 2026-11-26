@@ -775,6 +775,15 @@ quest that spawns the id (#144).
    Fail: the framing is MH4U Rathian's (the record kept the stand-in's `e001_cam`), or the load
    stops at the camera path.
 
+**For #234, the same procedure on both games.** MH4U's Rathian posts camera ids 0, 1, 2 and 5
+at actions 1/23, 1/24, 1/15 and 1/21 ([specs/camera.md](../specs/camera.md), check C3). Force
+those four in MH4U and write down what the view does at each (a cut in, a zoom, a locked-off
+shot, nothing). Then force the same action ids on 3U Rathian in MH3U (`reference/force_action.py`)
+and watch the monster's intro cutscene, and write down whether the view cuts, zooms or locks off
+at all. Pass (for the comparison): MH3U does something at the moment and it can be described
+next to MH4U's framing. Fail (for the comparison): MH3U shows the normal player camera, in which
+case no MH3U camera exists at that moment.
+
 Code side: pass (2026-11-26). 124's registry row lists `camera`, `mhuc convert monster --id 124`
 writes the converted list at the record's path, `tests/test_with_game_files.py` checks the
 entry against MHXX's own list, and the archive no longer carries the stand-in's `e001_cam`.
