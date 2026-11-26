@@ -162,7 +162,7 @@ Both take guest memory through the plugin host's `alloc`/`free` (ABI 2, the game
 
 **Open questions**, where a fact is missing to cost an option honestly:
 
-- MH4U's save layout: the character save is mapped ([specs/save.md](../specs/save.md)): 81,400 bytes decrypted, one checksum (the cipher's), and the 82-entry monster log is not indexed by monster id (entry 0 is Seltas, id 25; its order is unknown). Still open: the character save's quest clear lists ([#153](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/153)) and the `system` save's fields ([#154](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/154)); whether the save has a region the game copies and never reads stays open too.
+- MH4U's save layout: the character save is mapped ([specs/save.md](../specs/save.md)): 81,400 bytes decrypted, one checksum (the cipher's), the 82-entry monster log is not indexed by monster id (entry 0 is Seltas, id 25; its order is unknown), and the 64-byte flag array at 0x011E is characterised but what its bits index is not ([#237](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/237)). The `system` save's fields are mapped; its DLC and quest registration are not. Whether the save has a region the game copies and never reads stays open too.
 - Whether any loader validates a quest's or a guild card's monster ids, and what the game does with an id past 123 in a `.mib` and past 255 in a card.
 - What a guest without the mod sees for a new id in a quest or a room.
 - Whether the plugin host may write the code segment (the references and the bound instructions) or only hook: `PLUGINS.md` gives named hooks and read/write of guest memory, and says nothing about patching code.
