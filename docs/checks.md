@@ -349,7 +349,7 @@ differs.
 Category 1's fifteen ids are the second slice
 ([#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217)); their handlers and
 the #55-blocked effect calls are in the runtime's
-[category-1 table](../mods/uc_runtime/README.md#3u-rathians-module-category-0-category-1-and-category-3s-part-2).
+[category-1 table](../mods/uc_runtime/README.md#3u-rathians-module-category-0-category-1-and-category-3).
 Force each the same way; the log names the blocked effect calls once.
 
 | 3U id | status |
@@ -369,6 +369,34 @@ Force each the same way; the log names the blocked effect calls once.
 | 1/12 | not done |
 | 1/13 | not done |
 | 1/14 | not done |
+
+Category 3's part 1 ([#219](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/219))
+runs her own handlers for fifteen shared ids. Force each and compare it with MH3U's own move;
+the runtime's [README](../mods/uc_runtime/README.md#category-3s-part-1-219) and the
+[reference](../reference/README.md#the-category-3-part-1-units-219) name each unit's calls,
+the 3/5 pair's hand-read fields and the calls it leaves out.
+
+| 3U id | Handler unit | What to watch |
+|---|---|---|
+| 3/0 | 0x0068d9ec | motion 0x29 at 6.0, the flag, motion 0x43 at 0.0 with A cleared, the data-float turn, motion 0x1a at 6.0, the 0x100 turn and the immediate 3/2; the value curve 0x00c4ed80 is not carried, so aim A y keeps its value |
+| 3/1 | 0x0068db54 | the 3/0 opening, then the data-float turn and 0/3's base handler; the curve is not carried |
+| 3/2, 12 | 0x0082d054 | motion 0x1a, then 0x93cd70; the hold test, mode 3 and motion 0x1d; motion 0x2e; mode 0 and motion 0x41; then 0/2's base handler |
+| 3/4 | 0x0068dc60 | motion 0x1f at 0.0, then the heading turn at 0.04 and the 0x23/0x24 part check with the int speed and the work+0x394 rate; the 0x842a7c hit resolution is blocked |
+| 3/5 | 0x0068dd78 (r1 = 0) | the record start (its reader blocked), the data-float turn, then the fall and the immediate 3/11 |
+| 3/9 | 0x0068dd78 (r1 = 1) | the sub-machine, then the 3/9 or 3/10 request by the selector; the monster-list calls are blocked |
+| 3/10 | 0x0069983c | the shared state-0 motion 0x2d at 6.0, then the flag and 0/3's base handler |
+| 3/11 | 0x0083b424 | motion 0x1f at 4.0 and the 60.0 timer; when it is spent, the fall, the immediate 3/11 and the set byte |
+| 3/14 | 0x0068dd78 (r1 = 2) | the 3/5 sequence, then with the tail flag clear the fall and the immediate 3/11 |
+| 3/15 | 0x00699964 | the shared state-0 motion 0x2d, then the 0x180 turn, the flag and 0/3's base handler |
+| 3/22 | 0x0068dd78 (r1 = 3) | the 3/5 sequence with 0x83db24 blocked; on the flag the immediate 3/0x16, or the hit setup and the next 7/0x1c |
+| 3/23 | 0x0068dd78 (r1 = 4) | the same with the 3/0x17 tail, or the hit setup and 7/0x39 or 7/0x1d by the state predicate |
+| 3/26 | 0x0068dd78 (r1 = 5) | the same with the 3/0x1a tail, or the hit setup and 7/0x4b |
+| 3/30 | 0x0068dd78 (r1 = 6) | the same with the 3/0x1e tail, or the hit setup and 7/0x5e |
+| 12 | 0x0082d054 | 3/2's five states |
+
+Status: not done. These rows wait for #49, #105 and the quest load (#144), like the rows
+above; the module's self-test names the units and the blocked calls.
+
 The first category-7 slice's ids ([#221](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/221))
 have their own rows. They share an MH4U action, so the reference's counterpart handler for
 the same id is the comparison; under decision 0002's amendment the port still runs her own
@@ -1301,11 +1329,12 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --game mh3u --exheader <exheader
     --code <code.bin> --dispatcher 0x00687d30 --range 0x686000 0x69b000
 ```
 
-Last result (2026-11-26, issues #216, #217, #220, #221, #222 and #227): pass. 191 actions;
-blocks 191/191, handlers 182/191 (the other 9 are inline), first motions 132/191;
-translated 85 (category 0's six, category 1's fifteen, category 3's part 2's sixteen,
-category 7's part 1's twenty-one and part 2's twenty-two, and category 13's part 1's five),
-pending 106. Changing a ledger motion makes it exit 1 and name the id.
+Last result (2026-11-26, issues #216, #217, #219, #220, #221, #222 and #227): pass. 191
+actions; blocks 191/191, handlers 182/191 (the other 9 are inline), first motions 132/191;
+translated 100 (category 0's six, category 1's fifteen, category 3's part 1's fifteen,
+category 3's part 2's sixteen, category 7's part 1's twenty-one and part 2's twenty-two, and
+category 13's part 1's five), pending 91. Changing a ledger motion makes it exit 1 and name
+the id.
 
 
 T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
@@ -1323,7 +1352,8 @@ and re-ran the suite.
 The 3U module's tests are `tests/test_rathian_3u.c` (the shell: the factory association for
 125, the routing, the ready line and the self-test) and one program per action family under
 `tests/rathian-3u/` (category 0's is `cat0.c`, for #216; category 1's `cat1.c`, for #217;
-category 3's part 2 is `cat3b.c`, for #220; category 7's part 2 is `cat7b.c`, for #222); `make test` discovers the family tests from the
+category 3's part 1 is `cat3.c`, for #219 and its part 2 `cat3b.c`, for #220;
+category 7's part 2 is `cat7b.c`, for #222); `make test` discovers the family tests from the
 directory (issue #268). Last result (2026-11-26): pass. The shell test checks that 125 runs the
 module, that an MH4U id and a registered id without a module fall through, that a pair no
 family carries (`15/0`) is logged once and left to MH4U's dispatcher, and the ready and
@@ -1346,6 +1376,21 @@ handlers — and the two blocked calls' log lines. Changing the motion speed `6.
 sub-state choice (`index = 2` to `0`) fails `tests/family-cat0` with `0/0 state 1 doesn't start
 the sub-state 2 action`; reverting makes them pass.
 
+Category 3's part 1's test (`tests/family-cat3`) checks the fifteen ids' states, frame values,
+call order and arguments: 3/0's four states (motion `0x29` at 6.0, the flag, motion `0x43` at
+0.0 with A cleared, the turn at 1.0, motion `0x1a` at 6.0, the 0x100 turn and the immediate
+3/2); 3/1's shared opening and its 0/3 ending; 3/2's five states and action 12's same handler;
+3/4's angle from the position-to-target difference, the 0.6 turn it makes from a 6554-unit
+heading difference and the part check's `0x23`/`0x24` parts with the int speed in s0 and the
+`work+0x394` rate in s1; the 3/5 family's seven variants (the shared state 0, variant 0's
+immediate 3/11, variant 1's 3/9-or-3/10 selector, variant 2's fallback and variants 3-6's
+immediate 3/… and next 7/… tails, with the hit setup's five arguments); 3/10 and 3/15's shared
+state 0 and 3/15's 0x180 turn; 3/11's 60.0 timer and countdown; and that no blocked source
+address is called and each blocked one is logged. Breaking 3/0's first motion (`0x29` to
+`0x28`) fails it with `3/0 state 0 motion is 0x28 at 6/0, want 0x29 at 6/0`; swapping 3/4's
+part-check parts fails it with `3/4's part check is (36, 35), want (0x23, 0x24)`; reverting
+makes both pass. Last result (2026-11-26): pass.
+
 
 The family list's discovery is `tests/test_family_discovery.c`, for issue #265: it puts a probe
 family the module does not ship in a directory of its own, has `tools/gen_families.py` write
@@ -1361,11 +1406,12 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`; the 3U module's
-is `ready: translating 85 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
-#220, #221, #222 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest:
-15 of the 191 actions`, cat3b's `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of
-the 191 actions`, cat13a's `selftest: 5 of the 191 actions`, cat7b's `selftest: 22 of the
-191 actions` and the families' `field map anchors`/`selftest: open:` lines.
+is `ready: translating 100 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#219, #220, #221, #222 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's
+`selftest: 15 of the 191 actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's
+`selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191 actions`, cat7b's
+`selftest: 22 of the 191 actions`, cat13a's `selftest: 5 of the 191 actions` and the
+families' `field map anchors`/`selftest: open:` lines.
 The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
 runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
@@ -1419,6 +1465,20 @@ the tree the same lines sum to `ready: translating 58 of 3U Rathian's 191 action
 125` and four family files, and the family's own test is T1b's. The profile's save did not
 reach quest 10212 in that run, so the quest's own lines stay the 3U paragraph's above and the
 per-move half stays R2p/#116.
+
+The 3U module's run that checked category 3's part 1 (2026-11-26, USA v1.3.0, the tree before
+#222's part 2 merged, six families, the session's shared code library, the 125 quest's route,
+`--ms 150000`, `selftest = 1`): pass, exit 0. The log has `ready: translating 78 of 3U
+Rathian's 191 actions on monster 125`, the six families' `selftest: ... of the 191 actions`
+lines including cat3's `selftest: 15 of the 191 actions: 3/0 <- 0x0068d9ec ...`, cat3's
+`selftest: field map anchors read by hand against MH4U's 3/5 (0x006d5e98) ...` and `selftest:
+blocked and logged: #55's 0x0083db24 ...` lines, the float stubs' address, then quest 10212's
+`id 125 -> stand-in 1 marked present` and `data resource: id 125 -> its own archive`; the
+runner exited 0. A later run on the merged tree after #222 (`ready: translating 100 of 3U
+Rathian's 191 actions on monster 125`, the seven families' self-test lines including cat3's and
+cat7b's) also exited 0, but its route did not land on quest 10212 that time — the profile's
+save had advanced across runs — so the quest's own lines stay the earlier run's and the
+siblings'.
 
 ## Floats through a guest stub (T0)
 

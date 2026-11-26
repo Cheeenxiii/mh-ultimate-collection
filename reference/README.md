@@ -521,6 +521,37 @@ rows above apply to every one of them.
 | this+0x278 | this+0x290 | a speed (float) | 3 pairs, and the twin 0x0083c6e0 / 0x00922250 |
 | this+0x284 | this+0x29c | a second speed | the twin 0x0083c6e0 / 0x00922250 (the same body reads both speeds) |
 | this+0x27c | this+0x294 | | 1 pair |
+| work+0xf4 | work+0x1ee | "the action may advance", read before the 3/5 loops | the 0x0068dd78 / 0x006d5e98 pair, state 1's variant 1 (`0x6d616c`) |
+| work+0x944 | work+0x520 | the u16 the 3/5 loops compare with 0x12c | the same pair's state predicate and threshold step (`0x6d61cc`) |
+| work+0xaec | work+0x202 | the byte 3/5's variant 1 compares with `work+0xdb` | the same pair compares `+0x202` with `+0x14c` (`0x6d6444`) |
+| work+0x2b6 | work+0x27c | the part byte the 3/5 hit setup reads | the same pair tests `+0x27c` against 0xff (`0x6d6560`), so category 3 takes the `+0x27c` side of the row below |
+
+#### The category 3, part 1 units (#219)
+
+#219 translates fifteen of her ground ids on eight source units: 3/0 (`0x0068d9ec`), 3/1
+(`0x0068db54`), 3/2 and 12 (`0x0082d054`, base-class code reimplemented), 3/4 (`0x0068dc60`),
+the seven ids `0x0068dd78` serves (3/5, 3/9, 3/14, 3/22, 3/23, 3/26 and 3/30, told apart by
+its r1), 3/10 (`0x00858b6c`, the 0/3 base handler reimplemented once), 3/11 (its case block
+`0x0069987c` and tail `0x0083b424`) and 3/15 (the inline block `0x00699964`; 3/10 and 3/15
+share the state-0 block `0x006999ac`). The engine calls it maps to MH4U's counterparts, with
+the argument conventions, are in the runtime's
+[README](../mods/uc_runtime/README.md#category-3s-part-1-219).
+
+The rows the slice adds to the map above are the 3/5 pair's, read by hand because the map
+flagged that pair as misaligned: `+0x1ee` for 3U's `+0xf4` (the byte that must be zero before
+the loops), `+0x520` for `+0x944` (the u16 the loops compare with 0x12c), `+0x202` for
+`+0xaec` (the byte variant 1 compares with `+0xdb`), and `+0x27c` for `+0x2b6` (the part byte
+the hit setup reads), which settles category 3's side of the `+0x278`/`+0x27c` row.
+
+What it does not carry, named and logged once at the first hit: #55's `0x0083db24`,
+`0x00833234`, `0x00835f10`, `0x0083dc14` and `0x00a347bc` in the 3/5 family; `0x00842a7c`,
+3/4's hit resolution, also on #55's 28 list; the action-start record readers `0x0084704c`
+and `0x00847134`, which take MH3U's `0x00b0b168` (#135 rebuilt the record, but the module
+carries no copy); and `0x0083c6e0` with 3U's value curve `0x00c4ed80`, which 3/0 and 3/1
+evaluate. A blocked call answers 0, the source's "nothing found", so the state machines keep
+their shape. The 3/4 pair check `0x0084e74c` takes the source's part ids `0x23`/`0x24`, the
+int speed at `this+0x278` as s0 and the rate at `work+0x3d0` as s1, which is how MH4U's own
+3/4 hands its pair check the same roles.
 
 #### The category 3, part 2 units (#220)
 
@@ -587,9 +618,9 @@ position, heading, point and speed rows above; what they add:
 - **work+0x140** (a u16, category 7): `0x00694f4c` copies it into the target-line
   struct's +0x6a on the 7/80-family state 1; no pair reads it and MH4U's own handler
   (`0x006e09a0`) has no such step, so the copy is left out.
-- **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where.
+- **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where. Category 3's 3/5 handler takes +0x27c (its pair's `0x6d6560`); a category-7 slice still has to say.
 - **work+0x11c** (category 3, "the fall or hold step is enabled"): MH4U's counterpart function tests two flags instead (+0x620 and +0x628); which of them replies to +0x11c is unsettled.
-- **work+0xf4** and **work+0x944** (a byte and a halfword, category 3), **work+0x1c, +0xda, +0xaea** (category 13) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. (`work+0x2a8` was on this list; category 7's first slice found it at MH4U's `+0x238`, above.) +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
+- **work+0x1c, +0xda, +0xaea** (category 13) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. (`work+0x2a8` was on this list; category 7's first slice found it at MH4U's `+0x238`, above.) +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
 - **this+0x1a64** (a float the category-11 handler reads, 0x1c bytes past the block pointer), and **this+0x1ed0** as a field of its own rather than the target-line struct's +0x60: unverified.
 - **The categories without pairs:** category 4 (1 id) and category 10 (8 ids). Category 0 (1 of 5 ids), 11 (2 of 5), 1 (11 of 12), 2 (10 of 11) and 13 (8 of 10) are partly covered.
 - **A handler with no pair** is not evidence of a difference: an inline MH4U case (0/0, 0/1, 0/3) or a different unit leaves nothing to align, and the field still has to be read in the slice.
