@@ -25,9 +25,9 @@ A GU monster's code depends on MHXX's enemy layer, most of which MH4U lacks. Lin
 
 **Amended by the maintainer on 2026-11-26: every handler is the source's, shared actions included.** A ported monster runs its own source game's behaviour code for every action, 3U and GU alike. An action id MH4U also has does not reuse MH4U's handler: the source's handler is reimplemented like the others. So the monster asks for its own animation numbers and its own actions, and nothing translates between the two games at run time.
 
-This replaces the practice that grew after 0002: shared action ids ran MH4U's handlers, and run-time tables bridged the difference. Those tables were the motion-number translation (`mods/monster_motions`, [#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)) and the action map onto shared MH4U actions (`mods/monster_actions`). `mods/rathian_actions` already runs translated MHXX handlers for the actions MH4U lacks, which is the kind of code this asks for every action. In game, the 3U Rathian looped a limp and flew sideways: the translation table only covered the action/motion pairs a code comparison could resolve. Patching each gap with a heuristic would not end.
+This replaces the practice that grew after 0002: shared action ids ran MH4U's handlers, and run-time tables bridged the difference. Those tables were the motion-number translation (`mods/monster_motions`, [#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125)) and the action map onto shared MH4U actions (both since removed, this amendment). `mods/rathian_actions` already runs translated MHXX handlers for the actions MH4U lacks, which is the kind of code this asks for every action. In game, the 3U Rathian looped a limp and flew sideways: the translation table only covered the action/motion pairs a code comparison could resolve. Patching each gap with a heuristic would not end.
 
-What stays: the ids and resource records (`mods/monster_ids`, [0003](#0003-id-allocation-and-mod-saves)), the converted assets (models, materials moved to MH4U's shader package, motion lists, textures), and the quest loading. They don't depend on whose handlers run.
+What stays: the ids and resource records (`mods/uc_runtime`, [0003](#0003-id-allocation-and-mod-saves)), the converted assets (models, materials moved to MH4U's shader package, motion lists, textures), and the quest loading. They don't depend on whose handlers run.
 
 | Alternative | Why not |
 |---|---|
@@ -431,7 +431,7 @@ Still open: whether a module can be switched off by a setting as well as by its 
 
 The facts and options it was chosen from, as the open entry held them:
 
-- Today: `mods/monster_ids` (ids and resource records), `mods/rathian_actions` (GU Rathian's translated MHXX-only actions), `mods/force_action` (debug), `mods/monster_actions` (the superseded action-id map), and the data-only folders `mhuc convert monster` writes.
+- Before this entry: an id plugin (ids and resource records), `mods/rathian_actions` (GU Rathian's translated MHXX-only actions), `mods/force_action` (debug), an action-id map onto shared MH4U actions (superseded by 0002's amendment), and the data-only folders `mhuc convert monster` writes.
 - `tools/build_game.py` merges every enabled mod's hooks into the game's code library and lists the plugins beside it. A plugin's own library is built by its own Makefile, so a code change in a plugin needs no game rebuild; a hook change does.
 - Two mods hooking one function chain, the last mod in the order first, and one function carries at most 256 chained hooks.
 - The mod manager's order decides the chain, and later mods win on files.

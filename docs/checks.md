@@ -409,7 +409,8 @@ the stand-in's script path, so MH4U's own Rathian AI drives her.
    [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136), so the AI's
    category-4 picks are recorded but are not this check's pass.
 
-Status: not done. It waits for the EMC converter (a follow-up after #49) and a quest that names 125.
+Status: not done. It waits for the EMC converter (a follow-up after #49), #216's module and a
+quest that names 125.
 
 ### The plugin's check (R1p)
 
@@ -470,10 +471,10 @@ is a debugging tool for later move investigations, not part of this check.
 ## UC runtime
 
 The runtime answers MH4U's monster-id-indexed tables for the ids in
-[data/ids](../data/ids/README.md), as the first module table's `src/ids.c` describes: a
-registered id is answered with the MH4U monster the registry names as its stand-in, except its
-resource record, which the runtime builds for the ported id with its own paths for the kinds of
-file the port ships and the stand-in's for the rest; 0 to 123 fall through. The headless check needs no converted monster files, so it runs
+[data/ids](../data/ids/README.md): a registered id is answered with the MH4U monster the
+registry names as its stand-in, except its resource record, which the runtime builds for the
+ported id with its own paths for the kinds of file the port ships and the stand-in's for the
+rest; 0 to 123 fall through. The headless check needs no converted monster files, so it runs
 before #48 and #49.
 
 Ids 124 to 223 are permanent. A monster ported after that range is full takes a registry id

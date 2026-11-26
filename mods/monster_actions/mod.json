@@ -1,7 +1,0 @@
-{
-  "name": "Ported monsters' action ids",
-  "hooks": [
-    {"name": "uEnemy::setAction", "address": "0x0090ef74"}
-  ],
-  "plugin": {"linux": "monster_actions.so", "windows": "monster_actions.dll", "macos": "monster_actions.dylib"}
-}

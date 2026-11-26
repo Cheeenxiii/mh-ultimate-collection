@@ -1,12 +1,10 @@
-"""reference/monster_handlers.py: the worklist's classification and the action-id map must not
-drift from reference/README.md, which records them."""
+"""reference/monster_handlers.py: the worklist's classification must not drift from
+reference/README.md, which records it."""
 from __future__ import annotations
 
 import os
 import sys
 import tempfile
-
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reference"))
 import monster_handlers as mh  # noqa: E402
@@ -108,70 +106,3 @@ def test_an_inventory_tsv_and_a_motion_tsv_are_read_by_the_columns_the_tools_wri
     finally:
         os.unlink(inventory)
         os.unlink(motions)
-
-
-def test_the_per_id_table_is_read_by_the_columns_targets_writes():
-    with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False) as f:
-        f.write("# action\ttarget\thandler\tproof\tR1\tmh4u_handler\n")
-        f.write("7/64\t7/35\t0x006971c0\tbody match\tR1 same motion 205\t0x006e2764\n")
-        f.write("7/64\t7/37\t0x006971c0\tbody match\tR1 same motion 205\t\n")
-        path = f.name
-    try:
-        candidates = mh.read_targets(path)[(7, 64)]
-    finally:
-        os.unlink(path)
-    assert len(candidates) == 2
-    assert candidates[0].handler == 0x006E2764 and candidates[0].proof == "body match"
-    assert candidates[1].handler is None          # MH4U's 7/37 is inline
-
-
-def test_the_map_takes_the_lowest_shared_action_that_runs_an_mh4u_handler():
-    inline = mh.Target((7, 64), (7, 35), None, "body match", "")
-    handled = mh.Target((7, 64), (7, 92), 0x006E8E54, "body match", "")
-    lower = mh.Target((7, 64), (7, 36), 0x006E8E54, "body match", "")
-    assert mh.select_target([inline, handled]).target == (7, 92)
-    assert mh.select_target([handled, lower]).target == (7, 36)
-    # No candidate runs an MH4U handler: the lowest shared action is still the fallback.
-    assert mh.select_target([inline]).target == (7, 35)
-
-
-def test_an_id_with_no_shared_action_is_reported_as_new_code():
-    mapped, new_code = mh.build_map({(0, 4): [mh.Target((0, 4), (0, 0), None, "body match", "")]},
-                                    [(0, 4), (4, None)])
-    assert mapped == [((0, 4), (0, 0))]
-    assert new_code == [(4, None)]
-
-
-def test_the_header_holds_the_map_and_leaves_the_gu_monster_empty():
-    text = mh.render_header([((0, 4), (0, 0)), ((13, 9), (0, 3))], mh.read_registry())
-    assert text.startswith(f"/* {mh.GENERATED}")
-    assert "{0, 4, 0, 0}," in text and "{13, 9, 0, 3}," in text
-    assert "mhuc_actions_124 = NULL;" in text
-    assert text.count("static const MhucAction mhuc_actions_125[]") == 1
-    assert "{125, 2, mhuc_actions_125}," in text
-
-
-def registry_row(ident: int, key: str, source_game: str = "mh3u") -> dict[str, str]:
-    return dict(kind="monster", id=str(ident), key=key, source_game=source_game,
-                source_key="em001", name=key, stand_in="1", files="model", notes="")
-
-
-def test_a_second_ported_monster_gets_an_empty_table_not_the_recorded_map():
-    # The map is 3U Rathian's; another 3U monster must fall through to MH4U's handlers.
-    registry = [registry_row(124, "rathian-gu", "mhxx"), registry_row(125, "rathian-3u"),
-                registry_row(127, "great-wroggi-3u")]
-    text = mh.render_header([((0, 4), (0, 0))], registry)
-    assert "static const MhucAction *const mhuc_actions_127 = NULL;" in text
-    assert "id 127): no entry: no action-id map is recorded for it yet. */" in text
-    assert "{125, 1, mhuc_actions_125}," in text and "{127, 0, mhuc_actions_127}," in text
-
-
-def test_the_header_refuses_a_registry_without_the_monster_that_owns_the_map():
-    with pytest.raises(SystemExit, match="rathian-3u"):
-        mh.render_header([((0, 4), (0, 0))], [registry_row(124, "rathian-gu", "mhxx")])
-
-
-def test_a_category_only_action_uses_the_wildcard_index_in_the_header():
-    text = mh.render_header([((4, None), (0, 0))], mh.read_registry())
-    assert "{4, 255, 0, 0}," in text
-    assert "#define MHUC_ACTION_NO_INDEX 0xff" in text
