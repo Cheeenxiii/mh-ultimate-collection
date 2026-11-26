@@ -137,7 +137,8 @@ finds `arc/enemy/em001.arc`, and the mod holds one RomFS file, `/data/em125.arc`
 (`enemy\em125\...`), so it never touches the MH4U monster whose tables stand in for it. The `cmd` her row ships
 needs the two games' decompressed code images, where their instruction-length tables are
 ([emc.md](../specs/emc.md), check A5). 3U Rathian is the worked case: MH3U's 78-entry archive becomes 10 entries
-(2.2 MiB), and the sound mode of the same command adds her sound set (`--arc --sound-arc`).
+of her own (2.9 MiB) plus the 31 stand-in entries the record keeps, a 3.5 MiB archive, and the sound mode of the
+same command adds her sound set (`--arc --sound-arc`).
 
 | File kind | MH3U entries | In the mod | Why |
 |---|---|---|---|
