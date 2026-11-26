@@ -60,9 +60,9 @@ The blocks tile the 81,400 bytes exactly:
 | 0x0112 | 12 bytes | unknown; differs between character saves, written when a character is created | unknown | ours; check S8 |
 | 0x011E | 64 bytes | 512 flag bits, bit 0 the low bit of the first byte; what the bits index is unknown ("Quest clear lists") | unverified | ours; checks S8 |
 | 0x015E | 1,400 × 4 bytes | item box (table below) | verified | mh4edit; checks S3, S6 |
-| 0x173E | 1,400 × 28 bytes | equipment box (table below) | verified | mh4edit; check S3 |
-| 0xB05E | 0xAE6 bytes | unknown; all zero in the maintainer's saves | unknown | ours |
-| 0xBB44 | 0x96C bytes | Palico equipment box: 12 bytes then 100 × 24-byte slots, unread | unknown | mh4u-toolbox; ours |
+| 0x173E | 1,500 × 28 bytes | equipment box (table below), slots 0 to 1,499; the last 100 are the block the earlier map called unknown at 0xB05E | verified | ours: slots 1,400 to 1,499 hold equipment records (check S3) and the save-creation code clears 1,500 of them; mh4edit exposes the first 1,400 |
+| 0xBB4E | 2,400 bytes | Palico equipment box: 600 four-byte entries, unread; mh4u-toolbox groups 24-byte slots from 0xBB50 | unknown | ours: the save-creation code marks every entry; check S5 |
+| 0xC4AE | 2 bytes | unknown; zero in the maintainer's saves | unknown | ours; check S5 |
 | 0xC4B0 | 232 bytes | the main Palico (table below) | verified | mh4edit; check S5 |
 | 0xC598 | 0x55C bytes | unknown | unknown | ours; non-zero in the maintainer's saves |
 | 0xCAF4 | 8 × 4 bytes | gunner pouch (table below) | verified | the MH4G save-editor wiki; check S3 |
@@ -106,12 +106,12 @@ tell which ones move between characters.
 
 ### Equipment record (28 bytes)
 
-Worn in 0x0040, and the equipment box at 0x173E.
+Worn in 0x0040, and the 1,500 slots of the equipment box at 0x173E.
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
 | 0x00 | u8 | kind: 0 empty, 1 chest, 2 arms, 3 waist, 4 legs, 5 head, 6 talisman, 7 to 20 the fourteen weapon types in the game's order | verified | mh4edit; check S3 |
-| 0x01 | u8 | unknown, zero in the maintainer's saves | unknown | mh4edit |
+| 0x01 | u8 | unknown; values 0 to 12, 17 and 104 appear in the maintainer's saves | unknown | mh4edit; check S3 |
 | 0x02 | u16 | equipment id, indexed by kind | verified | mh4edit; check S3 |
 | 0x04 | u16 | unknown | unknown | mh4edit |
 | 0x06 | u16 | decoration slot 1: the jewel id in bits 0 to 14 | verified | mh4edit; check S3 |
@@ -168,7 +168,7 @@ Fifty-six 232-byte records: the main Palico at 0xC4B0, then 55 at 0xF338.
 | 0x70 | u64 | experience | verified | mh4edit; check S5 |
 
 The rest of the record (appearance, skills, equipment slots) is not decoded; mh4edit edits some of it, and
-the Palico gear box at 0xBB44 is unread.
+the Palico gear box at 0xBB4E is unread.
 
 ### Monster log (0x12E5C)
 
@@ -344,9 +344,9 @@ saves.
 
 ## Checks
 
-Run on 2026-11-25 on the maintainer's own saves (`game_files/saves/MH4U`: `system`, `user1` to `user3`)
-and, for S9, the copy of `system` that ships in the DLC Save Data folder and one the game wrote on a fresh
-SD card, outside the repository, decrypted with `mhuc decrypt mh4u-save` and the key in
+Run on 2026-11-25 and 2026-11-26 on the maintainer's own saves (`game_files/saves/MH4U`: `system`, `user1`
+to `user3`) and, for S9, the copy of `system` that ships in the DLC Save Data folder and one the game wrote
+on a fresh SD card, outside the repository, decrypted with `mhuc decrypt mh4u-save` and the key in
 `game_files/work/mhuc_dumps/mh4u/save.key`. The procedures print values and counts, never bytes; they are
 repeatable on any player's saves.
 
@@ -366,13 +366,21 @@ repeatable on any player's saves.
   kind and id. Pass: every id resolves and every count is inside 0 to 99; all 7 worn indices point at
   matching records on all three characters; the equipment kinds are 1 to 20. Item names are not written
   here (game data); the check reads them from the lists outside the repository, or from the game.
+  The equipment box is 1,500 slots, not the 1,400 mh4edit shows: the block at 0xB05E that the earlier map
+  left unknown is slots 1,400 to 1,499, and its records have the same shape (kind, id, decorations, 16
+  type bytes) as the rest of the box. The two completed saves use 75 of those 100 slots (the last at slot
+  1,499); the mid-game save uses none, because its 351 items fill slots 0 to 350. `mhuc save dump` parses
+  all 1,500 slots, and `tests/test_with_game_files.py` checks the kinds and the completed saves' tail.
 - **S4 (done):** read the ten guild-quest records. Pass: every used record's owner name is a decodable UTF-16
   name (the character's or another player's), every monster id is 0 to 123, and every level is 1 to 140; the
   records tile 0xDCA8 to 0xE888. The maintainer's mid-game character has all ten slots used, the other two
   have five.
 - **S5 (done):** read the 56 Palico records. Pass: the used slots have decodable names and non-zero
   experience; the main Palico is at 0xC4B0 and the rest are the 55 records at 0xF338; the records tile
-  0xC4B0 to 0xC598 and 0xF338 to 0x12510.
+  0xC4B0 to 0xC598 and 0xF338 to 0x12510. The Palico equipment box follows the equipment box at 0xBB4E:
+  2,400 bytes (600 four-byte entries), then two zero bytes at 0xC4AE; every save's last non-zero byte in
+  the box is 0xC4AA, which is where the game's save-creation code stops marking the 600 entries. The box's
+  slot fields are not decoded; mh4u-toolbox groups 24-byte slots from 0xBB50, two bytes later.
 - **S6 (done):** read the 82 log entries. Pass: they tile 0x12E5C to 0x13190; every largest is at least its
   smallest (when both are non-zero); crowns are 0 to 13; the completed save's entries are full. A board post
   names the first entry's monster Seltas, whose MH4U id is 25, so the order is not the id order; what the

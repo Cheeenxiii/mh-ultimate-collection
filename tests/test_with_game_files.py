@@ -156,6 +156,7 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
     assert names, "no save file found"
     characters = 0
     completed_flags, completed_prefixes, partial_flags = [], [], []
+    equipment_tails = []       # (is_completed, the records in equipment-box slots 1,400 to 1,499)
     for name in names:
         with open(os.path.join(folder, name), "rb") as f:
             original = f.read()
@@ -172,6 +173,11 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
             assert len(data["guild_quests"]) == 10, name
             assert len(data["palicos"]) >= 1, name
             assert data["profile"]["hunter_rank"] <= 999, name
+            # S3: the game's equipment box is 1,500 slots, not the 1,400 the editors expose, so the
+            # block that used to be listed as unknown at 0xB05E is slots 1,400 to 1,499.
+            box = data["equipment_box"]
+            assert all(1 <= rec["kind"] <= 20 for rec in box), f"{name}: an equipment kind is outside 1 to 20"
+            assert all(rec["slot"] < save.EQUIPMENT_BOX_COUNT for rec in box), name
             # S8: every item id the save holds has its bit in the 2,176-bit array at 0xF220.
             held = {slot["item"] for slot in data["item_box"]}
             for pouch in data["pouches"].values():
@@ -183,11 +189,13 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
             prefix = plain[save.QUEST_FLAGS_PREFIX_AT:save.QUEST_FLAGS_AT]
             candidate = data["quest_lists"]["candidate_clear_flags"]
             assert candidate["set_bits"] == sum(bin(b).count("1") for b in flags), name
-            if candidate["set_bits"] == 8 * save.QUEST_FLAGS_SIZE:
+            completed = candidate["set_bits"] == 8 * save.QUEST_FLAGS_SIZE
+            if completed:
                 completed_flags.append(flags)
                 completed_prefixes.append(prefix)
             else:
                 partial_flags.append(flags)
+            equipment_tails.append((completed, [rec for rec in box if rec["slot"] >= 1400]))
             characters += 1
         else:
             assert not save.system_problems(plain), name
@@ -206,6 +214,10 @@ def test_mh4u_saves_reencrypt_and_their_structures_close(dump):
         differing = sum(a != b for a, b in zip(completed_prefixes[0], completed_prefixes[1], strict=True))
         assert differing >= 11, \
             f"the two completed saves' prefixes differ in {differing} of 12 bytes, so the prefix is not per-character"
+    assert any(tail for done, tail in equipment_tails if done), \
+        "no completed save uses equipment slots past 1,400, so 0xB05E would not be the box's tail"
+    assert not any(tail for done, tail in equipment_tails if not done), \
+        "the mid-game save uses equipment slots past 1,400, so 0xB05E is not simply the box's tail"
     full = completed_flags[0] if completed_flags else None
     for flags in partial_flags:
         if full is not None:

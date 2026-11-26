@@ -47,8 +47,11 @@ POUCH_ITEM_COUNT = 24
 ITEM_BOX_AT = 0x015E
 ITEM_BOX_COUNT = 1400
 EQUIPMENT_BOX_AT = 0x173E
-EQUIPMENT_BOX_COUNT = 1400
+EQUIPMENT_BOX_COUNT = 1500      # the game's box is 1,500 slots; the community editors expose the first 1,400
 EQUIPMENT_SIZE = 28
+PALICO_GEAR_AT = 0xBB4E         # 600 four-byte entries, unread; the toolbox groups 24-byte slots
+PALICO_GEAR_COUNT = 100
+PALICO_GEAR_SIZE = 24
 PALICO_MAIN_AT = 0xC4B0
 PALICO_AT = 0xF338
 PALICO_COUNT = 56               # one main Palico, then 55 others
@@ -93,8 +96,8 @@ BLOCKS = (
     ("quest_flags", 0x011E, 64),
     ("item_box", ITEM_BOX_AT, ITEM_BOX_COUNT * 4),
     ("equipment_box", EQUIPMENT_BOX_AT, EQUIPMENT_BOX_COUNT * EQUIPMENT_SIZE),
-    ("unknown_0xB05E", 0xB05E, 0xAE6),
-    ("palico_gear_box", 0xBB44, 0x96C),
+    ("palico_gear_box", PALICO_GEAR_AT, PALICO_GEAR_COUNT * PALICO_GEAR_SIZE),
+    ("unknown_0xC4AE", 0xC4AE, 2),
     ("palico_main", PALICO_MAIN_AT, PALICO_SIZE),
     ("unknown_0xC598", 0xC598, 0x55C),
     ("pouch_gunner", POUCH_GUNNER_AT, POUCH_GUNNER_COUNT * 4),
