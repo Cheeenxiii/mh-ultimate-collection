@@ -438,18 +438,12 @@ names it the first time it runs.
    [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136), so the AI's
    category-4 picks are recorded but are not this check's pass.
 
-<<<<<<< HEAD
 Status: R3a passes (2026-11-26, quest 10212, a clean profile with only `Ported monster ids`,
 its library built from the USA v1.3.0 update by `build_game.py`): the record names
 `enemy\em125\data\em125_cmd`, the id layer answers id 125's own archive and record, and
 LayeredFS loads `/data/em125.arc`. The run does not show which actions the AI picks, so the
 converted script's 3U-only actions are R3's, with a human playing the quest; R3 waits for #216's
 module.
-=======
-Status: R3a passes (2026-11-26, the headless run below, quest 10212, this branch): the record
-names `enemy\em125\data\em125_cmd`, the id layer answers id 125's own archive and record, and
-her script's actions run. R3 still needs a human playing the quest to judge the move.
->>>>>>> 1e16791 (Record the headless check that the ported AI script loads)
 
 ### The plugin's check (R1p)
 
