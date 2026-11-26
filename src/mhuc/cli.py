@@ -594,7 +594,7 @@ def _convert_monster_sound(args) -> int:
         print(f"  {note}")
     if "sound" not in row.files:
         print(f"  note: data/ids/registry.csv's row for {row.id} doesn't list `sound`, so "
-              "mods/monster_ids keeps the stand-in's sound path", file=sys.stderr)
+              "the runtime keeps the stand-in's sound path", file=sys.stderr)
     return 0
 
 

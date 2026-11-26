@@ -1,15 +1,55 @@
-# Ported monster ids
+# UC runtime
 
-The plugin that gives a ported monster its own id. MH4U looks a monster up by id in tables
-that have 124 rows (0 to 123, [reference/README.md](../../reference/README.md#mh4u-monster-tables)).
-A ported monster's id starts at 124 and comes from the mod's registry,
-[data/ids/registry.csv](../../data/ids/README.md), which `tools/check_ids.py` turns into
-`src/ids.h`. Ids 124 to 223 are permanent; a monster ported after that range is full takes a
-registry id from 256 up, and the plugin lends it a free byte of 224 to 255 for each quest that
-names it (the [id pool](#the-id-pool) below). The plugin wraps the readers of those tables and
-answers a registered id with the MH4U monster's rows the registry names as its stand-in, except
-its resource record, which it builds for the ported id from the kinds of file the port ships;
-ids 0 to 123 go to the game's function unchanged, so MH4U's own monsters are untouched.
+The mod's one native plugin ([decision 0013](../../docs/decisions.md#0013-one-runtime-for-the-mods-native-code)).
+It holds the id layer that gives a ported monster its own id, and, as ports land, one C module
+per ported monster for its actions. Its `mod.json` names one fixed hook list, so a new monster
+rebuilds this library and redeploys the mod, while the game's code library stays as it is.
+
+The id layer: MH4U looks a monster up by id in tables that have 124 rows (0 to 123,
+[reference/README.md](../../reference/README.md#mh4u-monster-tables)). A ported monster's id
+starts at 124 and comes from the mod's registry, [data/ids/registry.csv](../../data/ids/README.md),
+which `tools/check_ids.py` turns into `src/ids.h` (the id tables and file kinds) and
+`src/modules.h` (the module table, one entry per registered id). Ids 124 to 223 are permanent;
+a monster ported after that range is full takes a registry id from 256 up, and the runtime
+lends it a free byte of 224 to 255 for each quest that names it (the [id pool](#the-id-pool)
+below). The runtime wraps the readers of the id-indexed tables and answers a registered id with
+the MH4U monster's rows the registry names as its stand-in, except its resource record, which it
+builds for the ported id from the kinds of file the port ships; ids 0 to 123 go to the game's
+function unchanged, so MH4U's own monsters are untouched. The readers, the resource-record
+builder, the pool, the text tables and the self-test moved here unchanged from the plugin that
+held them before.
+
+## Layout
+
+| Path | Holds |
+|---|---|
+| `src/runtime.c` | the plugin entry point and the one hook table: it registers the id layer's hooks and its frame call |
+| `src/runtime.h` | what the entry point and the parts share: the hook type and the id layer's calls |
+| `src/ids.c` | the id layer: the readers, the resource-record builder, the id pool, the name and notes text and the self-test |
+| `src/ids.h` | generated from `data/ids/registry.csv` by `tools/check_ids.py --write`; do not edit |
+| `src/modules.h` | generated from the registry: one entry per registered id, with the monster's module pointer that [#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215) fills; do not edit |
+| `tests/test_runtime.c` | the id layer on a fake host, with no game (`make test`) |
+
+## Adding a module
+
+A ported monster's code is a C module in this library, and its RomFS files stay the data-only
+mod folder `mhuc convert monster` writes. The module interface lands with
+[#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215), which moves GU
+Rathian's translated actions in; this step laid out the table and the rule it enforces. The
+steps to add a monster are:
+
+1. Register the monster's id in [data/ids/registry.csv](../../data/ids/README.md); a row is
+   what gives it an entry in `src/modules.h`. Run `python3 tools/check_ids.py --write`.
+2. Put the monster's module in `src/` (its generated tables with it) and list its C file in the
+   Makefile's `SOURCES`; [#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)
+   defines the module interface and how `tools/check_ids.py` fills the table's `ops` pointers,
+   so `src/modules.h` stays generated.
+3. `make`, then redeploy the mod. The runtime's `mod.json` and its hook list do not change, so
+   the game's code library is not built again.
+
+A module adds no hook of its own: the runtime's one dispatcher finds a ported monster and runs
+its module, and the id layer's readers answer its id. That is what keeps the code library's
+hook list fixed.
 
 ## What it hooks
 
@@ -75,7 +115,7 @@ its hunt records go through the mod's data in the save, not MH4U's byte-indexed 
 The self-test (settings below) builds a synthetic `.mib` in guest memory that names the first
 pooled id, lends it a byte, logs the answer, frees it again and logs that. With the shipped
 registry (no pooled row) it logs that the pool is unused instead; check P1 in
-[checks.md](../../docs/checks.md#ported-monster-ids) builds the plugin from
+[checks.md](../../docs/checks.md#uc-runtime) builds the plugin from
 `tests/fixtures/registry-pooled.csv` to see the pooled lines.
 
 ## The resource record
@@ -253,20 +293,22 @@ English notes are therefore still content work, not this plugin's.
 ## Build
 
 ```bash
-make        # monster_ids.so next to mod.json
+make        # uc_runtime.so next to mod.json
+make test   # the id layer on a fake host, with no game
 ```
 
 It builds against the engine fork's `include/mh4u_plugin.h`; `make FORK=/path/to/fork` uses
-another checkout. `src/ids.h` is generated, not edited: run `python3 tools/check_ids.py
---write` after changing the registry. Licence: GPL-3.0-or-later, like the rest of the mod.
+another checkout. `src/ids.h` and `src/modules.h` are generated, not edited: run `python3
+tools/check_ids.py --write` after changing the registry. Licence: GPL-3.0-or-later, like the
+rest of the mod.
 
 ## Install
 
 ```bash
-python3 <fork>/tools/mods.py add mods/monster_ids
-python3 <fork>/tools/mods.py enable "Ported monster ids"
+python3 <fork>/tools/mods.py add mods/uc_runtime
+python3 <fork>/tools/mods.py enable "UC runtime"
 MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> \
-    --out "<Azahar user directory>/mh4u-mods/Ported monster ids/text/monster_text.bin"
+    --out "<Azahar user directory>/mh4u-mods/UC runtime/text/monster_text.bin"
 python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Azahar user directory>
 ```
 
@@ -289,9 +331,9 @@ marked present so the state 0 preload loads its enemy data`, then `quest task: m
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#ported-monster-ids) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#uc-runtime) uses it. |
 
 ## The check
 
 The headless check and what it must show are in
-[checks.md](../../docs/checks.md#ported-monster-ids).
+[checks.md](../../docs/checks.md#uc-runtime).

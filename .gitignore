@@ -24,3 +24,6 @@ __pycache__/
 
 # The translated-actions test binary (mods/)
 mods/*/test/test_plugin
+
+# The runtime test binary (mods/)
+mods/*/tests/test_runtime

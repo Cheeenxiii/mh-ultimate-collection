@@ -13,18 +13,12 @@ monster_motions.py (which animation a handler starts).
         --dispatcher 0x00687d30 --functions games/mh3u/functions.tsv \
         --actions 0/4,4,7/64,7/87,7/93,10/0,10/1,10/2,10/3,10/4,10/5,10/6,11/5,11/15,11/26,11/28,13/9
     targets --game mh3u ... --target OTHER_ACTIONS.tsv [--motions MOTIONS.tsv]
-    table --targets TARGETS.tsv --actions 0/4,7/64,... -o actions.h
 
-`targets` is the action-id map: the missing id -> the shared action whose handler it reaches,
-with "body match" (the same handler function) or "tail match" (a short wrapper ending on it)
-as the proof, and R1's motion comparison where the handler starts a constant motion.
-
-`table` turns that per-id table into the run time's generated header,
-`mods/monster_actions/src/actions.h`: one entry per missing id, the shared MH4U action whose
-handler has the same body. Where several shared ids reach the handler, it takes the lowest
-whose MH4U action reaches a handler (an inline MH4U action is the fallback); the page records
-the alternatives, and the in-game check settles the choice. An id with no shared action
-(action 4) is reported and left out: it needs new C.
+`targets` lists the shared action each missing id can run, with "body match" (the same handler
+function) or "tail match" (a short wrapper ending on it) as the proof, and R1's motion
+comparison where the handler starts a constant motion. It is source analysis now: decision
+0002's 2026-11-26 amendment has every action run the source's own handler, so the port has no
+run-time action-id map.
 
 stdout holds ids and counts. The TSV `-o` writes holds addresses and constants only, but it
 is derived from game code: keep it outside the repository.
@@ -45,8 +39,6 @@ Either one is a second reason a handler waits.
 from __future__ import annotations
 
 import argparse
-import collections
-import csv
 import os
 import re
 import struct
@@ -498,198 +490,6 @@ def cmd_targets(args) -> int:
     return 0
 
 
-# The action-id map (issue #137). #115 found the 17 ids MH4U's uEm001 lacks; 16 of them reach
-# a handler a shared action also reaches, so the port can run that action and MH4U's own
-# handler instead of carrying new C. `targets` records the candidates and the proof; `table`
-# turns them into the run time's header, one entry per missing id.
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REGISTRY = os.path.join(ROOT, "data", "ids", "registry.csv")
-HEADER = os.path.join(ROOT, "mods", "monster_actions", "src", "actions.h")
-MAP_ACTIONS = ("0/4,4,7/64,7/87,7/93,10/0,10/1,10/2,10/3,10/4,10/5,10/6,"
-               "11/5,11/15,11/26,11/28,13/9")
-# The registered monster whose action-id map reference/README.md records (the 17 ids MH4U has
-# no action for, #115). It is the only port with a recorded map; every other registered
-# monster gets an empty table until its own map is worked out.
-MAP_KEY = "rathian-3u"
-NO_MAP_REASON = "no action-id map is recorded for it yet"
-# A reason that stays: GU Rathian's table is empty because R2 checked that every shared
-# action id runs MH4U's own handler as it is.
-NO_MAP_REASONS = {
-    "rathian-gu": "every action id her port keeps is shared with MH4U and runs MH4U's handler "
-                  "as it is (check R2)",
-}
-GENERATED = "Generated from the per-id action-id map by reference/monster_handlers.py table."
-NO_INDEX = 0xff      # a category-only action's index byte is unused; the plugin matches any
-
-
-@dataclass
-class Target:
-    """One row of `targets -o`: a source id, a shared action it can run, and the proof.
-
-    `handler` is MH4U's handler for the shared action, or None when MH4U's case block is
-    inline. An inline MH4U action has no handler to run, so it is only a fallback target.
-    """
-    action: tuple[int, int | None]
-    target: tuple[int, int | None]
-    handler: int | None
-    proof: str
-    r1: str
-
-
-def read_targets(path: str) -> dict[tuple[int, int | None], list[Target]]:
-    """The per-id table `targets -o` writes, grouped by source action."""
-    out: dict[tuple[int, int | None], list[Target]] = collections.defaultdict(list)
-    for line in open(path):
-        if line.startswith("#") or not line.strip():
-            continue
-        cells = line.rstrip("\n").split("\t")
-        if len(cells) < 2:
-            continue
-        action = parse_action(cells[0])
-        target = parse_action(cells[1])
-        handler = int(cells[5], 16) if len(cells) > 5 and cells[5] else None
-        out[action].append(Target(action, target, handler,
-                                  cells[3] if len(cells) > 3 else "",
-                                  cells[4] if len(cells) > 4 else ""))
-    return out
-
-
-def select_target(candidates: list[Target]) -> Target:
-    """The one shared action the map runs for an id.
-
-    Every candidate reaches the same source handler, so the proof holds for all of them. The
-    first rule keeps MH4U's own handler running (an inline MH4U action has none); the second
-    makes the pick repeatable. The page lists the alternatives and R2p's in-game check says
-    whether the pick plays; when it does not, moving the entry to another listed action is the
-    fix."""
-    with_handler = [c for c in candidates if c.handler is not None]
-    pool = with_handler or list(candidates)
-    return min(pool, key=lambda c: (c.target[0], -1 if c.target[1] is None else c.target[1]))
-
-
-def build_map(targets: dict[tuple[int, int | None], list[Target]],
-              actions: list[tuple[int, int | None]]
-              ) -> tuple[list[tuple[tuple[int, int | None], tuple[int, int | None]]],
-                         list[tuple[int, int | None]]]:
-    """The map's (source, target) entries, and the ids that need new C (no shared action)."""
-    mapped, new_code = [], []
-    for action in actions:
-        candidates = targets.get(action, [])
-        if not candidates:
-            new_code.append(action)
-            continue
-        mapped.append((action, select_target(candidates).target))
-    return mapped, new_code
-
-
-def read_registry(path: str = REGISTRY) -> list[dict[str, str]]:
-    """data/ids/registry.csv's monster rows."""
-    with open(path, newline="", encoding="utf-8") as f:
-        return [r for r in csv.DictReader(f) if r.get("kind") == "monster"]
-
-
-def action_bytes(action: tuple[int, int | None]) -> tuple[int, int]:
-    """An action as the two bytes the game stores; a category-only action's index is NO_INDEX."""
-    return action[0], NO_INDEX if action[1] is None else action[1]
-
-
-def action_id(action: tuple[int, int | None]) -> str:
-    return f"{action[0]}/{action[1]}" if action[1] is not None else str(action[0])
-
-
-def render_header(mapped: list[tuple[tuple[int, int | None], tuple[int, int | None]]],
-                  registry: list[dict[str, str]]) -> str:
-    """The generated header, mods/monster_actions/src/actions.h, as text.
-
-    The map belongs to the monster `MAP_KEY` names; every other registered monster gets a NULL
-    table with the reason its table is empty, so a port without a map still falls through to
-    MH4U's own handler for every action."""
-    owner = next((r for r in registry if r["key"] == MAP_KEY), None)
-    if owner is None:
-        raise SystemExit(f"the registry has no {MAP_KEY} row, the monster whose action-id map "
-                         "is recorded")
-    ported_id = int(owner["id"])
-    entries = sorted({(action_bytes(s), action_bytes(t)) for s, t in mapped})
-    if not entries:
-        raise SystemExit("the action-id map is empty")
-    by_id = {int(r["id"]): r for r in registry}
-    lines = [
-        f"/* {GENERATED}",
-        " * Do not edit: edit reference/README.md's map and the per-id table, then run the tool.",
-        " * Licence: GPL-3.0-or-later. */",
-        "#ifndef MHUC_ACTIONS_H",
-        "#define MHUC_ACTIONS_H",
-        "",
-        "#include <stdint.h>",
-        "",
-        "/* One translation for a ported monster: when the source game's AI asks for action",
-        " * `category`/`index`, MH4U runs `target_category`/`target_index` instead. The target's",
-        " * MH4U handler has the same body as the source's (reference/README.md records the",
-        " * proof). `index` is 0xff for a category-only action: any index byte matches it. */",
-        "typedef struct MhucAction {",
-        "    uint8_t category;",
-        "    uint8_t index;",
-        "    uint8_t target_category;",
-        "    uint8_t target_index;",
-        "} MhucAction;",
-        "",
-        "/* One ported monster's translations, keyed by its MH4U id (data/ids/registry.csv). */",
-        "typedef struct MhucPortedActions {",
-        "    uint8_t id;",
-        "    uint16_t entry_count;",
-        "    const MhucAction *entries;",
-        "} MhucPortedActions;",
-        "",
-        "/* The index byte a category-only action's entry holds: any index matches it. */",
-        f"#define MHUC_ACTION_NO_INDEX 0x{NO_INDEX:02x}",
-        "",
-    ]
-    counts = {}
-    for mid in sorted(by_id):
-        row = by_id[mid]
-        if mid == ported_id:
-            counts[mid] = len(entries)
-            lines.append(f"/* {row['name']}, ported from {row['source_game']} {row['source_key']} "
-                         f"({row['key']}, id {mid}): {len(entries)} action ids MH4U lacks, each "
-                         f"sent to the shared MH4U action whose handler has the same body "
-                         f"(reference/README.md). */")
-            lines.append(f"static const MhucAction mhuc_actions_{mid}[] = {{")
-            lines.extend(f"    {{{sc}, {si}, {tc}, {ti}}}," for (sc, si), (tc, ti) in entries)
-            lines.append("};")
-        else:
-            counts[mid] = 0
-            why = NO_MAP_REASONS.get(row["key"], NO_MAP_REASON)
-            lines.append(f"/* {row['name']}, ported from {row['source_game']} {row['source_key']} "
-                         f"({row['key']}, id {mid}): no entry: {why}. */")
-            lines.append(f"static const MhucAction *const mhuc_actions_{mid} = NULL;")
-        lines.append("")
-    lines.append(f"#define MHUC_PORTED_ACTIONS_COUNT {len(by_id)}")
-    lines.append("static const MhucPortedActions "
-                 "mhuc_ported_actions[MHUC_PORTED_ACTIONS_COUNT] = {")
-    for mid in sorted(by_id):
-        lines.append(f"    {{{mid}, {counts[mid]}, mhuc_actions_{mid}}},")
-    lines.append("};")
-    lines.append("")
-    lines.append("#endif")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def cmd_table(args) -> int:
-    """Write the action-id map's generated header from `targets -o`'s per-id table."""
-    mapped, new_code = build_map(read_targets(args.targets),
-                                 [parse_action(x) for x in args.actions.split(",")])
-    for action, target in mapped:
-        print(f"{action_id(action):<6} -> {action_id(target)}")
-    for action in new_code:
-        print(f"{action_id(action)}: no shared action reaches its handler: new code")
-    text = render_header(mapped, read_registry(args.registry))
-    with open(args.output, "w", encoding="utf-8") as f:
-        f.write(text)
-    print(f"{len(mapped)} of {len(mapped) + len(new_code)} ids served by a shared MH4U action")
-    return 0
-
-
 def cmd_selfcheck(_args) -> int:
     """The per-id records still name the ids and handlers the page states."""
     paired, lacking = read_reference()
@@ -728,13 +528,6 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--actions", help="comma-separated, e.g. 0/4,4,7/64 (default: every action)")
     p.add_argument("-o", "--output")
     p.set_defaults(fn=cmd_targets)
-    p = sub.add_parser("table", help="write the run time's action-id map header")
-    p.add_argument("--targets", required=True, help="the `targets -o` per-id table")
-    p.add_argument("--registry", default=REGISTRY)
-    p.add_argument("--actions", default=MAP_ACTIONS,
-                   help=f"comma-separated (default: {MAP_ACTIONS})")
-    p.add_argument("-o", "--output", default=HEADER)
-    p.set_defaults(fn=cmd_table)
     sub.add_parser("selfcheck").set_defaults(fn=cmd_selfcheck)
     args = ap.parse_args(argv)
     return args.fn(args)

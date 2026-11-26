@@ -1,8 +1,8 @@
 # Ids
 
 The registry of every id a ported content takes in MH4U. `registry.csv` is read by
-`tools/check_ids.py`, and the plugin `mods/monster_ids` gets its ids from the header the tool
-generates. Its companion `notes.csv` records where each ported id's Hunter's Notes text comes
+`tools/check_ids.py`, and the runtime `mods/uc_runtime` gets its ids from the headers the tool
+generates (`src/ids.h` and its module table, `src/modules.h`). Its companion `notes.csv` records where each ported id's Hunter's Notes text comes
 from; `tools/check_text.py` checks it and `mhuc text build` turns it and the registry into the
 mod's text table. Decision [0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)
 settles the rule: one registry, ids only ever grow, and the run time reads them from here.
@@ -32,14 +32,14 @@ stand-in's. Changing a `stand_in` is not moving an id.
 The resource record is a `0x2c`-byte record of eleven pointers: the model, six motion lists,
 the camera, a second motion list, the tail model, the motion effects, an unused field, the
 sound, four extra paths (the command/EMC is the fourth), the effect lists and a second effect
-list. The plugin's [README](../mods/monster_ids/README.md#the-resource-record) has the
-offsets, and check P1 in [checks.md](../docs/checks.md#ported-monster-ids) shows the built
+list. The runtime's [README](../mods/uc_runtime/README.md#the-resource-record) has the
+offsets, and check P1 in [checks.md](../docs/checks.md#uc-runtime) shows the built
 record's paths. A port packages its files under those paths
 (`enemy\em124\mod\em124`, `enemy\em124\mot\em124_0`, ...).
 
 ## The pool
 
-Ids 224 to 255 are not registry ids: they are the bytes `mods/monster_ids` lends to a quest's
+Ids 224 to 255 are not registry ids: they are the bytes `mods/uc_runtime` lends to a quest's
 pooled monsters. A pooled row takes an id from 256 up, which is what the quest's u32 monster
 list and the mod's data in the save record. When a quest loads, the plugin finds its loaded
 `.mib` among the quest holder's quest-file resources and rewrites each pooled id in the
@@ -96,7 +96,7 @@ and checked on the three games' monster archives ([mef](../../specs/mef.md),
 [efl](../../specs/efl.md), checks FX1, FX2, EF1 and EF2); their records and blocks are not
 understood yet, so a port still ships neither kind.
 
-A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the plugin's path map
+A new kind is added to `tools/check_ids.py`'s `FILE_KINDS` and to the runtime's path map
 together; the generated header's `MHUC_FILES_*` bits and each row's `motion_mask` are what
 the plugin's record builder reads.
 
@@ -125,18 +125,20 @@ row lists no `cmd` and MH4U's own script drives her.
 - a key, a source game and a source key are valid, and every row has a name and a stand-in;
 - `files` is not empty, every kind in it appears once, and `motions` names slots in 0..5 once
   each;
-- `mods/monster_ids/src/ids.h` is exactly what this file generates: the permanent ids in one
-  array, the pooled ids in another, and each row's `files` bits and `motion_mask`.
+- `mods/uc_runtime/src/ids.h` is exactly what this file generates: the permanent ids in one
+  array, the pooled ids in another, and each row's `files` bits and `motion_mask`;
+- `mods/uc_runtime/src/modules.h` is exactly what this file generates: the module table's one
+  entry per registered id, in the permanent-then-pooled order.
 
-After editing the registry, write the header and check both:
+After editing the registry, write the headers and check them:
 
 ```bash
 python3 tools/check_ids.py --write
 python3 tools/check_ids.py
 ```
 
-`ids.h` is checked in so the plugin builds from the registry without the tool having run; the
-check fails when it is stale. An id that has shipped never moves: a new content takes the next
+`ids.h` and `modules.h` are checked in so the runtime builds from the registry without the tool
+having run; the check fails when either is stale. An id that has shipped never moves: a new content takes the next
 free id, and a mistake is corrected by a migration, not by renumbering
 ([0003](../docs/decisions.md#0003-id-allocation-and-mod-saves)).
 
@@ -161,7 +163,7 @@ player's own dumps (MH3U's `arc/ID/ID_gallery_eng.arc`, MHXX's
 file holds exactly the registered ids with the registry's names. The text's language is the
 source game's: MH3U USA is English, MHXX JPN is Japanese until MHGU's English text is read.
 No text is kept here, only the source's address and index; the plugin's README
-([the name and notes text](../mods/monster_ids/README.md#the-name-and-notes-text)) says how
+([the name and notes text](../mods/uc_runtime/README.md#the-name-and-notes-text)) says how
 the game reads it.
 
 ## Why these bounds

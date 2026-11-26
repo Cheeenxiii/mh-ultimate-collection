@@ -400,10 +400,8 @@ the stand-in's script path, so MH4U's own Rathian AI drives her.
 
 3. Build the runtime with her module
    ([#213](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/213),
-   [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) and the id layer
-   (`mods/monster_ids` until [#213](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/213)
-   moves it), build the code library with them (the fork's `tools/build_game.py`), and take a
-   quest that names 125.
+   [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)), build the code
+   library with it (the fork's `tools/build_game.py`), and take a quest that names 125.
 4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the module's log names
    7/64 as the action it ran. Today, with the stand-in's script driving her, that line is the
    control: it must not appear until the converted EMC ships.
@@ -411,7 +409,8 @@ the stand-in's script path, so MH4U's own Rathian AI drives her.
    [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136), so the AI's
    category-4 picks are recorded but are not this check's pass.
 
-Status: not done. It waits for the EMC converter (a follow-up after #49) and a quest that names 125.
+Status: not done. It waits for the EMC converter (a follow-up after #49), #216's module and a
+quest that names 125.
 
 ### The plugin's check (R1p)
 
@@ -469,45 +468,45 @@ next is forced again. Why the idle routine runs during a forced move is not trac
 with [reference/force_action.py](../reference/force_action.py) through Azahar's GDB stub; it
 is a debugging tool for later move investigations, not part of this check.
 
-## Ported monster ids
+## UC runtime
 
-`mods/monster_ids` answers MH4U's monster-id-indexed tables for the ids in
+The runtime answers MH4U's monster-id-indexed tables for the ids in
 [data/ids](../data/ids/README.md): a registered id is answered with the MH4U monster the
-registry names as its stand-in, except its resource record, which the plugin builds for the
+registry names as its stand-in, except its resource record, which the runtime builds for the
 ported id with its own paths for the kinds of file the port ships and the stand-in's for the
 rest; 0 to 123 fall through. The headless check needs no converted monster files, so it runs
 before #48 and #49.
 
 Ids 124 to 223 are permanent. A monster ported after that range is full takes a registry id
-from 256 up, and the plugin lends it a free byte of 224 to 255 for each quest that names it: at
+from 256 up, and the runtime lends it a free byte of 224 to 255 for each quest that names it: at
 quest start it rewrites the pooled ids in the loaded `.mib`'s large-monster waves, the reader
 hooks answer the lent byte with the pooled monster's rows, and the bytes are freed when the
-quest ends. The bytes, the quest data it reads and the fixture are in the plugin's
-[README](../mods/monster_ids/README.md#the-id-pool). No pooled monster ships, so the shipped
+quest ends. The bytes, the quest data it reads and the fixture are in the runtime's
+[README](../mods/uc_runtime/README.md#the-id-pool). No pooled monster ships, so the shipped
 registry has no row from 256 up and the pool is exercised through a registry fixture.
 
 | Check | What | Pass |
 |---|---|---|
-| P1 | the plugin's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, its name and notes text from `text/monster_text.bin` and the three message getters answering it, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
+| P1 | the runtime's first-frame self-test, headless | the log shows the ready line, each reader answering the registered ids, the resource record each registered id built with its own id's paths for the kinds and motion slots the port ships and the stand-in's for the rest, its name and notes text from `text/monster_text.bin` and the three message getters answering it, the path the stand-in's data comes from, ids 0 to 123 passing through, and (with the pooled fixture) a pooled id lent, answered and freed |
 | P2 | a quest whose monster is a ported id, played | the reader lines appear when the monster spawns and 0 to 123 still pass through; the quest plays, and a quest with MH4U's own monster plays as before |
 
 P1, headless:
 
-1. Build the plugin (`make` in `mods/monster_ids`) and add it to a user folder's mod library
-   (`tools/mods.py add mods/monster_ids`). Set `selftest = 1` in the installed mod's
+1. Build the runtime (`make` in `mods/uc_runtime`) and add it to a user folder's mod library
+   (`tools/mods.py add mods/uc_runtime`). Set `selftest = 1` in the installed mod's
    `config.ini`. Build the mod's text table from the player's own dumps into the installed
    mod's folder, and check it:
-   `MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> --out "<user folder>/mh4u-mods/Ported
-   monster ids/text/monster_text.bin"` and `tools/check_text.py --mod "<that file>"`. Build the
+   `MHUC_DUMPS=<dumps> mhuc text build --dumps <dumps> --out "<user folder>/mh4u-mods/UC
+   runtime/text/monster_text.bin"` and `tools/check_text.py --mod "<that file>"`. Build the
    code library with the mod on:
    `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install <user folder>`. The
-   build reports 50 hook points: the base 32 and the mod's 19 names, `QuestFlow::startQuest`
-   being in both.
+   build reports 52 hook points: the base 32 and the runtime's 20 new names,
+   `QuestFlow::startQuest` being in both.
 2. For the pool's lines, use the registry fixture instead of the shipped registry: copy the
-   mod, write the copy's header from `tests/fixtures/registry-pooled.csv`
+   mod, write the copy's headers from `tests/fixtures/registry-pooled.csv`
    (`python3 tools/check_ids.py --registry tests/fixtures/registry-pooled.csv --header
-   <copy>/src/ids.h --write`), `make` in the copy, and install that library. It is a registry
-   fixture, not a shipped monster.
+   <copy>/src/ids.h --modules-header <copy>/src/modules.h --write`), `make` in the copy, and
+   install that library. It is a registry fixture, not a shipped monster.
 3. Run the game headless:
    `mh4u_runner <MH4U USA .3ds> --code <user folder>/recomp/0004000000126300.so --user <user folder> --ms 20000 --log "*:Info"`.
 4. Pass: the log has `ready: answering MH4U's monster tables and name/notes message getters
@@ -636,7 +635,7 @@ that, both outside the engine:
    changes only the large-monster wave's id. The builder's layout shifts the texts and the
    map/area init reads a stale zone index (99); the in-place path is covered by
    `tests/test_with_game_files.py` (an unchanged patch returns the file exactly).
-2. `mods/monster_ids` hooks the `data\em%03d` builder (0x00b7300c) and answers a registered id
+2. `mods/uc_runtime` hooks the `data\em%03d` builder (0x00b7300c) and answers a registered id
    with the stand-in's `data\em001`; ids 0..123 pass through. The error reporter and the engine
    mutex are not touched.
 
@@ -656,7 +655,7 @@ stand-in's data is never loaded, `enemyData::get(stand_in)` returns null, and th
 dereferences it (`ldr r0,[r0,#0x18]` at `0x00922160`; 553,321 `UnmappedAccess` reads in the
 next 100 s without this part).
 
-`mods/monster_ids` finds the starting quest's loaded `.mib` with the lookup the id pool
+`mods/uc_runtime` finds the starting quest's loaded `.mib` with the lookup the id pool
 already uses (`QuestFlow::startQuest`, `0x00b7c010`), reads the registered ids its large-monster
 waves name, and sets their stand-ins' bytes in the presence array before the state 0 preload.
 The game's own loop then loads the stand-in's data, with its own `loadEnemyData` call, exactly
@@ -668,7 +667,7 @@ Procedure:
 1. Deploy the port's own archive at `data/em125.arc` (the #203 conversion: the port's files
    plus the stand-in's kept entries, with MH4U's material signature) and the quest whose large
    monster is 125.
-2. Build the code library with the mod's hooks, now including `uc_questTask` (`0x0065bcd0`).
+2. Build the code library with the runtime's hooks, now including `uc_questTask` (`0x0065bcd0`).
 3. Run the P4 route (#144) headless for 150 s, count `HW.Memory UnmappedAccess`, and take
    screenshots after the factory.
 
@@ -758,14 +757,14 @@ MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an 
 number; a ported monster brings its source game's list, converted to MH4U's version 4, in its
 arc at `enemy\emNNN\mot\eNNN_cam` (the `camera` kind in [data/ids](../data/ids/README.md)).
 124's row lists `camera`, and `mhuc convert monster --id 124` writes MHXX em001's own list
-there. This check needs that arc, the plugin's record built with the camera bit (P1), and a
+there. This check needs that arc, the runtime's record built with the camera bit (P1), and a
 quest that spawns the id (#144).
 
 1. Run `mhuc convert monster --id 124 --romfs <MHXX RomFS> --mh4u-romfs <MH4U RomFS> --out
    <mod folder>` on the player's dumps: its `data/em124.arc` holds `enemy\em124\mot\e124_cam`,
    the LCM 4 conversion of `enemy\em001\em001_00\mot\em001_00_cam` (the game_files test
    `test_convert_monster_ships_the_gu_rathians_mhxx_camera` checks the entry against MHXX's
-   list). Regenerate `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
+   list). Regenerate `mods/uc_runtime/src/ids.h` and rebuild the code library (P1 step 1).
 2. Force an action whose handler posts a camera event: MH4U's camera event is `0x00934544`
    (USA v1.3.0), and a handler's call to it names the event id it posts. `mods/force_action`
    (R1p) plays the chosen action; the converted list keeps the source's event ids, and Rathian's
@@ -803,7 +802,7 @@ with it (P1), and a quest that spawns the id (#144). It is the in-game half of S
    folder>` (MHXX: `--from mhxx --id 124 --arc <MHXX arc/enemy/em001_00.arc>`). The port's
    `data/em125.arc` gains the sound call, 48 waves, the bank and the request, every path under
    `sound\se\em\em125\...` or `sound\call\em\em125`. Check that 125's `files` in
-   `data/ids/registry.csv` lists `sound`, regenerate `mods/monster_ids/src/ids.h` and rebuild the
+   `data/ids/registry.csv` lists `sound`, regenerate `mods/uc_runtime/src/ids.h` and rebuild the
    code library (P1 step 1).
 2. Spawn the ported monster in a quest (#144) and let it roar, bite, fly and take a hit; a roar
    is an action, so `mods/force_action` (R1p) can play one without waiting for the AI.
@@ -843,7 +842,7 @@ posts quest 10212, and leaves the quest to load.
 1. Profiles: two user folders, each a copy of the maintainer's save. The 3U one has the wave of
    the deployed `loc/data/quest01.arc` naming monster 125 and `data/em125.arc` deployed; the GU
    one names 124 and deploys `data/em124.arc`. Both have the code library built with
-   `mods/monster_ids` on (`selftest = 1`), and the quest written in place from MH4U's own `.mib`
+   `mods/uc_runtime` on (`selftest = 1`), and the quest written in place from MH4U's own `.mib`
    (P2): only the wave's monster id changes; the layout and the texts stay.
 2. The 3U profile's route (125) is the maintainer's recorded `.ctm`: 7-15 s, A through the Circle
    Pad Pro and break screens, the title, the save and the character select; 26-32 s, R held with
@@ -917,7 +916,7 @@ phase after the character is in town:
    and pick "Royal Assassination". The departure A is at 54.3 s and the splash is drawn at 60 s.
 3. The script stays outside the repository, like P4's. It is the converted `.ctm` with those 14
    presses prepended and the events at 25.692 s and later shifted by 2000 ms.
-4. Run it with the code library built with `mods/monster_ids` (P1) and the GU profile's deployed
+4. Run it with the code library built with `mods/uc_runtime` (P1) and the GU profile's deployed
    `data/em124.arc`, and with the screenshot schedule below. The schedule matters: a drawn frame
    pauses the emulated clock before each screenshot, and the counter's speech and the rank menu
    are timing-sensitive, so a route timed under one schedule drifts under another.
@@ -958,7 +957,7 @@ result in r2).
    returned r0 and the byte at `out`. r1 carries the scale as an unsigned integer: the
 getter does `vmov s0, r1; vcvt.f32.u32` at `0x006887a8`, so P3 proves r0-r2 and the r0
 return, not float arguments (T0 covers those).
-3. Put the plugin's line in the code library's `<program id>.plugins.tsv`
+3. Put the runtime's line in the code library's `<program id>.plugins.tsv`
    (`plugin`, name, library path and mod folder, tab-separated) in a copy of a user folder. No
    code library rebuild is needed: `sMhMain::frame` is a hook point of every library the
    fork's `tools/build_game.py` builds.
@@ -1088,7 +1087,7 @@ monster and no quest.
    `host->call2(call, 0x0022e43c, args, floats, &out)` with `args = {block, 0, 7, 0xbeef}`
    and `floats = {1.5f, 10.0f}`, and logs r0, the out float and the words at `block + 0`,
    `+8` and `+0xc`.
-3. Put the plugin's line in the code library's `<program id>.plugins.tsv` (`plugin`, name,
+3. Put the runtime's line in the code library's `<program id>.plugins.tsv` (`plugin`, name,
    library path and mod folder, tab-separated) in a copy of a user folder. No code library
    rebuild is needed: `sMhMain::frame` is a hook point of every library the fork's
    `tools/build_game.py` builds.

@@ -584,15 +584,15 @@ Monster ids run 0 to 123. Id N's files are `emNNN`. Every table below has to gro
 - 54 functions compare a register with 0x7c. Only some are monster code.
 - Save-side limits: a guild quest stores monster ids in one byte, and the character save's monster log has 82 fixed entries.
 
-The readers are what `mods/monster_ids` hooks for a ported id
-([its README](../mods/monster_ids/README.md#what-it-hooks)): each takes the id either in a
+The readers are what `mods/uc_runtime` hooks for a ported id
+([its README](../mods/uc_runtime/README.md#what-it-hooks)): each takes the id either in a
 register or from the monster's data block, so the plugin rewrites that one value and calls the
 game's function, which leaves MH4U's 0 to 123 untouched. The resource record is the exception:
 a port ships only some of its path kinds and motion slots, so the plugin builds the id a
 record of its own with its own paths for the kinds and motion slots its registry `files`
 lists and the stand-in's for the rest, and answers the three table readers with it. The name and notes text and the notes list's
 walk are not answered yet: the message layer is shared by every text kind, and the walk reads
-all 124 rows rather than one id. [The plugin's check](../docs/checks.md#ported-monster-ids) is
+all 124 rows rather than one id. [The plugin's check](../docs/checks.md#uc-runtime) is
 the headless one.
 
 The game's heap allocator, which plugins use, is named in the fork's `config/symbols.txt`, section "Heap".
