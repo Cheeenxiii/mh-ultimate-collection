@@ -35,6 +35,8 @@
 #define WORK_POS_W        0x01a4u
 #define WORK_HEADING      0x01acu
 #define WORK_SAVED_HEADING 0x0248u
+#define WORK_STATE        0x0144u
+#define WORK_DATAID       0x01c0u
 #define WORK_TIMER        0x01d4u
 #define WORK_PENDING      0x01d9u
 #define WORK_BYTE_A       0x0278u
@@ -44,6 +46,7 @@
 #define WORK_FLAG_ZERO_B  0x7739u
 #define WORK_FLAG_MODE    0x7a3cu
 #define WORK_FLAG_TAIL    0x7993u
+#define ENEMY_MARKER      0x0ca8u
 #define ENEMY_TARGET_LINE 0x08d88u
 #define ENEMY_SPEED       0x0290u
 #define ENEMY_TURN_SCALE  0x0014u
@@ -76,6 +79,36 @@
 #define FN_TURN_TO      0x0091db4cu
 #define FN_LINE_POINT   0x006e5608u
 #define FN_ROTATE       0x00aad55cu
+#define FN_SET_SPEED    0x00941d84u
+#define FN_COUNTDOWN    0x00b0704cu
+#define FN_1_5_TAIL     0x00911f20u
+#define FN_1_6_A        0x0093ba70u
+#define FN_1_6_B        0x0091b0f8u
+#define FN_1_6_C        0x0093ba88u
+#define FN_1_6_D        0x0093c938u
+#define FN_1_3_MOTION   0x0091908cu
+#define FN_1_3_QUERY    0x0091aae4u
+#define FN_MODE_CLEAR   0x0091aae4u
+#define FN_PRE          0x00922ca0u
+#define FN_2_0_SET      0x0092dc50u
+#define FN_2_0_CHECK    0x009128acu
+#define FN_CHECK        0x006e9a84u
+#define FN_2_0_TAIL     0x0092dcccu
+#define FN_1_4_STEP     0x00922c40u
+#define FN_DATA_SETUP   0x00911c0cu
+#define FN_TABLE_LEAF   0x0092f6e8u
+#define FN_SET50        0x00916108u
+#define FN_2_4_A        0x0091b3bcu
+#define FN_2_4_TABLE    0x00922250u
+#define FN_2_4_POINT    0x009114d4u
+#define FN_2_4_END      0x0093e558u
+#define FN_2_4_STEP     0x00916594u
+#define FN_2_14_SET     0x0093310cu
+#define FN_2_14_A       0x0090f8fcu
+#define FN_2_14_B       0x00916b94u
+#define TABLE_2_1       0x00e09458u
+#define TABLE_2_2       0x00e09498u
+#define TABLE_2_4       0x00fd1a68u
 
 /* The motion numbers, turn steps and frame values the source handlers pass. */
 #define MOTION_3_98_A    0x101u

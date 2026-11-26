@@ -39,6 +39,8 @@ that held them before.
 | `src/monsters/rathian-gu/act12_1_3.c` | the 12/1 to 12/3 family: the target-point blocks, 3/98's handler and MH4U's shared 3/12 and 3/9 handlers |
 | `src/monsters/rathian-gu/act4_27_32.c` | the 4/27 to 4/32 family: one handler, three states, r1/r2 per id |
 | `src/monsters/rathian-gu/act8_0.c` | action 8/0's family: three states and the 9/1 or 2/6 combo tail |
+| `src/monsters/rathian-gu/cat1.c` | category 1's family: the twelve shared ids' three handler units and five inline blocks (#273) |
+| `src/monsters/rathian-gu/cat2.c` | category 2's family: the thirty shared ids' five handler units and two inline blocks, and the 9/3 and 9/4 case blocks that share 2/4's unit (#273) |
 | `src/monsters/rathian-gu/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `src/monsters/rathian-3u.c` | 3U Rathian's module: the shared entry (the factory association's dispatch, the pending log, the ready line and the self-test) and the loop over the generated family list |
 | `src/monsters/rathian-3u/family.h` | the family interface: `MhucFamily` (a name, the ids it carries, a dispatch entry, a self-test) and the three base handlers `cat0.c` exports for the slices that reuse them |
@@ -67,6 +69,8 @@ that held them before.
 | `tests/rathian-gu/act12_1_3.c` | the 12/1 to 12/3 family's fake-host test: the target points and the shared handlers; `make test` builds `tests/family-gu-act12_1_3` |
 | `tests/rathian-gu/act4_27_32.c` | the 4/27 to 4/32 family's fake-host test: the six ids' states and the fast-step path; `make test` builds `tests/family-gu-act4_27_32` |
 | `tests/rathian-gu/act8_0.c` | action 8/0's fake-host test: its three states and the 9/1 or 2/6 tail; `make test` builds `tests/family-gu-act8_0` |
+| `tests/rathian-gu/cat1.c` | category 1's fake-host test: the twelve ids' units and inline blocks, the marker bits and the frame values; `make test` builds `tests/family-gu-cat1` |
+| `tests/rathian-gu/cat2.c` | category 2's fake-host test: the units, 9/3 and 9/4, the two tables and the frame values; `make test` builds `tests/family-gu-cat2` |
 | `tests/fixtures/rathian-3u/probe_test.c` | the probe family test the test-list discovery builds and runs |
 | `tests/test_family_discovery.c` | a family file added to a directory, discovered and routed with no other edit (`make test`) |
 | `tests/fake_host.c`, `tests/fake_host.h` | the fake host every test runs on: guest memory, the heap, `call`/`call2` and the guest stubs, the hooks, the registers and the log |
@@ -237,10 +241,14 @@ and self-test lines; each family's call sequences are its own program under
 
 ### GU Rathian's translated actions
 
-The fourteen ids split into four slices (the issues are in the same milestone), and the
-module's five family files: `cat17.c` for category 17, `act3_98.c` for 3/98, `act12_1_3.c` for
-the 12/1 to 12/3 chain, `act4_27_32.c` for 4/27 to 4/32 and `act8_0.c` for 8/0. 3/98 and the
-12/1-3 chain are one slice but two files, because 12/1 runs 3/98's handler.
+Decision 0002's 2026-11-26 amendment makes every one of her 301 ids run her own handler, so
+the module now translates 56 of them: the twelve MHXX-only ids (the first four slices) and the
+shared categories 1 and 2 (#273). The family files are one per slice: `cat17.c` for category
+17, `act3_98.c` for 3/98, `act12_1_3.c` for the 12/1 to 12/3 chain, `act4_27_32.c` for 4/27 to
+4/32, `act8_0.c` for 8/0, `cat1.c` for category 1 and `cat2.c` for category 2 (with 9/3 and
+9/4, which share 2/4's unit). 3/98 and the 12/1-3 chain are one slice but two files, because
+12/1 runs 3/98's handler; category 1 and category 2 are one issue but two files for the same
+reason (the module's dispatch tries one family per category).
 
 | Slice | Ids | State |
 |---|---|---|
@@ -248,11 +256,14 @@ the 12/1 to 12/3 chain, `act4_27_32.c` for 4/27 to 4/32 and `act8_0.c` for 8/0. 
 | 4/27 to 4/32 | six ids on one handler | this module |
 | 8/0 | one handler, with its combo tail | this module |
 | category 17 | a gate plus a base-class routine | this module |
+| category 1 | twelve ids on three handler units and five inline blocks | this module (#273) |
+| category 2 and 9/3, 9/4 | thirty ids on five handler units and two inline blocks, plus the two category-9 case blocks that share 2/4's unit | this module (#273) |
 
 12/0 needs no code. MH4U's category-12 case checks index 0 and runs its own handler
 `0x006d524c`, the handler MH4U's shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0
 (`0x0201177c`). Under decision 0002's 2026-11-26 amendment her own handler is still owed for
-12/0 and the shared ids; this move only carries the twelve translated ones.
+12/0; the shared ids still owed are the ones no slice has carried (category 3, 7, 10, 11, 12,
+13 and the rest of category 9).
 
 | Action | MHXX | What the port runs |
 |---|---|---|
@@ -383,6 +394,95 @@ The 4/27-32 slice has two more gaps:
   another value, which R2p will show.
 - **The state-2 request for 7/246 or 7/247**, through the same `0x008ebab0` helper as 12/1 and
   12/2. It is left out and logged once; the move plays and the action ends without it.
+
+#### Categories 1 and 2: the shared ids (#273)
+
+The twelve category-1 ids and the thirty category-2 ids are shared actions: MH4U's dispatcher
+has its own handler for each, and every one of them pairs with MHXX's handler. The source
+handlers, their case blocks and the args each case block passes:
+
+| Ids | MHXX unit | What it runs |
+|---|---|---|
+| 1/0, 1/9 | `0x0200e200` (r1 = 0) | state 0: state 1, mode 0, motion `0x4` at 10.0, then `0x00914dc4` (0, 0x13); state 1: the 110.0 speed step, the `(1, r2, 5)` call with r2 0x32 on MH4U's data id 5/6 and 8 otherwise, the finish flag and the base update |
+| 1/4, 1/7 | `0x02009ab8` (r1 = 0, 1) | state 0: state 1, sub 0, mode 0, motion `0x10` at 6.0; state 1: the flag bumps the sub byte, and at 3 it asks for 1/8 (r1 = 1), 1/5 when the index is 4, else 1/14; 1/7 sets this+0xca8's bit 3 first |
+| 1/5, 1/8 | `0x02009bd8` (r1 = 0, 1) | state 0: state 1, mode 0, motion `0x11` at 6.0, then `0x00911f20` (work+0x198, 0x64, 0); state 1: the finish flag and the base update; 1/8 sets this+0xca8's bit 3 first |
+| 1/6 | `0x02009c8c` | six states: motion `0x12` at 6.0; the flag, motion `0x13` at 30.0, `0x0093ba70` and `0x0091b0f8`; `0x0093ba88` (1, the data id's mode, 0.4), the 1.0 countdown at work+0x1d4, motion `0x14` and `0x0093c938`; the flag and motion `0x310`; the flag, the base update and the source's `0x00903e84` (not carried) |
+| 1/1, 1/2, 1/3, 1/10, 1/11 | inline blocks | 1/1 and 1/2: mode 0 and motion `0xf` at 10.0 / `0x310` at 6.0, then the flag and the base update; 1/3: mode 0 and `0x0091908c` (2, 0x11, 50.0), then the 52.0 query and the base update; 1/10: motion `0xe` at 6.0; 1/11: motion 1 at 10.0 and the 20.0 timer, then the 1.0 countdown and the base update |
+| 2/0, 2/7, 2/9, 2/11, 2/18, 2/19, 2/24, 2/26, 2/28 | `0x0200f26c` (r1 the mode 0-7, r2 the variant) | state 0: the variant pre-call (`r2 <= 1`), state 1, mode 0, the mode's setter (-500, 0, 0 with the 700 clamp, or the kind 3/4 check) and motion `0x5` at 6.0; state 1: the mode's check, the `(0, 0x20)` tail and, on it, motion `0x1` at 10.0 and the base update |
+| 2/1, 2/12, 2/25 | `0x02007a28` (r1 = 0 or 1) | `0x00911c0c` (this, MH4U's table, 0, 1, 0), then the 1.1 step on data id 5, the table leaf and the base update; r1 = 1 pre-calls `0x00922ca0` |
+| 2/2, 2/13 | inline blocks | the same data setup with MH4U's second table; 2/13 pre-calls `0x00922ca0` |
+| 2/3, 2/8, 2/10, 2/23, 2/27, 2/29 | `0x0200f0d8` (r1 mode, r2 variant, r3) | state 0: the r3 pre-call, state 1, mode 0, the mode's setter, motion `0x6` at 10.0 and (on r2 = 1) the 210.0 timer; state 1: the mode 1/3 check, the variant's countdown, the `(0, 0x20)` tail and motion `0x1` at 10.0 with the base update |
+| 2/4, 2/5, 2/6, 9/3, 9/4 | `0x0200f7a8` (r2 the kind, r3 the variant) | state 0: the kind's marker, mode 0 and the kind's motion at 4.0; state 1: the kind's turn, the flag, mode 3, the 50.0 setter, the side motion, `0x0091b3bc`, the action table read, `0x009114d4` and, on the variant, `0x0093e558`; state 2: the attack selector (not carried), the flag, the 0.25 factor, `0x00916594` and motion `0x102` at 12.0; state 3: `0x00916594`, the float clamp and the sub-state's motion; state 4: the flag, mode 0 and the end motion; state 5: the base update |
+| 2/14 to 2/17, 2/20 to 2/22 | `0x02011d94` (r1 the base) | state 0: state 1, mode 0, motion `0x7` at 4.0, `0x0093310c` (0, 5, 3), the timer cleared and the base's setter; state 1: the 1.0 countdown, the base's check (`0x009128ac` for 5-8, `0x006e9a84` for 9-11), the `(0, 0x40)` tail and, when the timer is over, state 2; state 2: `0x0090f8fc`, the kind-1/3 `0x00916b94` call and the request for 2/2 |
+
+**The field map.** MHXX keeps the work block at `*(this+0x10a8)`, MH4U at `*(this+0xe28)`.
+Each row is the MH4U offset, the MHXX offset it stands for, and the handler pair that shows it
+(the same call at the same point of the two handlers):
+
+| MH4U | MHXX | What |
+|---|---|---|
+| `work+0x144` | `work+0x1a1` | the handler's state byte |
+| `work+0x145` | `work+0x1a2` | the sub-state byte (1/4's counter, 2/14's next state) |
+| `work+0x146` | `work+0x1a3` | the kind/base byte 2/4 and 2/14 store |
+| `work+0x1c0` | `this+0xa304`/`this+0xa305` | MH4U's data id (the source's two-byte pair; the source tests a form, MH4U tests the id) |
+| `work+0x1d4` | `work+0x1bc` | the action's timer (1/11, 1/6, 2/3, 2/14) |
+| `work+0x238` | `work+0x1f0` | the clamped float (2/0's kind 2, 2/3's kind 2) |
+| `work+0x168` | `work+0x18` | the float 2/4's setup writes and state 3 clamps |
+| `work+0x178` | `work+0x28` | the 0.25 factor 2/4's state 2 writes |
+| `work+0x1a8` | `work+0x50` | the point 2/4's states advance |
+| `work+0x1cb` | `this+0x6bf1` | the current index (1/4's request choice) |
+| `this+0xca8` | `this+0xa308` | the action's marker: MH4U sets bit `1 << value` where MHXX stores the value 1, 2 or 3 |
+
+**The engine calls.** Each row is the MH4U function the family calls and the MHXX function it
+stands for; the pairs are the same call site in the two handlers, with the body match where the
+reference's map has one:
+
+| MH4U | MHXX | What |
+|---|---|---|
+| `0x009167b4` | `0x008b1700` | the mode setter |
+| `0x0094e318` | `0x008eb108` | the motion start |
+| `0x00b05da4` | `0x00aed11c` | the action's finish flag |
+| `0x00b0704c` | `0x008a78ec` | count a float down by the frame delta |
+| `0x0094ef64` | `0x008ebab0` | request the next action |
+| `0x00911b48` | `0x008ae50c` | MH4U's base update (uEnemy vtable slot 89) |
+| `0x00922ca0` | `0x008bba74` | the 2/0, 1/0, 2/1 and 2/13 pre-call |
+| `0x0092dc50` | `0x0200036c` | 2/0's and 2/3's variant float setter |
+| `0x009128ac` | `0x0200066c` | 2/0's and 2/14's kind check |
+| `0x006e9a84` | `0x020123b8` | the small kind check |
+| `0x0092dccc` | `0x0200037c` | 2/0's and 2/3's `(0, r2)` tail |
+| `0x00922c40` | `0x0200043c` | 2/1's, 2/2's and 2/13's 1.1 step |
+| `0x00911c0c` | `0x020004dc` | the five-argument action data setup |
+| `0x0092f6e8` | `0x020004ec` | the action table's leaf |
+| `0x00911f20` | `0x008c5c30` | 1/5's `(work+0x198, r2, 0)` |
+| `0x0093ba70`, `0x0091b0f8`, `0x0093ba88`, `0x0093c938` | `0x008d0444`, `0x008d14dc`, `0x008d057c`, `0x008d14a0` | 1/6's four helpers |
+| `0x0091db4c` | `0x008b75d8` | 2/4's turn |
+| `0x00916108` | `0x008b11dc` | 2/4's 50.0 setter |
+| `0x0091b3bc` | `0x008b52b8` | 2/4's state 1 call |
+| `0x00922250` | `0x008bb4f4` | 2/4's action table read |
+| `0x009114d4` | `0x008ae314` | 2/4's point advance |
+| `0x0093e558` | `0x0200053c` | 2/4's variant tail |
+| `0x00916594` | `0x008b1498` | 2/4's `(work+0x1a8, 1)` |
+| `0x0093310c` | `0x020003dc` | 2/14's `(0, 5, 3)` |
+| `0x0090f8fc` | `0x008ad5c4` | 2/14's state 2 call |
+| `0x00916b94` | `0x020006cc` | 2/14's kind-1/3 five-argument call |
+| `0x0091908c`, `0x0091aae4` | `0x008b393c`, `0x008a7360` | 1/3's motion and its 52.0 query |
+| `0x00914dc4`, `0x0093310c` | `0x008b0194`, `0x008c8b60` | 1/0's state 0 tail and its `(1, r2, 5)` |
+
+**What it does not translate yet.**
+
+- **1/0's, 1/5's, 2/1's, 2/2's, 2/3's and 2/4's source-only fields.** The source tests the two
+  bytes at `this+0xa304`/`this+0xa305`, stores `this+0x84`'s 0x80000 bit and reads
+  `this+0xcf4`; MH4U's own handlers use the data id at work+0x1c0, do not make the 2/3 store
+  and read a different part byte. The port uses MH4U's own choice where its handler makes one
+  and logs the 1/3 and 2/3 gaps once.
+- **1/6's `0x00903e84`.** MH4U's own 1/6 has no call after the base update, and no counterpart
+  was found; the move plays without it, logged once.
+- **2/4's attack selector `0x0201e190` and its `0x00adb528` multiplier.** The selector is the
+  source's kind-specific attack setup; `0x00adb528` is the source object MH4U lacks (recorded
+  for 4/27-32 too). The port keeps 2/4's states, marks, motions and flag-driven tail, and logs
+  both names once per action. The same applies to 9/3 and 9/4.
+- **2/14's `0x020006cc` table object.** The source passes `0xd3d24c`; MH4U's own 2/14 passes
+  nothing at that point, so the port calls `0x00916b94` without it (the table is not carried).
 
 #### Floats: the guest stubs
 
@@ -1195,9 +1295,11 @@ the source game's notes, Japanese until MHGU's English text is read.
   [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49)'s converted files are
   installed. The module's routing does not depend on that byte: it comes from the factory's r1
   before the id layer rewrites it.
-- **The GU module's shared ids and 12/0.** Decision 0002's 2026-11-26 amendment owes her own
-  handler for every action, shared ids included. This move carries only the twelve translated
-  MHXX-only actions; 12/0 and the shared ids still run MH4U's dispatcher.
+- **The GU module's remaining shared ids and 12/0.** Decision 0002's 2026-11-26 amendment
+  owes her own handler for every action, shared ids included. The module now carries 56 of the
+  301: the twelve MHXX-only ids and the shared categories 1 and 2 (#273). 12/0 and the shared
+  ids of categories 3, 7, 9 (except 9/3 and 9/4), 10, 11, 12 and 13 still run MH4U's
+  dispatcher.
 - **The rest of the 3U module's 191 ids.** Only category 0 (six ids), category 1 (fifteen ids),
   category 3's part 2 (sixteen ids), category 7's part 1 (twenty-one ids), category 13's part
   1 (five ids), category 3's part 1 (fifteen ids) and category 0's three base handlers run;
@@ -1244,7 +1346,7 @@ python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Az
 A run logs `ready: answering MH4U's monster tables and name/notes message getters for 4
 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files each port
 ships and the stand-in's for the rest`, then the modules' ready lines, for GU Rathian
-`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`, then
+`ready: translating 56 of GU Rathian's 301 actions on monster 124`, then
 `text: 4 of 4 entry(ies) from
 text/monster_text.bin; every registered id has a name and notes`, then one line per reader the first time it answers a registered id and one the first
 time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource

@@ -297,8 +297,15 @@ For each id in R2's map (the GU port, id 124), set it in `mods/force_action`'s `
 the move. R2 says what to expect: her own handler starts the animation at the index R2 records,
 and the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
 what differs: no motion, another motion, a different timing, a missing effect or projectile.
-The translated ids on the GU port are 3/98, 12/1, 12/2, 12/3 and 8/0; 8/0 should play motion
-0x403 at 4.0 and then ask for 9/1 (or 2/6), and its leaf effect is the one part not carried.
+The translated ids on the GU port are 3/98, 12/1, 12/2, 12/3, 8/0, category 17, and the
+shared category 1 and 2 ids; 8/0 should play motion 0x403 at 4.0 and then ask for 9/1 (or 2/6),
+and its leaf effect is the one part not carried.
+
+The shared category 1 and 2 rows (#273) group the ids of one handler unit, because they play
+one sequence with the unit's argument. The unit's argument is in the module's dispatch
+(`cat1.c` and `cat2.c`), and the runtime README's
+[categories 1 and 2 section](../mods/uc_runtime/README.md#categories-1-and-2-the-shared-ids-273)
+names each step.
 
 Category 17 has no motion to watch. MHXX's case jumps to the gate `0x008d5bd4`, which returns
 for indexes 0 to 2 and otherwise tail-calls the base update `0x008ae50c`; the port maps that
@@ -313,10 +320,28 @@ each row:
 
 Status: not done. The category-17 rows wait with the rest of R2p for #48 and #105.
 
+| Forced | Unit | What to watch |
+|---|---|---|
+| 1/0, 1/9 | 0x0200e200 | motion 0x4 at 10.0, then the 110.0 speed step and the body's `(1, r2, 5)` call; the finish flag ends it on the base update |
+| 1/4 | 0x02009ab8 | motion 0x10 at 6.0, then three finish flags before the request for 1/5 |
+| 1/7 | 0x02009ab8 | the same with this+0xca8's bit 3 set, asking for 1/8 |
+| 1/5 | 0x02009bd8 | motion 0x11 at 6.0 and the `(work+0x198, 0x64, 0)` call |
+| 1/8 | 0x02009bd8 | the same with the bit 3 marker |
+| 1/6 | 0x02009c8c | motions 0x12 at 6.0, 0x13 at 30.0, 0x14 and 0x310; the 0.4 step's r2 is MH4U's data id's mode; the source's last call is not carried |
+| 1/1, 1/2, 1/3, 1/10, 1/11 | inline | 1/1 motion 0xf at 10.0; 1/2 motion 0x310 at 6.0; 1/3 the `(2, 0x11, 50.0)` motion and the 52.0 query; 1/10 motion 0xe at 6.0; 1/11 motion 1 at 10.0 and the 20.0 timer |
+| 2/0, 2/7, 2/9, 2/11, 2/18, 2/19, 2/24, 2/26, 2/28 | 0x0200f26c | the mode's setter and motion 0x5 at 6.0, then the `(0, 0x20)` tail and motion 0x1 at 10.0 when it holds; the variant runs the pre-call and the check |
+| 2/1, 2/12, 2/25 | 0x02007a28 | the data setup, the 1.1 step on MH4U's data id 5 and the table leaf |
+| 2/2, 2/13 | inline | the same data setup with MH4U's second table; 2/13 pre-calls |
+| 2/3, 2/8, 2/10, 2/23, 2/27, 2/29 | 0x0200f0d8 | the mode's setter and motion 0x6 at 10.0; 2/23 arms the 210.0 timer; the mode 1/3 check and the variant's countdown before motion 0x1 |
+| 2/4, 2/5, 2/6 | 0x0200f7a8 | the kind's motion at 4.0, the 50.0 setter and the side motion, then motion 0x102 at 12.0 and the end motion; the source's attack selector and its 0x00adb528 multiplier are not carried |
+| 9/3, 9/4 | 0x0200f7a8 (2/4's unit) | the same with kind 1/3 and the variant's 0x0093e558 tail |
+| 2/14 to 2/17, 2/20 to 2/22 | 0x02011d94 | motion 7 at 4.0, the `(0, 5, 3)` call and the base's setter; the 1.0 countdown, the base's check and the request for 2/2; 2/15 and 2/17 make the kind-1/3 `0x00916b94` call |
+
+Status: not done. The rows wait with the rest of R2p for #48 and #105.
+
 The 3U port (id 125) has the rows below (#116's). They start with the 17 ids MH4U's `uEm001`
 has no action for; #116 will hold a row for every id the ledger marks translated, and the
-category-1 slice adds its fifteen below. Under decision
-0002's 2026-11-26 amendment she runs her own handler for each, so the 3U module
+category-1 slice adds its fifteen below. Under decision 0002's 2026-11-26 amendment she runs her own handler for each, so the 3U module
 ([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) runs the source's
 handler and the row checks the move against MH3U's own
 ([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each, set
@@ -520,12 +545,13 @@ the two #55 calls it leaves out.
 
 Status: not done. These rows wait for #49, #105 and the quest load (#144), like the 17 above.
 
-The port's module for the MHXX-only ids is the runtime's GU Rathian module
+The port's module is the runtime's GU Rathian module
 (`mods/uc_runtime/src/monsters/rathian-gu.c`): it runs the translated handlers for 3/98,
-12/1-3, 4/27-32, 8/0 and category 17 and leaves 12/0 (T1). Her own handler for every id,
-shared ids included, is still owed under decision 0002's 2026-11-26 amendment. The module logs
-one line the first time each translated action runs, one line per category-17 index and, for
-8/0, one line naming its uncovered calls.
+12/1-3, 4/27-32, 8/0, category 17, category 1 and category 2 (with 9/3 and 9/4) and leaves
+12/0 (T1). Her own handler for every id is still owed under decision 0002's 2026-11-26
+amendment for the categories no slice has carried. The module logs one line the first time
+each translated action runs, one line per category-17 index, one line for 8/0's uncovered
+calls and one line for each of the category-1 and category-2 gaps.
 
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
@@ -1334,12 +1360,12 @@ T1a: MHXX v1.4's `roEm001.cro` and its `static.crs` come from the player's own d
 MH4U_FORK=<fork> python3 tools/check_actions.py --module <roEm001.cro> --crs <static.crs>
 ```
 
-Last result (2026-11-26, issue #272): pass. 301 actions; blocks 301/301, handlers 274/301
-(the other 27 are 24 inline, 2 jump and 1 none), first motions 178/301; translated 12
-(3/98, 12/1-3, 4/27-32, 8/0 and category 17), pending 289. 12/0 is `pending`: under decision
-0002's 2026-11-26 amendment she runs her own handler for every id, and 12/0's is still owed,
-so `mh4u` is not a status of this ledger. Changing a ledger motion or a status makes it exit
-1 and name the id.
+Last result (2026-11-26, issues #272 and #273): pass. 301 actions; blocks 301/301, handlers
+274/301 (the other 27 are 24 inline, 2 jump and 1 none), first motions 178/301; translated 56
+(3/98, 12/1-3, 4/27-32, 8/0, category 17, category 1's twelve ids and category 2's thirty
+plus 9/3 and 9/4), pending 245. 12/0 is `pending`: under decision 0002's 2026-11-26 amendment
+she runs her own handler for every id, and 12/0's is still owed, so `mh4u` is not a status of
+this ledger. Changing a ledger motion or a status makes it exit 1 and name the id.
 
 T1a also checks the 3U ledger against MH3U USA's `code.bin` and its `exheader.bin`:
 
@@ -1356,16 +1382,18 @@ five, and categories 8 and 11's six), pending 85. Changing a ledger motion makes
 name the id.
 
 T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
-the 12/1-3 blocks, 4/27-32's states, 8/0's three states and category 17's no-op and
-base-update paths, and the routing (the module's id runs it; an MH4U id and a registered id
-without a module fall through). Deleting the factory association fails the routing check with
+the 12/1-3 blocks, 4/27-32's states, 8/0's three states, category 17's no-op and base-update
+paths, category 1's twelve ids and category 2's units with 9/3 and 9/4, and the routing (the
+module's id runs it; an MH4U id and a registered id without a module fall through). Deleting the factory association fails the routing check with
 `the module's monster didn't run 3/98 (0 calls, 1 original, 0 skipped)`. Changing 3/98's `6.0`
 to `5.0` fails it with the motion line; making 17/3 a no-op (`index > 3`) fails it with 17/3's
 line; giving 4/27 the fast turn step fails it with the turn line; changing 8/0's motion speed
-`4.0` to `5.0` fails it with 8/0's line (the shell checks in `tests/test_module.c` and the
-family checks in `tests/rathian-gu/`). Proofs of the
-last four were run when the plugin was translated (#139-#142); this session proved the routing
-and re-ran the suite.
+`4.0` to `5.0` fails it with 8/0's line; changing 1/0's `10.0` to `5.0` fails `cat1` with
+`1/0 doesn't start motion 0x4 at 10.0`; changing 2/4's `0x102` speed `12.0` to `11.0` fails
+`cat2` with `2/4 state 2 doesn't step and start motion 0x102 at 12.0` (the shell checks in
+`tests/test_module.c` and the family checks in `tests/rathian-gu/`). Proofs of the last four
+were run when the plugin was translated (#139-#142); the 1/0 and 2/4 proofs were run for #273,
+and this session re-ran the suite.
 
 The 3U module's tests are `tests/test_rathian_3u.c` (the shell: the factory association for
 125, the routing, the ready line and the self-test) and one program per action family under
@@ -1433,7 +1461,7 @@ tests/probe-tests`. Last result (2026-11-26): pass.
 T1c: a headless run of the code library built with the runtime, with `selftest = 1`. The log
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
-`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`; the 3U module's
+`ready: translating 56 of GU Rathian's 301 actions on monster 124`; the 3U module's
 is `ready: translating 106 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
 #219, #220, #221, #222, #227 and #225), with cat0's `selftest: 6 of the 191 actions`, cat1's
 `selftest: 15 of the 191 actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's
@@ -1447,19 +1475,18 @@ runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build 
 ABI 4's merge into the fork and refused the runtime, so rebuild its `mh4u_runner` target from
 the current fork before the run.
 
-Last result (2026-11-26, MH4U USA v1.3.0, the runtime built into the game's code library, the
-runner rebuilt from the fork's `uc/main`, headless runner): pass. The build reported 53 hook
-points (the 52 before it plus `uEnemy::dispatchAction`) and one native plugin. The log had the
-runtime's ready line, then `ready: translating 12 of GU Rathian's 13 MHXX-only actions on
-monster 124`, then `selftest: 12 of the 13 actions: ... 17 <- the gate 0x008d5bd4 + MH4U's
-base update 0x00911b48 (slot 89, MHXX's slot 244)`, the line naming 12/0 as MH4U's own
-`0x006d524c` and 8/0's leaf, and `selftest: float stubs at 0x08e45550 (384 bytes, the game's
-heap)`; the runner exited 0. No monster spawned, so no translated action ran: the in-game
-side is R2p.
+Last result (2026-11-26, MH4U USA v1.3.0, the session's shared code library, the ABI 4
+`mh4u_runner`, `--ms 5000`): pass. The profile had the runtime alone enabled and `selftest = 1`;
+the log had the runtime's ready line, then `ready: translating 56 of GU Rathian's 301 actions
+on monster 124`, then `selftest: 7 family file(s) discovered from src/monsters/rathian-gu/`,
+`selftest: 56 of the 301 actions: ... 17 <- the gate 0x008d5bd4 + MH4U's base update
+0x00911b48 (slot 89, MHXX's slot 244), and the shared ids: category 1's twelve and category 2's
+thirty plus 9/3 and 9/4`, and `selftest: float stubs at 0x08e45550 (384 bytes, the game's
+heap)`; the runner exited 0. No monster spawned, so no translated action ran: the in-game side
+is R2p.
 
-That "no pending slice" covers only the 13 MHXX-only ids; under decision 0002's 2026-11-26
-amendment her own handler runs for every action id, shared ids included, so 12/0 is not MH4U's
-to keep and the set the self-test counts stays open until the GU module's shared-id work.
+The shared ids now run their own handlers too; the set the self-test counts still leaves
+12/0 and the categories no slice has carried (3, 7, 9 except 9/3 and 9/4, 10, 11, 12 and 13).
 
 The 3U module's run (2026-11-26, USA v1.3.0, the runtime on the session's shared code library,
 the 125 quest's route, `--ms 150000`): the log has `ready: translating 85 of 3U Rathian's
@@ -1473,7 +1500,7 @@ being this slice's proof.
 
 The 3U module's run after #220 (2026-11-26, USA v1.3.0, the session's shared code library, the
 ABI 4 `mh4u_runner` rebuilt from the fork, `--ms 5000`): pass, exit 0. The log has the runtime's
-ready line, `ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`, then
+ready line, `ready: translating 56 of GU Rathian's 301 actions on monster 124`, then
 `ready: translating 22 of 3U Rathian's 191 actions on monster 125`, cat0's `selftest: 6 of the
 191 actions` and cat3b's `selftest: 16 of the 191 actions: 3/6, 3/13 and 3/16 <- 0x0068e448 ...`,
 its `selftest: field map anchors: +0x5/6/7 -> +0x144/145/146 ...` line and its
