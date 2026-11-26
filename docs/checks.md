@@ -369,6 +369,37 @@ Force each the same way; the log names the blocked effect calls once.
 | 1/12 | not done |
 | 1/13 | not done |
 | 1/14 | not done |
+The first category-7 slice's ids ([#221](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/221))
+have their own rows. They share an MH4U action, so the reference's counterpart handler for
+the same id is the comparison; under decision 0002's amendment the port still runs her own
+handler, and the motion it starts is her converted animation, not MH4U's index.
+
+| 3U id | status |
+|---|---|
+| 7/0 | not done |
+| 7/1 | not done |
+| 7/2 | not done |
+| 7/4 | not done |
+| 7/5 | not done |
+| 7/6 | not done |
+| 7/7 | not done |
+| 7/8 | not done |
+| 7/10 | not done |
+| 7/11 | not done |
+| 7/12 | not done |
+| 7/15 | not done |
+| 7/16 | not done |
+| 7/19 | not done |
+| 7/20 | not done |
+| 7/32 | not done |
+| 7/34 | not done |
+| 7/42 | not done |
+| 7/61 | not done |
+| 7/77 | not done |
+| 7/85 | not done |
+
+Status: not done. These 21 rows wait for the same load as the 3U rows above; the module's
+self-test names the units and the calls still blocked.
 
 Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
 translates it, and the other sixteen's counterparts are in the reference page.
@@ -1218,10 +1249,10 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --game mh3u --exheader <exheader
     --code <code.bin> --dispatcher 0x00687d30 --range 0x686000 0x69b000
 ```
 
-Last result (2026-11-26, issues #216, #217 and #220): pass. 191 actions; blocks 191/191,
-handlers 182/191 (the other 9 are inline), first motions 132/191; translated 37 (category 0's
-six, category 1's fifteen and category 3's part 2's sixteen), pending 154. Changing a ledger
-motion makes it exit 1 and name the id.
+Last result (2026-11-26, issues #216, #217, #220 and #221): pass. 191 actions; blocks
+191/191, handlers 182/191 (the other 9 are inline), first motions 132/191; translated 58
+(category 0's six, category 1's fifteen, category 3's part 2's sixteen and category 7's part
+1's twenty-one), pending 133. Changing a ledger motion makes it exit 1 and name the id.
 
 
 T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
@@ -1277,11 +1308,10 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`; the 3U module's
-is `ready: translating 37 of 3U Rathian's 191 actions on monster 125` (after #216, #217
-and #220), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest: 15 of the 191
-actions`, cat3b's `selftest: 16 of the 191 actions` and both `field map anchors`/`selftest:
-open:` lines.
-
+is `ready: translating 58 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#220 and #221), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest: 15 of the 191
+actions`, cat3b's `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191 actions`
+and the families' `field map anchors`/`selftest: open:` lines.
 The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
 runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
@@ -1323,6 +1353,19 @@ its `selftest: field map anchors: +0x5/6/7 -> +0x144/145/146 ...` line and its
 line, and the float stubs' address. The 125 quest route was left to #216's run above: the
 module's handlers are T1b's and the self-test runs on the first frame, so a boot run exercises
 the new lines.
+
+Category 7's first slice ([#221](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/221))
+was run the same way (2026-11-26, USA v1.3.0, `selftest = 1`, the runtime on the session's
+shared code library). That run proved the slice's own lines before #217's cat1 and #220's
+cat3b merged: the plugin loaded, the log had `ready: translating 27 of 3U Rathian's 191
+actions on monster 125`, `selftest: 2 family file(s) discovered`, `selftest: 21 of the 191
+actions` naming the seven units, the field-map line naming `+0x2a8 -> +0x238` and
+`+0xb81 -> +0xca5`, the open-item line naming `0x0084161c` and `0x00688a20/0x00829950`, and
+`selftest: float stubs at 0x08e45550 (384 bytes, the game's heap)`. With cat1 and cat3b in
+the tree the same lines sum to `ready: translating 58 of 3U Rathian's 191 actions on monster
+125` and four family files, and the family's own test is T1b's. The profile's save did not
+reach quest 10212 in that run, so the quest's own lines stay the 3U paragraph's above and the
+per-move half stays R2p/#116.
 
 ## Floats through a guest stub (T0)
 

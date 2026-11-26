@@ -571,21 +571,22 @@ position, heading, point and speed rows above; what they add:
 | work+0x2b6 | work+0x278 or +0x27c | the part byte the hit check takes | 3 pairs each way: 3U passes one byte to 0x0084512c, MH4U passes two (+0x278, +0x27c) to 0x0092b2b0, so which one replies to it is not settled |
 | work+0x80 / +0x84 | work+0x1a8 / +0x1ac | the turn slot and the heading | 1 and 2 pairs |
 | work+0x2b4 | — | read 10 times by the category, no pair | unverified |
-| work+0xb81 | — | read 4 times, no pair | unverified |
 | work+0x260 / +0x264 / +0x268 | work+0x160 / +0x164 / +0x168 | the aim point A | 11 pairs on A.z; 8 twin readings |
 | work+0x270 / +0x278 | work+0x170 / +0x178 | the aim vector B | 6 pairs on B.z |
 | work+0x288 / +0x28c / +0x290 | work+0x218 / +0x21c / +0x220 | the target point | 1 twin and the 8/0 pair |
 | work+0x88 | work+0x1b0 | a u32 read as a size or radius | twin only (5 readings); the role is unverified |
+| work+0x2a8 | work+0x238 | the float 7/16 clamps at 1000.0 | MH4U's own 7/6 handler (0x006e01e0) clamps `+0x238` at 1000.0 where the source's 7/16 clamps `+0x2a8` at 1000.0: the same clamp at the same point, read by this slice |
+| work+0xb81 | work+0xca5 | the second gate byte 0x006944b8 reads beside work+0x6 | MH4U's own 7/4 handler (0x006dfd54) reads `+0xca5` where the source reads `+0xb81`, both before the same conditional `0x0093310c` step, read by this slice |
 | this+0x1e70 | `*(this+0x8d88)` | the target-line struct's first float | 2 pairs (13/2 and 7/31). The layouts differ: 3U embeds the struct at this+0x1e70, MH4U reaches it through the pointer at this+0x8d88 |
 | this+0x1ed0 | `*(this+0x8d88)+0x60` | a float inside that struct, advanced by the frame delta | unverified: 3U reads it as this+0x1e70+0x60 (9 readings in 7/68), MH4U's struct is not read there by a pair |
 | this+0x27c | this+0x294 | | 1 pair |
 
 #### What is not mapped
 
-- **work+0x2b4** (10 readings, category 7) and **work+0xb81** (4 readings, category 7): no pair reads a role at one MH4U offset, and no twin.
+- **work+0x2b4** (10 readings, category 7): no pair reads a role at one MH4U offset, and no twin. (`work+0xb81` was on this list; category 7's first slice found it at MH4U's `+0xca5`, above.)
 - **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where.
 - **work+0x11c** (category 3, "the fall or hold step is enabled"): MH4U's counterpart function tests two flags instead (+0x620 and +0x628); which of them replies to +0x11c is unsettled.
-- **work+0xf4** and **work+0x944** (a byte and a halfword, category 3), **work+0x1c, +0xda, +0xaea** (category 13), **work+0x2a8** (a float the category-2 handlers clamp; one pair reads +0x238 twice) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
+- **work+0xf4** and **work+0x944** (a byte and a halfword, category 3), **work+0x1c, +0xda, +0xaea** (category 13) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. (`work+0x2a8` was on this list; category 7's first slice found it at MH4U's `+0x238`, above.) +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
 - **this+0x1a64** (a float the category-11 handler reads, 0x1c bytes past the block pointer), and **this+0x1ed0** as a field of its own rather than the target-line struct's +0x60: unverified.
 - **The categories without pairs:** category 4 (1 id) and category 10 (8 ids). Category 0 (1 of 5 ids), 11 (2 of 5), 1 (11 of 12), 2 (10 of 11) and 13 (8 of 10) are partly covered.
 - **A handler with no pair** is not evidence of a difference: an inline MH4U case (0/0, 0/1, 0/3) or a different unit leaves nothing to align, and the field still has to be read in the slice.
@@ -620,6 +621,48 @@ its calls are matched from the code alone. Each id's shared MH4U action with the
 and each call's MH4U counterpart or #55 blocker, are in [The 17 ids MH4U has no action
 for](#the-17-ids-mh4u-has-no-action-for) below. `monster_actions.py pairs` finds 63 body
 pairs between the two classes; 58 of the 66 3U handlers have one, 8 have none.
+
+#### Category 7, part 1 (#221): the seven units and what is blocked
+
+Category 7's first slice reimplements seven handler units on 21 ids. The class (`uEm002`)
+shares them with Rathalos and the colour variants (MH3U ids 1, 2 and 62 to 65), and branch on
+the work block's +3 (MH4U's +0x1c0) for the variants' attacks. The ported monster is em001
+(id 1), so the port carries the id-1 path and not the ids 62-65 branches; the action variant
+the case block passes (0, 1, 2 …) is kept and selects a motion, speed, timer or tail in five
+of the units. Each unit was read against MH4U's own handler for the same action (the "MH4U
+action with the same handler" column is the pair read by hand), and its engine calls are the
+MH4U counterpart at the same point.
+
+| 3U ids | MH3U unit | MH4U's own handler | what the port runs |
+|---|---|---|---|
+| 7/0, 7/77 | 0x00693468 | 0x006df128 | mode 0, motion 0x2f at 4.0 and the tail steps 0,1 and 1,9; the flag then 0/2's base. The ids 0x3e/0x3f branches (extra timers and 0x00842a7c) are not carried |
+| 7/1, 7/20, 7/42 | 0x00693be8 | 0x006df510 | mode 3, the order step -14, motion 0xd1 at 6.0; the -6.6666665 vertical step, the -200.0 speed floor, the 0x100 turn and the 50.0 check; state 2's -200.0, aim advance, 110.0 clamp and landing step, then motion 0xd2 (variant 0), mode 0 + motion 0xdd + speed 0 (1) or motion 0x35 at 10.0 (2); state 3's 20.0 drive into 0/6, or motion 0xda and 30.0 into 0/2, or the 10.0/5.0 drive and motion 0x3c into 0/2 |
+| 7/2, 7/10, 7/11, 7/15 | 0x00694180 | 0x006dfb30 | mode 0, motion 0x33 at 6.0; the 2.0, 12.0, 36.0 and 78.0 checks, the first three spawning effects 3, 1 and 1; 7/15 adds the source curve's rate step |
+| 7/4, 7/12 | 0x006944b8 | 0x006dfd54 | mode 0, motion 0x32/0x31 at 4.0 and three tail steps; the ±0x8000 turn over 0..120; the work+0x6/work+0xb81 gate; the flag into 0/2 |
+| 7/5, 7/61 | 0x00694694 | 0x006dffb0 | mode 3, motion 0xce at 10.0 and the 0,0x1b tail; the 200.0 check and the (A-200)/(B-200)·-150 speed; motion 0xcf then 0/2, or 0/6 |
+| 7/6, 7/7, 7/16, 7/19, 7/32, 7/85 | 0x00694840 | 0x006e01e0 | mode 0, motion 0x8 at 4.0 and the 0,5,3 tail; the variant's blend and timer (work+0x2a8's 1000.0 clamp for 7/16); the landing step with 0x80/0x40; motion 0x9/0x40/0x30, or 7/32's 4/7; the 36.0/120.0 check and the 0,0xd tail into 0/2 |
+| 7/8, 7/34 | 0x00694bf4 | 0x006e0794 | mode 0, motion 0xd0 at 4.0; the 2.0, 12.0 and 36.0 effects; the 78.0, 120.0 and 164.0 structure builds; 7/34 adds the source curve's rate step |
+
+**The calls still blocked or not carried.** They are named in the module's log and recorded
+in its README's category-7 section:
+
+- **0x0084161c (#55)**, 7/2's and 7/8's effect target check: named and skipped, and the effect
+  structure behind it with it.
+- **0x00688a20 and 0x00829950**, the attack-structure builder and its spawn: the structure
+  is the source's data and the spawn calls 0x0063cabc and 0x008890f0, which have no MH4U
+  counterpart read here, so neither is carried.
+- **0x00842a7c (#55)** is only the colour variants' branch of 0x00693468, which the ported id
+  (1) never takes; so are that branch's 0x0063e4ac shell spawns and the source's +0xdb
+  selector.
+- **0x0083c6cc (#55)** is not called by this slice's units; it is other category-7 ids'
+  helper.
+- **The source's value curves 0x00b0b1c0 and 0x00b0b1e8** (7/15, 7/34) are the source's
+  data, which the port does not carry, so the timing value they supply is skipped.
+
+The two field-map rows this slice adds (work+0xb81 → work+0xca5 and work+0x2a8 → work+0x238)
+are in [Flight](#flight-the-fields-category-7s-handlers-read). The ledger
+([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the 21 ids
+translated; their per-move rows are in [checks.md](../docs/checks.md#the-ported-moves-check-r2p).
 
 ### The 17 ids MH4U has no action for
 
