@@ -309,40 +309,48 @@ each row:
 
 Status: not done. The category-17 rows wait with the rest of R2p for #48 and #105.
 
-The 3U port (id 125) has the rows below (#116's). They are the 16 ids MH4U's `uEm001` lacks that
-reach a handler a shared action also reaches, so `mods/monster_actions` sends each to the MH4U
-action the map names and MH4U's own handler runs
-([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each row, enable
-both plugins, put `force_action` after `monster_actions` in the mod order (the last mod's hook
-runs first, so `force_action` writes the forced pair and the map translates it), set
-`action = <3U id>`, `monster = 125` and `hold = 1`, take a quest that names id 125, and watch
-the move. The plugin's log shows its ready line and one `monster 125: action <source> -> <target>`
-line per id. Record pass or fail and what differs; if the move is another variant, the actions
-in the page's "other MH4U actions with the same body" column are what to try next.
+The 3U port (id 125) has the rows below (#116's). They are the 17 ids MH4U's `uEm001` has no
+action for; #116 will hold a row for every id the ledger marks translated. Under decision
+0002's 2026-11-26 amendment she runs her own handler for each, so the 3U module
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) runs the source's
+handler and the row checks the move against MH3U's own
+([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each, set
+`action = <3U id>`, `monster = 125` and `hold = 1` in `mods/force_action`'s `config.ini`, take
+a quest that names id 125, and watch the move. The module logs the handler it ran, and an id
+the ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) still
+marks pending goes to MH4U's dispatcher once and is logged. Record pass or fail and what
+differs.
 
-| 3U id | the map runs | status |
-|---|---|---|
-| 0/4 | 0/0 | not done |
-| 7/64 | 7/35 | not done |
-| 7/87 | 7/92 | not done |
-| 7/93 | 7/92 | not done |
-| 10/0 | 10/7 | not done |
-| 10/1 | 10/7 | not done |
-| 10/2 | 10/7 | not done |
-| 10/3 | 10/7 | not done |
-| 10/4 | 10/7 | not done |
-| 10/5 | 10/7 | not done |
-| 10/6 | 10/7 | not done |
-| 11/5 | 11/0 | not done |
-| 11/15 | 11/0 | not done |
-| 11/26 | 11/0 | not done |
-| 11/28 | 11/0 | not done |
-| 13/9 | 0/3 | not done |
+| 3U id | status |
+|---|---|
+| 0/4 | not done |
+| 4 | not done |
+| 7/64 | not done |
+| 7/87 | not done |
+| 7/93 | not done |
+| 10/0 | not done |
+| 10/1 | not done |
+| 10/2 | not done |
+| 10/3 | not done |
+| 10/4 | not done |
+| 10/5 | not done |
+| 10/6 | not done |
+| 11/5 | not done |
+| 11/15 | not done |
+| 11/26 | not done |
+| 11/28 | not done |
+| 13/9 | not done |
 
-Action 4 needs new C (#136) and is not on the map; it joins this table when it plays.
+Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
+translates it, and the other sixteen's counterparts are in the reference page.
 
 Status: not done. The GU rows wait for #48 (the ported files) and #105 (the ported monster's own
-resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
+resource paths); the 3U rows wait for #49, #105 and the quest load
+([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)), with her module
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) and its slices
+[#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217) to
+[#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229) and
+[#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136).
 
 The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
 handlers for 3/98, 12/1-3, 4/27-32, 8/0 and category 17, and leaves shared ids and
@@ -977,9 +985,13 @@ monster spawned, so no translated action ran: the in-game side is R2p.
 The 4/27-32 and 8/0 slices change that line to `selftest: 12 of the 13 actions: ... 4/27-32
 <- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0
 <- 0x0201b460 (3 states, motion 0x403 at 4.0, ...), 17 <- the gate 0x008d5bd4 + MH4U's base
-update 0x00911b48`, and the last line names 8/0's leaf and no pending slice. No headless run
-has shown that line yet: it needs a code library rebuilt with the plugin, and the build
-machine's one heavy job is the quest-load proof
+update 0x00911b48`, and the last line names 8/0's leaf. That "no pending slice" covers only
+the 13 MHXX-only ids; under decision 0002's 2026-11-26 amendment her own handler runs for
+every action id, shared ids included, so 12/0 is not MH4U's to keep and the set the self-test
+counts stays open until the GU module
+([#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)) takes it. No
+headless run has shown the line yet: it needs a code library rebuilt with the plugin, and the
+build machine's one heavy job is the quest-load proof
 ([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)).
 
 ## Floats through a guest stub (T0)
