@@ -46,6 +46,7 @@ that held them before.
 | `src/monsters/rathian-3u/cat1.c` | category 1's family: `1/0` to `1/14`, its five handler units and four inline blocks; it reuses `cat0.c`'s `mhuc_3u_base_0_2` for 1/10 |
 | `src/monsters/rathian-3u/cat3b.c` | category 3's part 2's family: `3/6`, `3/7`, `3/8`, `3/12`, `3/13`, `3/16` to `3/21`, `3/24`, `3/25`, `3/27` to `3/29`, and 3/8's base-class handler (#220) |
 | `src/monsters/rathian-3u/cat7a.c` | category 7's first family (#221): `7/0`, `7/1`, `7/2`, `7/4`, `7/5`, `7/6`, `7/7`, `7/8`, `7/10`, `7/11`, `7/12`, `7/15`, `7/16`, `7/19`, `7/20`, `7/32`, `7/34`, `7/42`, `7/61`, `7/77`, `7/85`, and the calls still blocked |
+| `src/monsters/rathian-3u/cat7b.c` | category 7 part 2's family (#222): `7/3`, `7/9`, `7/13`, `7/14`, `7/17`, `7/18`, `7/21`, `7/30`, `7/41`, `7/43`, `7/44`, `7/53`, `7/54`, `7/55`, `7/56`, `7/72`, `7/73`, `7/78`, `7/80`, `7/83`, `7/88`, `7/89`, on the units 0x00694474, 0x00694f4c, 0x006956e8, 0x00695e68 and 0x00696408 |
 | `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
@@ -54,6 +55,7 @@ that held them before.
 | `tests/rathian-3u/cat1.c` | category 1's fake-host test: its fifteen ids' states, call sequences and frame values; `make test` discovers it and builds `tests/family-cat1` |
 | `tests/rathian-3u/cat3b.c` | category 3's part 2's fake-host test: the sixteen ids' frames and call order and the two blocked calls' log lines; `make test` builds `tests/family-cat3b` |
 | `tests/rathian-3u/cat7a.c` | category 7 part 1's fake-host test: every id's and variant's call sequence; `make test` discovers it and builds `tests/family-cat7a` |
+| `tests/rathian-3u/cat7b.c` | category 7 part 2's fake-host test: every id's and variant's call sequence and frame values; `make test` discovers it and builds `tests/family-cat7b` |
 | `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
 | `tests/rathian-gu/host.h` | what the GU module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-gu/cat17.c` | category 17's fake-host test: the 0-2 no-op and the base update; `make test` discovers it and builds `tests/family-gu-cat17` |
@@ -707,6 +709,90 @@ The family's fake-host test is `tests/rathian-3u/cat13a.c`. The module's ready l
 families' counts — `ready: translating 63 of 3U Rathian's 191 actions on monster 125` with
 cat0, cat1, cat3b, cat7a and this slice — and the family's self-test logs the five units and
 the blocked calls. The 125 quest's run reuses check T1c; the per-move rows are #116's.
+
+### 3U Rathian's module: category 7, part 2
+
+Category 7's second slice is `cat7b.c`, issue [#222](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/222):
+five handler units on 22 ids. The class (`uEm002`) shares them with Rathalos and the colour
+variants (MH3U ids 1, 2 and 62 to 65); the ported monster is em001 (id 1), so the branches
+only the variants take are not carried and the source's own id-1 path is. The action variant
+the case block passes (0 to 6) is kept, and it selects a variant, a motion, a speed or a tail
+in four of the five units.
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 7/3, 7/41, 7/43, 7/44, 7/53, 7/54, 7/55, 7/56, 7/72, 7/73 | the veneer `0x00694474` -> `0x00687398` | the six-state flight machine: state 0 mode 0 and motion 0xd6 at 4.0; state 1 the 0x400 turn for selectors 2, 4 and 5, the finish flag, mode 3, speed 50.0, motion 0xd7, the extra step, the (blocked) speed curve and the aim advance; state 2 the 6.0 check and the selector's blocked point/effect spawn, then the flag into the substate, the aim-vector z 0.5 and motion 0x1b, or the blocked curve and the aim advance; state 3 the aim step, the aim-z clamp, and the flag into 0/2's base (r1 = 0) or 0/6's (r1 = 1), or the substate's motion 0x1b/0xd8; state 4 mode 0 and motion 0xd9; state 5 0/2's base |
+| 7/9, 7/14, 7/30, 7/80, 7/83, 7/88, 7/89 | `0x00694f4c` | the seven-variant machine: the work-block flag 0x20 every frame; state 0 mode 0, the id-1 run flag -14 and motion 0xcd at 6.0 (variants 3 to 6: motion 0xe1/0xe3 at 0.0); state 1 the flag into motion 0xce, the 0,7 pair, the extra step and the two second speeds (variants 3 to 6: the 398.31 fall step, motion 0xe2/0xe4, the 0,0x26 pair and the unmapped u16 copy); state 2 the (blocked) curve, the turn step, the mode checks and the per-mode step, then variant 0's motion 0xcf, variant 1's motion 0x1b, variant 2's motion 0xd2, variants 3/4's motion 0x1b and set byte, variants 5/6's state advance into 0xcf (variants 3 to 6 also the blocked 0x00842a7c, curve and effects); state 3 variant 0/5/6 into 0/2, variant 2's motion 0xcd at 70.0 (the source's own r3 = 0x46), variants 1/3/4's vertical step into 0/6; state 4 the advance block; state 5 the turn/mode-check/per-mode path into 0xcf; state 6 into 0/2 |
+| 7/13 | `0x006956e8` | state 0 mode 0, the run flag -14, motion 8 at 0.0, the 0,5,2 pair and the -300 turn step; state 1 the 0x40 turn condition into motion 0x2f, the 0,1 and 1,9 pairs; state 2 the flag into 0/2. Its colour-variant effect and shell spawns are not carried |
+| 7/17, 7/78 | `0x00695e68` | the entry's -5.0 vertical step and -75.0 clamp; state 0 mode 3, the run flag, motion 0x36 at 4.0, the 0,0xc pair, the camera step and the distance/angle speed into the aim z; state 1 the 60.0 check, the 0x40 turn and the aim advance, then the flag into 0/6 |
+| 7/18, 7/21 | `0x00696408` | the entry's -5.0 vertical step and clamp; state 0 mode 3, the run flag, motion 0x37 at 4.0, the 0,2 pair, and for 7/21 the extra step with the 20.0/-0.5 aim; state 1 the flag into 0/6 |
+
+**The field map rows this slice reads.** They are the map's: +0x5/+0x6 -> +0x144/+0x145,
++0x3 -> +0x1c0, +0x68 -> +0x180, +0x80/+0x84 -> +0x1a8/+0x1ac (the heading is a u16 angle,
+as MH4U's `0x0091db4c` stores it), +0x264/+0x268/+0x278 -> +0x164/+0x168/+0x178, +0x38/+0x288
+-> +0x198/+0x218 (the two points), +0xf2 -> +0x1dc, and the object speed 3U this+0x284 ->
+MH4U this+0x29c (`0x0083c6cc`'s second speed, read as the map's row pairs it). One field has no
+row: **work+0x140**, a u16 `0x00694f4c` copies into the target-line struct's +0x6a on the
+7/80-family state 1. MH4U's own 7/80-family handler has no such step and no pair reads the
+field, so the copy is left out and logged.
+
+**The engine calls this slice adds**, each the MH4U counterpart at the same point:
+
+| MH4U | 3U | What |
+|---|---|---|
+| `0x0094e318` | `0x00828828` | start a motion (`r1` the motion, `s0`/`s1` the speed; 3U's wrapper ignores its caller's floats, so the value is MH4U's own handler's at the same step, or the source's r3 where it sets one) |
+| `0x009167b4` | `0x0082fe88` | the mode setter |
+| `0x00b05da4` | `0x0083cbf4` | the finish flag |
+| `0x0091db4c` | `0x008357b0` | turn toward the target (`r2` 0) |
+| `0x0091b430` | `0x00839ea0`, `0x00839514` | the turn wrapper (slot, `s0`, `s1`) |
+| `0x0091aae4` | `0x0083336c` | the per-mode check |
+| `0x00942220` | `0x0083369c` | the per-mode step |
+| `0x00911090` | `0x00834098` | advance the aim point by the aim vector |
+| `0x00912288` | `0x0082cee4` | advance the position by a speed vector |
+| `0x00916108` | `0x00833d88` | the speed 50.0 |
+| `0x0093d870` | `0x00852324` | the action data's float |
+| `0x0092e99c` | `0x00844124` | advance the fall |
+| `0x0096e164` | `0x00839968` | clear the aim point and vector |
+| `0x00915d44` | `0x00833b2c` | advance the vertical value (the source's -5.0 is passed halved, -2.5) |
+| `0x00922ca0` | `0x0083d18c` | set the one-shot byte |
+| `0x0092e960` | `0x00844100` | the state 2/3 predicate |
+| `0x00914de0` | `0x00832670` | the work-block flag 0x20 |
+| `0x0091b7b0` | `0x008345f8` | the run flag; the ported id is 1, whose wrapper passes -14 (the variants' values are -15, -10 and -7) |
+| `0x00916228` | `0x0082fc8c` | the camera step |
+| `0x00923f90` | `0x0083db3c` | the target's height |
+| `0x00568c64` | `0x00584cd8` | the u16 angle from a point to a point |
+| `0x00aacd50` | `0x005858f4` | the distance between two points |
+| `0x0092dc50` | `0x008437f4` | the vertical blend filter |
+| `0x0092dccc` | `0x008438e8` | the landing step |
+| `0x0093310c` / `0x00914dc4` | `0x00844a40` / `0x00844a38` | the motion's parameter pair |
+
+`0x0083c6cc` (3U's `this+0x284` times 2.0) and `0x0083b424` (the set byte at work+0xf2) are
+not calls in the port: the first is the mapped field read, the second the mapped work+0x1dc
+store. The two base handlers the flight machine ends in are `cat0.c`'s, reused (`0/2`'s for
+r1 = 0 and `0/6`'s for r1 = 1).
+
+**What it does not carry.** The family's blocked or source-data calls are named once in the
+log and recorded here:
+
+- **`0x00842a7c` (#55)** is `0x00694f4c`'s variant 3 to 6 state 2 and `0x00695e68`'s colour
+  variant 0x41 state 1. It is named and skipped. `0x0084161c`, the other #55 call the
+  category is known for, is not reached by this slice's units.
+- **`0x0083c6e0` -> `0x00922250`.** The MH4U function has the same body, but the call takes
+  one of the source's speed-curve tables (`0x00c4ee30`, `0x00c4ee70`, `0x00c4ef98`), which the
+  port does not carry, so the call is logged and the aim coordinate keeps its value.
+- **`0x00164f08`'s effect spawn**, with `0x00688a20`, `0x00688870` and `0x0063cabc`: the point
+  comes from `0x00199d00` and `0x00829950`, which have no MH4U counterpart (the whole-code
+  token index's best is 0.35), and the effect ids 0x17/2/4 and the manager are the source's.
+  The factory's counterpart is `0x00c0760c` with the type moved from 3U's r2 to MH4U's r1, but
+  without the point it is not called. The log keeps the source's point selector (0x1c72 for
+  selectors 1 to 4, 0x1555 for 5 and 6) so a run says which path a move took.
+- **`0x0063e4ac`'s shell factory** is only in the colour variants' branches (kind 0x3e, 0x3f
+  and 0x41), which the ported id 1 never takes; it is not carried.
+- **work+0x140 -> the target line's +0x6a** is unmapped, as above.
+
+The module's ready line sums the families' counts — `ready: translating 85 of 3U Rathian's
+191 actions on monster 125` — and the family's self-test logs the five units, the field
+rows this slice reads and the calls still blocked.
 
 ## What it hooks
 

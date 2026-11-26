@@ -569,7 +569,7 @@ position, heading, point and speed rows above; what they add:
 | work+0x68 | work+0x180 | the speed accumulator | 5 pairs |
 | work+0x28 / +0x2c | work+0x1d4 | the frame timer | 2 / 6 pairs; 7/1 counts it down before the flight blend |
 | work+0x2b6 | work+0x278 or +0x27c | the part byte the hit check takes | 3 pairs each way: 3U passes one byte to 0x0084512c, MH4U passes two (+0x278, +0x27c) to 0x0092b2b0, so which one replies to it is not settled |
-| work+0x80 / +0x84 | work+0x1a8 / +0x1ac | the turn slot and the heading | 1 and 2 pairs |
+| work+0x80 / +0x84 | work+0x1a8 / +0x1ac | the turn slot and the heading (a u16 angle, not a float) | 1 and 2 pairs; MH4U's `0x0091db4c` stores a u16 at +0x1ac |
 | work+0x2b4 | — | read 10 times by the category, no pair | unverified |
 | work+0x260 / +0x264 / +0x268 | work+0x160 / +0x164 / +0x168 | the aim point A | 11 pairs on A.z; 8 twin readings |
 | work+0x270 / +0x278 | work+0x170 / +0x178 | the aim vector B | 6 pairs on B.z |
@@ -584,6 +584,9 @@ position, heading, point and speed rows above; what they add:
 #### What is not mapped
 
 - **work+0x2b4** (10 readings, category 7): no pair reads a role at one MH4U offset, and no twin. (`work+0xb81` was on this list; category 7's first slice found it at MH4U's `+0xca5`, above.)
+- **work+0x140** (a u16, category 7): `0x00694f4c` copies it into the target-line
+  struct's +0x6a on the 7/80-family state 1; no pair reads it and MH4U's own handler
+  (`0x006e09a0`) has no such step, so the copy is left out.
 - **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where.
 - **work+0x11c** (category 3, "the fall or hold step is enabled"): MH4U's counterpart function tests two flags instead (+0x620 and +0x628); which of them replies to +0x11c is unsettled.
 - **work+0xf4** and **work+0x944** (a byte and a halfword, category 3), **work+0x1c, +0xda, +0xaea** (category 13) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. (`work+0x2a8` was on this list; category 7's first slice found it at MH4U's `+0x238`, above.) +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
@@ -663,6 +666,61 @@ The two field-map rows this slice adds (work+0xb81 → work+0xca5 and work+0x2a8
 are in [Flight](#flight-the-fields-category-7s-handlers-read). The ledger
 ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the 21 ids
 translated; their per-move rows are in [checks.md](../docs/checks.md#the-ported-moves-check-r2p).
+
+#### Category 7, part 2 (#222): the five units and what is blocked
+
+Category 7's second slice reimplements five handler units on 22 ids. Each unit was read
+against MH4U's own handler for the same action (the "MH4U's own handler" column is the pair
+read by hand), and its engine calls are the MH4U counterpart at the same point. The class
+(`uEm002`) shares them with Rathalos and the colour variants (MH3U ids 1, 2 and 62 to 65);
+the work block's +3 (MH4U's +0x1c0) tells them apart, and the ported monster is em001 (id 1),
+so the source's id-1 path is carried and the variants' branches are not.
+
+| 3U ids | MH3U unit | MH4U's own handler | what the port runs |
+|---|---|---|---|
+| 7/3, 7/41, 7/43, 7/44, 7/53, 7/54, 7/55, 7/56, 7/72, 7/73 | veneer 0x00694474 -> 0x00687398 | 0x006dfd10 -> 0x006ea05c | the six-state flight machine: state 0 mode 0 and motion 0xd6 at 4.0; state 1 the 0x400 turn for selectors 2, 4 and 5, the flag, mode 3, speed 50.0, motion 0xd7 and the extra and aim steps; state 2 the 6.0 check and the selector's effect spawn (blocked), then the flag into the substate and motion 0x1b, or the blocked curve and the aim advance; state 3 the aim step, the aim-z clamp and the flag into 0/2 (r1 = 0) or 0/6 (r1 = 1), or the substate's motion 0x1b/0xd8; state 4 mode 0 and motion 0xd9; state 5 0/2's base |
+| 7/9, 7/14, 7/30, 7/80, 7/83, 7/88, 7/89 | 0x00694f4c | 0x006e09a0 | the seven-variant machine: the work-block flag 0x20 every frame; state 0 mode 0, the id-1 run flag -14 and motion 0xcd at 6.0 (variants 3 to 6: motion 0xe1/0xe3 at 0.0); state 1 the flag into motion 0xce and the 0,7 pair with the extra step and the two second speeds (variants 3 to 6: the 398.31 fall step, motion 0xe2/0xe4, the 0,0x26 pair and the unmapped u16 copy); state 2 the blocked curve, the turn step, the mode checks and the per-mode step, then variant 0's motion 0xcf, variant 1's motion 0x1b, variant 2's motion 0xd2, variants 3/4's motion 0x1b and set byte, variants 5/6's state advance into 0xcf (variants 3 to 6 also the blocked 0x00842a7c, curve and effects); state 3 variant 0/5/6 into 0/2, variant 2's motion 0xcd at 70.0 (the source's own r3 = 0x46), variants 1/3/4's vertical step into 0/6; state 4 the advance block; state 5 the turn/mode-check/per-mode path into 0xcf; state 6 into 0/2 |
+| 7/13 | 0x006956e8 | inline in MH4U's dispatcher | state 0 mode 0, the run flag -14, motion 8 at 0.0, the 0,5,2 pair and the -300 turn step; state 1 the 0x40 turn condition into motion 0x2f, the 0,1 and 1,9 pairs; state 2 the flag into 0/2. Its colour-variant effect and shell spawns are not carried |
+| 7/17, 7/78 | 0x00695e68 | 0x006e1670 | the entry's -5.0 vertical step and -75.0 clamp; state 0 mode 3, the run flag, motion 0x36 at 4.0, the 0,0xc pair, the camera step and the distance/angle speed into the aim z; state 1 the 60.0 check, the 0x40 turn and the aim advance, then the flag into 0/6 |
+| 7/18, 7/21 | 0x00696408 | 0x006e1a68 | the entry's -5.0 vertical step and clamp; state 0 mode 3, the run flag, motion 0x37 at 4.0, the 0,2 pair, and for 7/21 the extra step with the 20.0/-0.5 aim; state 1 the flag into 0/6 |
+
+**The motion speeds.** 3U's motion start (`0x00828828`, a veneer to `0x0083771c`) ignores its
+caller's `s0`/`s1`: it converts the caller's r3 to a float and takes its second float from
+work+0x814, which the map does not cover. MH4U's counterpart `0x0094e318` takes `s0`/`s1`, so
+the port passes the value MH4U's own handler gives the counterpart call at the same step
+(4.0 for the take-offs, 6.0 for 7/9's first motion, 0.0 otherwise), or the source's own r3
+where it sets one (7/80-family state 3 passes 0x46, 70.0). The source's r2 (an extra argument
+to its own start) has no MH4U place: `0x0094e318` forces its `r2` to 0.
+
+**The field-map rows this slice reads.** They are the map's, above: +0x3 -> +0x1c0, +0x5/+0x6
+-> +0x144/+0x145, +0x68 -> +0x180, +0x80/+0x84 -> +0x1a8/+0x1ac (the heading is a u16 angle,
+which is what MH4U's `0x0091db4c` stores there), +0x264/+0x268/+0x278 ->
++0x164/+0x168/+0x178, +0x38/+0x288 -> +0x198/+0x218 (the two points) and this+0x284 ->
+this+0x29c (the second speed `0x0083c6cc` multiplies by 2.0). The one field with no row is
+work+0x140, a u16 `0x00694f4c` copies into the target-line struct's +0x6a on the 7/80-family
+state 1; no pair reads it and MH4U's own handler has no such step, so the copy is left out.
+
+**The calls still blocked or not carried.** They are named once in the module's log and
+recorded in its README's category-7 section:
+
+- **0x00842a7c (#55)** is 0x00694f4c's variants 3 to 6 state 2 and 0x00695e68's colour variant
+  0x41 state 1; it is named and skipped. **0x0084161c (#55)** is not reached by this slice's
+  units.
+- **0x0083c6e0 -> 0x00922250.** The function is MH4U's, but the call takes one of the source's
+  speed-curve tables (0x00c4ee30, 0x00c4ee70, 0x00c4ef98), which the port does not carry, so
+  the call is skipped and the aim coordinate keeps its value.
+- **0x00164f08's effect spawn**, with 0x00688a20, 0x00688870 and 0x0063cabc: the point comes
+  from 0x00199d00 and 0x00829950, which have no MH4U counterpart read here (the whole-code
+  token index's best is 0.35 for 0x00829950), and the effect ids 0x17/2/4 and the manager are
+  the source's. The factory's counterpart is 0x00c0760c with the type moved from 3U's r2 to
+  MH4U's r1, but without the point it is not called.
+- **0x0063e4ac's shell factory** is only in the colour variants' branches (kind 0x3e, 0x3f and
+  0x41), which the ported id 1 never takes; it is not carried.
+- **0x00584760** is not reached by this slice's units.
+
+The ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the
+22 ids translated; their per-move rows are in
+[checks.md](../docs/checks.md#the-ported-moves-check-r2p).
 
 #### Category 13, part 1 (#227): the five units and what is blocked
 
