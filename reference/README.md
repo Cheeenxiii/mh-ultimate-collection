@@ -516,10 +516,46 @@ rows above apply to every one of them.
 | work+0x30 | — | the pointer to the frame delta the timer adds | unmapped: MH4U's helper takes the delta in s0 |
 | work+0x120 | work+0x624 | the vertical limit position y is clamped to | 1 pair; the wrappers 0x00839514 / 0x0091b430 both tail into a function that reads it (0x00839540 / 0x00922b34) |
 | work+0x3d0 | work+0x394 | a 0–1 rate advanced by the frame delta | 1 pair; the twins 0x00836c04 / 0x00918e48 (same body) and 0x0084e74c / 0x00935fb8 |
+| work+0x7c9 | work+0x3c4 | the "flying" byte 0x008310f0 sets | 3/8's handler pair (0x0082b37c / 0x006d7378): both set it at the same two state entries, MH4U's handler inline; #220's port writes the field |
 | this+0x14 | this+0x14 | the frame delta (seconds) | 12 twins: every advance and every rate above multiplies by it |
 | this+0x278 | this+0x290 | a speed (float) | 3 pairs, and the twin 0x0083c6e0 / 0x00922250 |
 | this+0x284 | this+0x29c | a second speed | the twin 0x0083c6e0 / 0x00922250 (the same body reads both speeds) |
 | this+0x27c | this+0x294 | | 1 pair |
+
+#### The category 3, part 2 units (#220)
+
+#220 translates sixteen of her ground ids on five handler units, reusing cat0.c's base
+handlers: 3/6, 3/13 and 3/16 fall into 0/3's `0x00858b6c` (the blocked height branch aside),
+and 3/27's last state into 0/2's `0x0082d1cc`.
+
+| 3U ids | Handler | Arguments | What the handler does |
+|---|---|---|---|
+| 3/6, 3/13, 3/16 | `0x0068e448` | r1, r2 = (0, 0), (1, 0), (0, 1) | state 0: the data float, the fall, motion `0x1a` at 6.0, aim point A cleared; state 1: the value curve at the speed into aim A y, the position advance (the source's 0.5, which `0x00955440` lacks), the flag counts two and clears the aim, then 0x84d7e4's turn; the height test takes 3U's blocked `0x0064325c` for r1 = 0 and target z + 1300 for r1 = 1, then 0/3's base handler |
+| 3/7, 3/17, 3/18, 3/19, 3/24, 3/28 | `0x0068e5e8` | r1 = 0 to 5 | state 0: the data float, the fall, motion `0x1a` at 6.0; state 1: the turn at 3U's 0x200 (halved for `0x0091db4c`, which has no 0.5), then r1 2 to 5 ask the next action 3/0x14, 3/0x15, 3/0x19 and 3/0x1d; r1 0 and 1 fall into 0/3's base handler |
+| 3/12, 3/20, 3/21, 3/25, 3/29 | `0x0068e6e4` | r1 = 0 to 4 | state 0: the data float, the fall, motion `0x3d` at 6.0; state 1: the 70.0 distance test, aim A z 5.0 and aim B z 3.0, then the turn with aim A z clamped at 90.0; on the flag r1 1 to 4 ask 3/0x16, 3/0x17, 3/0x1a and 3/0x1e, and r1 0 starts 3/11 (`0x0084dc84`, `0x00935a90`) and writes the set byte |
+| 3/27 | `0x0068e8c8` | — | state 0: the data float, the fall, motion `0x1a` at 6.0, then `0x8509a0`; state 1: `0x850a50`, the data float, `0x83369c`'s height test, mode 3 and motion `0x1d`; state 2: the flag, mode 0, and the record's kind picks motion `0xcf` (MH4U `0x0207`) for 0x3e/0x3f/1 or `0xe1` (MH4U `0x0219`) for 2/0x40/0x41, then the shell `0x844a38` and `0x83d18c`; state 3: the flag, then 0/2's base handler |
+| 3/8 | `0x0082b37c` (base class) | — | five states: the data float and motion `0x2d`; the flag, motion `0x3d` and the rate at target z + 500.0; the two-joint turn at 0x100 (halved to `0x0092fc84`'s 0x80), the 30.0 distance test, aim A z 5.0 and aim B z 3.0, the turn point at -300.0, then motion `0x3e`; the joint turn at 0x80 (halved to `0x0092dccc`'s 0x40), motion `0x2d`, aim A y -10.0 and aim B z -3.2; the 30.0 test and aim B z -6.8, then mode 3 and motion `0x1d` or the blocked `0x00839598` and 0/3's base handler; state 5: mode 3 and 0/3's base handler |
+
+The two calls #55 still blocks are named and logged once per action:
+
+- **`0x0064325c`** (3/6, 3/13 and 3/16's r1 = 0 branch, i.e. 3/6 and 3/16) maps work+0xdb through
+  a table and returns a per-monster height from the monster's data block; no MH4U function with
+  those steps was found. The port leaves the call out and takes its result as 0.0, so the
+  target is the vertical limit + 2000.0 (the branch the source takes for a value below the
+  limit) until #55 settles it. 3/13 takes the other branch (target z + 1300.0) and never calls
+  it. The selector's field, work+0xdb, does map to MH4U's work+0x14c.
+- **`0x00839598`** (3/8's fourth state) returns the signed byte at 3U work+0xef; it is one of
+  #55's 28 with no MH4U counterpart, and work+0xef has no mapped offset. The port takes the
+  source's nonzero path and ends the action in 0/3's base handler, so the move cannot stall.
+
+Three argument translations the engine calls need: `0x83d884`'s two rates 0x100 and
+`0x8357b0`'s 0x200 and `0x8438e8`'s 0x80 are halved (3U's `0x8392d8` halves its rate,
+MH4U's `0x0091aaf0` does not), and `0x82b268`'s s0 = 1.0 becomes 0.5 (`0x00955440` has no
+0.5 factor). `0x8310f0` sets 3U's work+0x7c9 and has no function in MH4U: the port writes
+work+0x3c4, the offset MH4U's own 3/8 handler stores it at inline. The 3/6/3/13/3/16 value
+curve is MH4U's own 3/6 curve `0x00fd18a0`, whose keys were compared key by key with 3U's
+`0x00c4eca8` and are equal, so MH4U's evaluator `0x00922250` reads the converted curve and no
+3U data is carried.
 
 #### Flight: the fields category 7's handlers read
 
