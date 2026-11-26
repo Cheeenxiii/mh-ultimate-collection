@@ -446,4 +446,16 @@ The facts and options it was chosen from, as the open entry held them:
 
 ## Open
 
-None. A new structural question goes here, with its facts and options, until the maintainer settles it.
+### A 3U monster's camera, when MH3U ships none
+
+MH3U's monster archives hold no `rCameraList` (checked against its monster archives; [specs/camera.md](../specs/camera.md)), so a ported 3U monster has no camera of its own. MH4U's resource record names one (`enemy\emNNN\mot\eNNN_cam`), used by the cut-ins that frame the monster; #143 answers a ported id's record with the stand-in's camera while the port ships none. MH4U's lists are version 4, MHXX's version 5 with a 16-byte record prefix, and `mhuc convert camera` writes MH4U's version from MHXX's (check C1).
+
+| Option | Gives | Costs |
+|---|---|---|
+| Keep the stand-in's camera (today) | nothing authored; the record keeps MH4U's camera for the same monster | a 3U monster MH4U never had is framed by another monster's camera |
+| Author one for the 3U monster from MH4U's own camera for the same monster, recorded in the [authored register](sources.md#authored-register) | the cut-ins frame her | authored data, not from 3U; rule 2 allows it where no source exists, and it must be recorded |
+| Reuse the GU version's camera (MHXX's `em001`) | the other Rathian's camera, which is a real source game's | 3U's cut-ins follow MHXX's framing, not 3U's |
+
+Open because it says what fidelity means where the source game has nothing. The maintainer settles it.
+
+A new structural question goes here, with its facts and options, until the maintainer settles it.
