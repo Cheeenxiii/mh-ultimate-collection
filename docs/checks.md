@@ -1030,16 +1030,23 @@ must have the runtime's ready line, the GU module's ready line
 (`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`), its self-test
 line and the guest stubs' address; the runner must exit 0. The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
-runtime's `mod.json` changed.
+runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
+ABI 4's merge into the fork and refused the runtime, so rebuild its `mh4u_runner` target from
+the current fork before the run.
 
-The module's self-test line is the one the old plugin logged once the 4/27-32 and 8/0 slices
-were in: `selftest: 12 of the 13 actions: ... 4/27-32 <- 0x0200e3b4 (3 states, motions
-0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0 <- 0x0201b460 (3 states, motion
-0x403 at 4.0, ...), 17 <- the gate 0x008d5bd4 + MH4U's base update 0x00911b48`, the line
-naming 12/0 as MH4U's own `0x006d524c` and 8/0's leaf, and the float stubs' address. That "no
-pending slice" covers only the 13 MHXX-only ids; under decision 0002's 2026-11-26 amendment
-her own handler runs for every action id, shared ids included, so 12/0 is not MH4U's to keep
-and the set the self-test counts stays open until the GU module's shared-id work.
+Last result (2026-11-26, MH4U USA v1.3.0, the runtime built into the game's code library, the
+runner rebuilt from the fork's `uc/main`, headless runner): pass. The build reported 53 hook
+points (the 52 before it plus `uEnemy::dispatchAction`) and one native plugin. The log had the
+runtime's ready line, then `ready: translating 12 of GU Rathian's 13 MHXX-only actions on
+monster 124`, then `selftest: 12 of the 13 actions: ... 17 <- the gate 0x008d5bd4 + MH4U's
+base update 0x00911b48 (slot 89, MHXX's slot 244)`, the line naming 12/0 as MH4U's own
+`0x006d524c` and 8/0's leaf, and `selftest: float stubs at 0x08e45550 (384 bytes, the game's
+heap)`; the runner exited 0. No monster spawned, so no translated action ran: the in-game
+side is R2p.
+
+That "no pending slice" covers only the 13 MHXX-only ids; under decision 0002's 2026-11-26
+amendment her own handler runs for every action id, shared ids included, so 12/0 is not MH4U's
+to keep and the set the self-test counts stays open until the GU module's shared-id work.
 
 ## Floats through a guest stub (T0)
 
