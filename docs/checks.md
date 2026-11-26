@@ -552,14 +552,14 @@ P1, headless:
    id 1 answers the game's own format; ids 0..123 pass through`; one `self-test: id 124 resource record at <address>, built from
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
    record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, camera,
-   tail, cmd; keeps stand-in 1's paths for motions 5, mef, sound, efl` line; one for 125
-   (`ships model, motions 0,1,2, tail, sound; keeps stand-in 1's paths for motions 3,4,
-   camera, mef, cmd, efl`); one for 126 (`ships model, motions 0,2,3,4; keeps stand-in 15's paths
+   tail; keeps stand-in 1's paths for motions 5, mef, sound, cmd, efl` line; one for 125
+   (`ships model, motions 0,1,2, tail, sound, cmd; keeps stand-in 1's paths for motions 3,4,
+   camera, mef, efl`); one for 126 (`ships model, motions 0,2,3,4; keeps stand-in 15's paths
    for motions 1,5, camera, tail, mef, sound, cmd, efl`); one for 127 (`ships model, motions
    0,1,2; keeps stand-in 15's paths for motions 3,4,5, camera, tail, mef, sound, cmd, efl`);
    and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass through`. In the
-   124 record the model, motion, camera, tail and command paths name `em124`, and the
-   motion-effect, sound and effect-list paths and motion slot 5 still name `em001`. The 125
+   124 record the model, motion, camera and tail paths name `em124`, and the motion-effect,
+   sound, effect-list and command paths and motion slot 5 still name `em001`. The 125
    record names `em125` for the model, motion slots 0 to 2, the tail, the sound and the
    command, and keeps the stand-in's `em001` for motion slots 3 and 4, the camera, motion
    effects and effect lists. The 126 record names `em126` for the model and motion slots 0, 2,
@@ -568,8 +568,8 @@ P1, headless:
    for the model and motion slots 0, 1 and 2, and keeps stand-in 15's `em015` for motion slots
    3, 4 and 5, the tail, the camera, the motion effects, the sound, the command and the effect
    lists; no path may name a file the port's arc does not ship ([#143](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/143)).
-   The 125 sound path is the converted call `mhuc convert monster` writes (#158); the 125
-   command path stays the stand-in's until the EMC converter (a follow-up after #49) ships.
+   The 125 sound path is the converted call `mhuc convert monster` writes (#158), and her
+   command path is her converted 3U EMC ([specs/emc.md](../specs/emc.md), check A5).
    The factory's and data path's lines name the path the stand-in's files are read from
    (`enemy\em001\data\em001` for stand-in 1, `enemy\em015\data\em015` for the Great
    Jaggi), which the record does not change. With the fixture the ready
@@ -646,15 +646,17 @@ and Great Wroggi ([#166](https://github.com/Cheeenxiii/mh-ultimate-collection/is
 the next P1 run's 125 record also names `sound\call\em\em125`, the converted sound call
 #158's `mhuc convert monster` writes, and its 126 and 127 records name `em126`/`em127` for the
 model and the motion slots their rows list while keeping the stand-in's `em015` elsewhere;
-#159 added `cmd` on the plan to convert 125's EMC, but that converter is a follow-up after #49,
-so the row lists no `cmd` and the record keeps the stand-in's script. That run is the
-four-id run above: its records, masks, text and readers pass.
+#159 added `cmd` on the plan to convert 125's EMC; that converter now ships ([specs/emc.md](../specs/emc.md), check A5), so her row lists it and a current P1 run's 125 record names her own script. That run is the four-id run above: its records, masks, text and readers pass.
 
 After that run, 124's registry row gained `camera`
 ([#157](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/157)), so the next P1 run's
 124 record names `enemy\em124\mot\e124_cam` (the converted list `mhuc convert monster` writes)
 and its ships/keeps line lists the camera among the kinds it ships; that part of P1 has not
-been re-run.
+been re-run. After P4's 2026-11-26 run, 124's row lost `cmd`: the converter ships MHXX's EMC as
+is, and with it the quest reached the factory line and then froze on the splash, while the same
+archive with the stand-in's `em001_cmd` in the command slot loads the map (P4's Result). So
+124's record now keeps the stand-in's script, and the ships/keeps line step 4 lists is the one a
+P1 run reports.
 
 ### The quest's load, fixed (P2, headless)
 
@@ -834,7 +836,7 @@ the source's effect parameters and the MEF record's fields are not placed yet, s
    (`effect\psl\enemy\...`) and its lists. The converter will write the source's events into
    the ported motion lists and a MEF as MH4U reads it, and the effect lists as MH4U's version. Check
    that the id's row in `data/ids/registry.csv` lists `mef,efl`, regenerate
-   `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
+   `mods/uc_runtime/src/ids.h` and rebuild the code library (P1 step 1).
 2. Play an action whose source effect is visible and timed: a fireball or a breath is easiest to
    time. `mods/force_action` (R1p) plays a chosen action without the AI; the action's handler
    starts the same animation in both games, so the effect's frame is the frame of that animation.
@@ -884,29 +886,42 @@ Status: not done; waits for #48, #49 and #144.
 
 | Check | What | Pass |
 |---|---|---|
-| P4 | a headless run starts quest 10212 with a ported id (125 in the 3U profile, 124 in the GU one) and the quest loads past "Now Loading" | the run draws the quest's "Royal Assassination" splash, then the quest's map with the player (and the two Palicoes) in it, no hang, and the log has the ported id's reader lines and its `factory` line; the model's render is not part of this check (#203) |
+| P4 | a headless run starts quest 10212 with a ported id (125 in the 3U profile, 124 in the GU one) and the quest loads past "Now Loading" | the run draws the quest's "Royal Assassination" splash, then the quest's map with the player (and the two Palicoes) in it, no hang, and the log has the ported id's preload, resource and factory lines; the model's render is not part of this check (X4 runs it in game) |
 
 **What "loaded" means.** The departure is accepted and the quest's "Royal Assassination" splash is
 drawn; then the quest's map is drawn with the player in it (on these saves, the two Palicoes and
-the quest HUD as well), and nothing hangs. At that point the log has the ported id's reader lines
-— `data resource: id NNN -> stand-in N`, `resource load: id NNN -> its own record`, `effect
-lists: id NNN -> its own record` — and `factory: id NNN -> stand-in N`, the game creating the
-monster's entity from the record the plugin answers. Loaded is **not** visible: with #203 open the
-ported model does not render yet. The map shows the hunter and the Palicoes but no monster, and
-after the factory line the game logs the missing model as hundreds of thousands of unmapped reads
-(the record's path bytes read as pointers). The screenshot proves the map and the factory line
-proves the monster; the render, with `HW.Memory UnmappedAccess` at 0 during the load, is #203's
-pass, not this check's.
+the quest HUD as well), and nothing hangs. At that point the log has, for the ported id, the
+preload's lines — `quest 10212: id NNN -> stand-in N marked present so the state 0 preload loads
+its enemy data`, `quest task: marked stand-in N present before the preload` and the stand-in's
+`data path: id N is MH4U's own; passed through` — then `data resource: id NNN -> its own
+archive`, `resource load: id NNN -> its own record`, `effect lists: id NNN -> its own record` and
+`factory: id NNN -> stand-in N`, the game opening the port's own `data/emNNN.arc` and creating the
+monster's entity from the record the runtime answers. The whole run logs no `HW.Memory
+UnmappedAccess`: the preload's enemy data (#182) and the archive's converted material (#203) leave
+nothing the game reads as a pointer. Loaded is **not** visible: the harness's route stops at the
+camp, so no large monster is on screen; the screenshots show the map, the hunter and the two
+Palicoes, and the model's render is X4's in-game check.
 
 The per-move checks (#113, #116) need this load. This check starts one without a window: the
 runner's `--input` script plays from the title to the Gathering Hall's Low-rank quest counter,
 posts quest 10212, and leaves the quest to load.
 
-1. Profiles: two user folders, each a copy of the maintainer's save. The 3U one has the wave of
-   the deployed `loc/data/quest01.arc` naming monster 125 and `data/em125.arc` deployed; the GU
-   one names 124 and deploys `data/em124.arc`. Both have the code library built with
-   `mods/uc_runtime` on (`selftest = 1`), and the quest written in place from MH4U's own `.mib`
-   (P2): only the wave's monster id changes; the layout and the texts stay.
+1. Profiles: two user folders, each a copy of the maintainer's save. Restore `system` and
+   `user1` to `user3` before each run: the game writes the save when a quest starts, and the
+   input script's menu and counter presses no longer land on a profile that already started one.
+   The 3U one has the wave of the deployed `loc/data/quest01.arc` naming monster 125 and
+   `data/em125.arc`; the GU one names 124 and deploys `data/em124.arc`. Both have the code
+   library built with `mods/uc_runtime` on (`selftest = 1`), and the quest written in place from
+   MH4U's own `.mib` (P2): only the wave's monster id changes; the layout and the texts stay.
+   Build the library with `tools/build_game.py --dump <MH4U USA v1.3.0 update .cia> --install
+   <user folder>`; the session's shared build (the runtime and `force_action`, 54 hook points)
+   can be copied into `<user folder>/recomp/` instead, with the plugin list written for the
+   profile's enabled mods. Put the enabled mods in the profile's `load/mods/<program id>/` with
+   the fork's `tools/mods.py deploy` (the runner reads the deployed copies, not a mod library).
+   The port's archive is what `mhuc convert monster --id NNN --romfs <source RomFS>
+   --mh4u-romfs <MH4U RomFS> --out <mod folder>` writes, the sound mode too for 125. 124's row
+   ships no `cmd`: MHXX's EMC is not converted yet, and the as-is one froze the quest after the
+   factory line (the Result below); 125 ships her converted 3U EMC.
 2. The 3U profile's route (125) is the maintainer's recorded `.ctm`: 7-15 s, A through the Circle
    Pad Pro and break screens, the title, the save and the character select; 26-32 s, R held with
    the circle pad up, running through Val Habar; 33-52 s, A through the World Map, the Gathering
@@ -914,47 +929,61 @@ posts quest 10212, and leaves the quest to load.
    the departure A is at 52.3 s. The run draws the "Royal Assassination" splash and the map at
    about 128 s, so it needs at least 150 s emulated (the stock quest draws its map at about 60 s).
 3. The GU profile's route (124) keeps the recorded menu phase but re-anchors it after its own
-   boot; its steps are below. It departs at 54.3 s, draws the splash at 60 s and the map at about
-   65 s, so a 180 s run leaves room for the screenshot series and the load's tail.
+   boot; its steps are below. It departs at 54.3 s, draws the splash at about 62 s and the map at
+   about 70 s, so a 140 s run covers the screenshot series with room to spare.
 4. The input script stays outside the repository. It can be written from the route or converted
    from an Azahar `.ctm` recording of the same run: the movie holds the controller states in the
    order the HID service consumes them, and a pad record is one HID update, 234 per emulated
    second, so a record's time is about (index + 1) * 1000 / 234 ms. The screenshot schedule
    matters: a drawn frame pauses the emulated clock before each screenshot, so a route timed
    under one schedule drifts under another; keep the schedule the route was proved under.
-5. Run, from the workspace root, under the team's heavy-job lock:
+5. Run it under the session's headless-run gate, from the workspace root:
    ```
-   mh4u_runner "<MH4U USA .3ds>" --code <user>/recomp/0004000000126300.so --user <user> \
-       --ms 150000 --speed 0 --input "<script>" --shots <dir> --shot-every 4000 \
-       --shots-from 56000 --draw-window 150 --log "*:Info"
+   game_files/work/locks.sh headless -- mh4u_runner "<MH4U USA .3ds>" \
+       --code <user>/recomp/0004000000126300.so --user <user> --ms 150000 --speed 0 \
+       --input "<script>" --shots <dir> --shot-every 4000 --shots-from 56000 \
+       --draw-window 150 --log "*:Info"
    ```
    Screenshots show the route; `--draw-window` without `--shots` draws nothing and is much
    faster.
 6. Pass: the map with the player in it and the factory line for the ported id, as defined above.
    A stock quest (MH4U's own id 1) started with the same script is the control.
 
-Result (2026-11-25, USA v1.3.0 update, headless runner):
+Result (2026-11-26, USA v1.3.0 update, headless runner, fresh save copies, the code library and
+mods of this branch):
 
 | Profile | id | Route | Departure | Splash | Map | From the title |
 |---|---|---|---|---|---|---|
-| 3U | 125 | recorded `.ctm` | 52.3 s | "Royal Assassination" | ~128 s, player and two Palicoes, HUD | ~130 s; give 150 s |
-| GU | 124 | the route below | 54.3 s | 60 s | ~65 s, player and two Palicoes, HUD | ~65 s; the 180 s run is for the series |
-| 3U | 1 (control) | recorded `.ctm` | 52.3 s | "Royal Assassination" | ~60 s, player in the Ancestral Steppe, HUD | ~60 s |
+| 3U | 125 | recorded `.ctm` | 52.3 s | "Royal Assassination" | 128 s, player and two Palicoes, HUD | 128 s; give 150 s |
+| GU | 124 | the route below | 54.3 s | 62 s | ~70 s, player and two Palicoes, HUD | ~70 s; the 140 s run covers the series |
+| 3U | 1 (control) | recorded `.ctm` | 52.3 s | "Royal Assassination" | 62 s, player in the Ancestral Steppe, HUD | 62 s |
 
-- **125: pass.** The log has `data resource: id 125 -> stand-in 1`, `resource load: id 125 -> its
-  own record`, `effect lists: id 125 -> its own record` and `factory: id 125 -> stand-in 1`.
-- **124: pass.** The log has `data resource: id 124 -> stand-in 1`, `resource load: id 124 -> its
-  own record` and `factory: id 124 -> stand-in 1`.
+- **125: pass.** The log has `quest 10212: id 125 -> stand-in 1 marked present so the state 0
+  preload loads its enemy data`, `quest task: marked stand-in 1 present before the preload`, `data
+  path: id 1 is MH4U's own; passed through`, `data resource: id 125 -> its own archive`,
+  `resource load: id 125 -> its own record`, `effect lists: id 125 -> its own record` and
+  `factory: id 125 -> stand-in 1`; the run exited 0 with no `HW.Memory UnmappedAccess`.
+- **124: pass.** The same lines for 124 (`data resource: id 124 -> its own archive`, `resource
+  load`, `effect lists`, `factory: id 124 -> stand-in 1`), exit 0 and no `HW.Memory
+  UnmappedAccess`; the screenshot series shows the map and the hunter at 70 s. That run's row
+  was `model,motions=0-4,tail`; 124's converted `camera` ([#157](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/157))
+  joined the row afterwards, and the load has not been re-run with it.
 - **Stock control: pass.** The same script with MH4U's own id 1 puts the player in the Ancestral
-  Steppe at about 60 s, quest HUD up, no hang.
-- **The 125 wait is a load, not a hang.** The map comes about 76 s after the departure; the
-  plugin's lines each fire once, no FS request is in flight in the gap, and the wait is not a
-  round timeout. It is the game's own post-spawn load/processing of the ported monster (its model
-  and motions), which the stock quest does in about 8 s.
-- **Loaded is not visible (#203).** The ported model does not render yet: after the factory line
-  the game reads the record's `enemy\em125\...` / `enemy\em124\...` paths as pointers and logs
-  about 612,000 (125) and 792,000 (124) unmapped reads, and the map shows the hunter and the
-  Palicoes but no monster. The reads do not stop the map; the render is #203's.
+  Steppe at about 62 s, quest HUD up, no hang, no unmapped reads; its log has no runtime lines,
+  since the stock profile enables no plugin.
+- **The 125 wait is a load, not a hang.** The map comes about 76 s after the departure, the
+  runtime's lines each fire once and the wait is not a round timeout: the game is loading and
+  processing the ported monster (its model and motions), which the stock quest does in about 8 s.
+- **124's converted MHXX EMC hung the load.** With the row shipping `cmd`, the run reached the
+  factory line for 124 and then froze on the splash for the rest of two 180 s runs (the frames
+  from 65 to 180 s are identical), while the same archive with the stand-in's `em001_cmd` in the
+  port's command slot instead loads the map at about 70 s. MHXX's EMC is copied as is; its group
+  rows and opcode table are not MH4U's ([emc](../specs/emc.md)), so shipping it is unverified to
+  load and hung the load. 124's row now keeps the stand-in's script until an MHXX EMC
+  converter ships; 3U's converts (check A5), so 125 ships her own.
+- **Loaded is not visible.** The harness's route stops at the camp: the map shows the hunter and
+  the Palicoes but no monster, and no unmapped reads are logged. The model's render is X4's
+  in-game check; the headless run proves the map and the monster's factory line only.
 
 The harness is not specific to these two: any registered id can be written into the same quest in
 place and takes the same route. Giadrome (126) and Great Wroggi (127) have their records and
@@ -976,7 +1005,8 @@ phase after the character is in town:
 2. From 27.7 s: the recorded route's events from its 25.7 s, every time 2000 ms later. R held with
    the circle pad up for 6.3 s runs up Val Habar's street; the A presses then enter the Gathering
    Hall (it loads from about 35 s), answer the Low Questatrix's high-rank speech, open the 2★ list
-   and pick "Royal Assassination". The departure A is at 54.3 s and the splash is drawn at 60 s.
+   and pick "Royal Assassination". The departure A is at 54.3 s and the splash is drawn at about
+   62 s.
 3. The script stays outside the repository, like P4's. It is the converted `.ctm` with those 14
    presses prepended and the events at 25.692 s and later shifted by 2000 ms.
 4. Run it with the code library built with `mods/uc_runtime` (P1) and the GU profile's deployed
@@ -984,16 +1014,19 @@ phase after the character is in town:
    pauses the emulated clock before each screenshot, and the counter's speech and the rank menu
    are timing-sensitive, so a route timed under one schedule drifts under another.
    ```
-   mh4u_runner "<MH4U USA .3ds>" --code <user>/recomp/0004000000126300.so --user <user> \
-       --ms 180000 --speed 0 --input "<script>" --shots <dir> --shot-every 2500 \
-       --shots-from 15000 --draw-window 150 --log "*:Info"
+   game_files/work/locks.sh headless -- mh4u_runner "<MH4U USA .3ds>" \
+       --code <user>/recomp/0004000000126300.so --user <user> --ms 140000 --speed 0 \
+       --input "<script>" --shots <dir> --shot-every 2500 --shots-from 15000 \
+       --draw-window 150 --log "*:Info"
    ```
 5. Pass: the log shows the quest's map loading with the player in it and no hang, and the ported
    id's factory and resource reader lines.
 
-Result: pass; P4's table above has the route's timings and the log lines. The resource load walks
-the record the plugin builds and logs about 792,000 unmapped reads (the path bytes read as
-pointers, at `0x0092076c`, `0x00930880`, `0x00936a34` and others); they do not stop the map. The
+Result: pass, P4's table above has the route's timings and the log lines. The profile's save is
+restored before the run (P4's step 1): a profile that already started a quest boots into a state
+the recorded route no longer matches, and the counter presses then land before the hunter is
+there. The 124 archive's command slot carries the stand-in's `em001_cmd` (the row ships no
+`cmd`); with the converted MHXX EMC the load freezes after the factory line (P4's Result). The
 script and the screenshots stay outside the repository.
 
 ## Calling the engine from a plugin (P3)
