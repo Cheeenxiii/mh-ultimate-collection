@@ -17,12 +17,13 @@ typedef struct MhucModule {
 } MhucModule;
 
 extern const struct MhucModuleOps mhuc_module_rathian_gu;
+extern const struct MhucModuleOps mhuc_module_rathian_3u;
 
 #define MHUC_MODULE_COUNT 4
 
 static const MhucModule mhuc_modules[MHUC_MODULE_COUNT] = {
     {124, "rathian-gu", &mhuc_module_rathian_gu},  /* Rathian */
-    {125, "rathian-3u", 0},  /* Rathian */
+    {125, "rathian-3u", &mhuc_module_rathian_3u},  /* Rathian */
     {126, "giadrome-gu", 0},  /* Giadrome */
     {127, "great-wroggi-3u", 0},  /* Great Wroggi */
 };

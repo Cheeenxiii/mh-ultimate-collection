@@ -74,6 +74,13 @@ uint32_t mhuc_call_f(MH4UCall *call, uint32_t fn, uint32_t r0, uint32_t r1, uint
 uint32_t mhuc_call_s2(MH4UCall *call, uint32_t fn, uint32_t r0, uint32_t r1, uint32_t r2,
                       float s0, float s1, float s2);
 
+/* A call ABI 4 cannot make: a fifth argument on the stack. MH4U's action setter
+ * (0x0090ef74) takes one, the per-action value it passes on, after the category, the index
+ * and the kind in r1-r3. It runs on a guest stub from the game's heap (mhuc_stubs), so it
+ * needs that memory. */
+uint32_t mhuc_call5(MH4UCall *call, uint32_t fn, uint32_t r0, uint32_t r1, uint32_t r2,
+                    uint32_t r3, uint32_t arg4);
+
 /* The caller's floats s0 to s3, which a hook cannot read through ABI 4: a source case block
  * receives its target points there. Runs on a guest stub; a failure returns 0. */
 uint32_t mhuc_read_s(MH4UCall *call, unsigned n);

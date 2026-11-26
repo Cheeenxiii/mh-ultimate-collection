@@ -128,6 +128,19 @@ static void record_call(uint32_t fn, const uint32_t r[4], const float s[3], int 
     call->has_s2 = has_s2;
 }
 
+/* A call the runtime made through the fifth-stack-argument stub: the same record, plus the
+ * argument the stub pushed. */
+static void record_call_stack(uint32_t fn, const uint32_t r[4], uint32_t arg4) {
+    if (fake_call_count >= FAKE_CALLS) {
+        return;
+    }
+    const float s[3] = {0.0f, 0.0f, 0.0f};
+    record_call(fn, r, s, 0, 0, 0);
+    FakeCall *call = &fake_calls[fake_call_count - 1];
+    call->r4 = arg4;
+    call->has_r4 = 1;
+}
+
 /* ── the host table ──────────────────────────────────────────────────────────────────── */
 
 static uint32_t host_alloc(MH4UCall *call, uint32_t size, uint32_t align) {
@@ -264,6 +277,17 @@ static uint32_t run_stub(uint32_t addr, const uint32_t *r0_r3, const float s[4])
     if ((w0 & 0xFFF0FFFFu) == 0xEE100A10u) {          /* vmov r0,sN; bx lr */
         const unsigned n = (w0 >> 16) & 3u;
         return float_bits(s[n]);
+    }
+    if (w0 == 0xE92D4030u) {                          /* push {r4,r5,lr}; ...; blx fn */
+        const uint32_t fn = fake_mem_read32(addr + 36);
+        const uint32_t arg4 = fake_mem_read32(addr + 32);
+        uint32_t r[4] = {0, 0, 0, 0};
+        if (r0_r3) {
+            memcpy(r, r0_r3, sizeof r);
+        }
+        record_call_stack(fn, r, arg4);
+        const float s[3] = {0.0f, 0.0f, 0.0f};
+        return fake_guest_fn ? fake_guest_fn(fn, r, s, fake_guest_user).r0 : 0;
     }
     if (w0 == 0xED9F0A04u) {                          /* vldr s0/s1/s2; ldr pc; ... */
         const uint32_t fn = fake_mem_read32(addr + 36);

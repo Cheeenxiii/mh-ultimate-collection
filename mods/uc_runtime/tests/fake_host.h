@@ -17,17 +17,17 @@
 
 #include "mh4u_plugin.h"
 
-#define FAKE_MEM_SIZE (1u << 21)
+#define FAKE_MEM_SIZE (1u << 24)
 #define FAKE_HEAP_AT  0x00080000u
 #define FAKE_STUB_SIZE 384u
 
-/* One guest function the runtime called: the guest function, its integer arguments r0-r3 and
- * its floats s0-s2 (the ones the call took). A stub-wrapped call has s2; a direct call2 has
- * s0-s1. */
+/* One guest function the runtime called: the guest function, its integer arguments r0-r3 (or
+ * r0-r3 plus r4 for a call whose fifth argument is on the stack) and its floats s0-s2 (the
+ * ones the call took). A stub-wrapped call has s2; a direct call2 has s0-s1. */
 typedef struct FakeCall {
-    uint32_t fn, r0, r1, r2, r3;
+    uint32_t fn, r0, r1, r2, r3, r4;
     float s0, s1, s2;
-    int has_s0, has_s1, has_s2;
+    int has_s0, has_s1, has_s2, has_r4;
 } FakeCall;
 
 typedef struct FakeHook {
