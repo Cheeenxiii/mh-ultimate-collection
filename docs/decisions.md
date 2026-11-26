@@ -34,6 +34,8 @@ What stays: the ids and resource records (`mods/monster_ids`, [0003](#0003-id-al
 | MH4U's handlers for shared ids, with a generated motion table and an action map | every gap between the two games' handlers needs its own patch (computed motion indices, second motions, one-sided ids); the 3U port showed it in game |
 | The same, with a heuristic fallback that matches animations by signature | a second source of truth beside the code; it guesses where the code is unread |
 
+**Amended by the maintainer on 2026-11-26: the handlers a base class owns are the source's too.** When the source's dispatcher sends an action to a handler the base enemy class owns rather than to the monster class's own code — MH3U's `uEnemy` generic action code, such as `0x0082d1cc` for 0/2 and `0x008326e0` for category 10 — the port reimplements that handler as well, with its frame values and call order. A handler being base-class code does not make it an engine function the port may put MH4U's version in place of: the engine functions a handler calls are still MH4U's, called at their counterparts, but the handler the dispatcher reaches is the source's.
+
 ### 0003. Id allocation and mod saves
 
 Settled by the maintainer on 2026-11-25.
@@ -396,6 +398,51 @@ The engine side does not move with it: the fork keeps its diff with upstream MH4
 |---|---|
 | Hooks only around the game's code, never instead of it | every limit of MH4U's structures (one-byte ids, fixed tables, hard-coded motion indices) has to be worked around, monster by monster |
 | Replace MH4U's code in the fork | the fork would drift from upstream, which it must stay rebasable on |
+
+### 0013. One runtime for the mod's native code
+
+Settled by the maintainer on 2026-11-26.
+
+**One native runtime, a module per monster.** Every part of the mod's native code lives in one plugin, the runtime: the id and registry readers, the resource records, the ported monsters' action code, and the hooks for text, sound and quests as they come. A ported monster is a C module with its generated tables in that library; its RomFS files stay a data-only mod folder that `mhuc convert monster` writes. The runtime's `mod.json` names one fixed set of hooks, so the game's code library is built again for a hook change only, not for each monster: adding or fixing a monster rebuilds the runtime's library and redeploys the mod, and the game's code library stays as it is. A module is enabled by its registry row (or a setting); the mod order no longer decides which code answers a monster.
+
+Why now: the 3U Rathian's own handlers are about to be written (0002's amendment), and written per monster they would set the layout for every later monster. The plugins today are one per purpose (`mods/monster_ids`) and one per monster's actions (`mods/rathian_actions`), and the build merges the enabled mods' hooks into the game's code library: a new plugin adds hooks, so a new monster would recompile the game. The id layer and the action code also have to be ordered in the chain, because the ported monster's factory id is visible only before `mods/monster_ids` rewrites it.
+
+What the runtime holds:
+
+- **one dispatcher hook**: it finds a ported monster at `uEnemyFactory::create` (the work block's id byte is the stand-in's, [mods/monster_ids](../mods/monster_ids/README.md)), looks its module up by registry id, and runs the module's action handler; every other monster goes to the game's dispatcher unchanged;
+- **the id layer** and the resource records built from `data/ids/registry.csv`, today in `mods/monster_ids`;
+- **the shared machinery**: ABI 4's `call2`, the per-monster state slots and the fake-host test harness, written once instead of per monster;
+- **one module table** generated from the registry, so a build fails when a registered monster has no module, or a module a registered id.
+
+What stays outside:
+
+- a monster's RomFS files, a data-only mod folder ([the converter](../docs/architecture.md#a-ported-monsters-files));
+- `mods/force_action`, a debug tool;
+- the plugin host and the guest call, in the fork ([0006](#0006-runtime), [0012](#0012-how-much-of-mh4u-the-mod-may-replace)).
+
+Still open: whether a module can be switched off by a setting as well as by its registry row, and how the runtime's dispatcher hook and `mods/force_action`'s setter hook order (a forced action is set on the monster, so the two do not need the same hook).
+
+| Alternative | Why not |
+|---|---|
+| A plugin per subsystem, every monster's actions in one of them | the order between the id plugin and the action plugin still decides whether the ported id is seen; a monster still rebuilds a plugin, and there is one more hook chain than the runtime |
+| A plugin per source game (3U, GU) | the same ordering question, now between two libraries; a monster rebuilds its game's plugin; a 3U-only fix ships inside GU's library |
+| A plugin per monster over a shared source | one code-library rebuild and one hook chain per monster, which is the cost this entry removes; isolation is the only gain, and the runtime can gate a module by setting |
+| The present layout: one plugin per purpose, one per monster's actions | what this entry replaces, at the cost above |
+
+The facts and options it was chosen from, as the open entry held them:
+
+- Today: `mods/monster_ids` (ids and resource records), `mods/rathian_actions` (GU Rathian's translated MHXX-only actions), `mods/force_action` (debug), `mods/monster_actions` (the superseded action-id map), and the data-only folders `mhuc convert monster` writes.
+- `tools/build_game.py` merges every enabled mod's hooks into the game's code library and lists the plugins beside it. A plugin's own library is built by its own Makefile, so a code change in a plugin needs no game rebuild; a hook change does.
+- Two mods hooking one function chain, the last mod in the order first, and one function carries at most 256 chained hooks.
+- The mod manager's order decides the chain, and later mods win on files.
+- A mod with a plugin and no game files is valid, and so is a mod with game files and no plugin.
+
+| Option | Gives | Costs |
+|---|---|---|
+| One runtime, a module per monster | one hook list for the whole mod, so no game rebuild per monster; one dispatcher, one id layer, one set of guest-call helpers, one test harness; no cross-plugin order to get wrong | one crash turns the whole runtime off; a monster change rebuilds the runtime's library; per-monster enablement is a setting or a registry row |
+| One plugin per subsystem | fewer libraries than today; the id layer stays independently testable | the id/action order remains; a monster still rebuilds the actions plugin; more than one chain on the dispatcher |
+| One plugin per source game | matches the content's own game; a fix touches one library | the id/action order remains; a monster rebuilds its game's plugin; two libraries to keep in step |
+| One plugin per monster over a shared source | the most isolation: a broken monster cannot take another's code down | a hook change and a game code-library rebuild per monster, a chain step per monster, and the shared source is duplicated into each library |
 
 ## Open
 

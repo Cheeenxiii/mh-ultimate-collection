@@ -18,6 +18,8 @@ The mod reaches the engine only through the fork's plugin API. Its reference is 
 
 A hook can also run instead of the game's function, so the mod may replace any part of MH4U with its own C code, written from the decompiled original, while the fork stays a minimal diff on upstream ([decision 0012](decisions.md#0012-how-much-of-mh4u-the-mod-may-replace)).
 
+The mod's own native code is moving into one runtime, a module per monster ([decision 0013](decisions.md#0013-one-runtime-for-the-mods-native-code)): one fixed hook list, the id layer and every ported monster's action code compiled into the same library, so a new monster rebuilds the mod's library and not the game's. The plugins described below are the pieces it takes in, as they are today.
+
 The first plugin is `mods/force_action`. Its `mod.json` names `uEnemy`'s action setter (USA
 v1.3.0 address `0x0090ef74`); the C library replaces the category and index the AI asks for
 with the forced pair, so the game's own setter initializes the chosen action and it plays (the
