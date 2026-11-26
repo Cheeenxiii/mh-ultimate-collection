@@ -40,7 +40,7 @@ int main(void) {
     /* The module's ready line names its own registry id, 125, and the self-test logs the
      * slice and its open item. */
     fake_frame();
-    CHECK(fake_log_contains("ready: translating 6 of 3U Rathian's 191 actions on monster 125"),
+    CHECK(fake_log_contains("ready: translating 22 of 3U Rathian's 191 actions on monster 125"),
           "the 3U module's ready line is missing");
     CHECK(fake_log_contains("selftest: 6 of the 191 actions"), "the self-test line is missing");
     CHECK(fake_log_contains("field map anchors"), "the field-map line is missing");

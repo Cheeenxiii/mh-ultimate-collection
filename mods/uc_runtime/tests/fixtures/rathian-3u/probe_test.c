@@ -18,7 +18,7 @@ int main(void) {
         return 1;
     }
     fake_frame();
-    CHECK(fake_log_contains("ready: translating 6 of 3U Rathian's 191 actions on monster 125"),
+    CHECK(fake_log_contains("ready: translating 22 of 3U Rathian's 191 actions on monster 125"),
           "the probe family test didn't reach the module");
     if (failures) {
         fprintf(stderr, "%d check(s) failed\n", failures);

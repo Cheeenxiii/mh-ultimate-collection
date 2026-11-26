@@ -36,10 +36,12 @@ that held them before.
 | `src/monsters/rathian-3u.c` | 3U Rathian's module: the shared entry (the factory association's dispatch, the pending log, the ready line and the self-test) and the loop over the generated family list |
 | `src/monsters/rathian-3u/family.h` | the family interface: `MhucFamily` (a name, the ids it carries, a dispatch entry, a self-test) and the three base handlers `cat0.c` exports for the slices that reuse them |
 | `src/monsters/rathian-3u/cat0.c` | category 0's family: `0/0`, `0/1`, `0/2`, `0/3`, `0/4`, `0/6` and the three base handlers they reach, the first slice of her 191 ids |
+| `src/monsters/rathian-3u/cat3b.c` | category 3's part 2's family: `3/6`, `3/7`, `3/8`, `3/12`, `3/13`, `3/16` to `3/21`, `3/24`, `3/25`, `3/27` to `3/29`, and 3/8's base-class handler (#220) |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
 | `tests/rathian-3u/host.h` | what the 3U module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-3u/cat0.c` | category 0's fake-host test: its six ids' and three base handlers' call sequences; `make test` discovers it and builds `tests/family-cat0` |
+| `tests/rathian-3u/cat3b.c` | category 3's part 2's fake-host test: the sixteen ids' frames and call order and the two blocked calls' log lines; `make test` builds `tests/family-cat3b` |
 | `tests/fixtures/rathian-3u/probe_test.c` | the probe family test the test-list discovery builds and runs |
 | `tests/test_family_discovery.c` | a family file added to a directory, discovered and routed with no other edit (`make test`) |
 | `tests/fake_host.c`, `tests/fake_host.h` | the fake host every test runs on: guest memory, the heap, `call`/`call2` and the guest stubs, the hooks, the registers and the log |
@@ -444,9 +446,36 @@ Three things are not translated yet:
 - **0/0's second delay field.** The source keeps the old delay at `+0x2c`; MH4U's countdown
   worker keeps one value, so the port keeps `+0x1d4` only.
 
-The module's ready line is `ready: translating 6 of 3U Rathian's 191 actions on monster 125`,
-and its self-test logs the six ids, the three base handlers' engine calls and the open item.
-The 125 quest's run is check T1c.
+The module's ready line sums the families' `translated` counts: `ready: translating 6 of 3U
+Rathian's 191 actions on monster 125` after #216, and 22 after #220. Its self-test logs each
+family's ids, engine calls and open items. The 125 quest's run is check T1c.
+
+#### Category 3's part 2 (#220)
+
+`cat3b.c` translates sixteen of her ground ids on five handler units: `0x0068e448` for 3/6,
+3/13 and 3/16; `0x0068e5e8` for 3/7, 3/17 to 3/19, 3/24 and 3/28; `0x0068e6e4` for 3/12,
+3/20, 3/21, 3/25 and 3/29; `0x0068e8c8` for 3/27; and 3/8's base-class `0x0082b37c`,
+reimplemented under 0002's second amendment. It reuses `cat0.c`'s `mhuc_3u_base_0_3` and
+`mhuc_3u_base_0_2`; the reference page's
+[category 3 part 2 table](../../reference/README.md#the-category-3-part-2-units-220) lists each
+unit's states and ids.
+
+The argument translations the engine calls need: 3U's turn rates 0x200, 0x100 and 0x80 are
+halved for MH4U's `0x0091db4c`, `0x0092fc84` and `0x0092dccc` (3U's `0x8392d8` halves a rate,
+MH4U's `0x0091aaf0` does not), and `0x82b268`'s s0 = 1.0 becomes 0.5 (`0x00955440` has no 0.5
+factor). `0x8310f0` has no MH4U function: the port writes work+0x3c4, the offset MH4U's own
+3/8 handler stores it at inline. The 3/6 value curve is MH4U's own 3/6 curve `0x00fd18a0`,
+whose keys equal 3U's `0x00c4eca8`.
+
+Two calls #55 still blocks are reached and each is logged once per action:
+
+- **`0x0064325c`** (3/6 and 3/16, the r1 = 0 branch; 3/13 takes target z + 1300): the
+  per-monster height through work+0xdb. The port skips it and takes its result as 0.0, so the
+  height target is the vertical limit + 2000.0 until #55 settles it.
+- **`0x00839598`** (3/8's state 4): the signed byte at 3U work+0xef. The port takes the
+  source's nonzero path and ends the action in 0/3's base handler, so the move cannot stall.
+
+The family's fake-host test is `tests/rathian-3u/cat3b.c`.
 
 ## What it hooks
 
