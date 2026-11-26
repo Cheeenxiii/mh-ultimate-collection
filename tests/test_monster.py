@@ -17,8 +17,8 @@ from mhuc.formats import arc, camera, mfx, mrl, tex
 SLOTS = frozenset({0, 1, 2, 3, 4})
 ROW = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
                    frozenset({"model", "motions", "camera", "tail", "cmd"}), SLOTS)
-SHIPPED_ROW = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
-                           frozenset({"model", "motions", "tail", "cmd"}), SLOTS)
+ROW_WITHOUT_CAMERA = monsters.Row(124, "rathian-gu", "mhxx", "em001", "Rathian", 1,
+                                  frozenset({"model", "motions", "tail", "cmd"}), SLOTS)
 
 
 def entry(path: str, data: bytes) -> arc.Entry:
@@ -184,7 +184,7 @@ def test_a_camera_list_is_converted_to_mh4us_version_and_round_trips():
 
 
 def test_sound_effects_shells_and_monster_data_are_left_out_with_a_reason():
-    out, report = convert(SHIPPED_ROW)      # the shipped row: no camera
+    out, report = convert(ROW_WITHOUT_CAMERA)    # a row that ships no camera keeps the stand-in's
     stand_in = {e.file_name for e in stand_in_entries()}
     taken = {e.file_name for e in out.entries if e.file_name not in stand_in}
     assert not any(n.startswith(("sound/", "effect/", "arc/shell/")) for n in taken)
@@ -268,6 +268,12 @@ def test_the_registry_row_reads_the_files_column(tmp_path):
     assert row.source_key == "em001"
     assert row.files == {"model", "motions", "tail", "cmd"}
     assert row.motions == {0, 1, 2, 3, 4}
+
+
+def test_the_gu_rathians_registry_row_ships_her_camera():
+    # The converter only produces a kind the row lists: without this the record keeps the
+    # stand-in's camera and the port never ships MHXX's own (issue #157).
+    assert "camera" in monsters.registry_row(124).files
 
 
 def test_a_kind_this_converter_cannot_produce_is_refused(tmp_path):

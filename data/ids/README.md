@@ -65,14 +65,15 @@ group of paths in the record:
 |---|---|---|---|---|---|
 | `model` | the model | yes | yes | yes | yes |
 | `motions` | the six motion lists and the second motion list; `motions` names the slots the port ships | `motions=0-4` | `motions=0-2` | `motions=0,2,3,4` | `motions=0-2` |
-| `camera` | the camera | no | no | no | no |
+| `camera` | the camera | yes | no | no | no |
 | `tail` | the tail model | yes | yes | no | no |
 | `mef` | the motion effects | no | no | no | no |
 | `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no | no |
 | `cmd` | the command/EMC | yes | no, until the EMC converter (a follow-up after #49) ships | no | no |
 | `efl` | the effect lists | no | no | no | no |
 
-124's `em124.arc` holds the model, five motion lists, the tail and the command; 125's holds
+124's `em124.arc` holds the model, five motion lists, her converted MHXX camera, the tail and
+the command; 125's holds
 the model, three motion lists, the tail and its converted sound set, but no command yet: the
 EMC converter that would give her MH3U's own script is a follow-up after #49
 ([specs/emc.md](../../specs/emc.md#what-a-converter-must-do)), so her record keeps MH4U
@@ -82,12 +83,13 @@ same slots 0, 2, 3 and 4 the source groups them in, so its record keeps the stan
 for slots 1 and 5; 127's holds the model and three motion lists, its own MH3U lists at slots
 0, 1 and 2, and no tail, because MH3U's `em045.arc` has none (its tail is part of the body
 model). Each archive also carries a copy of every stand-in entry its record keeps: the
-stand-in's camera, the motion slots the row does not ship, its motion effects, sound (unless
-the port ships its own), effect lists and command, at the stand-in's own paths (`enemy\em001\...`
-for 124 and 125, `enemy\em015\...` for 126 and 127), so the engine finds them in the archive
-it opens. Until a port's
-own camera, motion effects and effect lists are converted, its monster loads MH4U's own from
-those paths; 125's record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
+stand-in's camera when the row ships none (125 to 127), the motion slots the row does not
+ship, its motion effects, sound (unless the port ships its own), effect lists and command, at
+the stand-in's own paths (`enemy\em001\...` for 124 and 125, `enemy\em015\...` for 126 and
+127), so the engine finds them in the archive it opens. Until a port's own motion effects and
+effect lists are converted, its monster loads MH4U's own from those paths; 125 to 127 keep
+MH4U's camera too, while 124 ships MHXX's ([specs/camera.md](../../specs/camera.md)); 125's
+record also keeps MH4U's `enemy\em001\mot\em001_3` and `_4`
 for the two motion slots it does not ship, so its motion-number translation only targets slots
 0 to 2. The motion-effect and effect-list formats the `mef` and `efl` kinds carry are laid out
 and checked on the three games' monster archives ([mef](../../specs/mef.md),
@@ -181,7 +183,7 @@ the game reads it.
 
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|
-| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=0-4, tail, cmd |
+| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=0-4, camera, tail, cmd |
 | 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=0-2, tail, cmd, sound |
 | 126 | `giadrome-gu` | Giadrome, ported from MHXX (GU) | MH4U Great Jaggi (15) | model, motions=0,2,3,4 |
 | 127 | `great-wroggi-3u` | Great Wroggi, ported from MH3U | MH4U Great Jaggi (15) | model, motions=0-2 |

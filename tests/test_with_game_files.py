@@ -1305,16 +1305,17 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
         "enemy/em124/mot/em124_2.lmt",
         "enemy/em124/mot/em124_3.lmt",
         "enemy/em124/mot/em124_4.lmt",
+        "enemy/em124/mot/e124_cam.lcm",
         "enemy/em124/data/em124_cmd.emc",
     }
     assert {e.file_name for e in converted.entries if e.file_name in port} == port
-    # Every other entry is an entry of MH4U's stand-in archive the record keeps (the camera,
-    # motion effects, sound and effect lists the row does not ship), at its original path.
+    # Every other entry is an entry of MH4U's stand-in archive the record keeps (the motion
+    # effects, sound and effect lists the row does not ship), at its original path.
     kept = [e for e in converted.entries if e.file_name not in port]
     assert {e.file_name for e in kept} == set(report.copied)
     assert all(e.file_name in stand_in_entries for e in kept)
-    assert {e.file_name for e in kept if e.file_name.startswith("enemy/")} == {
-        "enemy/em001/mot/e001_cam.lcm"}
+    # The row ships its own camera, so the stand-in's is no longer kept.
+    assert "enemy/em001/mot/e001_cam.lcm" not in {e.file_name for e in kept}
     assert {e.file_name for e in kept if e.file_name.startswith("effect/mef/")} == {
         "effect/mef/em/em001_0.mef", "effect/mef/em/em001_1.mef"}
     assert "sound/call/em/em001.mss" in {e.file_name for e in kept}
@@ -1352,8 +1353,35 @@ def test_the_gu_rathian_conversion_keeps_mhxxs_files_under_the_ports_paths(dump)
         before = source[entry.file_name]
         assert len(entry.data) == len(before), entry.file_name
         assert [i for i in range(len(before)) if before[i] != entry.data[i]] == [4], entry.file_name
-    assert row.files == {"model", "motions", "tail", "cmd"} and row.motions == {0, 1, 2, 3, 4}
-    assert sum(len(v) for v in report.left_out.values()) == 534
+    assert row.files == {"model", "motions", "camera", "tail", "cmd"} and row.motions == {0, 1, 2, 3, 4}
+    assert sum(len(v) for v in report.left_out.values()) == 533
+
+
+def test_convert_monster_ships_the_gu_rathians_mhxx_camera(dump, tmp_path):
+    """issue #157, docs/checks.md C2: `mhuc convert monster --id 124` puts MHXX em001's own
+    camera in `/data/em124.arc`, converted to MH4U's version 4, at the path 124's resource record
+    names (`enemy\\em124\\mot\\e124_cam`), and keeps no stand-in camera there."""
+    from mhuc import cli
+
+    out = tmp_path / "mod"
+    assert cli.main(["convert", "monster", "--id", "124",
+                     "--romfs", dump("mhxx", "romfs.bin"),
+                     "--mh4u-romfs", dump("mh4u", "romfs.bin"),
+                     "--out", str(out)]) == 0
+    built = arc.read((out / "romfs" / "data" / "em124.arc").read_bytes())
+    cameras = [e for e in built.entries if e.type_name == "rCameraList"]
+    assert [e.file_name for e in cameras] == ["enemy/em124/mot/e124_cam.lcm"]
+    assert not any(e.file_name == "enemy/em001/mot/e001_cam.lcm" for e in built.entries)
+    converted = camera.read(cameras[0].data)
+    assert converted.version == camera.VERSION_MH4U
+
+    # The port's list is MHXX's own, converted: the independent source the camera tests use.
+    image = romfs.open_image(dump("mhxx", "romfs.bin"))
+    source = image.read(next(f for f in image.files() if f.path == "/arc/enemy/em001_00.arc"))
+    mhxx = next(e.data for e in arc.read(source).entries if e.type_name == "rCameraList")
+    assert cameras[0].data == camera.from_mhxx(mhxx)
+    assert converted.order == camera.read(mhxx).order
+
 
 def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump):
     """docs/architecture.md#monsters, issue #49: `mhuc convert monster` turns MH3U's `arc/enemy/em001.arc` into

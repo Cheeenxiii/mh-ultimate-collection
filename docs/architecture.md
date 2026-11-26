@@ -124,14 +124,14 @@ stand-in's path for the rest, so the converter and the plugin agree on what is i
 The converter also reads the stand-in's own `/data/emNNN.arc` from MH4U's RomFS and copies
 every entry the record keeps into the port's archive under its original path, so the one
 archive the game opens holds both the port's files and the stand-in's kept ones. For Rathian
-the row is `model,motions=0-4,tail,cmd`; Giadrome's is `model,motions=0,2,3,4`.
+the row is `model,motions=0-4,camera,tail,cmd`; Giadrome's is `model,motions=0,2,3,4`.
 
 The port's files take MH4U's names with the port's id: `enemy\em124\mod\em124` and
 `..._tail`, `enemy\em124\mot\em124_0` to `_4`, `enemy\em124\mot\e124_cam` and
 `enemy\em124\data\em124_cmd`. MH4U builds the archive's own name from the id (`data\em%03d`),
-so a ported id's own archive is what the game opens. The stand-in's kept paths (its camera,
-unshipped motion slots, motion effects, sound, effect lists and command) are copied into the
-same archive under the stand-in's paths. The enemy data reader still answers with the
+so a ported id's own archive is what the game opens. The stand-in's kept paths (its camera for
+125 to 127, unshipped motion slots, motion effects, sound, effect lists and command) are copied
+into the same archive under the stand-in's paths. The enemy data reader still answers with the
 stand-in's: MH4U reads the monster's `.etd`/`.emd` from `data/em_data.arc` and the port ships no
 data yet (step 3).
 
@@ -140,11 +140,11 @@ data yet (step 3).
 | model and tail model (rModel) | MOD 0xE6 | MOD 0xE6 | taken as is, when the row ships `model` and `tail` |
 | material (rMaterial) | MRL 0x20 | MRL 0x20 | taken as is except its shader ids, moved to MH4U's slots for the same object names, and the signature at 0x10, MH4U's shader package hash (a material names its shader objects by slot in its own game's package, and MH4U's loader refuses another package's hash: [mfx](../specs/mfx.md), [mrl](../specs/mrl.md)); the texture paths it names are MHXX's and kept |
 | motion lists (rMotionList) | LMT 67 | LMT 67 | taken as is, at the slots the row's `motions=` names. MHXX may store them under another monster's folder (a family shares them: Giadrome's are em014's, at slots 0, 2, 3 and 4), so the converter takes a list from any `enemy/emNNN/.../mot/` and renames it to the port's id at its own slot |
-| camera list (rCameraList) | LCM 5 | LCM 4 | converted with `camera.from_mhxx` when the row ships `camera` ([camera](../specs/camera.md)); the shipped rows don't, so the record keeps the stand-in's camera |
+| camera list (rCameraList) | LCM 5 | LCM 4 | converted with `camera.from_mhxx` when the row ships `camera` ([camera](../specs/camera.md)); 124 ships MHXX's list at `e124_cam`, while 125 to 127 have no source camera and keep the stand-in's |
 | AI script (rEnemyCmd) | EMC 0x20120804, 21 group rows, MHGU's 167 opcodes | EMC 0x20120804, 23 rows, 146 opcodes | taken as is only when the row ships `cmd`, which is unverified to load: MHXX's rows and opcode table are not MH4U's ([emc](../specs/emc.md), checks A1 to A4), so a port that needs its own AI waits for that conversion. Giadrome's row ships no `cmd` and keeps the stand-in's script |
 | textures (rTexture) | TEX 0xA6 | TEX 0xA5 | converted: the version field 0xA6 → 0xA5, the one byte that differs, the PICA200 layout is the same ([tex](../specs/tex.md)); on Rathian's two textures the converted file differs from MHXX's in that byte alone. They stay at MHXX's paths (below) |
 | archive | ARC 0x11 | ARC 0x13 | converted: the kept entries are re-packed in MH4U's ARC version |
-| the stand-in's kept paths (camera, unshipped motion slots, motion effects, sound, effect lists, command) | — (the record names the stand-in's paths) | the same MH4U files, at those paths | copied as is from MH4U's own `data/emNNN.arc`, at their original paths, so the port's archive holds every path its resource record names (sound, mef and efl have no converter yet) |
+| the stand-in's kept paths (the camera for 125 to 127, unshipped motion slots, motion effects, sound, effect lists, command) | — (the record names the stand-in's paths) | the same MH4U files, at those paths | copied as is from MH4U's own `data/emNNN.arc`, at their original paths, so the port's archive holds every path its resource record names (mef and efl have no converter yet) |
 | sound | MHXX's SBKR banks and SRQR requests | MH4U's SNDB banks and SREQ requests | not this mode: the same command's sound mode (`--arc`, `--sound-arc`) converts the set for a row that ships `sound` ([specs/sound.md](../specs/sound.md)) |
 | effects (EFL, EAN, PEL, PSL) | versions 0x30120306 and 0x20120224 | 0x30111104 and 0x20100924 | left out: the versions differ and effects are not ported yet |
 | motion effects | PSL and PEL | MEF | left out: MHXX has no MEF |

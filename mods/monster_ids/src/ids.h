@@ -46,7 +46,7 @@ typedef struct MhucMonsterId {
 /* The permanent ids, consecutive from 124. */
 #define MHUC_MONSTER_COUNT 4
 static const MhucMonsterId mhuc_monster_ids[MHUC_MONSTER_COUNT] = {
-    {124, 1, 0x1fu, /* slots 0, 1, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_CMD},
+    {124, 1, 0x1fu, /* slots 0, 1, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_CAMERA | MHUC_FILES_TAIL | MHUC_FILES_CMD},
     {125, 1, 0x07u, /* slots 0, 1, 2 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS | MHUC_FILES_TAIL | MHUC_FILES_SOUND},
     {126, 15, 0x1du, /* slots 0, 2, 3, 4 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS},
     {127, 15, 0x07u, /* slots 0, 1, 2 */ MHUC_FILES_MODEL | MHUC_FILES_MOTIONS},
