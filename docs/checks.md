@@ -938,12 +938,12 @@ on a spawned monster still waits for a quest run.
 ## The translated actions' check (T1)
 
 The port's translated handlers for MHXX-only actions have no in-game run yet (R2p), so they
-are checked without a monster: the source facts against MHXX's module, the state machines
-against a fake host, and the plugin's self-test in a headless run.
+are checked without a monster: the source facts against MHXX's module and MH3U's code, the
+state machines against a fake host, and the plugin's self-test in a headless run.
 
 | Check | What | Pass |
 |---|---|---|
-| T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) and MHXX v1.4's `roEm001.cro` | every row's case block, handler unit and first motion constant match the module's dispatcher; counts and ids only |
+| T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) against MHXX v1.4's `roEm001.cro`, and [data/actions/rathian-3u.csv](../data/actions/rathian-3u.csv) against MH3U USA's `code.bin` | every row's case block, handler unit and first motion constant match the source dispatcher; counts and ids only |
 | T1b | `make -C mods/rathian_actions test` | the plugin's call sequences and frame values match the source's order, and a changed value fails it |
 | T1c | a headless run of the code library built with the plugin | the log has the plugin's ready and self-test lines and the float stubs' address; the runner exits 0 |
 | T1d | the in-game per-move check | R2p |
@@ -958,6 +958,17 @@ Last result (2026-11-25): pass. 13 actions; blocks 13/13, handlers 12/13 (catego
 none), first motions 9/13; translated 12 (3/98, 12/1-3, 4/27-32, 8/0 and category
 17), MH4U's own 1 (12/0), pending 0. Changing a ledger motion makes it exit 1 and name the
 id.
+
+T1a also checks the 3U ledger against MH3U USA's `code.bin` and its `exheader.bin`:
+
+```bash
+MH4U_FORK=<fork> python3 tools/check_actions.py --game mh3u --exheader <exheader.bin> \
+    --code <code.bin> --dispatcher 0x00687d30 --range 0x686000 0x69b000
+```
+
+Last result (2026-11-26): pass. 191 actions; blocks 191/191, handlers 182/191 (the other 9
+are inline), first motions 132/191; translated 0, pending 191. Changing a ledger motion makes
+it exit 1 and name the id.
 
 T1b, last result (2026-11-25): pass, the call sequences checked across 3/98's three frames,
 the 12/1-3 blocks, 4/27-32's states, 8/0's three states and category 17's no-op and
