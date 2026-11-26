@@ -4,10 +4,10 @@ MH4U ships them as `rMhMotionEffect` (magic `MEF\\0`, extension `mef`), MH3U as
 `rEffectSequence` (`ESQ\\0`, `esq`) and MHXX as `rProofEffectMotSequenceList` (`PSL\\0`, `psl`);
 `specs/mef.md` lays the three out. The MEF record's fields are placed from MH4U's own spawn
 (`0x391b28`) and getter (`0x391904`), but the record carries no effect id: the spawn derives the
-effect from the record's type and time through per-type tables, so a converter needs a
-source-to-(type, time) map. An ESQ event's fields and a PSL descriptor's words are placed too
-(FX5 to FX9). What is not placed is the PSL lists' contents, so `to_mh4u` still refuses to write
-an MH4U MEF from either source game.
+effect from the record's type, time and bone through the tables `specs/mef.md` lays out, so a
+converter needs a source-to-(type, time, bone) map and the port's own tables installed. An ESQ
+event's fields and a PSL descriptor's words are placed too (FX5 to FX9). What is not placed is the
+PSL lists' contents, so `to_mh4u` still refuses to write an MH4U MEF from either source game.
 """
 from __future__ import annotations
 
@@ -239,10 +239,11 @@ def read_psl(data: bytes) -> Psl:
 # item is the blocker: MH4U's record has no effect id (the spawn derives it from the type and the
 # time), so the effectmap needs a source-to-(type, time) row before a record can name an effect.
 UNVERIFIED = ("MH4U's record has no effect id: its spawn (0x391b28) derives the effect from the "
-              "record's type (+0x03) and time (+0x06) through the per-type tables at 0xeede7c and "
-              "0xeedde98, so a conversion needs a source-to-(type, time) map, and data/effectmap's "
-              "rows don't carry those values yet; the ESQ's scalars have no placed target fields, and "
-              "the PSL lists are not laid out")
+              "record's type (+0x03), time (+0x06) and bone (+0x08) through the tables at 0xeede7c, "
+              "0xeede98, 0xef895c and the type 5/11/12 remaps, so a conversion needs a "
+              "source-to-(type, time, bone) map and the port's own tables (specs/mef.md#carrying-a-"
+              "source-effect-into-the-tables); data/effectmap's rows don't carry those values yet; the "
+              "ESQ's scalars have no placed target fields, and the PSL lists are not laid out")
 
 
 def to_mh4u(data: bytes, game: str, effectmap=None) -> bytes:

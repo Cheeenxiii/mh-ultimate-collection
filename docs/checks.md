@@ -865,8 +865,17 @@ the source's effect parameters and the MEF record's fields are not placed yet, s
    MEF's keys), or the effect at another frame (the event frame or the source motion's frame
    count is wrong).
 
-Status: open; waits for the ESQ/PSL to MEF conversion (the source effect parameters and MH4U's
-MEF record fields) and #144's quest-load proof.
+**What is done headless (FX10, FX11 in [specs/mef.md](../specs/mef.md#checks)).** The spawn tables
+are laid out and every one of MH4U's 6,216 MEF records resolves through them on the real files, the
+game's own code agreeing on a 696-sample cross-check; and the addition path runs on that code: two
+`.data` writes make an unused type's chain name the port's own `effect\efl\em\em125\em125_000`.
+The converter part still needed for this check is [specs/mef.md](../specs/mef.md#a-3u-effects-assets):
+rewrite the source effect list's block paths, carry its model, materials, textures and effect
+animation, and write the MEF record with the port's type, time and bone. The one link no file check
+covers is the effect manager resolving the port's path to its own arc.
+
+Status: open; the visual half is the maintainer's, and it waits for the asset conversion (the effect
+list's paths, its model, materials, textures and effect animation) and #144's quest-load proof.
 
 ## A ported monster's own voice (A1)
 
