@@ -401,6 +401,23 @@ handler, and the motion it starts is her converted animation, not MH4U's index.
 Status: not done. These 21 rows wait for the same load as the 3U rows above; the module's
 self-test names the units and the calls still blocked.
 
+Category 13's first slice ([#227](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/227))
+runs her own handlers for five of them. Force each and compare it with MH3U's own move; the
+runtime's [README](../mods/uc_runtime/README.md#3u-rathians-module-category-13-part-1) and the
+[reference](../reference/README.md#category-13-part-1-227-the-five-units-and-what-is-blocked)
+name each unit's calls and the #55 calls it leaves out.
+
+| 3U id | Handler unit | What to watch |
+|---|---|---|
+| 13/0 | 0x0068eabc | motion 0x1a at 10.0 and the 300.0 timer; the height above the target sets the rate at 3500 or adds 10.0 at 2000, then the 0x180 turn into 13/1; the work+0xda gate is blocked (#55) |
+| 13/1 | 0x0068eca4 | motions 0x3d, 0x3e and 0x2d at 6.0, the heading and pitch turns, the -2500.0 blend and the 0x80 landing step, then 0/3's base handler or 13/2; the work+0xda gate is blocked (#55) |
+| 13/2 | 0x0068f0fc | mode 3, motion 0xc8 at 20.0, the (0, 0xb) tail, the distance/450 target line, the two curves and the -50.0 speed floor, motion 0xdc; the target loop takes #55's 0x00839598 as nonzero and 0x00835f10 as 0, so it ends in 1/3 |
+| 13/3 | 0x0068f424 | the 300.0/38.0 aim, the 12.0/50.0 query and the 38 - (speed - 12) range, the 0.5 move, motion 0xca at 4.0; the action-start record 0x00b0b0e8 is not carried and the target loop ends in 2/6 |
+| 13/4 | 0x0068f66c | motion 0xcb at 4.0 and the 4.0 timer, then the timer crossing test and the 1000/200 order step into 13/2; 0x0085162c and 0x00829620 are blocked (#55) |
+
+Status: not done. These five rows wait for #49, #105 and the quest load (#144), like the rows
+above; the module's self-test names the units and the blocked calls.
+
 Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
 translates it, and the other sixteen's counterparts are in the reference page.
 
@@ -1308,10 +1325,11 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`; the 3U module's
-is `ready: translating 58 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
-#220 and #221), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest: 15 of the 191
-actions`, cat3b's `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191 actions`
-and the families' `field map anchors`/`selftest: open:` lines.
+is `ready: translating 63 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#220, #221 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest: 15 of
+the 191 actions`, cat3b's `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191
+actions`, cat13a's `selftest: 5 of the 191 actions` and the families' `field map anchors`/
+`selftest: open:` lines.
 The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
 runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated

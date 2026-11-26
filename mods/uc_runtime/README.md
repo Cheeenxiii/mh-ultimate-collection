@@ -46,6 +46,7 @@ that held them before.
 | `src/monsters/rathian-3u/cat1.c` | category 1's family: `1/0` to `1/14`, its five handler units and four inline blocks; it reuses `cat0.c`'s `mhuc_3u_base_0_2` for 1/10 |
 | `src/monsters/rathian-3u/cat3b.c` | category 3's part 2's family: `3/6`, `3/7`, `3/8`, `3/12`, `3/13`, `3/16` to `3/21`, `3/24`, `3/25`, `3/27` to `3/29`, and 3/8's base-class handler (#220) |
 | `src/monsters/rathian-3u/cat7a.c` | category 7's first family (#221): `7/0`, `7/1`, `7/2`, `7/4`, `7/5`, `7/6`, `7/7`, `7/8`, `7/10`, `7/11`, `7/12`, `7/15`, `7/16`, `7/19`, `7/20`, `7/32`, `7/34`, `7/42`, `7/61`, `7/77`, `7/85`, and the calls still blocked |
+| `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
 | `tests/rathian-3u/host.h` | what the 3U module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
@@ -53,6 +54,7 @@ that held them before.
 | `tests/rathian-3u/cat1.c` | category 1's fake-host test: its fifteen ids' states, call sequences and frame values; `make test` discovers it and builds `tests/family-cat1` |
 | `tests/rathian-3u/cat3b.c` | category 3's part 2's fake-host test: the sixteen ids' frames and call order and the two blocked calls' log lines; `make test` builds `tests/family-cat3b` |
 | `tests/rathian-3u/cat7a.c` | category 7 part 1's fake-host test: every id's and variant's call sequence; `make test` discovers it and builds `tests/family-cat7a` |
+| `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
 | `tests/rathian-gu/host.h` | what the GU module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-gu/cat17.c` | category 17's fake-host test: the 0-2 no-op and the base update; `make test` discovers it and builds `tests/family-gu-cat17` |
 | `tests/rathian-gu/act3_98.c` | action 3/98's fake-host test: its three states and the motions `0x101`/`0x104`; `make test` builds `tests/family-gu-act3_98` |
@@ -523,9 +525,9 @@ Three things are not translated yet:
   worker keeps one value, so the port keeps `+0x1d4` only.
 
 The module's ready line sums the families' `translated` counts: `ready: translating 6 of 3U
-Rathian's 191 actions on monster 125` after #216, 22 after #220, 37 after #217 and 58 after
-#221. Its self-test logs each family's ids, engine calls and open items. The 125 quest's run
-is check T1c.
+Rathian's 191 actions on monster 125` after #216, 22 after #220, 37 after #217, 58 after
+#221 and 63 after #227. Its self-test logs each family's ids, engine calls and open items.
+The 125 quest's run is check T1c.
 
 #### Category 3's part 2 (#220)
 
@@ -630,6 +632,81 @@ log and recorded here:
 The module's ready line sums the families' counts — `ready: translating 58 of 3U Rathian's
 191 actions on monster 125` with cat0, cat1, cat3b and this slice — and the family's
 self-test logs the seven units, the two field-map rows and the blocked calls. The 125 quest's run reuses check T1c; the per-move rows are #116's.
+
+### 3U Rathian's module: category 13, part 1
+
+Category 13's first slice is `cat13a.c`, issue
+[#227](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/227): five handler units
+on five ids. The category entry `0x00699b78` switches on the index (0 to 9) and tail-calls
+each unit; the units ignore the case block's registers, so the family claims them by the
+pair. The units branch on the work block's id byte (`+3`, MH4U's `+0x1c0`) in 13/0, 13/2 and
+13/4; the ported monster is em001 (id 1), so the port carries the source's id-1 path.
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 13/0 | handler `0x0068eabc` | state 0: state byte 1, the data float and the fall it advances, motion 0x1a at 10.0, the rate, the 300.0 timer; state 1: the height above the target (position y - target y), the 3500 rate or the +10.0 step at or below 2000, the timer countdown, the 0x180 turn, then the request for 13/1 |
+| 13/1 | handler `0x0068eca4` | state 0: state byte 1, the data float and the fall, motion 0x3d at 6.0, the aim reset, aim A z -20.0 and aim B z 0.5; state 1: the aim step, the vector's heading and pitch, the 0x100/0x40 turns, then motion 0x3e at 6.0, aim A y -2.0, aim B z 0.5 and the -2500.0 blend; state 2: the 0x80 landing step, motion 0x2d at 6.0 and aim A y -15.0/aim B z -6.2, or the 130.0 aim clamp; state 3: the 30.0 query, the aim step, the flag and then 0/3's base handler or the request for 13/2 |
+| 13/2 | handler `0x0068f0fc` | state 0: state byte 1, mode 3, motion 0xc8 at 20.0, the (0, 0xb) tail, the aim reset, speed 0, the distance/450 target-line factor clamped to [1.0, 3.8] and the target-line step; state 1: the two value curves, the halved vertical step, the -50.0 speed floor, the aim step, the 36.0 query and the 0x100 turn; state 2: the 30.0 query, the signed work+0xef byte and the two-entry target loop, then 13/3 or 1/3 |
+| 13/3 | handler `0x0068f424` | state 0: mode 0 and the aim at the target at 300.0/38.0 (the source's action-start record is not carried); state 1: the 12.0/50.0 query, the 38 - (speed - 12) aim range, the 0.5 position advance and the record's leaf, then motion 0xca at 4.0; state 2: the signed work+0xef byte and the target loop, then 13/4 or 2/6 |
+| 13/4 | handler `0x0068f66c` | state 0: mode 0, motion 0xcb at 4.0 and the 4.0 timer; state 1: the flag, the timer crossing test (the source's saved `+0x2c` and the frame delta through `+0x30`), the state predicate and the 1000/200 order step, then the request for 13/2 |
+
+**The field-map rows.** The slice adds no confirmed row: it reads the map's state, mode,
+timer, position, heading, aim, target and speed rows, the id row `+3` -> `+0x1c0`, the
+selector `+0xdb` -> `+0x14c` the earlier slices found, and `+0x7c9` -> `+0x3c4` (13/1's
+`0x8310f0`). 3U's `+0x1c`, `+0xda` and `+0xaea` stay in the map's "what is not mapped":
+`+0xda` is the index 13/0, 13/1 and 13/2 hand to the blocked `0x00a347bc`, and `+0xaea` is
+13/0's second selector, reached only through that blocked lookup. 3U's target-line struct at
+`this+0x1e70` is MH4U's `*(this+0x8d88)`.
+
+**The engine calls this slice adds**, each the MH4U counterpart at the same point:
+
+| MH4U | 3U | What |
+|---|---|---|
+| `0x0093ce60` / `0x0093cd70` | `0x00850a50` / `0x008509a0` | 13/0's height rate and state-0 rate |
+| `0x00948548` | `0x005bde78` | 13/2's target-line step; MH4U's own 13/2 calls it at the same point |
+| `0x00948674` | `0x0068d070` | the class's aim-at-target-with-lead; MH4U's own 13/3 calls it with aim A at `+0x160` and the target at `+0x218` |
+| `0x00568c64` | `0x00585384` | the vector's heading and pitch; MH4U's own 13/1 calls the same helper twice |
+| `0x00aacd50` | `0x005858f4` | the distance in x/z; the third float `0x00845004` takes in s2 is why the port reproduces its step with this call |
+| `0x0091b430` | `0x00839ea0` / `0x00839514` | the aim step and the vertical clamp |
+| `0x0091aaf0` | `0x008392d8` | a turn by an angle step; the source's rates 0x100 and 0x40 are halved |
+| `0x0092dc50` | `0x008437f4` | 13/1's blend (`0x12`, -2500.0) |
+| `0x0092dccc` | `0x008438e8` | 13/1's landing step (its 0x80 halved to 0x40) |
+| `0x00955440` | `0x0082b268` | 13/3's position advance (the source's 1.0 becomes 0.5) |
+| `0x00922250` | `0x0083c6e0` | 13/2's two value curves; 3U's 0x00c4edb8 and 0x00c4ee00 were compared key by key with MH4U's own 0x00fd19b0 and 0x00fd19f8 and are equal, so MH4U's evaluator reads MH4U's tables |
+| `0x00916228` | `0x0082fc8c` | 13/1's state-2 entry step |
+| `0x0092e960` / `0x0091b7b0` | `0x00844100` / `0x008345f8` | 13/4's state predicate and order/phase step |
+| `0x00914dc4` / `0x00916108` | `0x00844a38` / `0x00833d88` | 13/2's (0, 0xb) tail and speed 0 |
+
+**What it does not carry.** The calls are named once in the log and recorded here:
+
+- **`0x00a347bc` and `0x00843c20` (#55)** are 13/0's, 13/1's and 13/2's entry gate: the
+  uCharacter table lookup of 3U work+0xda (which has no MH4U offset) and the scale/one-shot
+  pair behind its 0xc result. The port takes the source's non-0xc path; 13/0's second
+  lookup, its `+0xaea` selector and 13/1's special flag are skipped with it.
+- **`0x00839598` and `0x00835f10` (#55)** are 13/2's and 13/3's state-2 target loop: the
+  signed 3U work+0xef byte and the uEm066 position helper (called twice with the entry byte
+  0x1b, 700.0 and 350.0). The port takes the byte's nonzero path and the helper's result as
+  0, so the source's failure request runs (1/3 in 13/2, 2/6 in 13/3) and the move cannot
+  stall.
+- **`0x0085162c` and `0x00829620` (#55)** are 13/4's entry (the float at the monster's
+  `+0x97c`) and per-frame action-table helper. Both are skipped.
+- **13/3's action-start record `0x00b0b0e8`** is the source's data, not carried; its setup
+  `0x0082d278` and leaf `0x0082d430` are not called, so the port's MH4U counterpart
+  `0x00911c0c` is not run with the source's table.
+- **`0x0084512c`** is not reached by these five units: it is 8/0's unit `0x006870f4`.
+  `0x00829620` is reached by 13/4 only. The issue's list groups them with 13/1, but the
+  source's 13/1 does not call either.
+- **The aim wrappers' two floats.** 3U's `0x00839ea0` and `0x00839514` take the aim step in
+  s1 (1.0) and the clamp factor in s0; MH4U's `0x0091b430` takes one float and passes it to
+  both workers. The port passes the source's s0 (the clamp factor, the value MH4U's own 13/1
+  passes) and the heading slot at r1.
+- **13/4's timer.** 3U saves the old value at `+0x2c`; MH4U keeps one value at `+0x1d4`, so
+  the crossing test uses a local copy of the old value and MH4U's frame delta at this+0x14.
+
+The family's fake-host test is `tests/rathian-3u/cat13a.c`. The module's ready line sums the
+families' counts — `ready: translating 63 of 3U Rathian's 191 actions on monster 125` with
+cat0, cat1, cat3b, cat7a and this slice — and the family's self-test logs the five units and
+the blocked calls. The 125 quest's run reuses check T1c; the per-move rows are #116's.
 
 ## What it hooks
 
