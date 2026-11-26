@@ -53,6 +53,7 @@ that held them before.
 | `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
 | `src/monsters/rathian-3u/cat8.c` | category 8's family: id `8` and the three class helpers its handler reaches (#225) |
 | `src/monsters/rathian-3u/cat11.c` | category 11's family: `11/0`, `11/5`, `11/15`, `11/26`, `11/28`, the shared wrapper `0x00687e88` and the base-class handler `0x0084d864` (#225) |
+| `src/monsters/rathian-3u/cat7c.c` | category 7 part 3's family (#223): 36 ids on six handler units, the ids R1 could not resolve and three MH4U has no action for |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
 | `tests/rathian-3u/host.h` | what the 3U module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
@@ -65,6 +66,7 @@ that held them before.
 | `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
 | `tests/rathian-3u/cat8.c` | category 8's fake-host test: id 8's three states, the 300.0/38.0 aim, the 12.0/50.0 test, the 90.0 timer and motion `0xca`, and the four blocked calls' log lines; `make test` builds `tests/family-cat8` |
 | `tests/rathian-3u/cat11.c` | category 11's fake-host test: the five ids' shared-handler calls, 11/28's 45.0/0.5 step and its three open items' log lines; `make test` builds `tests/family-cat11` |
+| `tests/rathian-3u/cat7c.c` | category 7 part 3's fake-host test: the six units' call sequences and all 36 ids' dispatch; `make test` builds `tests/family-cat7c` |
 | `tests/rathian-gu/host.h` | what the GU module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-gu/cat17.c` | category 17's fake-host test: the 0-2 no-op and the base update; `make test` discovers it and builds `tests/family-gu-cat17` |
 | `tests/rathian-gu/act3_98.c` | action 3/98's fake-host test: its three states and the motions `0x101`/`0x104`; `make test` builds `tests/family-gu-act3_98` |
@@ -632,9 +634,11 @@ Three things are not translated yet:
 - **0/0's second delay field.** The source keeps the old delay at `+0x2c`; MH4U's countdown
   worker keeps one value, so the port keeps `+0x1d4` only.
 
-The module's ready line sums the families' `translated` counts: after #218 it is `ready:
-translating 125 of 3U Rathian's 191 actions on monster 125`. Its self-test logs families'
-ids, engine calls and open items. The 125 quest's run is check T1c.
+The module's ready line sums the families' `translated` counts: `ready: translating 161 of 3U
+Rathian's 191 actions on monster 125` today (6 after #216, 22 after #220, 37 after #217, 58
+after #221, 63 after #227, 85 after #222, 100 after #219, 106 after #225, 125 after #218 and
+161 after #223). Its self-test logs each family's ids, engine calls and open items. The 125
+quest's run is check T1c.
 
 #### Category 3's part 1 (#219)
 
@@ -1069,6 +1073,101 @@ continuation is taken:
 The module's ready line counts every family: `ready: translating 104 of 3U Rathian's 191
 actions on monster 125`.
 
+### 3U Rathian's category 7, part 3: the flight moves
+
+`cat7c.c` is category 7 part 3's family file (issue [#223](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/223)):
+six handler units and the 36 ids they carry. `0x00686bcc` is a stub into the class's own
+`0x00697888` (`bl` then `pop {r3, pc}`), so the last unit's real body is `0x00697888`.
+
+| Ids | Source | What the port runs |
+|---|---|---|
+| 7/22-7/29, 7/57 | `0x00696580` | a five-state flight machine; the case block's r1 picks the takeoff (0/1, and 7/57's 2 for the 150-timer landing) and its r2 the direction (0-3). State 0: the data float, the fall, the part step, motion `0x45`, aim point A at -2.0/50.0. State 1: the phase byte, y toward the target by 5.0, an angle step (0x2800/0x2000/0x1800 for r2 0-2, else the angle to the target capped at 0x3000), a turn at 0x600, the data float - 200.0, aim z capped at 120.0, then motion `0x3e` and aim vector B's z at 3.0. State 2: the timer, the turn, aim z capped at 110.0, motion `0x3f` and speed -200.0, or 0/3's base handler past 150.0. State 3: the speed, the path advance, motion `0xd0`. State 4: the speed, the advance, the timer past 6, then r1=1's mode 0 and motion `0xdd`, r1=2's motion `0x35`, else motion `0xd2` and aim B's z at -3.5. State 5: r1=1's motion `0xda` then 0/2; r1=2's 150-timer (`(5.0 - timer) * -200.0 * 0.2`) and motion `0x3c`, then 0/2; else the phase (`(20.0 - timer) * -150.0 * 0.05`) and 0/6's base handler |
+| 7/31 | `0x00696cd8` | three states over the target-line struct: mode 3, the part step, motion `0xc8`, part group 0x17, the aim cleared, and the distance ratio (3.8 at most, over 450.0) in the line's first float; state 1: the vertical step, y clamped at -50.0, the data float through `0x839514`, the source's 36.0/1.0 check and a turn at 0x100, then mode 0 and motion `0xdc`; state 2: the source's 30.0/1.0 check, then the request for 1/3 or 1/8 |
+| 7/33 | `0x00696f4c` | four states: mode 3, the part step, motion `0xd1`, part groups 6/8 and 3/0x10, the aim cleared and the speed 0.0; the turn at 0x2d8 and the source's 80.0 check; the vertical step, the speed clamp, the path advance and motion `0xd4`; then 0/2's base handler |
+| 7/35, 7/46-7/48, 7/62-7/65 | `0x006971c0` | the vertical step (-5.0, clamped at -75.0) runs every frame, then: mode 3, the part step, motion `0xcd` and aim A cleared; the source's 55.0 check, a turn at 910 and a further 82.0 check, then 0/6's base handler; or the vertical step, the speed clamp, the advance and motion `0xd4` |
+| 7/36, 7/38-7/40, 7/49-7/52, 7/59, 7/60 | `0x0069747c` | four states: the data float and fall, the part step, motion `0xd3`, aim z at +-10.0 for r1 2-4; a turn at 0x40, the advance for r1 >= 2, then motion `0xd4`; the turn/advance by r1, the source's 40.0 check, the effect substates and motion `0xd5`; then 0/3's base handler |
+| 7/37, 7/84, 7/86, 7/87, 7/92, 7/93, 7/96 | `0x00686bcc` -> `0x00697888` | three states; r1 (0-5), r2 (0/1), r3 (the part group 0x1f/0x2a/0x2b/0x2c) and the stacked fifth argument (0/1). State 0: the data float, the fall, the part step, motion `0xdb`, the part group, the source's launch point and heading, the aim cleared, and the timer at 20.0 / the monster's speed; state 1: the phase byte, the source's 65.0/110.0/80.0 check and turn, the source's 60.0/100.0 settle, the aim from the stored point and the target, then 150.0 and motion `0x1b`; state 2: the turn toward the stored heading, the aim from the stored point, the advance, then mode 3 and motion `0x1b` for r1 1/2 (and r1=4 with the fifth argument 1), else 0/3; state 3: the vertical step and 0/6 |
+
+**The field map category 7 adds** (each row is MH4U's offset, the 3U offset it stands for, and
+how it was found), on top of the pointer, state, category and position rows the map already
+carries:
+
+| MH4U | 3U | What | How |
+|---|---|---|---|
+| `+0x1d4` | `+0x28` | the frame timer | the `0x0082b268`/`0x00955440` and `0x00833b2c`/`0x00915d44` pairs; MH4U's own 7/22 adds the delta with `0x00b05274` at the same point |
+| `+0x180` | `+0x68` | the speed/vertical accumulator | the `0x00833b2c`/`0x00915d44` pair; MH4U's own 7/22 clamps it at the same point |
+| `+0x1a8`, `+0x1ac` | `+0x80`, `+0x84` | the turn slot and the heading | the `0x00839ea0`/`0x0091b430` pair and MH4U's own 7/22, which reads and stores both |
+| `+0x160`, `+0x164`, `+0x168` | `+0x260`, `+0x264`, `+0x268` | aim point A | MH4U's own 7/22 writes 0x164/0x168 at the source's 0x264/0x268 point; the `0x00839968`/`0x0091b3bc` pair clears all three |
+| `+0x170`, `+0x174`, `+0x178` | `+0x270`, `+0x274`, `+0x278` | aim vector B | the same clear-aim pair; MH4U's own 7/22 sets `+0x178` where the source sets `+0x278` |
+| `+0x218`, `+0x21c`, `+0x220` | `+0x288`, `+0x28c`, `+0x290` | the target point | MH4U's own 7/22 computes the same angle from it |
+| `+0x198`, `+0x19c`, `+0x1a0` | `+0x38`, `+0x3c`, `+0x40` | position | MH4U's own 7/22 and 7/36 subtract and advance it at the same points |
+| `+0x1c0` | `+0x3` | the enemy-data key | the `0x0083db3c`/`0x00923f90` pair; MH4U's own 7/22 reads `+0x1c0` where the source switches on `+0x3` |
+| `+0x3c4` | `+0x7c9` | the phase byte `0x8310f0` sets | MH4U's own 7/22 makes the same store at `+0x3c4` before the flight blend |
+| `+0x3e3` | `+0x7eb` | the "this flight action ran" byte | the `0x0083d18c`/`0x00922ca0` pair, same body |
+| `*(this+0x8d88)` | `this+0x1e70` | the target-line struct; 7/31 stores the distance ratio in its first float and 7/37 its heading at `+4` | MH4U's own 7/31 reaches the struct through the pointer where the source embeds it |
+| `this+0x290`, `this+0x29c` | `this+0x278`, `this+0x284` | the monster's two speeds | the `0x0083c6e0`/`0x00922250` twin; 7/37 divides 20.0 by `+0x29c`, the source by `+0x284` |
+
+**The engine calls this slice adds** (MH4U, the 3U function it stands for, and how the
+counterpart was established):
+
+| MH4U | 3U | What | How |
+|---|---|---|---|
+| `0x00922ca0` | `0x0083d18c` | the "this flight action ran" byte | same body (the 73); MH4U's own 7/22 calls it first |
+| `0x0094e318` | `0x00828828` | start a motion | the 73; MH4U's own 7/22, 7/31, 7/33, 7/35 and 7/36 call it at the source's points |
+| `0x0093d870` | `0x00852324` | the action data's float | the 73; the same call in the paired handlers |
+| `0x0092e99c` | `0x00844124` | advance the fall, set mode 1 | the 73; MH4U's own 7/22 and 7/36 |
+| `0x00915d44` | `0x00833b2c` | advance the speed/vertical value | the 73; MH4U's own 7/31 and 7/35 clamp it at the same point |
+| `0x00916108` | `0x00833d88` | set the speed | MH4U's own 7/31 calls it at the source's point |
+| `0x0091aae4` | `0x0083336c` | the per-mode speed/distance wrapper | the 73; the same call in the paired handlers |
+| `0x0091aaf0` | `0x008392d8` | the angle step (r3 the speed) | the 73; MH4U's own 7/22 and 7/36 use it at the source's points |
+| `0x0091db4c` | `0x008357b0` | turn toward a point | the 73; MH4U's own 7/31 and 7/36 |
+| `0x0091b430` | `0x00839ea0` | the turn with its two floats | MH4U's own 7/22, 7/31 and 7/36 |
+| `0x009114d4` | `0x0082cee4` | advance the position along the path | MH4U's own 7/36 calls it where the source calls `0x82cee4` (the 73's `0x00912288` row is the other role, `0x82b268`'s) |
+| `0x00955440` | `0x0082b268` | advance the position by aim point A | MH4U's own 7/37-shaped code and the 73 |
+| `0x0091b3bc` | `0x00839968` | clear aim point A and vector B | MH4U's own 7/31 calls it at the source's point (the 73's `0x0096e164` row is not this step) |
+| `0x00916228` | `0x0082fc8c` | clear aim point A | MH4U's own 7/36 |
+| `0x00955a5c` | `0x0082b8f0` | move y toward the target's y by s0 | MH4U's own 7/22 calls it at the source's point |
+| `0x00911090` | `0x00834098` | advance A by B times the delta | the 73; the same call in a paired handler |
+| `0x00914dc4` | `0x00844a38` | set a part group (r3 = 0) | the 73; MH4U's own 7/31 and 7/36 |
+| `0x0093310c` | `0x00844a40` | set a part group | the 73; MH4U's own 7/31 and 7/36 |
+| `0x00923f90` | `0x0083db3c` | the data record's float | the 73; the same call in 7/37's shape |
+| `0x00568c64` | `0x00584cd8` | the angle to a point (s0, s1) | MH4U's own 7/22 computes the same angle with it |
+| `0x00aacd50` | `0x005858f4` | the distance to a point | MH4U's own 7/31 (`0x92e408`) and 7/37 use it |
+| `0x0091b7b0` | `0x008345f8` | the part/type step with its value in r1 | the 73; it reads MH4U's `+0x51e` where the source reads `+0x942` |
+| `0x0090f8fc` | `0x0082c1c4` | the action's stall flag | the 73 |
+| `0x0091656c` | `0x00839514` | advance the path, then the line | MH4U's own 7/31 calls it at the source's point |
+| `0x00b05274` | `0x008a78ec`'s add | timer += the frame delta | MH4U's own 7/22 calls it on work+0x1d4 |
+
+The source's motion numbers are converted when the handler is written: MH3U's
+`file * 100 + slot` becomes MH4U's `file << 8 | slot`, so `0xc8` is `MHUC_MOTION(2, 0)` =
+`0x200`, `0xcd` = `0x205`, `0xdb` = `0x213`, and a file-0 motion such as `0x45` is unchanged.
+
+**What this slice does not translate yet**, each logged once and recorded here:
+
+- **The source's table interpolation.** `0x83c6e0` (MH4U `0x922250`) and `0x584760` (MH4U
+  `0xbe1d90`) read MH3U's tables `0x00c4edb8`, `0x00c4ee00`, `0x00c4ee98`, `0x00c4d4b0`,
+  `0x00c4d4c0` and `0x00c4d4cc` — source data the port does not
+  carry. Their steps (7/31's and 7/35's vertical step and aim z, 7/33's vertical step and aim
+  z, 7/35's state-1 table) are skipped; `0x922250` is called with a table in r1, so a wrong
+  table would be worse than the skip. 7/37's state-1 timer end (`0x83c6cc`, MH4U `0x00922250`'s
+  sibling) is one of #55's calls.
+- **The effect spawn.** 7/35's and 7/36's effect branches build a setup block through
+  `0x688a20` and `0x688870` and hand it to `0x00164f08` (MH4U's effect factory type 8); the
+  setup calls `0x00199d00`, `0x0063cabc` and `0x00829950`, none of which has an MH4U
+  counterpart found yet. MH4U's own handlers spawn a shell through `0x661bc4` with their own
+  setup, so the port skips the spawn and keeps the state machine's substate count.
+- **`0x00842a7c`, `0x00839598`, `0x0083c6cc`.** Three of the 19 calls #55 owes. The first is
+  called in 7/33, 7/35, 7/36 and 7/37; the second gates 7/31's request for 1/3 or 1/8; the
+  third computes 7/37's state-2 timer. Each is named and logged.
+- **`work+0x2b4` and `work+0x2b6`.** 7/36 reads the two part bytes to choose its turn step;
+  the map has no MH4U offset for either, and the port keeps the source's default. 7/37's
+  `work+0x70` launch point has no MH4U offset either, so the module keeps it in its state
+  slot's 12 bytes (the first use of that slot by this module).
+- **`0x844004`'s s0 return.** ABI 4's `mhuc_call_s2` sets the third float but returns only r0,
+  and `0x92e408` returns its ratio in s0. 7/31 computes the same ratio from the distance call
+  the function itself makes (`0x5858f4`), clamped to [0, 3.8] over 450.0; the engine call
+  itself is not made. A new guest call that returns s0 after three floats would close it.
+
 ## What it hooks
 
 | Table | Address | Reader hooked | Id where |
@@ -1338,10 +1437,10 @@ the source game's notes, Japanese until MHGU's English text is read.
   301: the twelve MHXX-only ids and the shared categories 1 and 2 (#273). 12/0 and the shared
   ids of categories 3, 7, 9 (except 9/3 and 9/4), 10, 11, 12 and 13 still run MH4U's
   dispatcher.
-- **The rest of the 3U module's 191 ids.** Category 0 (six ids), category 1 (fifteen ids),
-  categories 2 and 9 (nineteen ids), category 3's two parts (thirty-one ids), category 7's two
-  parts (forty-three ids), category 13's first part (five ids) and category 8 and 11 (six ids)
-  run: 125 of the 191. The other 66 ids are still owed, one family per slice
+- **The rest of the 3U module's 191 ids.** Category 0 (six ids) and its three base handlers,
+  category 1 (fifteen), categories 2 and 9 (nineteen), category 3's two parts (thirty-one),
+  category 7's three parts (seventy-nine), category 8 (one), category 11 (five) and category
+  13's part 1 (five) run: 161 of the 191. The other 30 ids are still owed, one family per slice
   ([#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217) to
   [#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229)) and action 4's
   ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)). An id this slice

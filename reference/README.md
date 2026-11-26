@@ -689,6 +689,34 @@ position, heading, point and speed rows above; what they add:
 | this+0x1ed0 | `*(this+0x8d88)+0x60` | a float inside that struct, advanced by the frame delta | unverified: 3U reads it as this+0x1e70+0x60 (9 readings in 7/68), MH4U's struct is not read there by a pair |
 | this+0x27c | this+0x294 | | 1 pair |
 
+#### Category 7, part 3's rows and the three call-map corrections (#223)
+
+The 36 ids of category 7 part 3 (`src/monsters/rathian-3u/cat7c.c` in the runtime) read the
+rows above and add these; the paired MH4U handlers for 7/22, 7/31, 7/33, 7/35 and 7/36 are the
+evidence, read beside the source's:
+
+| MH3U | MH4U | role | how |
+|---|---|---|---|
+| work+0x7c9 | work+0x3c4 | the phase byte `0x8310f0` sets | MH4U's own 7/22 makes the same store at +0x3c4 before the flight blend |
+| work+0x7eb | work+0x3e3 | the "this flight action ran" byte | the `0x0083d18c`/`0x00922ca0` pair, same body |
+| this+0x278 / +0x284 | this+0x290 / +0x29c | the monster's two speeds | the `0x0083c6e0`/`0x00922250` twin; 7/37 divides 20.0 by the second, the source by +0x284 |
+| work+0x70 / +0x74 / +0x78 | — | 7/37's launch point, written in state 0 and read in state 2 | no MH4U offset: the port keeps it in the module's state slot |
+
+Three rows of the 73 table did not hold when the paired handlers were read side by side. They
+are call-site matches, which the table already calls candidates to confirm:
+
+| MH3U function | the table's MH4U | what the pair shows |
+|---|---|---|
+| 0x008310f0 | 0x0093d870 | a five-instruction setter of work+0x7c9, not the data float; MH4U's own 7/22 inlines the store at +0x3c4 |
+| 0x00839968 | 0x0096e164 | it clears aim point A and vector B at work+0x260..+0x278; MH4U's own 7/31 calls 0x0091b3bc at that point |
+| 0x0082cee4 | 0x00912288 | it advances the position along the path; MH4U's own 7/36 calls 0x009114d4 at that point, and 0x00912288 is 0x0082b268's role (0x00955440) |
+
+The calls this slice leaves blocked are named in the runtime's
+[README](../mods/uc_runtime/README.md#3u-rathians-category-7-part-3-the-flight-moves):
+`0x00842a7c`, `0x00839598` and `0x0083c6cc` (#55), the source's table interpolation
+(`0x0083c6e0`, `0x00584760`) and its effect spawn (`0x00164f08` and the setup helpers), and
+`work+0x2b4`/`work+0x2b6`.
+
 #### What is not mapped
 
 - **work+0x2b4** (10 readings, category 7): no pair reads a role at one MH4U offset, and no twin. (`work+0xb81` was on this list; category 7's first slice found it at MH4U's `+0xca5`, above.)

@@ -536,6 +536,55 @@ resolve into 0/2.
 | 9/3 | not done |
 | 9/4 | not done |
 
+Category 7's third slice ([#223](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/223))
+runs her own handlers for thirty-six ids on six units, including the ten R1 could not resolve
+(7/36-7/40 and 7/49-7/52) and the three MH4U has no action for (7/64, 7/87 and 7/93). Force
+each and compare it with MH3U's own move; the runtime's
+[README](../mods/uc_runtime/README.md#3u-rathians-category-7-part-3-the-flight-moves) names
+each unit's calls and the calls it leaves blocked.
+
+| 3U id | Handler unit | What to watch |
+|---|---|---|
+| 7/22 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/23 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/24 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/25 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/26 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/27 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/28 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/29 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/57 | 0x00696580 | motion 0x45, then the flight states' motions (0x3e, 0x3f, 0xd0, 0xdd/0x35/0xd2, 0xda/0x3c) |
+| 7/31 | 0x00696cd8 | motion 0xc8, the target line's first float and the 36.0/1.0 and 30.0/1.0 checks, then the request for 1/3 or 1/8 (blocked at 0x00839598) |
+| 7/33 | 0x00696f4c | motion 0xd1, the 0x2d8 turn and the 80.0 check, then the vertical step and motion 0xd4 |
+| 7/35 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/46 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/47 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/48 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/62 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/63 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/64 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/65 | 0x006971c0 | motion 0xcd, the 55.0 and 82.0 checks, then 0/6's base handler or motion 0xd4 |
+| 7/36 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/38 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/39 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/40 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/49 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/50 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/51 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/52 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/59 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/60 | 0x0069747c | motion 0xd3, the +-10.0 aim for the later variants, then motions 0xd4 and 0xd5 and 0/3's base handler |
+| 7/37 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+| 7/84 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+| 7/86 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+| 7/87 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+| 7/92 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+| 7/93 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+| 7/96 | 0x00686bcc into 0x00697888 | motion 0xdb and the part group from r3, the launch point, then 0x1b and 0/3 or 0/6 |
+
+Status: not done. These 36 rows wait for the same load as the 3U rows above; the module's
+self-test names the six units and the calls still blocked.
+
 Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
 translates it, and the other sixteen's counterparts are in the reference page.
 
@@ -1404,12 +1453,12 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --game mh3u --exheader <exheader
     --code <code.bin> --dispatcher 0x00687d30 --range 0x686000 0x69b000
 ```
 
-Last result (2026-11-26, issues #216, #217, #219, #220, #221, #222, #227 and #225): pass.
-191 actions; blocks 191/191, handlers 182/191 (the other 9 are inline), first motions 132/191;
-translated 106 (category 0's six, category 1's fifteen, category 3's part 1's fifteen and part
-2's sixteen, category 7's part 1's twenty-one and part 2's twenty-two, category 13's part 1's
-five, and categories 8 and 11's six), pending 85. Changing a ledger motion makes it exit 1 and
-name the id.
+Last result (2026-11-26, issues #216, #217, #218, #219, #220, #221, #222, #223, #225 and
+#227): pass. 191 actions; blocks 191/191, handlers 182/191 (the other 9 are inline), first
+motions 132/191; translated 161 (category 0's six, category 1's fifteen, categories 2 and 9's
+nineteen, category 3's two parts' thirty-one, category 7's three parts' seventy-nine, category
+13's part 1's five, and categories 8 and 11's six), pending 30. Changing a ledger motion makes
+it exit 1 and name the id.
 
 T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
 the 12/1-3 blocks, 4/27-32's states, 8/0's three states, category 17's no-op and base-update
@@ -1492,13 +1541,14 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 56 of GU Rathian's 301 actions on monster 124`; the 3U module's
-is `ready: translating 125 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
-#218, #219, #220, #221, #222, #227 and #225), with cat0's `selftest: 6 of the 191 actions`, cat1's
+is `ready: translating 161 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#218, #219, #220, #221, #222, #223, #225 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's
 `selftest: 15 of the 191 actions`, cat2_9's `selftest: 19 of the 191 actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's
 `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191 actions`, cat7b's
 `selftest: 22 of the 191 actions`, cat13a's `selftest: 5 of the 191 actions`, cat8's
-`selftest: 1 of the 191 actions` and cat11's `selftest: 5 of the 191 actions`, and the
-families' `field map anchors`/`selftest: open:` lines.
+`selftest: 1 of the 191 actions`, cat11's `selftest: 5 of the 191 actions` and cat7c's
+`selftest: 36 of the 191 actions`, and the families' `field map anchors`/`selftest: open:`/
+`selftest: blocked:` lines.
 The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
 runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
@@ -1580,6 +1630,18 @@ to `ready: translating 106 of 3U Rathian's 191 actions on monster 125` and nine 
 files.
 The new families' handlers are T1b's and the self-test runs on the first frame, so a boot run
 exercises the lines; the 125 quest route is #216's.
+
+Category 7's third slice ([#223](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/223))
+was run on its own build before it rebased onto the merged families (2026-11-26, USA v1.3.0,
+`selftest = 1`, the session's shared code library, the 125 quest's route): pass, exit 0. The
+log had `ready: translating 42 of 3U Rathian's 191 actions on monster 125`, cat7c's `selftest:
+36 of the 191 actions: 7/22-7/29 and 7/57 <- 0x00696580 ...` and `selftest: blocked:
+0x00842a7c, 0x00839598 and 0x0083c6cc (#55); ...` lines, `selftest: float stubs at 0x08e45550`,
+then quest 10212's `id 125 -> stand-in 1 marked present` and `data resource: id 125 -> its own
+archive`. On a later rebased build the same boot logged `ready: translating 142 of 3U
+Rathian's 191 actions on monster 125` and cat7c's self-test lines before the run's time limit
+stopped it; the current branch's 161-id boot was not rerun (both headless slots were held), the
+quest lines are the earlier builds', and T1b is the slice's proof.
 
 
 The category 2 and 9 slice (#218) was run on the tree with the other 3U slices merged
