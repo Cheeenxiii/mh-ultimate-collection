@@ -88,6 +88,25 @@ def test_character_save_slices_read_the_values_at_the_spec_offsets():
     assert save.character_problems(data) == []
 
 
+def test_the_equipment_box_has_the_games_1500_slots_and_the_palico_gear_box_follows_it():
+    data = character_save()
+    at = save.EQUIPMENT_BOX_AT + 1499 * save.EQUIPMENT_SIZE
+    data[at:at + 12] = struct.pack("<BBHHHHH", 7, 0, 5, 0, 0, 0, 0)
+    assert save.equipment_box(data)[-1] == {"slot": 1499, "kind": 7, "id": 5, "slots": [0, 0, 0]}
+    blocks = {name: (offset, size) for name, offset, size in save.BLOCKS}
+    assert blocks["equipment_box"] == (0x173E, 1500 * 28)
+    assert blocks["palico_gear_box"] == (0xBB4E, 100 * 24)
+    assert blocks["unknown_0xC4AE"] == (0xC4AE, 2)
+
+
+def test_the_specs_blocks_tile_the_character_save_without_a_gap_or_overlap():
+    end = 0
+    for name, offset, size in save.BLOCKS:
+        assert offset == end, f"{name} starts at 0x{offset:X}, not 0x{end:X}"
+        end = offset + size
+    assert end == save.CHARACTER_SIZE
+
+
 def test_the_quest_flags_are_the_64_bytes_at_0x11e_and_the_12_bytes_before_them_are_separate():
     data = character_save()
     data[save.QUEST_FLAGS_PREFIX_AT:save.QUEST_FLAGS_AT] = b"\xff" * 12
