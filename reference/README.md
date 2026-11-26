@@ -967,6 +967,43 @@ ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214))
 five ids translated; their per-move rows are in
 [checks.md](../docs/checks.md#the-ported-moves-check-r2p).
 
+#### Category 13, part 2 (#228): the two units and what is blocked
+
+Category 13's second slice reimplements two units on two ids. 13/5 and 13/6 are two of the
+three ids R1 found starting a different animation from MH4U's version (13/8 is part 3), so the
+port runs the source's handler and her converted motions. The category entry `0x00699b78`
+tail-calls each unit and the units ignore the case block's registers. Each unit was read
+against MH4U's own handler for the same action, but MH4U's handler is not reused.
+
+| 3U ids | MH3U unit | MH4U's own handler | What the port runs |
+|---|---|---|---|
+| 13/5 | `0x0068f818` | `0x006dbec0` | state 0: mode 0 and motion 0x13 at 6.0; state 1: the twelve `0x0083336c` queries at 92/262/96/136-152/156/190/386/344-368/398-426/434/458-478 and the nine effect spawns they gate |
+| 13/6 | `0x0068fcc0` | `0x006dbffc` | state 0: the data float, the fall and motion 0x1a at 0.0; the eleven states' aim point and uEm024 trajectory setup, the `0x005c6938` gates at 0x1d6/0x2da/0x3a2/0x41a/0x578/0x6a4, the 90/56/114/48 queries and motions 0x3d, 0xc8 (start frame 30), 0x13, 0x12, 0x29, 0x43 and 0x1a |
+
+**The calls still blocked or not carried.** They are named in the module's log and recorded in
+its README's category-13 section:
+
+- **13/5's `0x0016052c`, `0x0016669c` and `0x00847798` (#55)** are the effects: the uEffect039
+  spawn, the type-9 factory whose MH4U argument differs, and the gate before four spawns. The
+  port takes the gate's result as 0 and skips the spawns; decision 0015 leaves the source's
+  effects to #259.
+- **13/6's `0x005bf66c`, `0x005bf77c`, `0x005bf7bc`, `0x005c0614`, `0x005c34c0`,
+  `0x005c3f88`, `0x005c6938` and `0x005c7270` (#55)** are the eight helper functions in
+  [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart). `0x005c6938` is the
+  progress gate: it compares a point of the game's global object with its threshold halved.
+  The port takes its result as 0, so the move stops at the first gate; the fake-host test
+  writes the state byte for the gated states.
+- **13/6's tables `0x00c4d890`, `0x00c4da20` and `0x00c4dbe0`** are the source's uEm024 data,
+  not carried, so `0x005c3f88` and `0x005c7270` are skipped with them.
+- **The issue's call list.** The issue names `0x0016052c` and `0x00847798` for both units; the
+  source's 13/6 calls neither. Both are 13/5's. 13/6 reaches `0x0083336c` and the eight helpers
+  above.
+
+The slice adds no field-map row: both units read only `+0x5` -> `+0x144`. The ledger
+([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) marks the two ids
+translated; their per-move rows are in
+[checks.md](../docs/checks.md#the-ported-moves-check-r2p).
+
 ### The 17 ids MH4U has no action for
 
 16 of the 17 reach the same handler function as a shared MH4U action, so that shared action's

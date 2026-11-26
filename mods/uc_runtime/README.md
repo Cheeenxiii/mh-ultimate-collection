@@ -51,6 +51,7 @@ that held them before.
 | `src/monsters/rathian-3u/cat7a.c` | category 7's first family (#221): `7/0`, `7/1`, `7/2`, `7/4`, `7/5`, `7/6`, `7/7`, `7/8`, `7/10`, `7/11`, `7/12`, `7/15`, `7/16`, `7/19`, `7/20`, `7/32`, `7/34`, `7/42`, `7/61`, `7/77`, `7/85`, and the calls still blocked |
 | `src/monsters/rathian-3u/cat7b.c` | category 7 part 2's family (#222): `7/3`, `7/9`, `7/13`, `7/14`, `7/17`, `7/18`, `7/21`, `7/30`, `7/41`, `7/43`, `7/44`, `7/53`, `7/54`, `7/55`, `7/56`, `7/72`, `7/73`, `7/78`, `7/80`, `7/83`, `7/88`, `7/89`, on the units 0x00694474, 0x00694f4c, 0x006956e8, 0x00695e68 and 0x00696408 |
 | `src/monsters/rathian-3u/cat13a.c` | category 13's first family (#227): `13/0` to `13/4`, the five units and the calls still blocked |
+| `src/monsters/rathian-3u/cat13b.c` | category 13's second family (#228): `13/5` and `13/6`, the two units, the effects and aim helpers still blocked |
 | `src/monsters/rathian-3u/cat8.c` | category 8's family: id `8` and the three class helpers its handler reaches (#225) |
 | `src/monsters/rathian-3u/cat11.c` | category 11's family: `11/0`, `11/5`, `11/15`, `11/26`, `11/28`, the shared wrapper `0x00687e88` and the base-class handler `0x0084d864` (#225) |
 | `src/monsters/rathian-3u/cat7c.c` | category 7 part 3's family (#223): 36 ids on six handler units, the ids R1 could not resolve and three MH4U has no action for |
@@ -64,6 +65,7 @@ that held them before.
 | `tests/rathian-3u/cat7a.c` | category 7 part 1's fake-host test: every id's and variant's call sequence; `make test` discovers it and builds `tests/family-cat7a` |
 | `tests/rathian-3u/cat7b.c` | category 7 part 2's fake-host test: every id's and variant's call sequence and frame values; `make test` discovers it and builds `tests/family-cat7b` |
 | `tests/rathian-3u/cat13a.c` | category 13 part 1's fake-host test: the five ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13a` |
+| `tests/rathian-3u/cat13b.c` | category 13 part 2's fake-host test: the two ids' frame values and call order, and the blocked calls' log lines; `make test` discovers it and builds `tests/family-cat13b` |
 | `tests/rathian-3u/cat8.c` | category 8's fake-host test: id 8's three states, the 300.0/38.0 aim, the 12.0/50.0 test, the 90.0 timer and motion `0xca`, and the four blocked calls' log lines; `make test` builds `tests/family-cat8` |
 | `tests/rathian-3u/cat11.c` | category 11's fake-host test: the five ids' shared-handler calls, 11/28's 45.0/0.5 step and its three open items' log lines; `make test` builds `tests/family-cat11` |
 | `tests/rathian-3u/cat7c.c` | category 7 part 3's fake-host test: the six units' call sequences and all 36 ids' dispatch; `make test` builds `tests/family-cat7c` |
@@ -1167,6 +1169,61 @@ The source's motion numbers are converted when the handler is written: MH3U's
   and `0x92e408` returns its ratio in s0. 7/31 computes the same ratio from the distance call
   the function itself makes (`0x5858f4`), clamped to [0, 3.8] over 450.0; the engine call
   itself is not made. A new guest call that returns s0 after three floats would close it.
+
+### 3U Rathian's module: category 13, part 2
+
+Category 13's second slice is `cat13b.c`, issue
+[#228](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/228): two handler units on
+two ids. 13/5 and 13/6 are two of the three ids R1 found starting a different animation from
+MH4U's version (13/8 is part 3), so the port runs the source's handler and her converted
+motions. The category entry `0x00699b78` tail-calls each unit; the units ignore the case
+block's registers, so the family claims them by the pair. MH4U's own handlers for the same
+actions are `0x006dbec0` (13/5) and `0x006dbffc` (13/6); they start their own motion 2 and the
+port does not reuse them.
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 13/5 | handler `0x0068f818` | state 0: state byte 1, mode 0, motion 0x13 at 6.0; state 1: the twelve `0x0083336c` queries at 92/262/96/136-152/156/190/386/344-368/398-426/434/458-478 and the nine conditional effect spawns they gate (seven `0x0016052c` and two `0x0016669c`, four of them behind `0x00847798`) |
+| 13/6 | handler `0x0068fcc0` | state 0: state byte 1, the data float and the fall, motion 0x1a at 0.0; the eleven states then set the aim point and the uEm024 trajectory, the gates `0x005c6938` at 0x1d6/0x2da/0x3a2/0x41a/0x578/0x6a4, the 90/56/114/48 queries, and motions 0x3d at 0.0, 0xc8 at 0.0 with start frame 30, 0x13 and 0x12 and 0x29 at 0.0, 0x43 at 6.0 and 0x1a at 6.0 |
+
+**The field map.** The slice adds no row: both units read only the handler's state byte
+(`+0x5` -> `+0x144`). 13/6's points come from the game's global object through `0x005c34c0`
+and its tables `0x00c4d890`, `0x00c4da20` and `0x00c4dbe0` are the source's data, which the
+port does not carry.
+
+**The engine calls this slice adds**, each the MH4U counterpart at the same point:
+
+| MH4U | 3U | What |
+|---|---|---|
+| `0x0094e318` | `0x00828828` | start a motion; the source's r2 is the speed in `s0`, and its r3 (0x1e for 13/6's motion 0xc8) is the start frame, passed in `s1`; MH4U's own 13/6 passes its start frame there too |
+| `0x0093d870` | `0x00852324` | 13/6's action data float |
+| `0x0092e99c` | `0x00844124` | 13/6's fall |
+| `0x0091aae4` | `0x0083336c` | 13/5's twelve queries and 13/6's four |
+| `0x00914dc4` | `0x00844a38` | 13/6's (0, 0x17) tail, r3 = 0 |
+| `0x009167b4` | `0x0082fe88` | 13/5's mode 0 |
+
+**What it does not carry.** All of it is #55-blocked and named once in the log:
+
+- **13/5's effects.** `0x0016052c` is the uEffect039 spawn (MH4U has no uEffect039 class) and
+  `0x0016669c` its type-9 factory, whose MH4U argument differs; `0x00847798` gates four of the
+  spawns and needs an MH4U trace. The port takes its result as 0 and skips the spawns, as
+  category 1 does; decision 0015 leaves the source's effects to #259.
+- **13/6's aim helpers and gate.** `0x005bf66c`, `0x005bf77c`, `0x005bf7bc`, `0x005c0614`,
+  `0x005c34c0`, `0x005c3f88`, `0x005c6938` and `0x005c7270` are the eight uEnemy/uEm024
+  helpers in reference/README.md's "The 28 with no MH4U counterpart". The port names them and
+  takes `0x005c6938`'s result as 0, so 13/6 plays its first motion and stops at the first gate
+  until #55 traces the helpers. The fake-host test writes the state byte for the states the
+  gate would reach, so their bodies are still checked for their calls and frame values.
+- **The issue's call list.** The issue names `0x0016052c` and `0x00847798` for both units; the
+  source's 13/6 calls neither. They are 13/5's, and 13/6's blocked calls are the eight above;
+  the self-test records the distinction.
+
+The family's fake-host test is `tests/rathian-3u/cat13b.c`. The module's ready line sums the
+families' counts — `ready: translating 163 of 3U Rathian's 191 actions on monster 125` with
+cat0, cat1, cat2/9, cat3, cat3b, cat7a, cat7b, cat7c, cat8, cat11, cat13a and this
+slice — and the family's self-test logs the two
+units and the blocked calls. The 125 quest's run reuses check T1c; the per-move rows are
+#116's.
 
 ## What it hooks
 

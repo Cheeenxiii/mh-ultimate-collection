@@ -468,7 +468,18 @@ name each unit's calls and the #55 calls it leaves out.
 | 13/3 | 0x0068f424 | the 300.0/38.0 aim, the 12.0/50.0 query and the 38 - (speed - 12) range, the 0.5 move, motion 0xca at 4.0; the action-start record 0x00b0b0e8 is not carried and the target loop ends in 2/6 |
 | 13/4 | 0x0068f66c | motion 0xcb at 4.0 and the 4.0 timer, then the timer crossing test and the 1000/200 order step into 13/2; 0x0085162c and 0x00829620 are blocked (#55) |
 
-Status: not done. These five rows wait for #49, #105 and the quest load (#144), like the rows
+Category 13's second slice ([#228](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/228))
+runs her own handlers for two more of them; the runtime's
+[README](../mods/uc_runtime/README.md#3u-rathians-module-category-13-part-2) and the
+[reference](../reference/README.md#category-13-part-2-228-the-two-units-and-what-is-blocked)
+name each unit's calls and the #55 calls it leaves out.
+
+| 3U id | Handler unit | What to watch |
+|---|---|---|
+| 13/5 | 0x0068f818 | motion 0x13 at 6.0 and the mode 0 setup, then the twelve 92/262/96/136-152/156/190/386/344-368/398-426/434/458-478 queries and the effect spawns; the effects are blocked (#55), so the move plays without them |
+| 13/6 | 0x0068fcc0 | motion 0x1a at 0.0 after the data float and the fall; the later motions and the aim helpers are behind the blocked 0x005c6938 gate, so in game it stops after the first motion until #55 traces the helpers |
+
+Status: not done. These seven rows wait for #49, #105 and the quest load (#144), like the rows
 above; the module's self-test names the units and the blocked calls.
 
 The second category-7 slice's ids ([#222](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/222))
@@ -1541,13 +1552,14 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 56 of GU Rathian's 301 actions on monster 124`; the 3U module's
-is `ready: translating 161 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
-#218, #219, #220, #221, #222, #223, #225 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's
-`selftest: 15 of the 191 actions`, cat2_9's `selftest: 19 of the 191 actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's
-`selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191 actions`, cat7b's
-`selftest: 22 of the 191 actions`, cat13a's `selftest: 5 of the 191 actions`, cat8's
-`selftest: 1 of the 191 actions`, cat11's `selftest: 5 of the 191 actions` and cat7c's
-`selftest: 36 of the 191 actions`, and the families' `field map anchors`/`selftest: open:`/
+is `ready: translating 163 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#218, #219, #220, #221, #222, #223, #225, #227 and #228), with cat0's `selftest: 6 of the 191
+actions`, cat1's `selftest: 15 of the 191 actions`, cat2_9's `selftest: 19 of the 191
+actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's `selftest: 16 of the 191 actions`,
+cat7a's `selftest: 21 of the 191 actions`, cat7b's `selftest: 22 of the 191 actions`,
+cat13a's `selftest: 5 of the 191 actions`, cat8's `selftest: 1 of the 191 actions`, cat11's
+`selftest: 5 of the 191 actions`, cat7c's `selftest: 36 of the 191 actions` and cat13b's
+`selftest: 2 of the 191 actions`, and the families' `field map anchors`/`selftest: open:`/
 `selftest: blocked:` lines.
 The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
@@ -1653,6 +1665,14 @@ of 301), cat0's `selftest: 6 of the 191 actions` and cat2_9's `selftest: 19 of t
 actions`, `selftest: field map anchors` and the families' `selftest: open:` lines, then quest
 10212's `id 125 -> stand-in 1 marked present` and `data resource: id 125 -> its own archive`.
 The profile's plugin list names only `UC runtime`.
+
+The 3U module's run after #228 (2026-11-26, USA v1.3.0, the session's shared code library,
+`--ms 5000`, `selftest = 1`): pass, exit 0. The log has `ready: translating 163 of 3U
+Rathian's 191 actions on monster 125`, `selftest: 12 family file(s) discovered from
+src/monsters/rathian-3u/`, cat13b's `selftest: 2 of the 191 actions: 13/5 <- 0x0068f818 ...
+13/6 <- 0x0068fcc0 ...`, its field-map line (`+0x5 -> +0x144 only`) and its blocked-calls
+line naming 13/5's `0x0016052c`/`0x0016669c`/`0x00847798` and 13/6's eight `0x5bf`/`0x5c`
+helpers, then the id layer's `id 125 -> 1 ... ids 0..123 pass through` lines.
 
 ## Floats through a guest stub (T0)
 
