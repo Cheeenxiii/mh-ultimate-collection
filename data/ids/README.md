@@ -69,12 +69,13 @@ group of paths in the record:
 | `tail` | the tail model | yes | yes | no | no |
 | `mef` | the motion effects | no | no | no | no |
 | `sound` | the sound: the call (`sound\call\em\emNNN`) and the waves, bank and request it names | no | yes | no | no |
-| `cmd` | the command/EMC | yes | yes, converted from MH3U's EMC ([specs/emc.md](../../specs/emc.md), check A5) | no | no |
+| `cmd` | the command/EMC | no, until MHXX's EMC converter ships | yes, converted from MH3U's EMC ([specs/emc.md](../../specs/emc.md), check A5) | no | no |
 | `efl` | the effect lists | no | no | no | no |
 
-124's `em124.arc` holds the model, five motion lists, her converted MHXX camera, the tail and
-the command; 125's holds the model, three motion lists, the tail, its converted sound set and
-her command converted from MH3U's EMC
+124's `em124.arc` holds the model, five motion lists, her converted MHXX camera and the tail;
+its command stays MH4U's until MHXX's EMC converts (P4: an as-is MHXX EMC in 124's record hung
+the quest load). 125's holds the model, three motion lists, the tail, its converted sound set
+and her command converted from MH3U's EMC
 ([specs/emc.md](../../specs/emc.md#what-a-converter-must-do), check A5), so her record names
 her own script path; 126's holds
 the model and four motion lists, borrowed from MHXX's em014 (Velocidrome) and shipped at the
@@ -191,7 +192,7 @@ the game reads it.
 
 | Id | Key | Content | Stand-in | Ships |
 |---|---|---|---|---|
-| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=0-4, camera, tail, cmd |
+| 124 | `rathian-gu` | Rathian, ported from MHXX (GU) | MH4U Rathian (1) | model, motions=0-4, camera, tail |
 | 125 | `rathian-3u` | Rathian, ported from MH3U | MH4U Rathian (1) | model, motions=0-2, tail, cmd, sound |
 | 126 | `giadrome-gu` | Giadrome, ported from MHXX (GU) | MH4U Great Jaggi (15) | model, motions=0,2,3,4 |
 | 127 | `great-wroggi-3u` | Great Wroggi, ported from MH3U | MH4U Great Jaggi (15) | model, motions=0-2 |
