@@ -57,7 +57,8 @@ The blocks tile the 81,400 bytes exactly:
 | 0x0000 | 0x40 bytes | profile (table below) | verified | mh4edit; checks S2, S3 |
 | 0x0040 | 7 × 28 bytes | the seven worn equipment records, in the order weapon, chest, arms, waist, legs, head, talisman | verified | mh4edit; check S3 |
 | 0x0104 | 7 × u16 | the equipment-box slot each worn piece comes from (`0xFFFF` = none) | verified | mh4edit; check S3 |
-| 0x0112 | 0x4C bytes | unknown | unknown | ours; non-zero in the maintainer's saves |
+| 0x0112 | 12 bytes | unknown; differs between character saves, written when a character is created | unknown | ours; check S8 |
+| 0x011E | 64 bytes | 512 flag bits, bit 0 the low bit of the first byte; what the bits index is unknown ("Quest clear lists") | unverified | ours; checks S8 |
 | 0x015E | 1,400 × 4 bytes | item box (table below) | verified | mh4edit; checks S3, S6 |
 | 0x173E | 1,400 × 28 bytes | equipment box (table below) | verified | mh4edit; check S3 |
 | 0xB05E | 0xAE6 bytes | unknown; all zero in the maintainer's saves | unknown | ours |
@@ -236,20 +237,40 @@ named are both ruled out:
   in a completed save and the mid-game one (762 and 765 of 2,456), so the block as a whole does not move
   with progress.
 
-The strongest remaining candidate is a 512-bit field at 0x11E (64 bytes, after a 12-byte header in the
-0x0112 block): both completed saves set all 512 bits and the mid-game save sets 51. If those bits were
-read as the village quest list in id order, the 51 would be low-rank village quests, advanced quests and
-a few event quests, which is the shape of a partly played village, but the game's quest table is not in
-the save and no check proves the order the bits index. The candidate is therefore **unknown**, and
-`mhuc save dump` reports its set bits as indices, not as quests.
+Two fields follow the equipped gear: 12 bytes at 0x0112, then 64 bytes at 0x011E. They are two fields, not
+one 76-byte block: both completed saves set all 512 bits of the 64-byte field and their 64 bytes are
+identical (all 0xFF), while their 12-byte prefixes differ in 11 of the 12 bytes (check S8). The 64 bytes
+are a flag array, bit 0 the low bit of 0x11E and bit 511 the high bit of 0x15D: the game's code reads and
+writes single bits at 0x11E, and its character-creation routine clears the 64 bytes with a 64-byte memset and
+then sets one bit for every index in a byte list (the routine at image VA 0xc1f4bc; a code read, not a
+file check). What the indices mean is still **unknown**.
+
+The completed saves set all 512 bits and the mid-game save sets 51, all below index 149. The game's own
+quest lists are in its image, not in the save: the base arc's 207 quest ids in menu order, the update
+arc's 301 ids, a 93-id low-rank village list, a 79-id high-rank village list and the 16 arena ids.
+Reading the 51 bits as positions in each of those lists was tried; the village orders give plausible
+early-village sets, but nothing selects one order. Every list is shorter than 512 and a completed save
+sets every bit, not only a list's entries, so a set bit alone does not name a quest. The mid-game
+character also has hall clears (the seven counts: 123 low-rank, 142 high-rank and 218 G-rank completions)
+while all its bits lie below 149; if the field indexed the base and update lists in the order they sit in
+the image (the 207 base ids first), those hall clears would need bits at 207 or above, and there are none.
+Every 2-byte offset in the 500 `.mib` quests was compared with the quests' positions in those lists, and
+no field carries the index. The field is therefore a flag array whose indexing is unknown (story flags,
+titles and the guild card are open candidates), and it is **not proved** to be the clear list.
+
+`mhuc save dump` reports the field's set bits as indices, never as quests, and leaves the 12-byte prefix
+to the unmapped-block listing.
 
 Searched, and no layout found: mh4edit's source (profile, boxes, guild quests and Palicos only), the MH4G
 save-editor wiki's pages, MHTrIDA's save notes (its MH3 save doc leaves "Quest Completed" as TODO), the
 MH4U save editors on GitHub (mh4u-toolbox, Dsya's editor), and the MH4G cheat-code pages, whose
 story-complete code patches functions rather than save flags. Those pages do give the running game's
 memory map, and it matches the save's known offsets (name at base+0x00, item box at +0x15E, equipment box
-at +0x173E, guild quests at +0xDCA8, all checked in S8), so a later session with a running game can look
-for the clear-list reader by its save offset.
+at +0x173E, guild quests at +0xDCA8, all checked in S8). This session added the game's own side: the quest
+lists in the image (above), every `.mib` offset against their positions, and the save-creation code that
+sets the flag array bit by bit. None of them names the array's indices, and no save with a single known
+quest clear was available; a later session with a running game can change one quest's state and diff the
+save, which is the procedure that would settle it.
 
 ## System save
 
@@ -372,8 +393,12 @@ repeatable on any player's saves.
      (762 and 765 of 2,456), so it is not the clear list;
   4. the 512 bits at 0x11E are all set in both completed saves, the mid-game save sets 51, and its 51 are
      contained in a completed save's. Those 51 stay unproved as quests, so the clear list is marked
-     unknown rather than verified.
-  `tests/test_with_game_files.py` runs check 1 and the candidate's bit count. The memory map the MH4G
+     unknown rather than verified;
+  5. the 12 bytes at 0x112 and the 64 at 0x11E are two fields: the two completed saves' 64-byte blocks are
+     byte-identical and all set, while their 12-byte prefixes differ in 11 of the 12 bytes, and the mid-game
+     save's 64 bytes are a subset of a completed save's. The save-creation code's bit-by-bit writes at
+     0x11E (read at image VA 0xc1f4bc) are why the spec calls the 64 bytes a flag array, not quests.
+  `tests/test_with_game_files.py` runs checks 1, 4 and 5. The memory map the MH4G
   cheat pages give matches the
   save's known offsets (name, item box, equipment box and guild quests are the save offsets plus one base
   address), which is the lead a later session can follow to the reader that consumes 0x11E.

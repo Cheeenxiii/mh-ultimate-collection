@@ -88,6 +88,19 @@ def test_character_save_slices_read_the_values_at_the_spec_offsets():
     assert save.character_problems(data) == []
 
 
+def test_the_quest_flags_are_the_64_bytes_at_0x11e_and_the_12_bytes_before_them_are_separate():
+    data = character_save()
+    data[save.QUEST_FLAGS_PREFIX_AT:save.QUEST_FLAGS_AT] = b"\xff" * 12
+    data[save.QUEST_FLAGS_AT] = 0x01                  # bit 0, the low bit of the first byte
+    data[save.QUEST_FLAGS_AT + save.QUEST_FLAGS_SIZE - 1] = 0x80   # bit 511, the high bit of the last
+    assert save.quest_lists(data)["candidate_clear_flags"]["indices"] == [0, 10, 511]
+    blocks = {name: (offset, size) for name, offset, size in save.BLOCKS}
+    assert blocks["unknown_0x0112"] == (0x0112, 12)
+    assert blocks["quest_flags"] == (0x011E, 64)
+    prefix = next(b for b in save.unmapped_blocks(data) if b["name"] == "unknown_0x0112")
+    assert prefix["nonzero_bytes"] == 12, "the 12-byte prefix is not part of the 512 flag bits"
+
+
 def test_character_save_problems_name_the_slot_that_breaks_the_bound():
     data = character_save()
     struct.pack_into("<H", data, 0x15E + 2, 100)
