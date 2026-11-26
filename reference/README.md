@@ -695,14 +695,82 @@ position, heading, point and speed rows above; what they add:
 - **work+0x140** (a u16, category 7): `0x00694f4c` copies it into the target-line
   struct's +0x6a on the 7/80-family state 1; no pair reads it and MH4U's own handler
   (`0x006e09a0`) has no such step, so the copy is left out.
-- **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where. Category 3's 3/5 handler takes +0x27c (its pair's `0x6d6560`); a category-7 slice still has to say.
+- **work+0x2b6**: the pairs divide between MH4U's +0x278 and +0x27c; the two MH4U bytes are the hit check's part pair, so a slice has to say which one the port passes where. Category 3's 3/5 handler takes +0x27c (its pair's `0x6d6560`); category 2 and 9's 9/0 and 9/1 take +0x278 (#218); which byte really replies is still unverified.
 - **work+0x11c** (category 3, "the fall or hold step is enabled"): MH4U's counterpart function tests two flags instead (+0x620 and +0x628); which of them replies to +0x11c is unsettled.
 - **work+0x1c, +0xda, +0xaea** (category 13) and **work+0x1** (one pair, category 11, proposes +0x1c8): no confirmed MH4U offset. (`work+0x2a8` was on this list; category 7's first slice found it at MH4U's `+0x238`, above.) +0xda indexes a `uCharacter` table through 0x00a347bc, which has no MH4U counterpart (see [The 28 with no MH4U counterpart](#the-28-with-no-mh4u-counterpart)).
 - **this+0x1a64** (a float the category-11 handler reads, 0x1c bytes past the block pointer), and **this+0x1ed0** as a field of its own rather than the target-line struct's +0x60: unverified.
-- **The categories without pairs:** category 4 (1 id) and category 10 (8 ids). Category 0 (1 of 5 ids), 11 (2 of 5), 1 (11 of 12), 2 (10 of 11) and 13 (8 of 10) are partly covered.
+- **The categories without pairs:** category 4 (1 id) and category 10 (8 ids). Category 0 (1 of 5 ids), 11 (2 of 5), 1 (11 of 12) and 13 (8 of 10) are partly covered; category 2 and 9's handlers are covered by #218's six pairs (all 19 ids).
 - **A handler with no pair** is not evidence of a difference: an inline MH4U case (0/0, 0/1, 0/3) or a different unit leaves nothing to align, and the field still has to be read in the slice.
 
 The map extends per slice: a category's slice adds its rows here with the same three sources and its pair count.
+
+#### Category 2 and 9: the units, the calls and what is blocked (#218)
+
+Categories 2 and 9's nineteen ids run on six handler units and four inline case blocks. The
+units, their ids, and the frame values the port keeps:
+
+| Unit | Ids | What it runs |
+|---|---|---|
+| `0x00690e28` | 2/0, 2/7, 2/9, 2/11 | two states: mode 0, the sub's -500.0/0.0 decel (sub 2 adds the 700.0 clamp), motion `0x6` at 6.0; then the `0x8438e8` test and 0/2's base handler. 2/11 adds the `0x83d18c` mark at the entry. |
+| `0x00690f28` | 2/3, 2/8, 2/10 | the same shape with motion `0x7` at 10.0. |
+| `0x00687398` | 2/4, 2/5, 2/6, 9/3, 9/4 | six states on motions `0xd6` (4.0), `0xd7` (0.0), `0x1b` (6.0 then 0.0), `0xd8` (6.0) and `0xd9` (0.0), with mode 3, the 50.0 speed, `0x839968`, the turn step and the 0.5 float. 2/5's r1 = 1 ends in 0/6's base handler; the others walk the sub-states into 0/2's. |
+| `0x00691020` | 9/0 | two states: mode 0 and motion `0xca` at 4.0; then the finish flag and the hit/counter checks, whose source tail is 2/6. |
+| `0x0069119c` | 9/1 | mode 0, motion `0xcb` at 4.0 and the kind/tail-flag `0x844a38` step; then motion `0xca` and the same checks and tail as 9/0. |
+| `0x00691384` | 9/2 | three states on motion `0xcd` (6.0), then the data float, the fall, `0xce` (0.0), the two `0x844a38` steps, the sub-state turn and `0xcf` (0.0), then 0/2. |
+| inline blocks | 2/1, 2/2, 2/12, 2/13 | state 1, mode 0 and `0x82d278`'s data setup; then the kind test, `0x83cbfc`'s 1.1 and `0x82d430`'s guard into 0/2. 2/12 and 2/13 add the `0x83d18c` mark every frame. |
+
+The field map adds: `+0x2a8` -> `+0x238` (the category-2 clamp; the `0x00690e28`/`0x006dc694`
+and `0x00690f28`/`0x006dc984` pairs), `+0x268` -> `+0x168` and `+0x278` -> `+0x178` (the
+floats the `0x00687398`/`0x006ea05c` and `0x00691384`/`0x006dcfcc` pairs store), `+0x264` ->
+`+0x164` (9/2's first float), and `+0x7eb` -> `+0x3e3` (the mark). `+0x2b6` (the part byte
+9/0 and 9/1 pass to the hit check) is taken as MH4U's `+0x278`; `+0x27c` is the other
+candidate and the choice is unverified.
+
+The engine calls the slice adds to the map, each the counterpart of the source's:
+
+| MH3U | MH4U | What |
+|---|---|---|
+| `0x008437f4` | `0x0092dc50` | the decel/position step from s0 |
+| `0x008438e8` | `0x0092dccc` | the completion/setup test |
+| `0x0083d18c` | `0x00922ca0` | the entry mark |
+| `0x008357b0` | `0x0091db4c` | the forced target step |
+| `0x00833d88` | `0x00916108` | set the speed to s0 |
+| `0x00839968` | `0x0096e164` | a data/effect step |
+| `0x0083c6e0` | `0x00922250` | a per-monster float from a table |
+| `0x0082cee4` | `0x00912288` | advance a point by s0 |
+| `0x00834098` | `0x00911090` | the turn/aim step |
+| `0x0083336c` | `0x0091aae4` | per-mode distance/speed |
+| `0x0083369c` | `0x00942220` | the state gate |
+| `0x00838c28` | `0x0091a84c` | a bit-mask test |
+| `0x00844a38` | `0x00914dc4` | an action/motion table step |
+| `0x00839ea0`, `0x00839514` | `0x0091b430` | the turn-and-advance wrapper |
+| `0x0083cbfc` | `0x00922c40` | the 1.1 float the inline blocks apply |
+
+**What is still blocked.** The slice names each of these once in the module's log and skips
+it; the action plays with the step missing, and where the missing call is a guard the
+source's continuation is taken so the action resolves:
+
+| Source call | Ids | Why |
+|---|---|---|
+| `0x00853c70` | 9/0, 9/1 | #55: sets the halfword at +0x89c to 2 |
+| `0x00839598` | 9/0, 9/1 | #55: the signed byte at +0xef |
+| `0x0084512c` | 9/0, 9/1 | #55: the hit check |
+| `0x00829620` | 9/2 | #55: the per-frame action-table walk |
+| `0x00257628` | 9/2 | #55: the byte at +0x1c8 of the object at +0x14 |
+| `0x0083c6cc` | 9/2, `0x00687398` | #55: the float at this+0x284 times a constant |
+| `0x0083c6e0`'s argument, `0x00c4ee70` | 9/2, `0x00687398` | MH3U's own data table; the port carries no table yet |
+| `0x0082d430`'s argument, `0x00b0b068`/`0x00b0b0a8` | 2/1, 2/2, 2/12, 2/13 | MH3U's own action data; the port carries no table yet |
+| `0x0082d278`'s argument, `0x00b0b068`/`0x00b0b0a8` | 2/1, 2/2, 2/12, 2/13 | the same |
+| `0x00688a20`, `0x00688870` (and `0x00199d00`, `0x00829950`, `0x0063cabc`) | 9/3, 9/4 | her own effect setup; MH4U's paired handler spawns a shell instead and no counterpart for these helpers was found |
+
+`0x00687398`'s effect branch (9/3 and 9/4's r2 = 1 and 3) is the largest gap: the check
+before it is the mapped `0x0083336c`, but the setup after it has no counterpart. 2/4, 2/5,
+2/6 and the rest of 9/3 and 9/4's states are carried.
+
+One small detail: 9/2's turn wrapper `0x00839ea0`/`0x00839514` gives its first callee
+`s1 = 1.0` and its tail `s17` (the data float). MH4U's single `0x0091b430` counterpart takes
+one float, so the port passes `s17` in `s0` and `1.0` in `s1`; whether the counterpart reads
+`s1` is unverified.
 
 ### A 3U Rathian's moves
 

@@ -45,6 +45,7 @@ that held them before.
 | `src/monsters/rathian-3u.c` | 3U Rathian's module: the shared entry (the factory association's dispatch, the pending log, the ready line and the self-test) and the loop over the generated family list |
 | `src/monsters/rathian-3u/family.h` | the family interface: `MhucFamily` (a name, the ids it carries, a dispatch entry, a self-test) and the three base handlers `cat0.c` exports for the slices that reuse them |
 | `src/monsters/rathian-3u/cat0.c` | category 0's family: `0/0`, `0/1`, `0/2`, `0/3`, `0/4`, `0/6` and the three base handlers they reach, the first slice of her 191 ids |
+| `src/monsters/rathian-3u/cat2_9.c` | categories 2 and 9's family: the nineteen ids `2/0` to `2/13` and `9/0` to `9/4` on six handler units and four inline case blocks, the second slice |
 | `src/monsters/rathian-3u/cat1.c` | category 1's family: `1/0` to `1/14`, its five handler units and four inline blocks; it reuses `cat0.c`'s `mhuc_3u_base_0_2` for 1/10 |
 | `src/monsters/rathian-3u/cat3b.c` | category 3's part 2's family: `3/6`, `3/7`, `3/8`, `3/12`, `3/13`, `3/16` to `3/21`, `3/24`, `3/25`, `3/27` to `3/29`, and 3/8's base-class handler (#220) |
 | `src/monsters/rathian-3u/cat7a.c` | category 7's first family (#221): `7/0`, `7/1`, `7/2`, `7/4`, `7/5`, `7/6`, `7/7`, `7/8`, `7/10`, `7/11`, `7/12`, `7/15`, `7/16`, `7/19`, `7/20`, `7/32`, `7/34`, `7/42`, `7/61`, `7/77`, `7/85`, and the calls still blocked |
@@ -56,6 +57,7 @@ that held them before.
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
 | `tests/rathian-3u/host.h` | what the 3U module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-3u/cat0.c` | category 0's fake-host test: its six ids' and three base handlers' call sequences; `make test` discovers it and builds `tests/family-cat0` |
+| `tests/rathian-3u/cat2_9.c` | categories 2 and 9's fake-host test: the nineteen ids' call sequences and the named blocked calls; builds `tests/family-cat2_9` |
 | `tests/rathian-3u/cat1.c` | category 1's fake-host test: its fifteen ids' states, call sequences and frame values; `make test` discovers it and builds `tests/family-cat1` |
 | `tests/rathian-3u/cat3b.c` | category 3's part 2's fake-host test: the sixteen ids' frames and call order and the two blocked calls' log lines; `make test` builds `tests/family-cat3b` |
 | `tests/rathian-3u/cat7a.c` | category 7 part 1's fake-host test: every id's and variant's call sequence; `make test` discovers it and builds `tests/family-cat7a` |
@@ -630,10 +632,9 @@ Three things are not translated yet:
 - **0/0's second delay field.** The source keeps the old delay at `+0x2c`; MH4U's countdown
   worker keeps one value, so the port keeps `+0x1d4` only.
 
-The module's ready line sums the families' `translated` counts: `ready: translating 6 of 3U
-Rathian's 191 actions on monster 125` after #216, 22 after #220, 37 after #217, 58 after
-#221, 63 after #227, 85 after #222, 100 after #219 and 106 after #225. Its self-test logs
-families' ids, engine calls and open items. The 125 quest's run is check T1c.
+The module's ready line sums the families' `translated` counts: after #218 it is `ready:
+translating 125 of 3U Rathian's 191 actions on monster 125`. Its self-test logs families'
+ids, engine calls and open items. The 125 quest's run is check T1c.
 
 #### Category 3's part 1 (#219)
 
@@ -1031,6 +1032,43 @@ The module's ready line sums the families' counts — `ready: translating 85 of 
 191 actions on monster 125` — and the family's self-test logs the five units, the field
 rows this slice reads and the calls still blocked.
 
+### 3U Rathian's module: categories 2 and 9
+
+The second family, [#218](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/218),
+adds the nineteen ids 2/0 to 2/13 and 9/0 to 9/4 in `cat2_9.c`. Six handler units and four
+inline case blocks run them:
+
+| Unit | Ids | What the module runs |
+|---|---|---|
+| `0x00690e28` | 2/0, 2/7, 2/9, 2/11 | mode 0, the sub's -500.0/0.0 decel (sub 2 adds the 700.0 clamp), the motion 6 request at 6.0; then the `0x8438e8` completion test and 0/2's base handler. 2/11 adds the `0x83d18c` mark. |
+| `0x00690f28` | 2/3, 2/8, 2/10 | the same shape with motion 7 at 10.0. |
+| `0x00687398` | 2/4, 2/5, 2/6, 9/3, 9/4 | six states on motions `0xd6` (4.0), `0xd7` (0.0), `0x1b` (6.0 then 0.0), `0xd8` (6.0) and `0xd9` (0.0), with mode 3, the 50.0 speed, `0x839968`, the turn step and the 0.5 float; 2/5 ends in 0/6's base handler, the others in 0/2's. |
+| `0x00691020` | 9/0 | mode 0 and motion `0xca` at 4.0; then the finish flag and the hit/counter checks, whose source tail is 2/6. |
+| `0x0069119c` | 9/1 | mode 0, motion `0xcb` at 4.0 and the kind/tail-flag `0x844a38` step; then motion `0xca` and the same checks and tail as 9/0. |
+| `0x00691384` | 9/2 | three states on motion `0xcd` (6.0), the data float, the fall, `0xce` (0.0), the two `0x844a38` steps, the turn states and `0xcf` (0.0), then 0/2. |
+| inline blocks | 2/1, 2/2, 2/12, 2/13 | mode 0 and `0x82d278`'s data setup; then the kind test, `0x83cbfc`'s 1.1 and `0x82d430`'s guard into 0/2. 2/12 and 2/13 add the `0x83d18c` mark every frame. |
+
+The motion numbers are MH4U's form: the source's `0xca`-`0xd9` are file 2's slots 2-17, so
+they are `MHUC_MOTION(2, 2)` to `MHUC_MOTION(2, 17)`, and `0x6`, `0x7` and `0x1b` stay file
+0. The field map and the call map are in
+[reference/README.md](../../reference/README.md#category-2-and-9-the-units-the-calls-and-what-is-blocked-218).
+
+**What is still blocked.** The module names each of these once in its log and skips it; the
+action plays with the step missing, and where the missing call is a guard the source's
+continuation is taken:
+
+- **#55:** `0x00853c70`, `0x00839598` and `0x0084512c` (9/0, 9/1), `0x00829620` and
+  `0x00257628` (9/2), and `0x0083c6cc` (9/2 and `0x00687398`).
+- **MH3U's own data:** `0x0083c6e0`'s table (`0x00c4ee70`/`0x00c4ee30`) in 9/2 and
+  `0x00687398`, and `0x0082d430`'s and `0x0082d278`'s action data (`0x00b0b068`/`0x00b0b0a8`)
+  in 2/1, 2/2, 2/12 and 2/13. The port carries no MH3U table yet.
+- **9/3 and 9/4's effect setup:** `0x00688a20` and `0x00688870`, with their `0x00199d00`,
+  `0x00829950` and `0x0063cabc` callees. The check before the branch (`0x0083336c`) is
+  translated; the setup after it has no MH4U counterpart. The rest of their states play.
+
+The module's ready line counts every family: `ready: translating 104 of 3U Rathian's 191
+actions on monster 125`.
+
 ## What it hooks
 
 | Table | Address | Reader hooked | Id where |
@@ -1300,10 +1338,10 @@ the source game's notes, Japanese until MHGU's English text is read.
   301: the twelve MHXX-only ids and the shared categories 1 and 2 (#273). 12/0 and the shared
   ids of categories 3, 7, 9 (except 9/3 and 9/4), 10, 11, 12 and 13 still run MH4U's
   dispatcher.
-- **The rest of the 3U module's 191 ids.** Only category 0 (six ids), category 1 (fifteen ids),
-  category 3's part 2 (sixteen ids), category 7's part 1 (twenty-one ids), category 13's part
-  1 (five ids), category 3's part 1 (fifteen ids) and category 0's three base handlers run;
-  the other 113 ids are still owed, one family per slice
+- **The rest of the 3U module's 191 ids.** Category 0 (six ids), category 1 (fifteen ids),
+  categories 2 and 9 (nineteen ids), category 3's two parts (thirty-one ids), category 7's two
+  parts (forty-three ids), category 13's first part (five ids) and category 8 and 11 (six ids)
+  run: 125 of the 191. The other 66 ids are still owed, one family per slice
   ([#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217) to
   [#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229)) and action 4's
   ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)). An id this slice

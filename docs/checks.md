@@ -506,6 +506,36 @@ self-test and the runtime's README.
 Status: not done. These 22 rows wait for the same load as the 3U rows above; the module's
 self-test names the five units and the calls still blocked.
 
+The shared ids #218 marks translated have the rows below. Their handlers are in the 3U
+module's `cat2_9.c`, and the frame values, the call map and the blocked calls are in
+[reference/README.md](../reference/README.md#category-2-and-9-the-units-the-calls-and-what-is-blocked-218).
+What to watch besides the motion and the timing: 9/0 and 9/1 should continue into 2/6 (the
+source's own fallback) while their #55 checks cannot answer; 9/3 and 9/4 should play without
+the effect/projectile their skipped setup would spawn; 2/1, 2/2, 2/12 and 2/13 should still
+resolve into 0/2.
+
+| 3U id | status |
+|---|---|
+| 2/0 | not done |
+| 2/1 | not done |
+| 2/2 | not done |
+| 2/3 | not done |
+| 2/4 | not done |
+| 2/5 | not done |
+| 2/6 | not done |
+| 2/7 | not done |
+| 2/8 | not done |
+| 2/9 | not done |
+| 2/10 | not done |
+| 2/11 | not done |
+| 2/12 | not done |
+| 2/13 | not done |
+| 9/0 | not done |
+| 9/1 | not done |
+| 9/2 | not done |
+| 9/3 | not done |
+| 9/4 | not done |
+
 Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
 translates it, and the other sixteen's counterparts are in the reference page.
 
@@ -1462,9 +1492,9 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 56 of GU Rathian's 301 actions on monster 124`; the 3U module's
-is `ready: translating 106 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
-#219, #220, #221, #222, #227 and #225), with cat0's `selftest: 6 of the 191 actions`, cat1's
-`selftest: 15 of the 191 actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's
+is `ready: translating 125 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#218, #219, #220, #221, #222, #227 and #225), with cat0's `selftest: 6 of the 191 actions`, cat1's
+`selftest: 15 of the 191 actions`, cat2_9's `selftest: 19 of the 191 actions`, cat3's `selftest: 15 of the 191 actions`, cat3b's
 `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191 actions`, cat7b's
 `selftest: 22 of the 191 actions`, cat13a's `selftest: 5 of the 191 actions`, cat8's
 `selftest: 1 of the 191 actions` and cat11's `selftest: 5 of the 191 actions`, and the
@@ -1551,6 +1581,16 @@ files.
 The new families' handlers are T1b's and the self-test runs on the first frame, so a boot run
 exercises the lines; the 125 quest route is #216's.
 
+
+The category 2 and 9 slice (#218) was run on the tree with the other 3U slices merged
+(2026-11-26, USA v1.3.0, the session's shared code library, the 125 quest's route,
+`--ms 150000`, `selftest = 1`): pass, exit 0. The log has `ready: translating 125 of 3U
+Rathian's 191 actions on monster 125` (the GU module's line there was still `12 of 13`;
+[#273](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/273) later raises it to 56
+of 301), cat0's `selftest: 6 of the 191 actions` and cat2_9's `selftest: 19 of the 191
+actions`, `selftest: field map anchors` and the families' `selftest: open:` lines, then quest
+10212's `id 125 -> stand-in 1 marked present` and `data resource: id 125 -> its own archive`.
+The profile's plugin list names only `UC runtime`.
 
 ## Floats through a guest stub (T0)
 
