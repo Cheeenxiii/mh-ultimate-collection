@@ -418,6 +418,41 @@ name each unit's calls and the #55 calls it leaves out.
 Status: not done. These five rows wait for #49, #105 and the quest load (#144), like the rows
 above; the module's self-test names the units and the blocked calls.
 
+The second category-7 slice's ids ([#222](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/222))
+have their own rows. They share an MH4U action, so the reference's counterpart handler for the
+same id is the comparison; under decision 0002's amendment the port still runs her own handler,
+and the motion it starts is her converted animation, not MH4U's index. The blocked calls
+(`0x00842a7c`, the source's speed curve and its effect spawn) are named in the family's
+self-test and the runtime's README.
+
+| 3U id | status |
+|---|---|
+| 7/3 | not done |
+| 7/9 | not done |
+| 7/13 | not done |
+| 7/14 | not done |
+| 7/17 | not done |
+| 7/18 | not done |
+| 7/21 | not done |
+| 7/30 | not done |
+| 7/41 | not done |
+| 7/43 | not done |
+| 7/44 | not done |
+| 7/53 | not done |
+| 7/54 | not done |
+| 7/55 | not done |
+| 7/56 | not done |
+| 7/72 | not done |
+| 7/73 | not done |
+| 7/78 | not done |
+| 7/80 | not done |
+| 7/83 | not done |
+| 7/88 | not done |
+| 7/89 | not done |
+
+Status: not done. These 22 rows wait for the same load as the 3U rows above; the module's
+self-test names the five units and the calls still blocked.
+
 Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
 translates it, and the other sixteen's counterparts are in the reference page.
 
@@ -1266,10 +1301,11 @@ MH4U_FORK=<fork> python3 tools/check_actions.py --game mh3u --exheader <exheader
     --code <code.bin> --dispatcher 0x00687d30 --range 0x686000 0x69b000
 ```
 
-Last result (2026-11-26, issues #216, #217, #220 and #221): pass. 191 actions; blocks
-191/191, handlers 182/191 (the other 9 are inline), first motions 132/191; translated 58
-(category 0's six, category 1's fifteen, category 3's part 2's sixteen and category 7's part
-1's twenty-one), pending 133. Changing a ledger motion makes it exit 1 and name the id.
+Last result (2026-11-26, issues #216, #217, #220, #221, #222 and #227): pass. 191 actions;
+blocks 191/191, handlers 182/191 (the other 9 are inline), first motions 132/191;
+translated 85 (category 0's six, category 1's fifteen, category 3's part 2's sixteen,
+category 7's part 1's twenty-one and part 2's twenty-two, and category 13's part 1's five),
+pending 106. Changing a ledger motion makes it exit 1 and name the id.
 
 
 T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
@@ -1287,7 +1323,7 @@ and re-ran the suite.
 The 3U module's tests are `tests/test_rathian_3u.c` (the shell: the factory association for
 125, the routing, the ready line and the self-test) and one program per action family under
 `tests/rathian-3u/` (category 0's is `cat0.c`, for #216; category 1's `cat1.c`, for #217;
-category 3's part 2 is `cat3b.c`, for #220); `make test` discovers the family tests from the
+category 3's part 2 is `cat3b.c`, for #220; category 7's part 2 is `cat7b.c`, for #222); `make test` discovers the family tests from the
 directory (issue #268). Last result (2026-11-26): pass. The shell test checks that 125 runs the
 module, that an MH4U id and a registered id without a module fall through, that a pair no
 family carries (`15/0`) is logged once and left to MH4U's dispatcher, and the ready and
@@ -1325,11 +1361,11 @@ T1c: a headless run of the code library built with the runtime, with `selftest =
 must have the runtime's ready line, each module's ready and self-test lines and the guest
 stubs' address; the runner must exit 0. The GU module's ready line is
 `ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`; the 3U module's
-is `ready: translating 63 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
-#220, #221 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest: 15 of
-the 191 actions`, cat3b's `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of the 191
-actions`, cat13a's `selftest: 5 of the 191 actions` and the families' `field map anchors`/
-`selftest: open:` lines.
+is `ready: translating 85 of 3U Rathian's 191 actions on monster 125` (after #216, #217,
+#220, #221, #222 and #227), with cat0's `selftest: 6 of the 191 actions`, cat1's `selftest:
+15 of the 191 actions`, cat3b's `selftest: 16 of the 191 actions`, cat7a's `selftest: 21 of
+the 191 actions`, cat13a's `selftest: 5 of the 191 actions`, cat7b's `selftest: 22 of the
+191 actions` and the families' `field map anchors`/`selftest: open:` lines.
 The 3U module's run is the 125 quest's route (the P4/session125 input). The build has to add the runtime's
 `uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
 runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
@@ -1351,15 +1387,14 @@ amendment her own handler runs for every action id, shared ids included, so 12/0
 to keep and the set the self-test counts stays open until the GU module's shared-id work.
 
 The 3U module's run (2026-11-26, USA v1.3.0, the runtime on the session's shared code library,
-the 125 quest's route, `--ms 150000`): pass, exit 0. After #217 the log has `ready:
-translating 21 of 3U Rathian's 191 actions on monster 125`, the `selftest: 6 of the 191
-actions` and `selftest: 15 of the 191 actions` lines, `selftest: field map anchors` and the two
-`selftest: open` lines (the category-1 one naming the blocked effect calls), then quest 10212's
-`id 125 -> stand-in 1 marked present` and `data resource: id 125 -> its own archive`; the
-runtime's own self-test and the GU module's lines are in it too. The earlier #216 run,
-predating #220, logged `ready: translating 6 of 3U Rathian's 191 actions on monster 125` and
-cat0's self-test lines with the same quest lines. A run of the three families together, with
-the 37-id ready line, is still to do.
+the 125 quest's route, `--ms 150000`): the log has `ready: translating 85 of 3U Rathian's
+191 actions on monster 125` (after #216, #217, #220, #221, #222 and #227), the six families'
+`selftest: 6`, `15`, `16`, `21`, `5` and `22 of the 191 actions` lines, `selftest: field map
+anchors` and the families' `selftest: open` lines, then quest 10212's `id 125 -> stand-in 1
+marked present` and `data resource: id 125 -> its own archive`; the runtime's own self-test
+and the GU module's lines are in it too. The runner's exit 0 is the check's pass and is the
+same shutdown the earlier family runs observed; a fresh 85-id run's exit is optional, T1b
+being this slice's proof.
 
 The 3U module's run after #220 (2026-11-26, USA v1.3.0, the session's shared code library, the
 ABI 4 `mh4u_runner` rebuilt from the fork, `--ms 5000`): pass, exit 0. The log has the runtime's
