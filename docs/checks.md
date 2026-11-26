@@ -744,6 +744,41 @@ plugin's record built with it (P1), and a quest that spawns the id (#144).
 
 Status: open; waits for #48's port files and #144's quest-load proof.
 
+## A ported effect at the source frame (E1)
+
+A ported monster's motion effects time its visual effects to its own animations. MH4U plays an
+effect when one of a motion's event-block entries fires: the event's remap id selects a record in
+the MEF, and the record names the effect and where it appears ([specs/mef.md](../specs/mef.md)).
+The port has to write both: the source's events into its own motion lists (the source's motion
+lists carry no such ids) and the MEF records keyed to them, from the source game's ESQ (MH3U) or
+PSL (MHXX). This check confirms the timing, which is the part a file check can miss: the source
+event's motion and frame are read and checked against the source's motion list (FX5, FX6), while
+the source's effect parameters and the MEF record's fields are not placed yet, so
+`mhuc convert monster` still refuses an `mef` kind and the row's `files` does not list
+`mef`/`efl` yet.
+
+1. Take MH3U's effect sequence for the monster out of its archive (`effect\esq\em\emNNN`) and its
+   effect lists (`effect\efl\em\emNNN\...`); for MHXX, the motion list's PSL
+   (`effect\psl\enemy\...`) and its lists. The converter will write the source's events into
+   the ported motion lists and a MEF as MH4U reads it, and the effect lists as MH4U's version. Check
+   that the id's row in `data/ids/registry.csv` lists `mef,efl`, regenerate
+   `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
+2. Play an action whose source effect is visible and timed: a fireball or a breath is easiest to
+   time. `mods/force_action` (R1p) plays a chosen action without the AI; the action's handler
+   starts the same animation in both games, so the effect's frame is the frame of that animation.
+   Record the source game's move and the port's move frame by frame (the emulator's frame advance
+   and screen capture, outside the repository), or compare two recordings at the same frame rate.
+3. Pass: the effect first appears on the source game's frame of the same animation — the frame
+   FX5 reads in the source ESQ/PSL, not MH4U's own Rathian's timing — on the same bone and at the
+   same offset and scale, and the P1 log's line for the id names the port's own `mef` paths.
+   Fail: MH4U Rathian's fire, dust or wind (the record kept the stand-in's effect paths and the
+   port ships no `mef`), no effect at all (the ported motion list's event ids don't reach the
+   MEF's keys), or the effect at another frame (the event frame or the source motion's frame
+   count is wrong).
+
+Status: open; waits for the ESQ/PSL to MEF conversion (the source effect parameters and MH4U's
+MEF record fields) and #144's quest-load proof.
+
 ## A ported monster's own voice (A1)
 
 A ported monster's resource record names its sounds by one path, `sound\call\em\emNNN`: the
