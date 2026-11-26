@@ -90,6 +90,7 @@ static const MhucModuleOps *module_of(uint32_t enemy) {
 #define STUB_READ     128u   /* s0-s3 readers, 32 bytes */
 #define STUB_S012     160u   /* s0/s1/s2, 40 bytes */
 #define STUB_SCRATCH  208u   /* 16 bytes of guest memory for a point an engine function fills */
+#define STUB_STACK    224u   /* a fifth argument on the stack, 40 bytes */
 
 static uint32_t stub_block;
 static int stub_failed, stub_logged;
@@ -152,6 +153,29 @@ uint32_t mhuc_call_s2(MH4UCall *call, uint32_t fn, uint32_t r0, uint32_t r1, uin
     host->write32(call, at + 32, s2_bits);
     host->write32(call, at + 36, fn);
     const uint32_t args[4] = {r0, r1, r2, 0};
+    return host->call2(call, at, args, NULL, NULL);
+}
+
+/* A fifth argument on the stack, which call2 cannot set: push the argument, call the function
+ * with r0-r3 as they came, and return its r0. The stub keeps the guest's 8-byte alignment
+ * (three registers and one word) and restores sp and r4/r5 afterwards. */
+uint32_t mhuc_call5(MH4UCall *call, uint32_t fn, uint32_t r0, uint32_t r1, uint32_t r2,
+                    uint32_t r3, uint32_t arg4) {
+    if (!mhuc_stubs(call)) {
+        return 0;
+    }
+    const uint32_t at = stub_block + STUB_STACK;
+    host->write32(call, at + 0, 0xE92D4030u);  /* push {r4, r5, lr} */
+    host->write32(call, at + 4, 0xE24DD004u);  /* sub sp, sp, #4 */
+    host->write32(call, at + 8, 0xE59F4010u);  /* ldr r4, [pc, #0x10] (arg4) */
+    host->write32(call, at + 12, 0xE59FC010u); /* ldr r12, [pc, #0x10] (fn) */
+    host->write32(call, at + 16, 0xE58D4000u); /* str r4, [sp] */
+    host->write32(call, at + 20, 0xE12FFF3Cu); /* blx r12 */
+    host->write32(call, at + 24, 0xE28DD004u); /* add sp, sp, #4 */
+    host->write32(call, at + 28, 0xE8BD8030u); /* pop {r4, r5, pc} */
+    host->write32(call, at + 32, arg4);
+    host->write32(call, at + 36, fn);
+    const uint32_t args[4] = {r0, r1, r2, r3};
     return host->call2(call, at, args, NULL, NULL);
 }
 
