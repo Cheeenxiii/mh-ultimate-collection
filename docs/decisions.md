@@ -487,6 +487,17 @@ would add a cut-in 3U never had (option 3); MHXX's camera is a third game's (opt
 
 ## Open
 
-No open decisions.
+### How a source effect maps to MH4U's (type, time)
+
+MH4U's MEF record carries **no effect id**: the spawn (`0x391b28`, reached through the key lookup `0x398f48`) computes the effect from the record's type at `+0x03` (0 to 14) and its time at `+0x06`, through the tables at `0xeede7c` and `0xeedde98` (`0x390c48`, `0x390ef8`); [specs/mef.md](../specs/mef.md) checks it on all 6,216 records (FX7). MH3U's ESQ event names its effect asset by an id in its own space at `+0x0A` (0 to 1313, resolved by the spawn `0x333a00`) and its type at `+0x08` (FX8); MHXX's PSL descriptors carry flags and list offsets, and the list contents are not laid out yet (FX9). So a source effect's id cannot become one MEF "id": the converter has to produce a **(type, time)** pair, and nothing says yet which pair a source id becomes.
+
+| Option | Gives | Costs |
+|---|---|---|
+| A mapping file (`data/effectmap`) whose rows carry source id → MH4U (type, time), one row per effect, each with its source | the converter writes the pair and the mapping is reviewable; the authored rows are recorded | the mapping must be built per effect; a wrong row plays the wrong effect; how many rows a monster needs is unmeasured |
+| Derive the pair at conversion time by inverting MH4U's tables from the player's dump | no committed mapping; the pair comes from the player's own files | the tables give (type, time) → an MH4U effect, but the key that matches a source id to one of them is unverified, so the correspondence is still a guess unless the two id spaces align |
+| Carry the source effect's assets and definitions into MH4U as new spawn-table entries | the source's own effect, exactly | growing MH4U's effect tables and converting the effect assets; a much larger converter and table growth |
+| Keep MH4U's effects (the stand-in's), as today | nothing authored; the port shows MH4U's effects | a 3U monster shows MH4U's fire and dust, timed to MH4U's animations; a monster MH4U never had shows the wrong ones, and check E1 cannot pass |
+
+The maintainer settles it; the facts are in [specs/mef.md](../specs/mef.md) (FX7 to FX9) and #249. Until then no port ships `mef`/`efl`.
 
 A new structural question goes here, with its facts and options, until the maintainer settles it.
