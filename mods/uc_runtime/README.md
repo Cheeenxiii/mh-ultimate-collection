@@ -1,9 +1,10 @@
 # UC runtime
 
 The mod's one native plugin ([decision 0013](../../docs/decisions.md#0013-one-runtime-for-the-mods-native-code)).
-It holds the id layer that gives a ported monster its own id, and, as ports land, one C module
-per ported monster for its actions. Its `mod.json` names one fixed hook list, so a new monster
-rebuilds this library and redeploys the mod, while the game's code library stays as it is.
+It holds the id layer that gives a ported monster its own id, and one C module per ported
+monster for its actions; GU Rathian's module was the first. Its `mod.json` names one fixed hook
+list, so a new monster rebuilds this library and redeploys the mod, while the game's code
+library stays as it is.
 
 The id layer: MH4U looks a monster up by id in tables that have 124 rows (0 to 123,
 [reference/README.md](../../reference/README.md#mh4u-monster-tables)). A ported monster's id
@@ -23,39 +24,293 @@ held them before.
 
 | Path | Holds |
 |---|---|
-| `src/runtime.c` | the plugin entry point and the one hook table: it registers the id layer's hooks and its frame call |
-| `src/runtime.h` | what the entry point and the parts share: the hook type and the id layer's calls |
+| `src/runtime.c` | the plugin entry point and the one hook table: it registers the id layer's hooks and frame call, then the module side's |
+| `src/runtime.h` | what the entry point and the parts share: the hook type, the id layer's calls, the registry-id lookup and the module side's calls |
 | `src/ids.c` | the id layer: the readers, the resource-record builder, the id pool, the name and notes text and the self-test |
 | `src/ids.h` | generated from `data/ids/registry.csv` by `tools/check_ids.py --write`; do not edit |
-| `src/modules.h` | generated from the registry: one entry per registered id, with the monster's module pointer that [#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215) fills; do not edit |
-| `tests/test_runtime.c` | the id layer on a fake host, with no game (`make test`) |
+| `src/module.c` | the machinery every module shares: the factory association, the action dispatcher, the state slots, the guest call and the guest stubs |
+| `src/module.h` | the module interface: `MhucModuleOps`, `MhucState`, the guest call, the accessors, the motion encoder and the log |
+| `src/modules.h` | generated from the registry and the module files: one row per registered id, with the monster's `ops` or 0 for a data-only port; do not edit |
+| `src/monsters/rathian-gu.c` | GU Rathian's module: her translated MHXX-only actions, the first real module |
+| `tests/fake_host.c`, `tests/fake_host.h` | the fake host every test runs on: guest memory, the heap, `call`/`call2` and the guest stubs, the hooks, the registers and the log |
+| `tests/test_runtime.c` | the id layer on the fake host (`make test`) |
+| `tests/test_module.c` | the module's routing and its translated actions' call sequences on the fake host (`make test`) |
+
+## The module interface
+
+A ported monster's action code is one C file, `src/monsters/<key>.c`, where `<key>` is its
+registry key, compiled into the runtime. It exports one `const MhucModuleOps`
+([src/module.h](src/module.h)):
+
+```c
+typedef struct MhucModuleOps {
+    uint32_t id;                       /* the registry id the module answers */
+    void (*start)(void);               /* once at init: log the module's ready line */
+    void (*self_test)(MH4UCall *call); /* once, first frame, when `selftest = 1` */
+    int (*dispatch)(MH4UCall *call, uint32_t enemy);  /* 1 when it ran a handler */
+} MhucModuleOps;
+```
+
+The runtime does the rest once for every module:
+
+- **the factory association.** `uEnemyFactory::create` receives the ported id in r1, and the id
+  layer's reader rewrites that register to the stand-in before the game creates the monster.
+  The runtime's factory hook is registered after the id layer's, and the host runs a later hook
+  first, so it keeps the original id, calls the rest of the chain (the id layer answers the
+  stand-in, the game creates the enemy), and records the returned enemy pointer against the
+  module its registry id names. An id no module answers, and MH4U's own ids, are not recorded
+  and fall through.
+- **the dispatch.** `uEnemy::dispatchAction` (USA v1.3.0 `0x006e9cac`) runs the module recorded
+  for the monster in r0; the module reads the action pair and returns 1 when it ran a handler,
+  which makes the runtime skip the game's dispatcher, or 0 for a pair it leaves to the game. A
+  monster with no module recorded goes to the game unchanged.
+- **the state slots.** `mhuc_state(call, enemy, category, index, &changed)` returns the
+  monster's slot, keyed by the enemy pointer; `state` and `data` are reset when the action pair
+  changes, and `changed` says when that happened (the module logs the action then). The runtime
+  keeps eight slots.
+- **the guest call.** `mhuc_call2` is ABI 4's `call2` (r0-r3, the floats s0/s1, the s0 return);
+  `mhuc_call` and `mhuc_call_f` spell the arguments out. Two calls ABI 4 cannot make run on one
+  guest stub from the game's heap: `mhuc_call_s2` (a third float, s2) and `mhuc_read_s` (the
+  caller's s0-s3, which a hook cannot read). `mhuc_stubs` allocates that block, `mhuc_scratch`
+  gives 16 bytes of guest memory to an engine function that fills a point.
+- **the accessors.** `mhuc_work` (the work block at `*(enemy + 0xe28)`), `mhuc_category` and
+  `mhuc_index` (its `+0x1ca`/`+0x1cb`), `mhuc_object` (a pointer field of the monster, such as
+  the target line at `+0x8d88`), the read/write and float helpers, and `MHUC_MOTION(file, slot)`
+  for MH4U's motion number, `file << 8 | slot`.
+- **the log and the settings.** `mhuc_log`/`mhuc_logf` write one line through the port, and
+  `mhuc_config` reads the mod's settings (init only).
+
+A module adds no hook of its own: the runtime's one dispatcher reaches it, and the id layer's
+readers answer its id. That is what keeps the code library's hook list fixed.
 
 ## Adding a module
 
-A ported monster's code is a C module in this library, and its RomFS files stay the data-only
-mod folder `mhuc convert monster` writes. The module interface lands with
-[#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215), which moves GU
-Rathian's translated actions in; this step laid out the table and the rule it enforces. The
-steps to add a monster are:
-
-1. Register the monster's id in [data/ids/registry.csv](../../data/ids/README.md); a row is
-   what gives it an entry in `src/modules.h`. Run `python3 tools/check_ids.py --write`.
-2. Put the monster's module in `src/` (its generated tables with it) and list its C file in the
-   Makefile's `SOURCES`; [#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)
-   defines the module interface and how `tools/check_ids.py` fills the table's `ops` pointers,
-   so `src/modules.h` stays generated.
+1. Register the monster's id in [data/ids/registry.csv](../../data/ids/README.md), if it isn't
+   there yet; a row is what gives it an entry in `src/modules.h`. Run
+   `python3 tools/check_ids.py --write`.
+2. Write `src/monsters/<key>.c` and export `const struct MhucModuleOps mhuc_module_<key>`
+   (hyphens become underscores). The Makefile compiles every `src/monsters/*.c`; run
+   `python3 tools/check_ids.py --write` again so the generated table gives the row its `ops`.
+   The checker refuses a module file with no registry row, and one that doesn't export its
+   symbol, so the C build can't silently lose it.
 3. `make`, then redeploy the mod. The runtime's `mod.json` and its hook list do not change, so
    the game's code library is not built again.
 
-A module adds no hook of its own: the runtime's one dispatcher finds a ported monster and runs
-its module, and the id layer's readers answer its id. That is what keeps the code library's
-hook list fixed.
+### A worked example: GU Rathian's module
+
+`src/monsters/rathian-gu.c` is the first module and the template. Its `dispatch` is the shape
+every module uses:
+
+```c
+static int dispatch(MH4UCall *call, uint32_t enemy) {
+    const uint32_t work = mhuc_work(call, enemy);
+    if (!work) {
+        return 0;
+    }
+    const int category = mhuc_category(call, work);
+    const int index = mhuc_index(call, work);
+    if (category == 17) {                      /* its own path: the gate plus the base update */
+        if (index > 2) {
+            mhuc_call(call, FN_BASE_UPDATE, enemy, 0, 0, 0);
+        }
+        return 1;
+    }
+    if (!(category == 3 && index == 98)) {     /* only the ids this module carries */
+        return 0;
+    }
+    int changed;
+    MhucState *state = mhuc_state(call, enemy, category, index, &changed);
+    if (!state) {
+        return 0;
+    }
+    if (changed) {
+        mhuc_logf(MH4U_LOG_INFO, "running the translated action %d/%d", category, index);
+    }
+    /* one state per frame; an engine call is mhuc_call / mhuc_call_f, a motion number
+     * MHUC_MOTION(file, slot) */
+    return 1;
+}
+
+const struct MhucModuleOps mhuc_module_rathian_gu = {
+    MHUC_MONSTER_ID_RATHIAN_GU, start, self_test, dispatch,
+};
+```
+
+The module's `start` logs its ready line, its `self_test` logs what it carries and where the
+guest stubs are, and the rest of the file is the translated handlers below. The runtime's
+`tests/test_module.c` drives exactly this: the factory association, the routing (its id runs
+the module, an MH4U id and a registered id without a module fall through) and every translated
+handler's call sequence on the fake host.
+
+### GU Rathian's translated actions
+
+The fourteen ids split into four slices (the issues are in the same milestone):
+
+| Slice | Ids | State |
+|---|---|---|
+| 3/98 and the 12/1-3 chain | 3/98, 12/1, 12/2, 12/3 | this module |
+| 4/27 to 4/32 | six ids on one handler | this module |
+| 8/0 | one handler, with its combo tail | this module |
+| category 17 | a gate plus a base-class routine | this module |
+
+12/0 needs no code. MH4U's category-12 case checks index 0 and runs its own handler
+`0x006d524c`, the handler MH4U's shared 3/2, 3/83 etc. use and the role pair of MHXX's 12/0
+(`0x0201177c`). Under decision 0002's 2026-11-26 amendment her own handler is still owed for
+12/0 and the shared ids; this move only carries the twelve translated ones.
+
+| Action | MHXX | What the port runs |
+|---|---|---|
+| 3/98 | block `0x020089a8`, handler `0x020062d4`, 3 states, motions `0x101` and `0x104` | a C state machine: data float, fall advance, motion, fall snap; then the rate, speed `2.0`, motion; then the finish flag and `0x0094dc84` (idle) |
+| 12/1 | block `0x0201c1d0` | fixed target points, then the 3/98 handler |
+| 12/2 | block `0x0201c228` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/12 handler `0x006d791c` |
+| 12/3 | block `0x0201c27c` | target points from the caller's `s0`-`s3`, then MH4U's shared 3/9 handler `0x006d5e98` (r1=1, r2=0) |
+| 17 | case `0x020098b8` -> gate `0x008d5bd4`; 0-2 return, others the base update `0x008ae50c` (vtable slot `0x3d0`) | indexes 0-2 nothing; others MH4U's base action update `0x00911b48` (`uEnemy` vtable slot 89) |
+| 4/27-32 | handler `0x0200e3b4`, blocks `0x02018af8`, `0x02018b1c`, `0x02018b40`, `0x02018b64`, `0x02018b88`, `0x02018bac`, r1/r2 2/0, 1/0, 2/1, 1/1, 2/0, 1/0 | one C state machine, three states: line setup and motion `0x418`/`0x417` at 6.0; a turn, a line point and a step, motion `0x90a`/`0x909` at 0.0; a turn at +-0x2000, then the finish flag and MH4U's base update `0x00911b48`, or motion `0x90b`/`0x90d` at 2.0 and the source's next-action request |
+| 8/0 | block `0x020097a4`, handler `0x0201b460`, 3 states, motion `0x403` | a C state machine: copy the data entry and aim at the target at 300.0/38.0; the per-mode check at 12.0/50.0 and the position advance; the finish flag, motion `0x403` at 4.0 and the 180.0 timer; then the timer, the two hit checks at 300.0/0.0/150.0 and the request for `9/1`, or `2/6` when they fail or the timer is spent |
+
+8/0 is the same action as MH4U's own 8/0: MH4U's category-8 case runs `0x006e9770`, which uses
+the same frame values (300.0/38.0, 12.0/50.0, 180.0, 4.0, 300.0/0.0/150.0) and the same tail
+(`9/1` or `2/6`). So its calls map onto MH4U functions at the same points, and its work offsets
+are MH4U's: the state is kept by the module, the timer is work+0x1d4, the pending-action mode
+work+0x1d9, the two hit-check bytes work+0x278/+0x27c and the velocity work+0x160. The entry
+stores are MH4U's work+0x7738/+0x7739 cleared and work+0x7a3c set to 2, and the tail flag is
+work+0x7993.
+
+Each engine call maps to the MH4U function of the same steps, from the reference's call mapping
+(the MHXX address in brackets): motion start `0x0094e318` [`0x008eb108`], data float
+`0x0093d870` [`0x008d21ac`], fall advance `0x0092e99c` [`0x008b1698`], fall snap `0x0094a45c`
+[`0x008e192c`], rate `0x0093ce60` [`0x008d1a0c`], speed `0x00941d84` [`0x008d73e8`], finish
+flag `0x00b05da4` [`0x00aed11c`], idle `0x0094dc84` [`0x008eb050`]. The work block is MH4U's
+`*(this+0xe28)`; MHXX's `+0x44` and `+0x1d0` are MH4U's `+0x19c` and `+0x218`.
+
+#### Category 17: the gate and the base update
+
+MH4U's dispatcher has no category 17: its category table compares the category byte with 14
+and returns for anything above. MHXX's dispatcher case for 17 (`0x020098b8`) is a veneer to
+`0x008d5bd4`, a gate shared by every monster: it reads the index byte (MHXX's `this+0x6bf1`,
+the port's `work+0x1cb`), returns for indexes 0 to 2, and otherwise tail-calls `uEnemy`'s
+vtable slot `0x3d0` (`0x008ae50c`). That slot is a base-class action update, and MH4U's
+`uEnemy` vtable stops at slot 94, so the number does not exist there. MH4U's own `uEnemy`
+slot 89 (`0x00911b48`) is the same routine on MH4U's layout, so the port calls it with the
+monster in `r0` instead of reimplementing the steps.
+
+`0x008ae50c` and `0x00911b48` do the same work at translated offsets:
+
+| Step | MHXX `0x008ae50c` | MH4U `0x00911b48` |
+|---|---|---|
+| reset the action from the monster's data entry, mode 0 | `0x8b1700(this, 0)` | `0x9167b4(this, 0)` |
+| is the monster in state 2 or 3 | `0xadd004`: `work+0x4dd` is 2 or 3 | `0x92e960`: `work+0x51c` is 2 or 3, and `work+0x7e80` bit 0x20 is clear |
+| the action-active flag | `work+0x1a8` bit 0x40 | `work+0x1b4` bit 0x40 |
+| the current category | `this+0x6bf0` | `work+0x1ca` |
+| category 11 skips the update | `#0xb` | `#0xb` |
+| the setter's extra argument | `0x8a1d88(this)`, a signed byte from a table | a signed byte at `*(0x00fb6b7c)+0x2f` |
+| the action setter | `0x8ac5a0(this, 0, r2, 2, arg)` | `0x0090ef74(this, 0, r2, 2, arg)` |
+| the other state | `work+0x2c0` is 1 | `work+0x34c` is 1 |
+| the finish flag | `0x8bf728(this, 0)` sets `this+0x6b00` to 1 | stores 1 at `work+0x1dc` |
+
+`r2` is 2 when the first two conditions hold, otherwise 1 when the other state is 1, otherwise
+0. The index the gate tests is MH4U's `work+0x1cb`, the byte its dispatcher reads. The
+category-17 path needs no float stubs; the setter's call is the same one `0x00911b48` makes
+for MH4U's own actions, so MH4U's handler runs the ported action's data.
+
+#### 4/27-32: one handler, three states
+
+The 4/27-32 handler's calls, and the fields and the target-line struct they use:
+
+| MHXX | MH4U | What |
+|---|---|---|
+| `0x0201262c` | `0x006e7be8` | the flight's setup, from the monster's height data |
+| `0x008b1700` | `0x009167b4` | set the monster's mode |
+| `0x008b2210` | `0x00917570` | turn by an angle step, s0/s1 the speed range |
+| `0x008a7360` | `0x0091aae4` | the mode call's flag-clear wrapper (r3 = r2, r2 = 0) |
+| `0x008c21f8` | `0x0092d09c` | build a target point from an index |
+| `0x008b75d8` | `0x0091db4c` | turn toward a target point at a step in r3 |
+| `0x020063fc` | `0x006e5608` | a point on the target line at a fraction |
+| `0x0201277c` | `0x00aad55c` | rotate a direction by an angle |
+| `0x008eb108` | `0x0094e318` | start a motion |
+| `0x00aed11c` | `0x00b05da4` | the action's finish flag |
+| vtable slot 244, `0x008ae50c` | `0x00911b48` | the finish flag's end-of-action, the same routine as category 17's base update (MH4U's vtable slot 89) |
+
+The work-block fields, MHXX -> MH4U, each read from a paired function (the MHXX and MH4U
+functions that step through the same fields): position x,y,z `+0x40/+0x44/+0x48` ->
+`+0x198/+0x19c/+0x1a0`, position w `+0x4c` -> `+0x1a4`, heading `+0x54` -> `+0x1ac`, target
+point x,z `+0x1d0/+0x1d8` -> `+0x218/+0x220`, heading saved `+0x200` -> `+0x248`. The speed
+getter `0x008bb4e4` reads the float at `this+0x298`, which MH4U's same handler reads at
+`this+0x290`; the turn step `this+0x1c` is MH4U's `this+0x14`. The target-line struct
+`*(this+0xb770)` is MH4U's `*(this+0x8d88)` and keeps its layout: origin x,z at `+0x30`,
+direction x,y,z,w at `+0x40` to `+0x4c`.
+
+8/0's calls, each the MH4U function MH4U's own 8/0 handler calls at the same point: data
+entry `0x009167b4` [`0x008b1700`], aim at a point `0x00948674` [`0x008df28c`], per-mode
+speed/distance `0x0091aae4` [`0x008a7360`], position advance `0x00955440` [`0x008f1f30`],
+countdown `0x00b0704c` [`0x008a78ec`'s worker; MHXX's worker multiplies the frame delta by
+the call's `s0`, which is 1.0 here, and both clamp at 0], hit check `0x009122fc`
+[`0x008ae8ec`], hit check with its mode in r3 `0x0092b2b0` [`0x008c024c`], request next
+action `0x0094ef64` [`0x008ebab0`].
+
+**What it does not translate yet.** The 12/1 and 12/2 blocks end through MHXX's
+request-next-action helper `0x008ebab0`. Its MH4U counterpart is `0x0094ef64` — the same
+steps: refuse category 0x0b, otherwise take the immediate path through the action setter
+when work+0x1d9 is 1, else store the pending pair at work+0x1d0/+0x1d1 with the flag at
+work+0x1cf. The 8/0 slice uses it, but the 12/1-3 slice still returns to idle instead of
+following on to 12/2 or 12/3; wiring those two is a follow-up (the chain is visible in R2p).
+
+8/0 has four gaps, recorded here and in the module's log:
+
+- **The leaf `0x008c4184` is MH4U's `0x0092f6e8`.** Both take `(this, table)` with the mode
+  in r2: 0x008c4184 clears r2 and falls into `0x008c418c`, which picks one of the table's
+  entries by work+0x331, adds this+0x2a4 times the frame delta to the float at work+0x334,
+  and sets flags at work+0x32e. MH4U's own handler calls it with `0x00e094d8` where MHXX
+  uses `0x20220ac`. The MHXX table is the port's data and is not carried yet, so the
+  handler does not call it; when it does, the table goes with it.
+- **`0x008ae5e4` (MH4U `0x00911c0c`) takes its 4th and 5th arguments in r3 and on the
+  stack**, which ABI 4 cannot set. It is the data setup for this action and waits on #134.
+- **`0x008d0528` has no confirmed MH4U counterpart.** It reads this+0x6dd0, calls
+  0x00add004 and then 0x008da42c or 0x008b58c0, and ends in 0x008d057c(this, 0), which
+  adjusts a float at work+0x59d4 and the work+0x5800 area. MH4U's own 8/0 handler has no
+  call at that point. The port skips it.
+- The source's `[this+0xa304] == 2 && [this+0xa305] == 4` branch sets the tail flag to 1
+  instead of 3. The MH4U handler has no such branch and the two bytes have no MH4U
+  counterpart, so the port takes the source's other path.
+
+Both slices leave one small detail: 3/98's second motion gets `s1 = 0.0` (the source leaves
+`s1` from the previous state, which is `0.0` while the move is current), and 8/0's state 1
+calls the per-mode check every frame as the source does.
+
+The 4/27-32 slice has two more gaps:
+
+- **The case blocks' call to `0x00adb528`, before the handler.** It forwards `(this, mode)` to
+  method `0x4c` of the object `*(this+0x6dc4)` (the mode is 2, 2, 3, 3, 5, 5 per id). MH4U
+  has no object at a matching field and no counterpart for the call was found, so it is left
+  out and logged once per action. The handler's incoming `s0` (the percent it puts the line
+  point at) is the dispatcher caller's; without the call's return the source may have had
+  another value, which R2p will show.
+- **The state-2 request for 7/246 or 7/247**, through the same `0x008ebab0` helper as 12/1 and
+  12/2. It is left out and logged once; the move plays and the action ends without it.
+
+#### Floats: the guest stubs
+
+The host's ABI 4 `call2` runs a game function with `r0`-`r3` and the floats `s0`/`s1`, and
+returns its `r0` plus its s0. That covers every engine call the translated handlers make
+except two: 8/0's first hit check takes a third float in `s2`, and a source case block
+receives its target points in `s0`-`s3`, which a hook cannot read. The runtime writes small
+ARM stubs in a 384-byte block from the game's own heap (`alloc`, ABI 2) once for every module:
+
+- `vldr s0/s1/s2` from a literal, then branch to the engine function (8/0's hit check);
+- `vmov r0, sN; bx lr` to read the caller's `s0`-`s3`.
+
+The port runs code that is not recompiled in Azahar's interpreter (`port/src/arm_recomp.cpp`,
+`Interpret`), which reads the bytes each time, so a block from `alloc` is executable and a
+stub's literals can be rewritten per call. T0 in
+[checks.md](../../docs/checks.md#floats-through-a-guest-stub-t0) proves the stub in a headless
+run, and P4 proves ABI 4's `call2`. When the plugin API grows s2/s3 arguments, the s2 stub is
+replaced by the new call; the s0-s3 read still needs the `vmov` stub.
 
 ## What it hooks
 
 | Table | Address | Reader hooked | Id where |
 |---|---|---|---|
-| factory (`createEnemy`) | `0x006901f4` | the factory itself | r1 |
+| factory (`createEnemy`) | `0x006901f4` | the factory itself (the id layer), and the module association, which runs first and keeps the original id | r1 |
 | data path (`enemyDataPathIndex`) | `0x00efc268` | `loadEnemyData`, `0x00689490` | r1 |
 | enemy data (`enemyDataById`) | `0x00f3a024` | `0x0068882c` | r1 |
 | crowns (`crownSizeTable`) | `0x00f32008` | `getCrown`, `0x0068877c` | r0 |
@@ -69,9 +324,11 @@ hook list fixed.
 | name/notes text | — | `0x00cdfa30` (`message::getRecordById`) | r0 the table, r1 the id |
 | the quest task (`uc_questTask`) | `0x0065bcd0` | the state machine itself, before its state 0 preload (`0x0065bd7c`) | the stand-in's byte at `task + 0xd4`, see [the enemy data](#the-enemy-data) |
 | the monster archive's name (`uc_dataPath`) | `0x00b7300c` | the `data\em%03d` builder, before the area init asks the archive loader | r2 the quest's wave id, see [the port's archive](#the-ports-archive) |
+| the action dispatcher (`uEnemy::dispatchAction`) | `0x006e9cac` | the runtime's module dispatch, which runs the monster's module or the game's dispatcher | r0 the monster |
 
 Most readers take the id in a register; the plugin rewrites that register and calls the game's
-function. Four read the id from the monster's data block (`this+0xe28`, byte `+0x1c0`); the
+function. The factory has two hooks: the runtime's module association runs first and keeps the
+original id, the id layer's reader rewrites it to the stand-in. Four read the id from the monster's data block (`this+0xe28`, byte `+0x1c0`); the
 plugin swaps that byte for the stand-in, calls the game's function, and puts the real id back,
 because the block is the game's own and must not keep the stand-in.
 
@@ -288,13 +545,22 @@ English notes are therefore still content work, not this plugin's.
   monster is MH4U's monster. The port's own rows replace the stand-in when
   [#48](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/48) and
   [#49](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/49)'s converted files are
-  installed.
+  installed. The module's routing does not depend on that byte: it comes from the factory's r1
+  before the id layer rewrites it.
+- **The GU module's shared ids and 12/0.** Decision 0002's 2026-11-26 amendment owes her own
+  handler for every action, shared ids included. This move carries only the twelve translated
+  MHXX-only actions; 12/0 and the shared ids still run MH4U's dispatcher.
+- **`monster` no longer chooses another monster.** A module answers its registry id, so the old
+  plugin's `monster = 1` (translate GU Rathian's actions onto MH4U's Rathian) is gone. The
+  setting is kept for old config files and warns when it names no module; whether a module can
+  be switched off by a setting is [0013](../../docs/decisions.md#0013-one-runtime-for-the-mods-native-code)'s
+  open question.
 
 ## Build
 
 ```bash
 make        # uc_runtime.so next to mod.json
-make test   # the id layer on a fake host, with no game
+make test   # the id layer and the modules on a fake host, with no game
 ```
 
 It builds against the engine fork's `include/mh4u_plugin.h`; `make FORK=/path/to/fork` uses
@@ -314,7 +580,9 @@ python3 <fork>/tools/build_game.py --dump "MH4U v1.3.0 update.cia" --install <Az
 
 A run logs `ready: answering MH4U's monster tables and name/notes message getters for 4
 permanent and 0 pooled id(s), 124 and up, lending 224..255 per quest, with the files each port
-ships and the stand-in's for the rest`, then `text: 4 of 4 entry(ies) from
+ships and the stand-in's for the rest`, then the modules' ready lines, for GU Rathian
+`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`, then
+`text: 4 of 4 entry(ies) from
 text/monster_text.bin; every registered id has a name and notes`, then one line per reader the first time it answers a registered id and one the first
 time it passes an MH4U id through, for example `factory: id 124 -> stand-in 1`; the resource
 readers log `resource index: id 124 -> its own record`, `resource load: id 124 -> its own
@@ -331,7 +599,8 @@ marked present so the state 0 preload loads its enemy data`, then `quest task: m
 
 | Key | Default | Means |
 |---|---|---|
-| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest. The check in [checks.md](../../docs/checks.md#uc-runtime) uses it. |
+| `selftest` | `0` | `1`: on the first frame, log what every reader answers for each registered id, the paths of the resource record built for it and which kinds and motion slots it ships and keeps the stand-in's for, the path the stand-in's data comes from, the name and notes text and the three message getters' answers, that ids 0 to 123 pass through, and a pooled id lent, answered and freed by a synthetic quest; then each module's self-test. The check in [checks.md](../../docs/checks.md#uc-runtime) uses it. |
+| `monster` | `124` | The id a module's ready line names. A module answers the registry id it was built for, so this no longer chooses another monster (the old plugin's `monster = 1` translated her actions onto MH4U's Rathian; a module cannot, see [what it does not do yet](#what-it-does-not-do-yet)); the setting is kept so an old `config.ini` still loads, and the runtime warns when it names no module. |
 
 ## The check
 

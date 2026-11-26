@@ -1,8 +1,0 @@
-{
-  "name": "GU Rathian's MHXX-only actions",
-  "hooks": [
-    {"name": "uEnemy::dispatchAction", "address": "0x006e9cac"}
-  ],
-  "plugin": {"linux": "rathian_actions.so", "windows": "rathian_actions.dll", "macos": "rathian_actions.dylib"},
-  "config": {"monster": "124", "selftest": "0"}
-}

@@ -14,7 +14,7 @@ One file per ported monster and source game, read by `tools/check_actions.py`:
 | `block` | the case block in the source game's dispatcher |
 | `handler` | the handler unit the case block tail-calls, empty when the work is inline or a jump |
 | `first_motion` | the first constant motion index the handler starts, empty when it computes it or starts none |
-| `status` | `translated`: the port's plugin runs it; `mh4u`: MH4U's own handler already serves it; `pending`: still owed |
+| `status` | `translated`: the runtime's monster module runs it; `mh4u`: MH4U's own handler already serves it; `pending`: still owed |
 
 `rathian-3u.csv` holds all 191 ids MH3U's dispatcher handles. A 3U row is `translated` or
 `pending` only: MH3U reaches every id on one of its own handlers, so no 3U id is left to an

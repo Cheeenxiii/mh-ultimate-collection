@@ -128,7 +128,11 @@ is not 0.
 - `mods/uc_runtime/src/ids.h` is exactly what this file generates: the permanent ids in one
   array, the pooled ids in another, and each row's `files` bits and `motion_mask`;
 - `mods/uc_runtime/src/modules.h` is exactly what this file generates: the module table's one
-  entry per registered id, in the permanent-then-pooled order.
+  entry per registered id, in the permanent-then-pooled order, with the `ops` of the monster
+  whose `src/monsters/<key>.c` exists and 0 for a data-only port (the module interface is in the
+  runtime's [README](../mods/uc_runtime/README.md#the-module-interface)); and every module file
+  under `src/monsters/` has a registered monster row and exports its `mhuc_module_<key>`
+  symbol.
 
 After editing the registry, write the headers and check them:
 

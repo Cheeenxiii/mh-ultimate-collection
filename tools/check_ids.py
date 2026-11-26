@@ -34,9 +34,10 @@ once each and gives `motions` slots in 0..5, and every line of the runtime's gen
 is the one this file writes.
 
 `--write` writes the runtime's two generated headers: `src/ids.h` (the id tables and the file
-kinds) and `src/modules.h` (the module table, one entry per registered id, which issue #215
-fills with each monster's code). They are checked in, so a wrong or stale one fails the check:
-run `check_ids.py --write` after editing the registry, never edit them.
+kinds) and `src/modules.h` (the module table, one entry per registered id; a row whose
+`src/monsters/<key>.c` exists gets that module's `ops`, the others stay 0 for a data-only
+port). They are checked in, so a wrong or stale one fails the check: run
+`check_ids.py --write` after editing the registry or adding a module, never edit them.
 
 Usage: check_ids.py [--registry PATH] [--header PATH] [--modules-header PATH] [--write]
 """
@@ -52,6 +53,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(ROOT, "data", "ids", "registry.csv")
 HEADER = os.path.join(ROOT, "mods", "uc_runtime", "src", "ids.h")
 MODULES_HEADER = os.path.join(ROOT, "mods", "uc_runtime", "src", "modules.h")
+MODULE_DIR = os.path.join(ROOT, "mods", "uc_runtime", "src", "monsters")
 
 COLUMNS = ("kind", "id", "key", "source_game", "source_key", "name", "stand_in", "files", "notes")
 SOURCE_GAMES = ("mh4u", "mh3u", "mhxx", "mhgu")
@@ -264,6 +266,42 @@ def c_identifier(key: str) -> str:
     return "MHUC_MONSTER_ID_" + key.upper().replace("-", "_")
 
 
+def c_module(key: str) -> str:
+    """The C symbol a monster's module exports (src/module.h, src/modules.h)."""
+    return "mhuc_module_" + key.replace("-", "_")
+
+
+def module_path(key: str, module_dir: str = MODULE_DIR) -> str:
+    return os.path.join(module_dir, key + ".c")
+
+
+def check_modules(rows: list[dict[str, str]], module_dir: str = MODULE_DIR) -> list[str]:
+    """Every src/monsters/<key>.c is a registered monster's module and exports its symbol.
+
+    A module is one C file per monster (src/module.h); the generated table names its ops by
+    the registry key, so a file without a row would be dead code and a file that doesn't
+    define the symbol fails the C build. Catch both here, where the table is written.
+    """
+    problems: list[str] = []
+    monsters = {r["key"]: r for r in rows if r["kind"] == "monster"}
+    if not os.path.isdir(module_dir):
+        return problems
+    for name in sorted(os.listdir(module_dir)):
+        if not name.endswith(".c"):
+            continue
+        key = name[:-2]
+        if key not in monsters:
+            problems.append(f"{os.path.relpath(os.path.join(module_dir, name), ROOT)} is a "
+                            "module with no monster row in the registry")
+            continue
+        with open(os.path.join(module_dir, name), encoding="utf-8") as f:
+            text = f.read()
+        if c_module(key) not in text:
+            problems.append(f"src/monsters/{name} doesn't export {c_module(key)}: "
+                            "src/modules.h names it, so the runtime won't build")
+    return problems
+
+
 def file_mask(row: dict[str, str]) -> str:
     """One row's `files` as the C expression of its kind bits."""
     kinds = {kind for kind, _count in files_tokens(row["files"])}
@@ -357,14 +395,14 @@ def render_header(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def render_modules(rows: list[dict[str, str]]) -> str:
+def render_modules(rows: list[dict[str, str]], module_dir: str = MODULE_DIR) -> str:
     """The runtime's module table for the registry's monster ids.
 
     One entry per registered id, in the registry's order (the permanent ids first, then the
-    pooled ones). Issue #215 fills each entry's `ops` with the monster's C module; until a
-    monster has one, the entry is a placeholder and the runtime answers the id from the id
-    layer alone. Generating the table from the registry keeps the two in step: a registered
-    monster has a row here, and a module has the row that names it.
+    pooled ones). A monster whose code is in `src/monsters/<key>.c` gets its module's `ops`;
+    the others stay 0, a data-only port whose actions stay with the game. Generating the table
+    from the registry and the module files keeps the two in step: a registered monster has a
+    row here, and a module has the row that names it.
     """
     monsters = [r for r in rows if r["kind"] == "monster"]
     permanent = sorted((r for r in monsters if int(r["id"], 0) <= PERMANENT_LAST),
@@ -372,6 +410,7 @@ def render_modules(rows: list[dict[str, str]]) -> str:
     pooled = sorted((r for r in monsters if int(r["id"], 0) > PERMANENT_LAST),
                     key=lambda r: int(r["id"], 0))
     monsters = permanent + pooled
+    coded = [r for r in monsters if os.path.exists(module_path(r["key"], module_dir))]
     lines = [
         "/* Generated from data/ids/registry.csv by tools/check_ids.py --write.",
         " * Do not edit: edit the registry and run the tool. Licence: GPL-3.0-or-later. */",
@@ -381,10 +420,9 @@ def render_modules(rows: list[dict[str, str]]) -> str:
         "#include <stdint.h>",
         "",
         "/* One ported monster in the runtime's table: the registry id, the registry key, and the",
-        " * monster's C module. The registry gives the first two and tools/check_ids.py writes the",
-        " * row, so a registered monster has an entry and a module has the id that names it; issue",
-        " * #215 fills the `ops` of each monster whose code lands. Until then it is 0 and the",
-        " * runtime answers the id with its id layer alone. */",
+        " * monster's C module (src/monsters/<key>.c, its interface in src/module.h).",
+        " * tools/check_ids.py writes the row: `ops` is the module when that file exists, and 0",
+        " * for a data-only port whose actions stay with the game. */",
         "struct MhucModuleOps;",
         "typedef struct MhucModule {",
         "    uint32_t id;                      /* its registry id */",
@@ -392,13 +430,20 @@ def render_modules(rows: list[dict[str, str]]) -> str:
         "    const struct MhucModuleOps *ops;  /* its code, or 0 while it has none */",
         "} MhucModule;",
         "",
+    ]
+    for row in coded:
+        lines.append(f"extern const struct MhucModuleOps {c_module(row['key'])};")
+    if coded:
+        lines.append("")
+    lines += [
         f"#define MHUC_MODULE_COUNT {len(monsters)}",
         "",
     ]
     if monsters:
         lines.append("static const MhucModule mhuc_modules[MHUC_MODULE_COUNT] = {")
         for row in monsters:
-            lines.append(f"    {{{int(row['id'], 0)}, \"{row['key']}\", 0}},"
+            ops = f"&{c_module(row['key'])}" if row in coded else "0"
+            lines.append(f"    {{{int(row['id'], 0)}, \"{row['key']}\", {ops}}},"
                          f"  /* {row['name']} */")
         lines.append("};")
     else:
@@ -427,19 +472,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--registry", default=REGISTRY)
     ap.add_argument("--header", default=HEADER)
     ap.add_argument("--modules-header", default=MODULES_HEADER)
+    ap.add_argument("--module-dir", default=MODULE_DIR,
+                    help="the monsters' module files (default: src/monsters under the runtime)")
     ap.add_argument("--write", action="store_true",
                     help="write the runtime's generated headers from the registry")
     args = ap.parse_args(argv)
 
     rows, problems = read_registry(args.registry)
     problems += check_rows(rows)
+    problems += check_modules(rows, args.module_dir)
     if problems:
         for p in problems:
             print(p)
         print("the registry is wrong; ids are permanent once shipped (docs/decisions.md#0003)", file=sys.stderr)
         return 1
     header = render_header(rows)
-    modules = render_modules(rows)
+    modules = render_modules(rows, args.module_dir)
     if args.write:
         for path, text in ((args.header, header), (args.modules_header, modules)):
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)

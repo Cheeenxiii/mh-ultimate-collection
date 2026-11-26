@@ -272,7 +272,7 @@ Two of those 28 are not missing. MH4U's category-8 and category-12 cases test th
   for index 0, which uses the same frame values as MHXX's `0x0201b460` (300.0/38.0,
   12.0/50.0, the 180.0 timer, motion 0x403 at 4.0, 300.0/0.0/150.0) and the same tail
   (9/1 or 2/6). The two bodies differ, so the port translates MHXX's handler onto MH4U's
-  calls and layout (`mods/rathian_actions`); its leaf `0x008c4184` is MH4U's
+  calls and layout (the runtime's GU Rathian module); its leaf `0x008c4184` is MH4U's
   `0x0092f6e8`, whose table is not carried yet. Both 8/0 and 12/0 are missing from the
   inventory because their cases are `cmp #0; bne`, not switches.
 
@@ -302,8 +302,8 @@ The translated ids on the GU port are 3/98, 12/1, 12/2, 12/3 and 8/0; 8/0 should
 
 Category 17 has no motion to watch. MHXX's case jumps to the gate `0x008d5bd4`, which returns
 for indexes 0 to 2 and otherwise tail-calls the base update `0x008ae50c`; the port maps that
-routine to MH4U's `0x00911b48` (the step mapping is in the plugin's
-[README](../mods/rathian_actions/README.md#category-17-the-gate-and-the-base-update)). Force
+routine to MH4U's `0x00911b48` (the step mapping is in the runtime's
+[README](../mods/uc_runtime/README.md#category-17-the-gate-and-the-base-update)). Force
 each row:
 
 | Forced | What MHXX does | What to watch |
@@ -356,12 +356,12 @@ resource paths); the 3U rows wait for #49, #105 and the quest load
 [#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229) and
 [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136).
 
-The port's plugin for the MHXX-only ids is `mods/rathian_actions`: today it runs the translated
-handlers for 3/98, 12/1-3, 4/27-32, 8/0 and category 17 and leaves 12/0 (T1), and it moves into
-the runtime ([#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)), where
-her own handler runs for every id (decision 0002's 2026-11-26 amendment). It logs one line the
-first time each translated action runs, one line per category-17 index and, for 8/0, one line
-naming its uncovered calls.
+The port's module for the MHXX-only ids is the runtime's GU Rathian module
+(`mods/uc_runtime/src/monsters/rathian-gu.c`): it runs the translated handlers for 3/98,
+12/1-3, 4/27-32, 8/0 and category 17 and leaves 12/0 (T1). Her own handler for every id,
+shared ids included, is still owed under decision 0002's 2026-11-26 amendment. The module logs
+one line the first time each translated action runs, one line per category-17 index and, for
+8/0, one line naming its uncovered calls.
 
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
@@ -1046,13 +1046,13 @@ on a spawned monster still waits for a quest run.
 
 The port's translated handlers for MHXX-only actions have no in-game run yet (R2p), so they
 are checked without a monster: the source facts against MHXX's module and MH3U's code, the
-state machines against a fake host, and the plugin's self-test in a headless run.
+state machines against a fake host, and the module's self-test in a headless run.
 
 | Check | What | Pass |
 |---|---|---|
 | T1a | `tools/check_actions.py` reads [data/actions/rathian-gu.csv](../data/actions/rathian-gu.csv) against MHXX v1.4's `roEm001.cro`, and [data/actions/rathian-3u.csv](../data/actions/rathian-3u.csv) against MH3U USA's `code.bin` | every row's case block, handler unit and first motion constant match the source dispatcher; counts and ids only |
-| T1b | `make -C mods/rathian_actions test` | the plugin's call sequences and frame values match the source's order, and a changed value fails it |
-| T1c | a headless run of the code library built with the plugin | the log has the plugin's ready and self-test lines and the float stubs' address; the runner exits 0 |
+| T1b | `make -C mods/uc_runtime test` | the module's routing and its call sequences and frame values match the source's order, and a changed value fails it |
+| T1c | a headless run of the code library built with the runtime | the log has the runtime's ready line, the GU module's ready and self-test lines and the float stubs' address; the runner exits 0 |
 | T1d | the in-game per-move check | R2p |
 
 T1a: MHXX v1.4's `roEm001.cro` and its `static.crs` come from the player's own dump.
@@ -1077,32 +1077,39 @@ Last result (2026-11-26): pass. 191 actions; blocks 191/191, handlers 182/191 (t
 are inline), first motions 132/191; translated 0, pending 191. Changing a ledger motion makes
 it exit 1 and name the id.
 
-T1b, last result (2026-11-25): pass, the call sequences checked across 3/98's three frames,
+T1b, last result (2026-11-26): pass, the call sequences checked across 3/98's three frames,
 the 12/1-3 blocks, 4/27-32's states, 8/0's three states and category 17's no-op and
-base-update paths. Changing 3/98's `6.0` to `5.0` fails it with the motion line; making
-17/3 a no-op (`index > 3`) fails it with 17/3's line; giving 4/27 the fast turn step fails
-it with the turn line; changing 8/0's motion speed `4.0` to `5.0` fails it with 8/0's line.
+base-update paths, and the routing (the module's id runs it; an MH4U id and a registered id
+without a module fall through). Deleting the factory association fails the routing check with
+`the module's monster didn't run 3/98 (0 calls, 1 original, 0 skipped)`. Changing 3/98's `6.0`
+to `5.0` fails it with the motion line; making 17/3 a no-op (`index > 3`) fails it with 17/3's
+line; giving 4/27 the fast turn step fails it with the turn line; changing 8/0's motion speed
+`4.0` to `5.0` fails it with 8/0's line (the checks in `tests/test_module.c`). Proofs of the
+last four were run when the plugin was translated (#139-#142); this session proved the routing
+and re-ran the suite.
 
-T1c, last result (2026-11-25, MH4U USA v1.3.0, the #139 code library built with the mod's
-`uEnemy::dispatchAction` hook, headless runner): pass, when only the 3/98 and 12/1-3 slices
-were in the build. The log had the plugin's ready line,
-`ready: translating 5 of GU Rathian's 13 MHXX-only actions on monster 124`, then
-`selftest: 5 of the 13 actions: 3/98 <- 0x020062d4 (3 states, motions 0x101 and 0x104), ...`,
-the line naming 12/0 as MH4U's own `0x006d524c` and the pending slices, and
-`selftest: float stubs at 0x08e44670 (256 bytes, the game's heap)`; the runner exited 0. No
-monster spawned, so no translated action ran: the in-game side is R2p.
+T1c: a headless run of the code library built with the runtime, with `selftest = 1`. The log
+must have the runtime's ready line, the GU module's ready line
+(`ready: translating 12 of GU Rathian's 13 MHXX-only actions on monster 124`), its self-test
+line and the guest stubs' address; the runner must exit 0. The build has to add the runtime's
+`uEnemy::dispatchAction` hook point, so it is rebuilt from `--install <user dir>` after the
+runtime's `mod.json` changed. The runner must carry ABI 4: the one in the build tree predated
+ABI 4's merge into the fork and refused the runtime, so rebuild its `mh4u_runner` target from
+the current fork before the run.
 
-The 4/27-32 and 8/0 slices change that line to `selftest: 12 of the 13 actions: ... 4/27-32
-<- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0
-<- 0x0201b460 (3 states, motion 0x403 at 4.0, ...), 17 <- the gate 0x008d5bd4 + MH4U's base
-update 0x00911b48`, and the last line names 8/0's leaf. That "no pending slice" covers only
-the 13 MHXX-only ids; under decision 0002's 2026-11-26 amendment her own handler runs for
-every action id, shared ids included, so 12/0 is not MH4U's to keep and the set the self-test
-counts stays open until the GU module
-([#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)) takes it. No
-headless run has shown the line yet: it needs a code library rebuilt with the plugin, and the
-build machine's one heavy job is the quest-load proof
-([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)).
+Last result (2026-11-26, MH4U USA v1.3.0, the runtime built into the game's code library, the
+runner rebuilt from the fork's `uc/main`, headless runner): pass. The build reported 53 hook
+points (the 52 before it plus `uEnemy::dispatchAction`) and one native plugin. The log had the
+runtime's ready line, then `ready: translating 12 of GU Rathian's 13 MHXX-only actions on
+monster 124`, then `selftest: 12 of the 13 actions: ... 17 <- the gate 0x008d5bd4 + MH4U's
+base update 0x00911b48 (slot 89, MHXX's slot 244)`, the line naming 12/0 as MH4U's own
+`0x006d524c` and 8/0's leaf, and `selftest: float stubs at 0x08e45550 (384 bytes, the game's
+heap)`; the runner exited 0. No monster spawned, so no translated action ran: the in-game
+side is R2p.
+
+That "no pending slice" covers only the 13 MHXX-only ids; under decision 0002's 2026-11-26
+amendment her own handler runs for every action id, shared ids included, so 12/0 is not MH4U's
+to keep and the set the self-test counts stays open until the GU module's shared-id work.
 
 ## Floats through a guest stub (T0)
 
@@ -1121,7 +1128,7 @@ Result (2026-11-25, MH4U USA v1.3.0, headless runner with an ABI 3 code library)
 had the stub and target addresses, `call -> r0=0x40c00000`, and exit 0. A first attempt with a
 wrong literal offset jumped into the literal and the runner died with an illegal instruction,
 which is what a bad stub looks like; the layout is in
-[the plugin's README](../mods/rathian_actions/README.md#floats-the-guest-stubs). The fork's
+[the runtime's README](../mods/uc_runtime/README.md#floats-the-guest-stubs). The fork's
 [#134](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/134) adds float and `r3`
 arguments to the plugin ABI; when it lands, the stubs give way to that `call`.
 
