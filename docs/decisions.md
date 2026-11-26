@@ -448,14 +448,17 @@ The facts and options it was chosen from, as the open entry held them:
 
 ### A 3U monster's camera, when MH3U ships none
 
-MH3U's monster archives hold no `rCameraList` (checked against its monster archives; [specs/camera.md](../specs/camera.md)), so a ported 3U monster has no camera of its own. MH4U's resource record names one (`enemy\emNNN\mot\eNNN_cam`), used by the cut-ins that frame the monster; #143 answers a ported id's record with the stand-in's camera while the port ships none. MH4U's lists are version 4, MHXX's version 5 with a 16-byte record prefix, and `mhuc convert camera` writes MH4U's version from MHXX's (check C1).
+MH3U's monster archives hold no `rCameraList` (checked against all 6,141 files and all 85 monster arcs; [specs/camera.md](../specs/camera.md), check C1), so a ported 3U monster has no per-monster camera of its own. MH3U does have cut-in cameras: they are `rDemoCamera` resources (`camera/dcm*`, 81 in the RomFS), which belong to cutscenes. MH4U instead has a per-monster list (`enemy\emNNN\mot\eNNN_cam`, version 4) whose cameras the monster's actions post by id — cut-ins, mounts, pins and kill cameras — and #143 answers a ported id's record with the stand-in's while the port ships none. MHXX's lists are version 5, and `mhuc convert camera` writes MH4U's version (C1).
+
+The two games' mechanisms and files therefore differ. The maintainer's criterion (2026-11-26): the port is for a faithful match in feeling for the player, so the question is whether MH3U's camera behaviour gives the same feeling as MH4U's at the same moment, even where the code and data differ; [#234](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/234) compares them per moment on the real files.
 
 | Option | Gives | Costs |
 |---|---|---|
-| Keep the stand-in's camera (today) | nothing authored; the record keeps MH4U's camera for the same monster | a 3U monster MH4U never had is framed by another monster's camera |
-| Author one for the 3U monster from MH4U's own camera for the same monster, recorded in the [authored register](sources.md#authored-register) | the cut-ins frame her | authored data, not from 3U; rule 2 allows it where no source exists, and it must be recorded |
-| Reuse the GU version's camera (MHXX's `em001`) | the other Rathian's camera, which is a real source game's | 3U's cut-ins follow MHXX's framing, not 3U's |
+| Keep the stand-in's camera | nothing authored; the record keeps MH4U's camera for the same monster | faithful only if #234 finds MH3U's framing gives the same feeling at those moments; otherwise the cut-ins feel MH4U's |
+| Carry MH3U's framing into a camera list, built from its `rDemoCamera` data for the same moments | the player sees MH3U's framing where a demo camera covers the moment | a mapping per moment from a demo camera to MH4U's list; a demo camera is cutscene data and what it does outside a cutscene is unverified |
+| Author one from MH4U's own camera for the same monster, recorded in the [authored register](sources.md#authored-register) | the cut-ins frame the monster | authored data, not from MH3U; rule 2 allows it where no source exists, and it must be recorded |
+| Reuse the GU version's camera (MHXX's `em001`) | a real source game's camera for the same monster | 3U's cut-ins follow MHXX's framing |
 
-Open because it says what fidelity means where the source game has nothing. The maintainer settles it.
+Open until #234's comparison says which option keeps the feeling; the maintainer settles it.
 
 A new structural question goes here, with its facts and options, until the maintainer settles it.
