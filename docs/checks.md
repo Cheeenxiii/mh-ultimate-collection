@@ -189,9 +189,11 @@ Last result (2026-11-24): MH4U and MHXX start the same index for every one of th
 comparable ids. The two ids whose index also agrees with MH3U are 1/11 and 1/12; the content
 comparison above shows that the rest are mostly the same motion at another index, not different
 moves. The not-compared ids are those where one side (or both) is `computed`, `none` or
-`no-handler`; the run prints the reason counts. The port translates MH3U's motion indices at
-run time from a generated table ([#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125));
-13/5, 13/6 and 13/8 each keep their own animation.
+`no-handler`; the run prints the reason counts. The port's own handler for each 3U id passes
+MH4U's form of her own animation to MH4U's motion-start wrapper, written as `file << 8 | slot`
+when the handler is written
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)); nothing translates a
+motion number at run time. 13/5, 13/6 and 13/8 each keep their own animation.
 
 To rerun, write the TSVs outside the repository (for example under `build/`):
 
@@ -277,10 +279,12 @@ Two of those 28 are not missing. MH4U's category-8 and category-12 cases test th
 `reference/monster_actions.py`'s `find_switch` needs that `cmp #0; bne` case before R2's counts
 can include the two ids; the counts above were made without it.
 
-What this means for the port: a shared id runs MH4U's own handler, and because #48 ships
-MHXX's motion lists under the ported monster's name and the index is the same, that handler
-starts MHXX's animation. A GU shared id needs no index remap, unlike a 3U one. The ids above
-where only one side starts a motion are what R2p looks at first.
+What this means for the port: under decision 0002's 2026-11-26 amendment a ported id runs her
+own handler, so R2's counts are evidence for the constant each handler passes, not for whose
+handler runs. GU's index is already MH4U's on every comparable id; a 3U handler's MH3U index is
+converted when the handler is written
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)). The ids above where
+only one side starts a motion are what R2p looks at first.
 
 ### The ported moves' check (R2p)
 
@@ -290,8 +294,8 @@ where only one side starts a motion are what R2p looks at first.
 
 For each id in R2's map (the GU port, id 124), set it in `mods/force_action`'s `config.ini`
 (`action = <cat>/<idx>`, `monster = 124`, `hold = 1`), take a quest that names id 124, and watch
-the move. R2's map says what to expect: a shared id starts MHXX's motion at the same index, and
-the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
+the move. R2 says what to expect: her own handler starts the animation at the index R2 records,
+and the ids R2 lists as one-sided may start no motion or another one. Record pass or fail per id and
 what differs: no motion, another motion, a different timing, a missing effect or projectile.
 The translated ids on the GU port are 3/98, 12/1, 12/2, 12/3 and 8/0; 8/0 should play motion
 0x403 at 4.0 and then ask for 9/1 (or 2/6), and its leaf effect is the one part not carried.
@@ -309,45 +313,55 @@ each row:
 
 Status: not done. The category-17 rows wait with the rest of R2p for #48 and #105.
 
-The 3U port (id 125) has the rows below (#116's). They are the 16 ids MH4U's `uEm001` lacks that
-reach a handler a shared action also reaches, so `mods/monster_actions` sends each to the MH4U
-action the map names and MH4U's own handler runs
-([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each row, enable
-both plugins, put `force_action` after `monster_actions` in the mod order (the last mod's hook
-runs first, so `force_action` writes the forced pair and the map translates it), set
-`action = <3U id>`, `monster = 125` and `hold = 1`, take a quest that names id 125, and watch
-the move. The plugin's log shows its ready line and one `monster 125: action <source> -> <target>`
-line per id. Record pass or fail and what differs; if the move is another variant, the actions
-in the page's "other MH4U actions with the same body" column are what to try next.
+The 3U port (id 125) has the rows below (#116's). They are the 17 ids MH4U's `uEm001` has no
+action for; #116 will hold a row for every id the ledger marks translated. Under decision
+0002's 2026-11-26 amendment she runs her own handler for each, so the 3U module
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) runs the source's
+handler and the row checks the move against MH3U's own
+([reference](../reference/README.md#the-17-ids-mh4u-has-no-action-for)). For each, set
+`action = <3U id>`, `monster = 125` and `hold = 1` in `mods/force_action`'s `config.ini`, take
+a quest that names id 125, and watch the move. The module logs the handler it ran, and an id
+the ledger ([#214](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/214)) still
+marks pending goes to MH4U's dispatcher once and is logged. Record pass or fail and what
+differs.
 
-| 3U id | the map runs | status |
-|---|---|---|
-| 0/4 | 0/0 | not done |
-| 7/64 | 7/35 | not done |
-| 7/87 | 7/92 | not done |
-| 7/93 | 7/92 | not done |
-| 10/0 | 10/7 | not done |
-| 10/1 | 10/7 | not done |
-| 10/2 | 10/7 | not done |
-| 10/3 | 10/7 | not done |
-| 10/4 | 10/7 | not done |
-| 10/5 | 10/7 | not done |
-| 10/6 | 10/7 | not done |
-| 11/5 | 11/0 | not done |
-| 11/15 | 11/0 | not done |
-| 11/26 | 11/0 | not done |
-| 11/28 | 11/0 | not done |
-| 13/9 | 0/3 | not done |
+| 3U id | status |
+|---|---|
+| 0/4 | not done |
+| 4 | not done |
+| 7/64 | not done |
+| 7/87 | not done |
+| 7/93 | not done |
+| 10/0 | not done |
+| 10/1 | not done |
+| 10/2 | not done |
+| 10/3 | not done |
+| 10/4 | not done |
+| 10/5 | not done |
+| 10/6 | not done |
+| 11/5 | not done |
+| 11/15 | not done |
+| 11/26 | not done |
+| 11/28 | not done |
+| 13/9 | not done |
 
-Action 4 needs new C (#136) and is not on the map; it joins this table when it plays.
+Action 4 has no shared MH4U action to compare with; [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)
+translates it, and the other sixteen's counterparts are in the reference page.
 
 Status: not done. The GU rows wait for #48 (the ported files) and #105 (the ported monster's own
-resource paths); the 3U rows wait for #49, #105 and #125 (the motion table).
+resource paths); the 3U rows wait for #49, #105 and the quest load
+([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)), with her module
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) and its slices
+[#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217) to
+[#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229) and
+[#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136).
 
-The port's plugin for the MHXX-only ids is `mods/rathian_actions`: it runs the translated
-handlers for 3/98, 12/1-3, 4/27-32, 8/0 and category 17, and leaves shared ids and
-12/0 alone (T1). It logs one line the first time each translated action runs, one line per
-category-17 index and, for 8/0, one line naming its uncovered calls.
+The port's plugin for the MHXX-only ids is `mods/rathian_actions`: today it runs the translated
+handlers for 3/98, 12/1-3, 4/27-32, 8/0 and category 17 and leaves 12/0 (T1), and it moves into
+the runtime ([#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)), where
+her own handler runs for every id (decision 0002's 2026-11-26 amendment). It logs one line the
+first time each translated action runs, one line per category-17 index and, for 8/0, one line
+naming its uncovered calls.
 
 Status: not done. It waits for #48 (the ported files) and #143 (the ported monster's own
 resource paths); the ids themselves are in R2.
@@ -356,16 +370,20 @@ resource paths); the ids themselves are in R2.
 
 | Check | What | Pass |
 |---|---|---|
-| R3 | play the ported 3U Rathian (id 125) without forcing, and read the actions her AI asks for | she asks for an action only MH3U's script picks, so `mods/monster_actions` logs `monster 125: action 7/64 -> 7/35`; MH4U's own script never asks for 7/64, so the line is only there if her converted EMC drives her |
+| R3 | play the ported 3U Rathian (id 125) without forcing, and read the actions her AI asks for | she asks for an action only MH3U's script picks, so her module logs that it ran 7/64; MH4U's own script never asks for 7/64, so the line is only there if her converted EMC drives her |
 
 The 3U Rathian's EMC is to be converted at build time (version, 23 group rows, the 15 opcodes
 whose argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)). Cut by
 the game's tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and
 7/85, are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so
-`mods/monster_actions` translates it to 7/35 and logs one line the first time it runs.
+the port runs her own 7/64 handler, translated in a category-7 slice
+([#221](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/221) to
+[#224](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/224)), and the module's
+log names it the first time it runs.
 
 The converter does not exist yet: #159 (closed) laid the method out and [specs/emc.md](../specs/emc.md)
-records it, but the 15 opcodes' added argument's meaning is unverified, so it is a follow-up
+records it, but the 15 opcodes' added argument's meaning is unverified; it is
+[#198](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/198)'s work, a follow-up
 after #49. Until it ships, 125's registry row does not list `cmd` and her resource record keeps
 the stand-in's script path, so MH4U's own Rathian AI drives her.
 
@@ -380,13 +398,17 @@ the stand-in's script path, so MH4U's own Rathian AI drives her.
        --lens <the MH4U ELF or flat code image> 0x00ffe9f4 146 --check
    ```
 
-3. Enable `mods/monster_ids` and `mods/monster_actions`, build the code library with them
-   (the fork's `tools/build_game.py`), and take a quest that names 125.
-4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the log has
-   `monster 125: action 7/64 -> 7/35`. Today, with the stand-in's script driving her, that line
-   is the control: it must not appear until the converted EMC ships.
-5. Category-4 lines are expected too: action 4 has no MH4U handler and is not on the map
-   ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)), so the AI's
+3. Build the runtime with her module
+   ([#213](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/213),
+   [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) and the id layer
+   (`mods/monster_ids` until [#213](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/213)
+   moves it), build the code library with them (the fork's `tools/build_game.py`), and take a
+   quest that names 125.
+4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the module's log names
+   7/64 as the action it ran. Today, with the stand-in's script driving her, that line is the
+   control: it must not appear until the converted EMC ships.
+5. Category-4 lines are expected too: action 4 gets its own translated handler in
+   [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136), so the AI's
    category-4 picks are recorded but are not this check's pass.
 
 Status: not done. It waits for the EMC converter (a follow-up after #49) and a quest that names 125.
@@ -714,9 +736,12 @@ Procedure:
 Result (2026-11-26, USA v1.3.0 update, the Qt frontend, the maintainer's walk): **pass.** In
 area 3 of the Ancestral Steppe, 3U Rathian stands at the wave's spawn, drawn with her own model
 and textures, and the minimap marks her in that area. Before the ids were moved, the same walk
-found no Rathian. She plays her limp animation in a loop: the motion number MH4U's action asks
-for picks another motion in her MH3U lists, which is the motion translation of
-[#125](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/125), not the material. Headlessly the 125 quest loads with the converted archive (0 unmapped reads),
+found no Rathian. She plays her limp animation in a loop: MH4U's AI was driving her while
+MH4U's handler ran, so the motion number it asked for picked another motion in her MH3U
+lists — not a material fault. Under decision 0002's 2026-11-26 amendment her own handlers ask
+for her own animations
+([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216) and its slices).
+Headlessly the 125 quest loads with the converted archive (0 unmapped reads),
 but the harness's route never puts a large monster on screen: with the wave moved to area 1,
 MH4U's own Rathian (id 1) was not in view either. So this check is a player's walk, not a
 headless run.
@@ -988,9 +1013,13 @@ monster spawned, so no translated action ran: the in-game side is R2p.
 The 4/27-32 and 8/0 slices change that line to `selftest: 12 of the 13 actions: ... 4/27-32
 <- 0x0200e3b4 (3 states, motions 0x417/0x418, 0x909/0x90a, 0x90b/0x90d, r1/r2 per id), 8/0
 <- 0x0201b460 (3 states, motion 0x403 at 4.0, ...), 17 <- the gate 0x008d5bd4 + MH4U's base
-update 0x00911b48`, and the last line names 8/0's leaf and no pending slice. No headless run
-has shown that line yet: it needs a code library rebuilt with the plugin, and the build
-machine's one heavy job is the quest-load proof
+update 0x00911b48`, and the last line names 8/0's leaf. That "no pending slice" covers only
+the 13 MHXX-only ids; under decision 0002's 2026-11-26 amendment her own handler runs for
+every action id, shared ids included, so 12/0 is not MH4U's to keep and the set the self-test
+counts stays open until the GU module
+([#215](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/215)) takes it. No
+headless run has shown the line yet: it needs a code library rebuilt with the plugin, and the
+build machine's one heavy job is the quest-load proof
 ([#144](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/144)).
 
 ## Floats through a guest stub (T0)

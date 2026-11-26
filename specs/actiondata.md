@@ -67,7 +67,8 @@ time, like the monster data (`mhuc monsterdata`).
 The category-10 and category-11 case blocks pass a list pointer in r1 to the shared handler
 (MH3U 0x008326E0 and 0x008326DC; MH4U 0x00919788), which keeps it in the work block at
 `work+0x98C` and hands it to the interpreter 0x0083E4B0. MH4U has its own handler and its own
-interpreter, so a list is not converted; see check N3.
+interpreter; MH3U's list bytes are the ones the port's handler passes, and the two games' list
+formats correspond (check N3).
 
 | Offset | Type | Name | Status | Source |
 |---|---|---|---|---|
@@ -115,11 +116,14 @@ negative ends the list, and its value is the constant after the last key (0x0058
   share theirs with each other), so the signature confirms the animation but not the left/right
   order; the second reader's sign test, the same in both games, is what pairs the turn fields.
 - **N3 (done, MH3U USA's image):** read the category-10 and -11 case blocks and the interpreter.
-  Each case block loads its list pointer from a literal and passes it to the shared handler;
-  the lists end with a 0xFF command; 0x0083E4B0 walks them eight bytes at a time. MH4U's 10/7
-  and 11/0 case blocks pass MH4U's own lists to the same handler's MH4U counterpart 0x00919788,
-  and the action-id map ([reference/README.md](../reference/README.md#the-17-ids-mh4u-has-no-action-for))
-  sends the ids MH3U alone has there, so the 3U lists are read and not converted.
+  Each 3U case block loads its list pointer from a literal and passes it to the shared handler
+  0x008326E0 or its other entry 0x008326DC; the lists end with a 0xFF command; 0x0083E4B0 walks
+  them eight bytes at a time. MH4U's 10/7 and 11/0 case blocks pass MH4U's own lists to the same
+  handler's MH4U counterpart 0x00919788, which is evidence that the two games' formats
+  correspond. Under decision 0002's 2026-11-26 second amendment the port reimplements the base
+  handler too, so it reads MH3U's lists: the port needs those in-image bytes from the player's
+  dump, converted at build time from the dump and never committed, and
+  [#226](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/226) names them.
 - **N4 (done, MH3U USA's `code.bin`):** `reference/monster_attack_records.py curve` reads each
   of action 4's three curves, and the evaluator 0x0058493C is the map pair of MH4U's 0x00AAC8DC
   ("same body", reference/README.md's 73). Results: 0x00C4ED68 has 2 keys, 0x00C4EEF0 has 6 and
