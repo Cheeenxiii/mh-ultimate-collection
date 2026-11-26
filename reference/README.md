@@ -403,6 +403,44 @@ Read in MH3U's code; the last column says what MH4U does instead, or that a trac
 
 **What was searched for the 19.** `fnmap.py`'s instruction-token index (NGRAM) over both games' whole code gives each of them its closest MH4U bodies, scoring 0.39 to 1.0, the highest only over 4 to 10 tokens where a score says little; some have no candidate at all. Aligning her handlers with their MH4U counterparts (the call-site method above) shows no unmatched call left where one should be: the nearest spare call in each paired handler scores 0.0 to 0.6, and none is the function in question. An in-game trace is what settled the joint sound and the quest manager for MHXX (same tracer, MH4U's addresses); these 19 need it too. They are tracked in issue #55.
 
+### The base-class helpers behind category 0 and 0x0082d054
+
+The 101 functions above are the ones the 66 handlers call outside her block. The
+dispatcher also reaches `uEnemy`'s own action code: category 0's 0/2, 0/3 and 0/6
+(0x0082d1cc, 0x00858b6c and 0x0082b7dc) and 3/2's and 12's 0x0082d054. Decision 0002's second
+2026-11-26 amendment makes those handlers port code too, so what still needs MH4U's
+counterpart is each engine function they call, not the handlers themselves.
+
+| MH3U handler | Actions | What it does | MH4U's own handler |
+|---|---|---|---|
+| 0x00699ad4 | 0/0, 0/4 | a two-step delay: sets mode 0 and starts the follow-up through 0x0082a878 (0xa), then subtracts a float from another and, once the result is below zero, falls into the 0/2 handler 0x0082d1cc | — (her own handler; its calls are in the 73) |
+| 0x0082d1cc | 0/2 | sets mode 0, picks one of three sub-states from the monster's state byte and action category, applies 0x008412cc, starts the next action with 0x00827d54(0, 0, 1 or 2, 2), sets work+0xf2 | 0x00911b48, the base method MH4U's own 0/2 case block calls through `[vtable+0x164]`: same steps read (0x009167b4 with 0, the state test, 0x0090ef74 with (0, 0/1/2, 2), the run flag), 0.57 by token |
+| 0x00858b6c | 0/3 | adds the data record's +0x70 value, scaled by the block's +0x90 and +0x94 factors, to work+0x3c when the mode is 0 or 3, sets mode 1, then unless the action category is 0xb applies 0x008412cc and starts 0x00827d54(0, 3, 2), sets work+0xf2 | 0x0094dc84, MH4U's own 0/3 handler: same steps read, 0.81 by token |
+| 0x0082b7dc | 0/6 | sets mode 3, then unless the action category is 0xb applies 0x008412cc and starts 0x00827d54(0, 6, 2), sets work+0xf2 | 0x00955970, MH4U's own 0/6 handler: the same calls in the same order with the same arguments |
+| 0x0082d054 | 3/2, 12 | a five-step state machine on work+5: 0x00852324, 0x00844124 and 0x00828828 then 0x008509a0; 0x00850a50, 0x00852324 and 0x0083369c, mode 3 and 0x00828828(0x1d); 0x0083cbf4 then 0x00828828(0x2e); 0x0083cbf4, mode 0 and 0x00828828(0x41); 0x0083cbf4 then 0x0082d1cc | not read |
+
+**The helpers those handlers call**, with MH4U's counterpart or its absence:
+
+| MH3U | Class | What it does | MH4U | Evidence |
+|---|---|---|---|---|
+| 0x0082fe88 | `uEnemy` | the mode/state setter: stores the mode byte at the work block's +0xdc after per-mode side effects (mode 0 and 4 refill work+0x3c from +0x120, mode 2 does when +0x25e is set, mode 3 copies the data record's +0x70 to work+0x280), and returns early when the byte already holds the argument | 0x009167b4 | map, same body (in the 73); called at the same point with 0, 1 and 3 by the 0/2 (0x0082d1cc/0x00911b48), 0/3 (0x00858b6c/0x0094dc84) and 0/6 (0x0082b7dc/0x00955970) handler pairs |
+| 0x00827d54 | `uEnemy` | starts the next action: writes the new category at work+0xdf and index at work+0xe0, a u16 at work+0xe6, resets the action's state bytes and flags (work+5/6/7, +0x956..+0x95a, +0xf6, +0xc27), and notifies the manager through 0x002dc3e8 | 0x0090ef74 | the same call at the same point in the 0/2, 0/3 and 0/6 handler pairs, with the same (category, index, kind) plus one stack argument MH4U adds; 0.62 by token over 507 against 511 tokens, and read: same prologue, state writes, two-entry slot loop and manager call at translated offsets |
+| 0x00a33b50 | `uEnemy` | returns the monster's data record from the manager's table at its +0xdc, indexed by the block's +3 (a kind) and +0xa (an index); only kind 0x20 uses the seven-entry index, every other kind reads entry 0 | 0x0068882c | called at the same point in the 0/3 handler pair, and in the pairs 0x00852324/0x0093d870 and 0x0083db3c/0x00923f90, which read the record's +0x70 and +8 against MH4U's +0x64 and +4; MH4U looks the record up by the monster id at +0x1c0 |
+| 0x008412cc | `uEnemy` | looks the current action up in a list of 4-byte `{category, index, s16 value}` entries at `[0x0084d3d0(this)+0x3c]+8`, then tail-calls 0x0085033c with the value and work+0x942; 0x0085033c moves a u16 at work+0x944, capped by work+0x942 from the +0x7f8/+0x7fc ratio and the monster's state, and may call 0x008518a4 | MH4U lacks it | none of MH4U's 0/2 (0x00911b48), 0/3 (0x0094dc84) or 0/6 (0x00955970) handlers has a call at that point; the 0/3 and 0/6 ones call 0x009167b4, 0x0090ef74 and 0x0068882c there, and the 0/2 one 0x009167b4, a state predicate 0x0092e960 and 0x0090ef74. The token index's best is 0x0092e1e0 at 0.53 over 31 against 52 tokens, which is a predicate over a 3-byte-entry list at `[record+0x38]` returning a flag, not an applier; 0x0085033c's own best is 0.38 over 157 tokens |
+
+Everything else these handlers call is already in the 73 table: 0x0082a878
+(0x00699ad4 and the inline 0/1 case), 0x0083cbf4 (the category 0 case blocks), and
+0x00852324, 0x00844124, 0x00828828, 0x008509a0, 0x00850a50 and 0x0083369c (0x0082d054).
+So 0x0082d054's eight callees are all covered; only its handler, and the three `uEnemy`
+handlers, are new port code. The 73's rows are the evidence for those, not repeated here.
+
+The 0/3 and 0/6 pairs, and the 0/2 pair through the `[vtable+0x164]` call, are what
+settled the three matches: each pair calls its helper at the same point with the same
+arguments, and the 73 already maps 0x0082fe88 there. 0x008412cc is the one helper of the
+set MH4U does not have as its own function; whether MH3U's step is folded into MH4U's
+0x0090ef74 (which takes one more argument than 0x00827d54) is what an in-game trace of an
+MH4U Rathian at 0/2, 0/3 or 0/6 would settle (#55).
+
 ### A 3U Rathian's moves
 
 The 3U port keeps the source's own animations and runs her own handler for every action id,
