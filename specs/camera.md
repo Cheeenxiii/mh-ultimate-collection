@@ -313,8 +313,8 @@ list is one continuous shot keyed to a monster action; MH3U's 80 cameras are wor
 cutscene sequences of 0 to 2,900 frames (median 1,355) and 9° to 87° fov-like angles, and the
 3U Rathian block checked does not reach them. **The files cannot compare the framing of a moment, because MH3U
 has no camera at that moment.** Whether MH3U instead moves the normal player camera there is for
-the in-game watch: its monster code reaches no demo camera (C3), and the per-monster camera
-event MH4U uses has no MH3U counterpart (no file of the class, C1).
+the in-game watch: its monster code reaches no demo camera (C3), and MH3U has no file of the
+per-monster class for such an event to post into (C1).
 
 ### What the maintainer has to watch
 
