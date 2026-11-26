@@ -36,11 +36,13 @@ that held them before.
 | `src/monsters/rathian-3u.c` | 3U Rathian's module: the shared entry (the factory association's dispatch, the pending log, the ready line and the self-test) and the loop over the generated family list |
 | `src/monsters/rathian-3u/family.h` | the family interface: `MhucFamily` (a name, the ids it carries, a dispatch entry, a self-test) and the three base handlers `cat0.c` exports for the slices that reuse them |
 | `src/monsters/rathian-3u/cat0.c` | category 0's family: `0/0`, `0/1`, `0/2`, `0/3`, `0/4`, `0/6` and the three base handlers they reach, the first slice of her 191 ids |
+| `src/monsters/rathian-3u/cat1.c` | category 1's family: `1/0` to `1/14`, its five handler units and four inline blocks; it reuses `cat0.c`'s `mhuc_3u_base_0_2` for 1/10 |
 | `src/monsters/rathian-3u/cat3b.c` | category 3's part 2's family: `3/6`, `3/7`, `3/8`, `3/12`, `3/13`, `3/16` to `3/21`, `3/24`, `3/25`, `3/27` to `3/29`, and 3/8's base-class handler (#220) |
 | `src/monsters/rathian-3u/families.h` | generated at build time from the `.c` files in that directory by `tools/gen_families.py`; do not edit or commit |
 | `tests/test_rathian_3u.c` | the 3U module's shell on the fake host: the factory association, the routing, the ready line and the self-test (`make test`) |
 | `tests/rathian-3u/host.h` | what the 3U module's fake-host tests share: the constants the expectations are written against, and the spawn/frame helpers |
 | `tests/rathian-3u/cat0.c` | category 0's fake-host test: its six ids' and three base handlers' call sequences; `make test` discovers it and builds `tests/family-cat0` |
+| `tests/rathian-3u/cat1.c` | category 1's fake-host test: its fifteen ids' states, call sequences and frame values; `make test` discovers it and builds `tests/family-cat1` |
 | `tests/rathian-3u/cat3b.c` | category 3's part 2's fake-host test: the sixteen ids' frames and call order and the two blocked calls' log lines; `make test` builds `tests/family-cat3b` |
 | `tests/fixtures/rathian-3u/probe_test.c` | the probe family test the test-list discovery builds and runs |
 | `tests/test_family_discovery.c` | a family file added to a directory, discovered and routed with no other edit (`make test`) |
@@ -361,7 +363,7 @@ replaced by the new call; the s0-s3 read still needs the `vmov` stub. `mhuc_call
 third: it pushes the fifth argument, calls the function with r0-r3 as they came, and returns
 its r0.
 
-### 3U Rathian's module: category 0
+### 3U Rathian's module: category 0, category 1 and category 3's part 2
 
 MH3U's Rathian (USA, class `uEm002`) has 191 action ids, every one on her own code: the
 dispatcher (vtable slot 50, `0x00687d30`) switches on the category byte and each category on
@@ -383,6 +385,37 @@ slices (#217 to #229, and action 4's #136) add one file each. Category 0's famil
 The three base handlers are the port's own code under decision 0002's second 2026-11-26
 amendment. Later slices reuse them: `0x0082d1cc` for 1/10 and 2/13, `0x00858b6c` for 3/10,
 13/7 and 13/9.
+
+Category 1's fifteen ids are `cat1.c`, the second slice (issue
+[#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217)). Its five handler units
+and four inline blocks run:
+
+| Id | Source | What the module runs |
+|---|---|---|
+| 1/0, 1/9 | handler `0x00692834` | state 0: state byte 1, mode 0, the motion 5 at 10.0, the `(0, 0x13)` call and the elapsed-time accumulator cleared; state 1: the 110.0 query twice, the `(1, 8, 5)` call and the `0x00161798` forward on the first, the accumulator on the 112.0/214.0 query, then the finish flag and 0/2's base handler |
+| 1/1 | its inline block (`0x00686384`) | state 0: state byte 1, mode 0, the motion `0x12` at 10.0; state 1: the finish flag, then 0/2's base handler |
+| 1/2 | its inline block (`0x006863e0`) | state 0: state byte 1, mode 0, the source's motion `0x7c` (file 1, slot 24) at 2.0; state 1: the finish flag, then 0/2's base handler |
+| 1/3 | its inline block (`0x0068643c`) | state 0: state byte 1, mode 0, the motion 2 at 50.0; state 1: the 52.0 query at mode 1, then 0/2's base handler |
+| 1/4, 1/13 | handler `0x00692a1c`, r1 = 0 | the `0x0083d18c` byte, state 0: state byte 1, mode 0, the motion `0x13` at 6.0 and the 3.0 timer; state 1: the 176.0 query counts the timer down; while it runs, return; once spent, a request for 1/5 (index 4) or 1/0x0e |
+| 1/7 | handler `0x00692a1c`, r1 = 1 | the same, plus the twelve animation queries and their effect spawns; a spent timer requests 1/8 |
+| 1/5, 1/14 | handler `0x00692f14`, r1 = 0 | state 0: state byte 1, mode 0, the motion `0x14` at 6.0; state 1: the finish flag and 0/2's base handler |
+| 1/8 | handler `0x00692f14`, r1 = 1 | the same, with the six animation queries and their effect spawns before the flag |
+| 1/6 | handler `0x0069322c` | state 0: state byte 1, mode 0, the motion `0x17` at 6.0; state 1: the finish flag, then state 2, the motion `0x18` at 0.0, the 1800.0 timer and `0x0031be10`; state 2: the `(1, 0xa, 0.6)` call, the countdown, then state 3, the motion `0x19` at 4.0 and `0x008440a4`; state 3: the finish flag and 0/2's base handler |
+| 1/10 | its inline block (`0x006864dc`) | state 0: state byte 1, mode 0, the motion `0x11` at 6.0; state 1: the finish flag, then `cat0.c`'s `mhuc_3u_base_0_2` |
+| 1/11 | handler `0x00693388`, r1 = 0 | state 0: state byte 1, mode 0, the 20.0 timer and the motion 1 at 10.0; state 1: the finish flag or the spent timer, then 0/2's base handler |
+| 1/12 | handler `0x00693388`, r1 = 1 | the same, with the motion `0x11` at 6.0 |
+
+**#55's open calls.** All eight ids on the three handlers `0x00692834`, `0x00692a1c` and
+`0x00692f14` (`1/0`, `1/4`, `1/5`, `1/7`, `1/8`, `1/9`, `1/13` and `1/14`) call the source's
+`0x0016052c`, the uEffect039 spawn. MH4U has no uEffect039 class, so the call is #55-blocked;
+`0x00161798` (1/0 and 1/9), `0x00847798` (the six ids whose handler runs the r1 = 1 effect
+block) and `0x0016669c` (1/7's type-9 effect factory, whose MH4U factory takes a type where the
+source passes the monster) are blocked the same way, and `0x005aef18`'s two-float gate has no
+MH4U field pair. The module names them once in the log, skips them and plays the moves without
+their effects; #55's trace, and the effects' carrying in
+[0015](../../docs/decisions.md#0015-carrying-a-source-effect-into-mh4u), fill them in. 1/3's
+motion start also passes a fifth stack argument, which MH4U's motion-start wrapper does not
+take.
 
 **The field map.** MH3U keeps the work block at `*(this+0x1a48)`, MH4U at `*(this+0xe28)`.
 Each row is an offset in MH4U's block and the 3U offset it stands for, with how it was found
@@ -406,7 +439,8 @@ Each row is an offset in MH4U's block and the 3U offset it stands for, with how 
 | `+0x19c` | `+0x3c` | the fall height the data float advances | the same pair |
 | `+0x180` | `+0x68` | the vertical value 0/6 advances | the `0x00833b2c`/`0x00915d44` pair |
 | `+0x1c7` | `+0xd9` | `0x00833b2c`'s "applied" byte | the same pair |
-| `+0x1d4` | `+0x28` | 0/0's 150.0 delay | MH4U's own category-0 handler (`0x006dc454`) stores its delay there and calls `0x00b0704c`, which the source's inline subtraction stands for |
+| `+0x1d4` | `+0x28` | 0/0's 150.0 delay, category 1's timer (1/4, 1/6, 1/11) and 1/0's elapsed-time accumulator | MH4U's own category-0 handler (`0x006dc454`) stores its delay there and calls `0x00b0704c`, which the source's inline subtraction stands for; category 1's 1/4/1/6/1/11 pairs read the same field as their timer, and 1/0's pair reads it as the elapsed value its effect gate divides |
+| `+0x14` (this) | `+0x14` (this) | the frame delta | the same 12 twins as the field map ([#251](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/251)); `0x00b0704c` reads it there, and 3U's timer reaches the same value through the pointer at `work+0x30` |
 
 The #251 map covers the state, mode, category and record-key rows; the record's `+0x64`
 and the fall rate come from the [#253 helper map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054); `+0x180` and `+0x1c7` are read off the
@@ -428,7 +462,16 @@ for, and how the counterpart was established:
 | `0x0092e99c` | `0x00844124` | advance the fall by s0, set mode 1 | map, same body (the 73), offsets translated |
 | `0x0068882c` | `0x00a33b50` | the monster's data record | the same call in the 0/3 handler pair (the [#253 map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054)) |
 | `0x0090ef74` | `0x00827d54` | start an action | the same call in the three handler pairs (the [#253 map](../../reference/README.md#the-base-class-helpers-behind-category-0-and-0x0082d054)), with one more stack argument |
-| `0x00b0704c` | `0x008a78ec`'s body | count a float down by the frame delta | MH4U's own 0/0 handler |
+| `0x00b0704c` | `0x008a78ec`'s body | count a float down by the frame delta | MH4U's own 0/0 handler; category 1's 1/4, 1/6 and 1/11 timer |
+| `0x0094e318` | `0x00828828` | start a motion (index r1, speed s0, s1) | the same call in a paired handler (the 73); the source's r2 is the speed, which MH4U takes in s0 (1/6's 6.0, 1/11's 10.0 and 6.0) |
+| `0x0091aae4` | `0x0083336c` | the flag-clear query, its r0 tested | the same call in a paired handler (the 73); the source's r1 is the mode, and MH4U's r3 = r2, r2 = 0 |
+| `0x0094ef64` | `0x0082a06c` | request the next action (r1, r2) | the same call in a paired handler (the 73) |
+| `0x0093310c` | `0x00844a40` | 1/0's `(1, 8, 5)` call | the same call in a paired handler (the 73) |
+| `0x00914dc4` | `0x00844a38` | 1/0's `(0, 0x13)` call, r3 = 0 | the same call in a paired handler (the 73); `0x00844a38` is `0x00844a40` with r3 = 0, and `0x00914dc4` is `0x0093310c` with r3 = 0 |
+| `0x00922ca0` | `0x0083d18c` | 1/4's and 1/13's r1 = 0 byte | the same call in a paired handler (the 73) |
+| `0x0093ba88` | `0x0083c79c` | 1/6's state 2 call | the same call in a paired handler (the 73) |
+| `0x0091b0f8` | `0x0031be10` | 1/6's state 1 tail | the same call in a paired handler (the 73) |
+| `0x0093c938` | `0x008440a4` | 1/6's state 2 tail | the same call in a paired handler (the 73); `0x008440a4` is the source's r1 = 0 form, MH4U's r1/r2 = 0 |
 
 Three things are not translated yet:
 
@@ -447,8 +490,8 @@ Three things are not translated yet:
   worker keeps one value, so the port keeps `+0x1d4` only.
 
 The module's ready line sums the families' `translated` counts: `ready: translating 6 of 3U
-Rathian's 191 actions on monster 125` after #216, and 22 after #220. Its self-test logs each
-family's ids, engine calls and open items. The 125 quest's run is check T1c.
+Rathian's 191 actions on monster 125` after #216, 22 after #220, and 37 after #217. Its self-test
+logs each family's ids, engine calls and open items. The 125 quest's run is check T1c.
 
 #### Category 3's part 2 (#220)
 
@@ -744,14 +787,17 @@ the source game's notes, Japanese until MHGU's English text is read.
 - **The GU module's shared ids and 12/0.** Decision 0002's 2026-11-26 amendment owes her own
   handler for every action, shared ids included. This move carries only the twelve translated
   MHXX-only actions; 12/0 and the shared ids still run MH4U's dispatcher.
-- **The rest of the 3U module's 191 ids.** Only category 0 (six ids) and its three base
-  handlers run; the other 185 ids are still owed, one family per slice
+- **The rest of the 3U module's 191 ids.** Only category 0 (six ids), category 1 (fifteen ids),
+  category 3's part 2 (sixteen ids) and category 0's three base handlers run; the other 154 ids
+  are still owed, one family per slice
   ([#217](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/217) to
   [#229](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/229)) and action 4's
   ([#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136)). An id this slice
   does not carry goes to MH4U's dispatcher and is logged once, so a forced id that does
   nothing says so. The source's `0x008412cc` per-action value step is the one item the
-  category-0 slice leaves open (#55).
+  category-0 slice leaves open (#55); category 1's `0x0016052c` uEffect039 spawn and its
+  three other effect calls are #55's too, and the moves play without their effects until
+  #55 and [0015](../../docs/decisions.md#0015-carrying-a-source-effect-into-mh4u) carry them.
 - **`monster` no longer chooses another monster.** A module answers its registry id, so the old
   plugin's `monster = 1` (translate GU Rathian's actions onto MH4U's Rathian) is gone. The
   setting is kept for old config files and warns when it names no module; whether a module can
