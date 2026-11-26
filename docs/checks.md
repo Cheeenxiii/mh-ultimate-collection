@@ -519,14 +519,14 @@ P1, headless:
    getters are called through the game's own entry points), one `self-test: message tables:
    id 1 answers the game's own format; ids 0..123 pass through`; one `self-test: id 124 resource record at <address>, built from
    stand-in 1, names: ...` line per registered id, listing the paths read back from the
-   record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, tail,
-   cmd; keeps stand-in 1's paths for motions 5, camera, mef, sound, efl` line; one for 125
+   record built in guest memory; one `self-test: id 124 ships model, motions 0,1,2,3,4, camera,
+   tail, cmd; keeps stand-in 1's paths for motions 5, mef, sound, efl` line; one for 125
    (`ships model, motions 0,1,2, tail, sound; keeps stand-in 1's paths for motions 3,4,
    camera, mef, cmd, efl`); one for 126 (`ships model, motions 0,2,3,4; keeps stand-in 15's paths
    for motions 1,5, camera, tail, mef, sound, cmd, efl`); one for 127 (`ships model, motions
    0,1,2; keeps stand-in 15's paths for motions 3,4,5, camera, tail, mef, sound, cmd, efl`);
    and, for each reader, `self-test: <reader> answers ...; ids 0..123 pass through`. In the
-   124 record the model, motion, tail and command paths name `em124`, and the camera,
+   124 record the model, motion, camera, tail and command paths name `em124`, and the
    motion-effect, sound and effect-list paths and motion slot 5 still name `em001`. The 125
    record names `em125` for the model, motion slots 0 to 2, the tail, the sound and the
    command, and keeps the stand-in's `em001` for motion slots 3 and 4, the camera, motion
@@ -617,6 +617,12 @@ model and the motion slots their rows list while keeping the stand-in's `em015` 
 #159 added `cmd` on the plan to convert 125's EMC, but that converter is a follow-up after #49,
 so the row lists no `cmd` and the record keeps the stand-in's script. That run is the
 four-id run above: its records, masks, text and readers pass.
+
+After that run, 124's registry row gained `camera`
+([#157](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/157)), so the next P1 run's
+124 record names `enemy\em124\mot\e124_cam` (the converted list `mhuc convert monster` writes)
+and its ships/keeps line lists the camera among the kinds it ships; that part of P1 has not
+been re-run.
 
 ### The quest's load, fixed (P2, headless)
 
@@ -751,13 +757,15 @@ headless run.
 MH4U's camera list ([specs/camera.md](../specs/camera.md)) holds the cameras an action posts by
 number; a ported monster brings its source game's list, converted to MH4U's version 4, in its
 arc at `enemy\emNNN\mot\eNNN_cam` (the `camera` kind in [data/ids](../data/ids/README.md)).
-This check needs the converted camera in the port's arc, the `camera` kind on the id, the
-plugin's record built with it (P1), and a quest that spawns the id (#144).
+124's row lists `camera`, and `mhuc convert monster --id 124` writes MHXX em001's own list
+there. This check needs that arc, the plugin's record built with the camera bit (P1), and a
+quest that spawns the id (#144).
 
-1. Take MHXX's camera list out of `arc/enemy/em001_00.arc` and convert it with `mhuc convert
-   camera <camera>.lcm --from mhxx -o <camera>_4u.lcm`; put it in the port's arc at
-   `enemy\em124\mot\e124_cam`. Check that 124's `files` in `data/ids/registry.csv` lists
-   `camera`, regenerate `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
+1. Run `mhuc convert monster --id 124 --romfs <MHXX RomFS> --mh4u-romfs <MH4U RomFS> --out
+   <mod folder>` on the player's dumps: its `data/em124.arc` holds `enemy\em124\mot\e124_cam`,
+   the LCM 4 conversion of `enemy\em001\em001_00\mot\em001_00_cam` (the game_files test
+   `test_convert_monster_ships_the_gu_rathians_mhxx_camera` checks the entry against MHXX's
+   list). Regenerate `mods/monster_ids/src/ids.h` and rebuild the code library (P1 step 1).
 2. Force an action whose handler posts a camera event: MH4U's camera event is `0x00934544`
    (USA v1.3.0), and a handler's call to it names the event id it posts. `mods/force_action`
    (R1p) plays the chosen action; the converted list keeps the source's event ids, and Rathian's
@@ -767,7 +775,10 @@ plugin's record built with it (P1), and a quest that spawns the id (#144).
    Fail: the framing is MH4U Rathian's (the record kept the stand-in's `e001_cam`), or the load
    stops at the camera path.
 
-Status: open; waits for #48's port files and #144's quest-load proof.
+Code side: pass (2026-11-26). 124's registry row lists `camera`, `mhuc convert monster --id 124`
+writes the converted list at the record's path, `tests/test_with_game_files.py` checks the
+entry against MHXX's own list, and the archive no longer carries the stand-in's `e001_cam`.
+Status: open; the in-game run is the maintainer's and waits for #144's quest-load proof.
 
 ## A ported monster's own voice (A1)
 

@@ -130,10 +130,11 @@ stand-in's 1 and 5; 127 ships slots 0, 1 and 2 and keeps 3, 4 and 5). A slot the
 own record leaves empty but the port ships gets the port's own motion-list name,
 `enemy\emNNN\mot\emNNN_<slot>`, which is what the converter writes: 126's slot 4 is one,
 because Great Jaggi's record has no slot 4. For a kind it does not ship, the stand-in's path is
-copied unchanged, so the monster loads MH4U's own camera, motion effects and effect lists
-until its game's are converted; 125 ships her own sound (`mhuc convert monster`, issue
-#158). The record, its slots and its strings are one block from the game's own heap (`alloc`,
-ABI 2), and it is kept for the run.
+copied unchanged, so the monster loads MH4U's own motion effects and effect lists until its
+game's are converted; 125 to 127 also keep MH4U's camera, since only 124 has a source camera
+list to convert (MHXX's; `mhuc convert monster` writes it at `e124_cam`). 125 ships her own
+sound (`mhuc convert monster`, issue #158). The record, its slots and its strings are one
+block from the game's own heap (`alloc`, ABI 2), and it is kept for the run.
 
 | Kind in `files` | The record's paths |
 |---|---|
@@ -193,9 +194,10 @@ builder still answers with the stand-in's archive. MH4U's own ids 0 to 123 alway
 The material signature was what made the port's archive never load (#203): MH4U's
 `rMaterial` loader refuses a file whose signature at +0x10 isn't its own, and
 `mhuc convert monster` now writes it ([specs/mrl.md](../../specs/mrl.md)). A model port's
-archive must also carry the stand-in's entries the record keeps (its camera, motion effects,
-command and effect lists), so the one archive the game opens holds every path the record names:
-`mhuc convert monster --mh4u-romfs` copies them in from MH4U's own `data/emNNN.arc`.
+archive must also carry the stand-in's entries the record keeps (the camera for a row without
+one, motion effects, command and effect lists), so the one archive the game opens holds every
+path the record names: `mhuc convert monster --mh4u-romfs` copies them in from MH4U's own
+`data/emNNN.arc`.
 
 ## The name and notes text
 
@@ -237,10 +239,10 @@ English notes are therefore still content work, not this plugin's.
   the tables after the end sequence is unverified. A quest that never reaches its end sequence
   keeps its bytes until the next quest starts.
 - **The port's camera, motion effects and effect lists.** A port ships its model, motions,
-  tail and command, and 125 her sound (126 and 127 ship only their models and motions); the
-  record keeps
-  the stand-in's paths for the camera, motion effects and effect lists, and their files are
-  MH4U's until the port's game has them converted.
+  tail and command, 124 her converted MHXX camera, and 125 her sound (126 and 127 ship only
+  their models and motions); for the kinds it does not ship — motion effects and effect lists
+  for all of them, and the camera for 125 to 127, which have no source list — the record keeps
+  MH4U's paths, and their files are MH4U's until the port's game has them converted.
 - **The monster is the stand-in.** Except for its resource record, the tables answer with the
   stand-in, and the monster's data block still holds the stand-in's own id byte, so a spawned
   monster is MH4U's monster. The port's own rows replace the stand-in when

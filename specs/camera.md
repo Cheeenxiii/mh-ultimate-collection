@@ -181,9 +181,10 @@ and writes version 4 for MH4U:
 
 `camera.to_mhxx` is the exact inverse (the check round-trips every MHXX file through it). The
 source's camera ids stay: a ported monster's handlers post the source's event ids, so the ids
-must not be renumbered. The port's own converter (`mhuc convert monster`, #48's) will call
-`camera.from_mhxx` on the camera entry in the MHXX monster archive and place the result at
-`enemy\emNNN\mot\eNNN_cam`.
+must not be renumbered. The port's own converter (`mhuc convert monster`, #48's) calls
+`camera.from_mhxx` on the camera entry in the MHXX monster archive and places the result at
+`enemy\emNNN\mot\eNNN_cam`, for a row whose `files` lists `camera`; 124 is the first (issue
+#157).
 
 The two Rathians' lists show what staying by id means: they share ids 0, 1, 2, 4, 5 and 8,
 MH4U's own has 9, 10 and 12 to 20 as well, and MHXX's has 40 to 44 and 50 to 53. A port that runs
@@ -205,8 +206,10 @@ one authored, which is content work and not a conversion.
   gaps sum to frame count − 1, and every rotation key is a unit quaternion within 0.03 after its
   bounds block. `camera.to_mhxx(camera.from_mhxx(file)) == file` for every MHXX file; running
   the version 5 to 4 conversion and reading it back holds the same invariants.
-- **C2 (open, in game):** the ported Rathian's cut-in camera plays. Put a ported id's own camera
-  in its arc (the `camera` kind), spawn it in a quest, and force an action whose handler posts
-  a camera event (the handler's `bl 0x00934544` names the id): the view frames the monster with
-  the source game's camera, not MH4U Rathian's. Procedure in
-  [docs/checks.md](../docs/checks.md#a-ported-cameras-cut-in-c2); needs #144's quest-load proof.
+- **C2 (open, in game):** the ported Rathian's cut-in camera plays. `mhuc convert monster`
+  writes a ported id's own camera into its arc for a row that lists `camera` (124 does, and
+  the game_files test checks the entry against MHXX's own list). Spawn the id in a quest and
+  force an action whose handler posts a camera event (the handler's `bl 0x00934544` names the
+  id): the view frames the monster with the source game's camera, not MH4U Rathian's.
+  Procedure in [docs/checks.md](../docs/checks.md#a-ported-cameras-cut-in-c2); needs #144's
+  quest-load proof and a run in the game.

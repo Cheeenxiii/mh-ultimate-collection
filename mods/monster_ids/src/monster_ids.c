@@ -56,8 +56,8 @@
  * counts: the reader runs as the stand-in, and a port ships no effect lists yet, so its paths
  * are the stand-in's anyway.
  *
- * A port ships only some of those path kinds (its arc holds the model, motions, tail and
- * command for 124, the model, the first three motion lists and the tail for 125); MH4U stops
+ * A port ships only some of those path kinds (its arc holds the model, motions, camera, tail
+ * and command for 124, the model, the first three motion lists and the tail for 125); MH4U stops
  * the load on a path that is not there. The registry's `files` column, generated into
  * src/ids.h, names the kinds a port ships, and `motions=0,2,3,4` names the motion-list slots
  * it ships. For a kind and slot it ships the path is copied and its monster-id token
