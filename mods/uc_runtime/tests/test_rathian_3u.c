@@ -40,8 +40,11 @@ int main(void) {
     /* The module's ready line names its own registry id, 125, and the self-test logs the
      * slice and its open item. */
     fake_frame();
-    CHECK(fake_log_contains("ready: translating 22 of 3U Rathian's 191 actions on monster 125"),
-          "the 3U module's ready line is missing");
+    /* The count is the families' sum, and every action slice adds to it, so the shell checks
+     * the line's shape; each family test carries its own ids. */
+    CHECK(fake_log_contains("ready: translating "), "the 3U module's ready line is missing");
+    CHECK(fake_log_contains(" of 3U Rathian's 191 actions on monster 125"),
+          "the 3U module's ready line doesn't name the source's 191 and monster 125");
     CHECK(fake_log_contains("selftest: 6 of the 191 actions"), "the self-test line is missing");
     CHECK(fake_log_contains("field map anchors"), "the field-map line is missing");
     CHECK(fake_log_contains("selftest: open: 0x008412cc"), "the open-item line is missing");
@@ -76,15 +79,16 @@ int main(void) {
           "a registered id without a module isn't left to the game (%d calls, %d original)",
           fake_call_count, fake_original_count);
 
-    /* An id no family carries is logged once and left to MH4U's dispatcher. */
+    /* A pair no family ever carries (the source has no category 15) is logged once and left
+     * to MH4U's dispatcher. */
     fake_reset_calls();
-    frame_with(enemy_125, work_125, 1, 0);
+    frame_with(enemy_125, work_125, 15, 0);
     CHECK(fake_original_count == 1 && fake_call_count == 0 && fake_skip_count == 0,
-          "a pending id (1/0) isn't left to the game");
-    CHECK(fake_log_contains("pending action 1/0"), "the pending id isn't logged");
+          "a pending id (15/0) isn't left to the game");
+    CHECK(fake_log_contains("pending action 15/0"), "the pending id isn't logged");
     fake_clear_log();
-    frame_with(enemy_125, work_125, 1, 0);
-    CHECK(!fake_log_contains("pending action 1/0"), "the pending id is logged more than once");
+    frame_with(enemy_125, work_125, 15, 0);
+    CHECK(!fake_log_contains("pending action 15/0"), "the pending id is logged more than once");
 
     if (failures) {
         fprintf(stderr, "%d check(s) failed\n", failures);
