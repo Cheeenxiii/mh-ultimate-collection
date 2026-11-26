@@ -103,7 +103,43 @@ MH4U both have take a different number of arguments (A3):
 | `0x70` | block, 0 | block, 1 |
 
 All 15 are used by MH3U's files (A3). What the byte an opcode gains in MH4U means, and what the
-one `0x67` loses, is unverified: a converter has to translate those arguments, not pad them.
+one `0x67` loses, is at [the added argument](#the-added-argument): MH4U's evaluator reads it
+and MH3U's has no byte to read, so a converter writes the entry MH3U's own code uses, never a
+pad (check A5).
+
+## The added argument
+
+MH4U's evaluator reads the byte each of the 14 opcodes gains and MH3U's has none. The byte's
+place and what it does are read in MH4U's recompiled code (handler addresses below are USA
+v1.3.0's; check A5). A **linear** opcode (`0x01`, `0x1b`) gains it before its first argument; a
+**block** opcode gains it right after the sub-code, and only on the open form (`sub-code 0x00`),
+because a case's value width and the else and end forms are the same in both games.
+
+| Opcode | MH4U handler | What MH4U's evaluator does with the added byte | MH3U's evaluator instead | Filler |
+|---|---|---|---|---|
+| `0x01` | `0x0094fbdc` → `0x0092ce60` | indexes the per-monster state bytes at work `+0x278 + n` | reads work `+0x2b4`, the only entry | 0, verified |
+| `0x0b` | `0x0094ff24` → `0x0092b4d4` | selects a target point, `work +0x218 + 16n` | checks the one fixed target at work `+0x38`/`+0x288` | 0, verified |
+| `0x11` | `0x00950188` | indexes the state byte at work `+0x27c + n` | reads work `+0x2b6` | 0, verified |
+| `0x16` | `0x009505b0` → `0x0092b4d4` | the block's comparison value, a target point's distance | compares with the fixed first target | 0, verified |
+| `0x1b` | `0x00950808` | indexes the state byte at work `+0x27e + n`, then the `0x01` condition's arguments | reads work `+0x2b7` | 0, verified |
+| `0x1d` | `0x00950920` | selects a target point for the heading test | turns to the fixed target (`0x00584cd8`, work `+0x38`/`+0x288`) | 0, verified |
+| `0x2e` | `0x00951274` | selects a target point for the angle test | the fixed target | 0, verified |
+| `0x33` | `0x0095162c` | selects a target point, three of its fields | the fixed target's three fields | 0, verified |
+| `0x4b` | `0x009520d0` → `0x009412f4` | the branch index moves to the second argument; the added one indexes the state byte in each branch | branch index is the first argument, no state index | 0, verified |
+| `0x57` | `0x0095265c` | nothing: the byte is in the instruction but the handler never reads it (reserved) | — | 0, unread |
+| `0x58` | `0x0095267c` | the block's comparison value | passes 0 as that value | 0, verified |
+| `0x6c` | `0x00952d40` | selects a target point; the two angle bounds follow it | the fixed target, bounds as two arguments | 0, verified |
+| `0x6d` | `0x00952e90` | indexes the state byte at work `+0x278 + n` | reads work `+0x2b4` | 0, verified |
+| `0x70` | `0x00952f58` | selects a target point, `work +0x21c + 16n` | compares a threshold from a global object (`[0x00c1bff8] +0x4044`), not an entry | **unverified** |
+
+`0x67` loses its open form's argument: MH4U's handler (`0x00952ac8`) calls its two helpers with
+the constant 0 where MH3U reads the byte, so only the byte 0 has a translation (check A5). The
+game's own files use 0 in 83 of 85 open `0x67` blocks; `em018` (Gobul) and `em019` (Agnaktor)
+use `0x17` and `0x1d`, and those two files are refused.
+
+A value MH3U's evaluator *computes* rather than takes from an entry cannot be turned into a
+fixed byte, so `0x70` is unverified and the converter refuses a file that uses it: 14 of the 91
+MH3U files do.
 
 ## Groups
 
@@ -161,6 +197,19 @@ length. A file whose version is not the loader's fails at the version check (A4)
   fixed 13, 23 or 21 group rows. A file of another version stops at the version check; a file
   with fewer rows than the loader reads makes the loader read the first script rows as group
   rows. The address of each check and loop is in the loaders' code (our reading).
+- **A5 (done):** the added argument of each of the 14 opcodes that gain one in MH4U is read
+  in MH4U's own evaluator, at the handler addresses in [The added argument](#the-added-argument)
+  (MH4U USA v1.3.0's recompiled code); MH3U's evaluator, at the corresponding handlers, takes
+  the entry or constant each table row names. `0x67`'s removed argument is 0 where MH4U's
+  evaluator uses 0. The converter (`src/mhuc/formats/emc.py`) writes 0 for the 13 verified
+  additions, refuses `0x70` (whose value MH3U computes), and refuses a `0x67` argument that is
+  not 0. On the game's 91 MH3U files: 75 convert, 14 are refused for `0x70` and 2 for a non-zero
+  `0x67`; every converted script cuts cleanly with MH4U's table, has 23 group rows with 0 to 12
+  in the source's order, and names the same `00 cat num` actions and `14 nn` calls as the source
+  did, each cut with its own game's table (`tests/test_with_game_files.py`,
+  `test_every_mh3u_emc_converts_to_mh4us_and_keeps_every_action_and_script_call`). The tables
+  are read from the games' decompressed code images (`MHUC_MH3U_CODE`, `MHUC_MH4U_CODE`); the
+  repository holds no table bytes.
 
 ## What a converter must do
 
@@ -169,8 +218,10 @@ For an MH3U monster onto MH4U, the converter, in `mhuc` at build time:
 1. Read the file with MH3U's layout: magic, version `0x20110601`, 13 group rows, each script by
    its length. Refuse anything else.
 2. Cut each script with MH3U's 113-opcode table and write it again with MH4U's 146-opcode
-   table. The 15 opcodes in [The tables](#the-tables) need their arguments translated; every
-   other instruction is copied. End each script with `0xff`.
+   table. The 14 opcodes that gain an argument get 0 where [the added argument](#the-added-argument)
+   puts it (a block: after its sub-code, on the open form only), `0x67` loses its argument (only
+   0 converts), and `0x70` is refused; every other instruction is copied. End each script with
+   `0xff`.
 3. Write the header: magic unchanged, version `0x20120804`, group-row count 23, zero, and 23
    group rows. Rows 0 to 12 are the source's, in order; rows 13 to 22 have count 0 and offset
    0, which the loader skips. Recompute every script table and script offset, pad each script
@@ -192,7 +243,8 @@ For an MH3U monster onto MH4U, the converter, in `mhuc` at build time:
 0012 allows either). Conversion keeps every selector and branch the source has, needs no
 per-monster C, and one converter serves every 3U monster; a rewrite would reimplement the same
 conditions per monster and would still need each opcode's meaning. The price is the 15
-translated opcodes, whose extra or missing argument is unverified until R3 runs.
+translated opcodes: their added or removed argument is read in MH4U's evaluator (A5), and the
+one value MH3U computes rather than stores (`0x70`) makes its file unconvertible.
 
 **Action ids.** The scheme is shared: a pair is a category byte and an index byte, and every
 pair runs the source's own handler (decision 0002's 2026-11-26 amendment). Cut with its table,

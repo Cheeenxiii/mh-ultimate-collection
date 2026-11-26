@@ -430,7 +430,7 @@ def cmd_convert(args) -> int:
               "[--tables DIR] --out OUT.json  (docs/architecture.md#quests)\n"
               "mhuc convert camera SOURCE.lcm --from mh4u|mhxx -o OUT.lcm  (specs/camera.md)\n"
               "mhuc convert monster --id N --romfs SOURCE_ROMFS --mh4u-romfs MH4U_ROMFS "
-              "--out MOD_FOLDER [--variant V] "
+              "--out MOD_FOLDER [--variant V] [--mh3u-code CODE --mh4u-code CODE] "
               "(docs/architecture.md#a-ported-monsters-files)\n"
               "mhuc convert monster --id N --arc SOURCE.arc [--sound-arc SND.arc] --out MOD_FOLDER "
               "(specs/sound.md)", file=sys.stderr)
@@ -479,8 +479,8 @@ def _convert_monster_files(args) -> int:
     from .formats import mfx, romfs
     if args.id is None or not args.out or not args.mh4u_romfs:
         print("mhuc convert monster --id N --romfs SOURCE_ROMFS --mh4u-romfs MH4U_ROMFS "
-              "--out MOD_FOLDER [--variant V] (docs/architecture.md#a-ported-monsters-files)",
-              file=sys.stderr)
+              "--out MOD_FOLDER [--variant V] [--mh3u-code CODE --mh4u-code CODE] "
+              "(docs/architecture.md#a-ported-monsters-files)", file=sys.stderr)
         return 2
     try:
         # The row's `files` is the contract for both halves: the kinds and motion slots the port
@@ -506,7 +506,17 @@ def _convert_monster_files(args) -> int:
         report = None
         copied = []
         if row.source_game == "mh3u":
-            mod = monsterassets.convert(data, row.id, shaders)
+            script = "cmd" in row.files
+            tables = None
+            if script:
+                from .formats import emc
+                if not args.mh3u_code or not args.mh4u_code:
+                    raise monsters.ConvertError(
+                        f"id {row.id} ships its cmd, so its MH3U EMC is converted: pass --mh3u-code "
+                        "and --mh4u-code, the games' decompressed code images (specs/emc.md)")
+                tables = (emc.lengths(_read(args.mh3u_code), "mh3u"),
+                          emc.lengths(_read(args.mh4u_code), "mh4u"))
+            mod = monsterassets.convert(data, row.id, shaders, cmd=script, emc_tables=tables)
             arc_data, copied = monsters.with_stand_in(mod.archive(), row, stand_in_data)
         else:
             arc_data, report = monsters.convert(data, row, stand_in_data, shaders, args.variant)
@@ -908,6 +918,11 @@ def build_parser() -> argparse.ArgumentParser:
                                        "(arc/sound/se/em/emNNN/snd_emNNN.arc)")
     p.add_argument("--variant", type=int, default=0, help="monster files: the MHXX archive number "
                                                           "(_00 by default)")
+    p.add_argument("--mh3u-code", help="monster files, MH3U: its decompressed code image, holding the "
+                                       "113-opcode instruction-length table the EMC converter cuts "
+                                       "MH3U's scripts with (specs/emc.md)")
+    p.add_argument("--mh4u-code", help="monster files, MH3U: MH4U's decompressed code image, holding the "
+                                       "146-opcode table the converted EMC is checked against")
     p.add_argument("--registry", help="monster files: the id registry "
                                       "(default: data/ids/registry.csv)")
     p.add_argument("--report", help="monster files: write each entry's kind here")

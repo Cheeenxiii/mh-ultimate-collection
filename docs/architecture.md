@@ -131,12 +131,14 @@ Nothing is authored: every file comes from MHXX, taken or converted as the table
 
 ### 3U Rathian's files
 
-`mhuc convert monster --id 125 --romfs <MH3U RomFS> --mh4u-romfs <MH4U RomFS> --out <mod folder>` is the MH3U side of [the converter
+`mhuc convert monster --id 125 --romfs <MH3U RomFS> --mh4u-romfs <MH4U RomFS> --mh3u-code <MH3U code> --mh4u-code <MH4U code> --out <mod folder>` is the MH3U side of [the converter
 above](#a-ported-monsters-files): the id comes from [data/ids](../data/ids/README.md), the row's `source_key`
 finds `arc/enemy/em001.arc`, and the mod holds one RomFS file, `/data/em125.arc`, whose every path names that id
-(`enemy\em125\...`), so it never touches the MH4U monster whose tables stand in for it. 3U Rathian is the
-worked case: MH3U's 78-entry archive becomes 9 entries (2.2 MiB), and the sound mode of the same command adds
-her sound set (`--arc --sound-arc`).
+(`enemy\em125\...`), so it never touches the MH4U monster whose tables stand in for it. The `cmd` her row ships
+needs the two games' decompressed code images, where their instruction-length tables are
+([emc.md](../specs/emc.md), check A5). 3U Rathian is the worked case: MH3U's 78-entry archive becomes 10 entries
+of her own (2.9 MiB) plus the 31 stand-in entries the record keeps, a 3.5 MiB archive, and the sound mode of the
+same command adds her sound set (`--arc --sound-arc`).
 
 | File kind | MH3U entries | In the mod | Why |
 |---|---|---|---|
@@ -145,7 +147,7 @@ her sound set (`--arc --sound-arc`).
 | model textures (`TEX`, 0xA5) | 2 | as they are | the same version in both games ([tex.md](../specs/tex.md), check T1) |
 | motion lists (`LMT`, 66) | 3 | converted to version 67 | the layouts are the same, but version 66 stores keyframe types 11 to 13 signed and version 67 unsigned behind a bounds block ([lmt.md](../specs/lmt.md#keyframe-buffers)): each key is re-encoded, within 6.11e-5 of the source's component (check L6) |
 | monster data (`EMS`, `BDD`, `HTS`, `HTD`) | 5 | left out of the archive | they become MH4U's `.emd`/`.etd` rows through `mhuc monsterdata`, on her own skeleton ([hitdata.md](../specs/hitdata.md)); those rows live in `/data/em_data.arc`, not in her archive |
-| AI script (`EMC`, 0x20110601) | 1 | left out, a follow-up | MH4U's script is 0x20120804 and the conversion rules 15 opcodes differently, whose added argument's meaning is unverified ([emc.md](../specs/emc.md)); until a converter ships, her registry row keeps the stand-in's script path |
+| AI script (`EMC`, 0x20110601) | 1 | converted to MH4U's version `0x20120804`, 23 group rows, at `enemy\em125\data\em125_cmd` | the file shape is shared but the bytecode is not: 15 opcodes' argument counts differ, and MH4U's evaluator reads the argument each of the 14 gains as a target-point or state-table index ([emc.md](../specs/emc.md), check A5). The converter writes 0 there, the entry MH3U's evaluator uses, keeps every `00 cat num` and `14 nn`, and refuses a file that uses `0x70` (whose value MH3U computes) or a `0x67` whose dropped argument is not 0; hers converts, so her registry row ships `cmd` and the record names this path |
 | movement and spawn data (`EMM`, `EMG`, `EML`, `EMT`, `EAR`) | 5 | left out | MH4U's `uEnemy` doesn't read these files; they are the source for the behaviour port |
 | sound (`MSS`, 0x20110404) | 1 | converted by the command's sound mode | MH4U's is 0x20120123; `--arc --sound-arc` converts her 48 waves, bank, request and call into the same archive ([sound.md](../specs/sound.md), check SN9) |
 | effects (`EFL` 0x30110616, `EAN`, `ESQ`, the effect model, material and textures) | 57 | left out | MH4U's effect lists are 0x30111104; effects are their own work, and MH4U's own effects play for now |
@@ -168,7 +170,7 @@ The in-game load and move checks are [#144](https://github.com/Cheeenxiii/mh-ult
 What makes this tractable:
 
 - **The three games share one action scheme.** A monster's current action is a category byte and an index byte. 273 of MHXX Rathian's 301 action ids also exist in MH4U. The motion index a handler starts is numbered differently, though: MH4U and MHXX pack it as LMT file << 8 | slot and MH3U as file * 100 + slot, with the LMT files grouping the animations differently. R1's content check finds the same animation at another index for most 3U ids, so a 3U handler passes MH4U's form of the index it starts; 13/5, 13/6 and 13/8 are the ids whose motion itself differs. For GU the index agrees on every comparable id (R2) and #48 ships MHXX's motion lists, so a GU handler's index is already MH4U's. The converted animation files keep the source game's grouping and every action runs its source's handler (0002's 2026-11-26 amendment), so each action keeps its own animation: 13/5, 13/6 and 13/8 each play theirs, and the 17 3U ids MH4U lacks are reimplemented like the 174 it has, base-class handlers included, in her module ([#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)).
-- **The AI script's action ids and group order survive a conversion.** An EMC names native actions by the same category/index pair the handlers use, and `14 nn` indexes group 1, so a 3U script keeps both: no action id and no motion number is remapped in the script. Only the version, the group rows and 15 opcodes' argument counts change ([emc](../specs/emc.md#what-a-converter-must-do)), and the ported monster's `cmd` path loads the result (`files` in [data/ids](../data/ids/README.md)).
+- **The AI script's action ids and group order survive a conversion.** An EMC names native actions by the same category/index pair the handlers use, and `14 nn` indexes group 1, so a 3U script keeps both: no action id and no motion number is remapped in the script. Only the version, the group rows and 15 opcodes' arguments change ([emc](../specs/emc.md#the-added-argument)): the 14 that gain one get the entry MH3U's evaluator used (0) and `0x67` loses a 0, both read in the games' evaluators (check A5), and the ported monster's `cmd` path loads the result (`files` in [data/ids](../data/ids/README.md)).
 - **A GU monster's code assumes MHXX's enemy layer.** Rathian's MHXX module calls 330 engine functions, and MH4U lacks 262 of them. That is why handlers are rewritten instead of linked.
 - **MHXX keeps its monsters in 109 CRO modules,** not in `code.bin`. All of them recompile and test against the original ([reference/](../reference/README.md)).
 - **MHGU on Switch is nearly MHXX.** It shares 2,949 classes with MHXX and links its monsters statically, which helps match functions across games.

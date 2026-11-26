@@ -370,47 +370,80 @@ resource paths); the ids themselves are in R2.
 
 | Check | What | Pass |
 |---|---|---|
+| R3a | run the 125 quest headless and read the resource record the id layer builds and the archive the game loads | the log has the record line for id 125 naming `enemy\em125\data\em125_cmd`, `data resource: id 125 -> its own archive`, `resource load: id 125 -> its own record`, and LayeredFS's replacement line for `/data/em125.arc`; no missing-resource line |
 | R3 | play the ported 3U Rathian (id 125) without forcing, and read the actions her AI asks for | she asks for an action only MH3U's script picks, so her module logs that it ran 7/64; MH4U's own script never asks for 7/64, so the line is only there if her converted EMC drives her |
 
-The 3U Rathian's EMC is to be converted at build time (version, 23 group rows, the 15 opcodes
-whose argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)). Cut by
-the game's tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and
-7/85, are not in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so
-the port runs her own 7/64 handler, translated in a category-7 slice
+The 3U Rathian's EMC is converted at build time (version `0x20120804`, 23 group rows, the 15
+opcodes whose argument count differs; [specs/emc.md](../specs/emc.md#what-a-converter-must-do)
+and [the added argument](../specs/emc.md#the-added-argument), check A5). Cut by the game's
+tables, it names 143 native actions; six of them, 3/0, 7/22, 7/63, 7/64, 7/69 and 7/85, are not
+in MH4U's own script. 7/64 is also one of the 17 ids MH4U's `uEm001` lacks, so the port runs her
+own 7/64 handler, translated in a category-7 slice
 ([#221](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/221) to
-[#224](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/224)), and the module's
-log names it the first time it runs.
+[#224](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/224)), and the module's log
+names it the first time it runs.
 
-The converter does not exist yet: #159 (closed) laid the method out and [specs/emc.md](../specs/emc.md)
-records it, but the 15 opcodes' added argument's meaning is unverified; it is
-[#198](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/198)'s work, a follow-up
-after #49. Until it ships, 125's registry row does not list `cmd` and her resource record keeps
-the stand-in's script path, so MH4U's own Rathian AI drives her.
+1. Build 125's files, with the two games' decompressed code images for the EMC tables:
 
-1. Build 125's files with #49 (`model,motions=3,tail,sound`; no `cmd` yet). The registry does
-   not list `cmd`, so the resource record keeps the stand-in's
-   `enemy\em001\data\em001_cmd` ([data/ids](../data/ids/README.md)).
-2. Check the converted EMC first: 23 group rows, every script cuts cleanly with MH4U's table
-   (A2):
+   ```bash
+   game_files/work/venv/bin/python -m mhuc convert monster --id 125 \
+       --romfs <MH3U RomFS> --mh4u-romfs <MH4U RomFS> \
+       --mh3u-code <MH3U decompressed code.bin> --mh4u-code <MH4U v1.3.0 decompressed code.bin> \
+       --out <mod folder>
+   ```
+
+   Pass here already: `Rathian (id 125, from MH3U em001): 10 files`, and the archive holds one
+   `rEnemyCmd` at `enemy\em125\data\em125_cmd`, version `0x20120804` with 23 group rows.
+2. Check the converted EMC on its own: 23 group rows, every script cuts cleanly with MH4U's
+   table (A2), and the action pairs and script calls are the source's (A5):
 
    ```bash
    game_files/work/venv/bin/python reference/monster_emc.py <cmd> \
-       --lens <the MH4U ELF or flat code image> 0x00ffe9f4 146 --check
+       --lens <the MH4U flat code image> 0x00ffe9f4 146 --check
+   ```
+3. Deploy the mod into a copy of an Azahar profile with the fork's `tools/mods.py`
+   (`--user-dir <copy>`, after putting the mod in `<copy>/mh4u-mods`), and take a quest whose
+   monster list names 125. Build the profile's code library from the USA v1.3.0 update with the
+   fork's `tools/build_game.py --mods <copy> --install <copy>`, with only the repository's
+   current mods enabled: for this check `Ported monster ids` (and the data-only quest mod, which
+   carries no hooks). A library left over from an older profile can bring in retired plugins
+   such as the `Ported monsters' motion numbers` bridge, whose action log is not evidence about
+   this converter.
+4. Run it headless with the port's runner; the id layer's `selftest` config makes it print each
+   ported id's record:
+
+   ```bash
+   game_files/work/azahar/build/bin/Release/mh4u_runner \
+       "Monster Hunter 4 Ultimate (USA) Decrypted.3ds" \
+       --code <copy>/recomp/0004000000126300.so --user <copy> --ms 150000 --speed 0 \
+       --log "*:Info" --input <the input script> --draw-window 1
    ```
 
-3. Build the runtime with her module
+   Pass: `self-test: id 125 resource record at ..., built from stand-in 1, names: ...` with the
+   command path in the list; `data resource: id 125 -> its own archive`; `resource load: id 125 ->
+   its own record`; and LayeredFS's `replacement file in use for /data/em125.arc`, with no
+   missing-resource or failed-to-load line. This shows the record and the archive load, not
+   which actions the AI picks: nothing in the repository today logs those, so that is R3's
+   question.
+5. Build the runtime with her module
    ([#213](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/213),
-   [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)), build the code
-   library with it (the fork's `tools/build_game.py`), and take a quest that names 125.
-4. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the module's log names
-   7/64 as the action it ran. Today, with the stand-in's script driving her, that line is the
-   control: it must not appear until the converted EMC ships.
-5. Category-4 lines are expected too: action 4 gets its own translated handler in
+   [#216](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/216)) and the id layer
+   (`mods/monster_ids` until [#213](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/213)
+   moves it), build the code library with them (the fork's `tools/build_game.py`), and take a
+   quest that names 125.
+6. Fight her normally: let her fly, run, bite and tail-swipe. Pass: the module's log names
+   7/64 as the action it ran. A run with the stand-in's script is the control: the line must
+   not appear without the converted EMC.
+7. Category-4 lines are expected too: action 4 gets its own translated handler in
    [#136](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/136), so the AI's
    category-4 picks are recorded but are not this check's pass.
 
-Status: not done. It waits for the EMC converter (a follow-up after #49), #216's module and a
-quest that names 125.
+Status: R3a passes (2026-11-26, quest 10212, a clean profile with only `Ported monster ids`,
+its library built from the USA v1.3.0 update by `build_game.py`): the record names
+`enemy\em125\data\em125_cmd`, the id layer answers id 125's own archive and record, and
+LayeredFS loads `/data/em125.arc`. The run does not show which actions the AI picks, so the
+converted script's 3U-only actions are R3's, with a human playing the quest; R3 waits for #216's
+module.
 
 ### The plugin's check (R1p)
 

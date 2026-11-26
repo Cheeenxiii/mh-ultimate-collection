@@ -23,6 +23,7 @@ from mhuc.formats import (
     dtbparts,
     dttune,
     efl,
+    emc,
     emd,
     emstatus,
     hitdata,
@@ -1575,6 +1576,97 @@ def test_mh3u_rathians_mod_archive_holds_her_files_at_her_ported_ids_paths(dump)
                 continue
             assert (a.frames, a.loop_frame, len(a.tracks), bool(a.events)) == \
                    (b.frames, b.loop_frame, len(b.tracks), bool(b.events))
+
+def _emc_tables():
+    """The two games' instruction-length tables from their decompressed code images.
+
+    The tables' bytes are the games', so the repository doesn't hold them (specs/emc.md, check
+    A3): MH3U's at 0x00b11325 (113 opcodes) and MH4U USA v1.3.0's at 0x00ffe9f4 (146), in the
+    flat code.bin images `MHUC_MH3U_CODE` and `MHUC_MH4U_CODE` name. Skipped when they aren't set.
+    """
+    paths = (os.environ.get("MHUC_MH3U_CODE"), os.environ.get("MHUC_MH4U_CODE"))
+    if not all(paths):
+        pytest.skip("MHUC_MH3U_CODE and MHUC_MH4U_CODE aren't set (the games' decompressed code images)")
+    for path in paths:
+        if not os.path.exists(path):
+            pytest.skip(f"{path} isn't there")
+    return tuple(emc.lengths(open(path, "rb").read(), game) for path, game in zip(paths, ("mh3u", "mh4u"), strict=True))
+
+
+def test_every_mh3u_emc_converts_to_mh4us_and_keeps_every_action_and_script_call(dump):
+    """specs/emc.md, check A5: the converter on the game's own 91 `rEnemyCmd` files.
+
+    Each converted script cuts cleanly with MH4U's table, has 23 group rows with 0 to 12 in the
+    source's order, and names the same native actions (`00 cat num`) and action scripts (`14 nn`)
+    as the source did, cut by each game's own table. The files it refuses are the ones whose
+    translation is unverified: a 0x70 (whose added argument's value MH3U takes from a global) or
+    a 0x67 with an argument other than 0 (which MH4U's evaluator cannot carry)."""
+    src_lens, dst_lens = _emc_tables()
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    files = 0
+    converted = refused_70 = refused_67 = 0
+    for f in image.files():
+        if not f.path.endswith(".arc"):
+            continue
+        try:
+            archive = arc.read(image.read(f))
+        except arc.ArcError:
+            continue
+        for entry in archive.entries:
+            if entry.data[:4] != b"EMC\0":
+                continue
+            files += 1
+            try:
+                out = emc.convert(entry.data, src_lens, dst_lens)
+            except emc.EmcError as e:
+                if "0x70" in str(e):
+                    refused_70 += 1
+                elif "only 0 converts" in str(e):
+                    refused_67 += 1
+                else:
+                    raise AssertionError(f"{f.path}: {e}") from None
+                continue
+            converted += 1
+            version, src_groups = emc.parse(entry.data)
+            out_version, out_groups = emc.parse(out)
+            assert (version, out_version) == (emc.VERSION_MH3U, emc.VERSION_MH4U)
+            assert len(out_groups) == 23
+            assert [len(g) for g in out_groups[:13]] == [len(g) for g in src_groups]
+            assert [len(g) for g in out_groups[13:]] == [0] * 10
+            for g in range(13):
+                for before, after in zip(src_groups[g], out_groups[g], strict=True):
+                    old = emc.cut(before, src_lens)
+                    new = emc.cut(after, dst_lens)
+                    assert {(i[1], i[2]) for i in old if i[0] == 0x00} == \
+                        {(i[1], i[2]) for i in new if i[0] == 0x00}, (f.path, g)
+                    assert {i[1] for i in old if i[0] == 0x14} == \
+                        {i[1] for i in new if i[0] == 0x14}, (f.path, g)
+    assert files == 91, files
+    # 3U Rathian's EMC converts: her 0x67 opens carry 0, and she uses none of the unverified 0x70.
+    assert converted == 75 and refused_70 == 14 and refused_67 == 2, (converted, refused_70, refused_67)
+
+
+def test_mh3u_rathians_converted_emc_sits_at_her_ported_ids_cmd_path(dump):
+    """specs/emc.md, check A5: `mhuc convert monster` adds her converted EMC to her archive at the
+    path MH4U's record names, `enemy\\em125\\data\\em125_cmd`, and her row ships `cmd`."""
+    src_lens, dst_lens = _emc_tables()
+    image = romfs.open_image(dump("mh3u", "romfs.bin"))
+    src = next(image.read(f) for f in image.files() if f.path == "/arc/enemy/em001.arc")
+    shaders = (mfx.from_romfs(dump("mh3u", "romfs.bin"), "mh3u"),
+               mfx.from_romfs(dump("mh4u", "romfs.bin"), "mh4u"))
+    mod = monsterassets.convert(src, 125, shaders, cmd=True, emc_tables=(src_lens, dst_lens))
+    built = arc.read(mod.archive())
+    cmd = [e for e in built.entries if e.type_name == "rEnemyCmd"]
+    assert [e.path for e in cmd] == ["enemy\\em125\\data\\em125_cmd"]
+    version, groups = emc.parse(cmd[0].data)
+    assert (version, len(groups)) == (emc.VERSION_MH4U, 23)
+    before = emc.parse(next(e for e in arc.read(src).entries if e.type_name == "rEnemyCmd").data)[1]
+    for group, source_group in zip(groups[:13], before, strict=True):
+        for script, source_script in zip(group, source_group, strict=True):
+            new_actions = {(i[1], i[2]) for i in emc.cut(script, dst_lens) if i[0] == 0x00}
+            old_actions = {(i[1], i[2]) for i in emc.cut(source_script, src_lens) if i[0] == 0x00}
+            assert new_actions == old_actions
+
 
 def test_the_three_games_material_signature_is_their_own_and_names_hash_to_their_records(dump):
     """specs/mrl.md checks MR1 and MR2, issue #203: each game's material files carry that game's
