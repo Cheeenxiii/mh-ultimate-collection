@@ -29,12 +29,14 @@ import re
 import struct
 from dataclasses import dataclass
 
-from .formats import arc, lmt, mfx, mod, mrl
+from .formats import arc, emc, lmt, mfx, mod, mrl
 
 # (the source game's shader package, MH4U's): a material's and a model's shader ids move between them.
 Shaders = tuple[mfx.Package, mfx.Package]
+# (MH3U's instruction-length table, MH4U's): the converter that writes MH3U's EMC as MH4U's needs both.
+EmcTables = tuple[bytes, bytes]
 
-MODEL, MATERIAL, TEXTURE, MOTION = "rModel", "rMaterial", "rTexture", "rMotionList"
+MODEL, MATERIAL, TEXTURE, MOTION, CMD = "rModel", "rMaterial", "rTexture", "rMotionList", "rEnemyCmd"
 TAKEN = (MODEL, MATERIAL, TEXTURE)          # same versions in MH3U and MH4U; paths and the material's signature change
 MODEL_FLAGS = 0xA0000000                   # MH4U's own model entries carry this (specs/arc.md, size word flags)
 TEXTURE_PATH = re.compile(rb"enemy\\[^\x00]{1,62}")
@@ -127,9 +129,15 @@ def unbound_materials(model: bytes, material: bytes) -> list[bytes]:
         raise ConvertError(f"the material doesn't read: {e}") from None
 
 
-def convert(src: bytes, monster_id: int, shaders: Shaders) -> Mod:
+def convert(src: bytes, monster_id: int, shaders: Shaders, cmd: bool = False,
+            emc_tables: EmcTables | None = None) -> Mod:
     """The mod for `monster_id` (124 and up, [data/ids](../../data/ids/README.md)) from the source archive;
-    `shaders` is (the source game's shader package, MH4U's), whose slots the material and model ids move between."""
+    `shaders` is (the source game's shader package, MH4U's), whose slots the material and model ids move between.
+
+    `cmd` says the registry row ships the AI script: the archive's `rEnemyCmd` is converted from
+    MH3U's EMC to MH4U's with `emc_tables` (specs/emc.md, check A5) and written at the path
+    MH4U's resource record names, `enemy\\emNNN\\data\\emNNN_cmd`.
+    """
     if not 1 <= monster_id < 1000:
         raise ConvertError(f"monster id {monster_id} isn't a file id (1 to 999)")
     archive = arc.read(src)
@@ -139,6 +147,7 @@ def convert(src: bytes, monster_id: int, shaders: Shaders) -> Mod:
         raise ConvertError(f"the source's file name {stem} and the target's {target} differ in length; the "
                            "material files' texture paths are rewritten in place")
     entries: list[arc.Entry] = []
+    script = None
     for e in archive.entries:
         if e.type_name in TAKEN and e.path.startswith(f"enemy\\{stem}\\mod\\"):
             base = e.path.rsplit("\\", 1)[1]
@@ -150,25 +159,40 @@ def convert(src: bytes, monster_id: int, shaders: Shaders) -> Mod:
                 data = e.data
             entries.append(arc.Entry(f"enemy\\{target}\\mod\\{_rename(base, stem, target)}", e.type_id, data,
                                       flags=MODEL_FLAGS if e.type_name == MODEL else 0))
+        elif e.type_name == CMD and e.data[:4] == b"EMC\0":
+            script = e
+    if cmd:
+        if script is None:
+            raise ConvertError("the row ships cmd, but the source archive holds no rEnemyCmd")
+        if emc_tables is None:
+            raise ConvertError("the row ships cmd, so its MH3U EMC is converted: pass the two games' "
+                               "instruction-length tables (specs/emc.md)")
+        try:
+            script_data = emc.convert(script.data, *emc_tables)
+        except emc.EmcError as e:
+            raise ConvertError(f"{script.path}: {e}") from None
+        entries.append(arc.Entry(f"enemy\\{target}\\data\\{target}_cmd", script.type_id, script_data))
     motions = sorted((e for e in archive.entries
                       if e.type_name == MOTION and e.path.startswith(f"enemy\\{stem}\\mot\\")),
                      key=lambda e: e.path)
     for i, e in enumerate(motions):
         entries.append(arc.Entry(f"enemy\\{target}\\mot\\{target}_{i}", e.type_id, lmt.convert(e.data)))
-    _check(entries, archive, stem, target)
+    _check(entries, archive, stem, target, cmd)
     return Mod(monster_id, entries)
 
 
-def _check(entries: list[arc.Entry], src: arc.Archive, stem: str, target: str) -> None:
+def _check(entries: list[arc.Entry], src: arc.Archive, stem: str, target: str, cmd: bool = False) -> None:
     """Refuse a mod the game can't read: no model, material or motion, a texture a material names
-    is absent, or a material record the model's names can't bind (specs/mrl.md, checks MR2
-    and MR4)."""
+    is absent, a material record the model's names can't bind (specs/mrl.md, checks MR2
+    and MR4), or the AI script the row ships is missing (specs/emc.md, check A5)."""
     kinds = {e.type_name for e in src.entries}
     for kind in (MODEL, MATERIAL, MOTION):
         if kind not in kinds:
             raise ConvertError(f"the source archive holds no {kind}")
     if not any(e.type_name == MODEL for e in entries):
         raise ConvertError(f"no model under enemy\\{stem}\\mod\\")
+    if cmd and not any(e.path == f"enemy\\{target}\\data\\{target}_cmd" for e in entries):
+        raise ConvertError(f"the row ships cmd, but the mod holds no enemy\\{target}\\data\\{target}_cmd")
     paths = {e.path for e in entries}
     materials = {e.path: e for e in entries if e.type_name == MATERIAL}
     for e in entries:
