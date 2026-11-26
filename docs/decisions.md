@@ -485,19 +485,26 @@ The first option is taken: the record keeps the stand-in's list, and the port ad
 event of its own. There is no 3U framing at the moment to carry (option 2); an authored camera
 would add a cut-in 3U never had (option 3); MHXX's camera is a third game's (option 4).
 
+### 0015. Carrying a source effect into MH4U
+
+Settled by the maintainer on 2026-11-26.
+
+**A ported monster's effects come from its own game.** The port does not map a source effect's id to an MH4U (type, time) pair, and does not keep MH4U's effects for a ported monster: it converts the source game's effect assets and adds the source's effects to MH4U's spawn tables as new entries ([#259](https://github.com/Cheeenxiii/mh-ultimate-collection/issues/259)). A monster MH4U never had then shows its own fire and dust, timed to its own animations.
+
+Why: MH4U's spawn (`0x391b28`) derives an effect from the record's type at `+0x03` and time at `+0x06` through the tables at `0xeede7c` and `0xeedde98`, so a source id cannot become one MH4U id, and a mapping table would guess each effect. Carrying the source's own definitions keeps the feel the port is for ([0014](#0014-a-3u-monster-ships-no-camera)'s criterion).
+
+What it takes: MH4U's spawn tables read and grown, or the spawn replaced ([0012](#0012-how-much-of-mh4u-the-mod-may-replace)'s pattern); the 3U effect's assets (its model, materials, textures and motion effect) converted and shipped in the port's mod; and the converter writing the record's type and time for the new entry.
+
+| Alternative | Why not |
+|---|---|
+| A mapping file whose rows carry source id to (type, time) | a guess per effect; the source's own effect is not carried |
+| Deriving the pair from MH4U's tables at conversion time | the id correspondence between the two games is unverified, so it would still approximate |
+| Keeping MH4U's effects (the stand-in's) | a monster MH4U never had shows the wrong fire, and a 3U monster shows MH4U's timing |
+
+The facts it was chosen from, as the open entry held them: MH4U's MEF record carries no effect id; the spawn (`0x391b28`, through the key lookup `0x398f48`) computes the effect from the record's type at `+0x03` (0 to 14) and its time at `+0x06`, through the tables at `0xeede7c` and `0xeedde98` (`0x390c48`, `0x390ef8`); [specs/mef.md](../specs/mef.md) checks it on all 6,216 records (FX7). MH3U's ESQ event names its effect asset by an id in its own space at `+0x0A` (0 to 1313, resolved by the spawn `0x333a00`) and its type at `+0x08` (FX8); MHXX's PSL descriptors carry flags and list offsets, and the list contents are not laid out yet (FX9). So a source effect's id cannot become one MEF id: the converter has to produce a type and a time, and carrying the source's effects is the choice that keeps them the source's.
+
 ## Open
 
-### How a source effect maps to MH4U's (type, time)
-
-MH4U's MEF record carries **no effect id**: the spawn (`0x391b28`, reached through the key lookup `0x398f48`) computes the effect from the record's type at `+0x03` (0 to 14) and its time at `+0x06`, through the tables at `0xeede7c` and `0xeedde98` (`0x390c48`, `0x390ef8`); [specs/mef.md](../specs/mef.md) checks it on all 6,216 records (FX7). MH3U's ESQ event names its effect asset by an id in its own space at `+0x0A` (0 to 1313, resolved by the spawn `0x333a00`) and its type at `+0x08` (FX8); MHXX's PSL descriptors carry flags and list offsets, and the list contents are not laid out yet (FX9). So a source effect's id cannot become one MEF "id": the converter has to produce a **(type, time)** pair, and nothing says yet which pair a source id becomes.
-
-| Option | Gives | Costs |
-|---|---|---|
-| A mapping file (`data/effectmap`) whose rows carry source id → MH4U (type, time), one row per effect, each with its source | the converter writes the pair and the mapping is reviewable; the authored rows are recorded | the mapping must be built per effect; a wrong row plays the wrong effect; how many rows a monster needs is unmeasured |
-| Derive the pair at conversion time by inverting MH4U's tables from the player's dump | no committed mapping; the pair comes from the player's own files | the tables give (type, time) → an MH4U effect, but the key that matches a source id to one of them is unverified, so the correspondence is still a guess unless the two id spaces align |
-| Carry the source effect's assets and definitions into MH4U as new spawn-table entries | the source's own effect, exactly | growing MH4U's effect tables and converting the effect assets; a much larger converter and table growth |
-| Keep MH4U's effects (the stand-in's), as today | nothing authored; the port shows MH4U's effects | a 3U monster shows MH4U's fire and dust, timed to MH4U's animations; a monster MH4U never had shows the wrong ones, and check E1 cannot pass |
-
-The maintainer settles it; the facts are in [specs/mef.md](../specs/mef.md) (FX7 to FX9) and #249. Until then no port ships `mef`/`efl`.
+No open decisions.
 
 A new structural question goes here, with its facts and options, until the maintainer settles it.
